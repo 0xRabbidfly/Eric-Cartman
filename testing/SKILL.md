@@ -123,7 +123,7 @@ vi.mock('next-auth', () => ({
 
 // Mock authenticated user
 vi.mocked(getServerSession).mockResolvedValue({
-  user: { email: 'test@cgi.com', name: 'Test User' }
+  user: { email: 'test@133t.com', name: 'Test User' }
 });
 ```
 

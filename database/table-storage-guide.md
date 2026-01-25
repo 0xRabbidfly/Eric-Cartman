@@ -58,13 +58,13 @@ const recentPages = tableClient.listEntities({
 await tableClient.updateEntity({
   partitionKey: 'page',
   rowKey: 'about',
-  titleEn: 'About CGI AI Hub',  // Update this field
+  titleEn: 'About 133T AI Hub',  // Update this field
   lastModified: new Date().toISOString()
 }, 'Merge');
 
 // Replace (full update)
 const entity = await tableClient.getEntity('page', 'about');
-entity.titleEn = 'About CGI AI Hub';
+entity.titleEn = 'About 133T AI Hub';
 entity.lastModified = new Date().toISOString();
 
 await tableClient.updateEntity(entity, 'Replace');
