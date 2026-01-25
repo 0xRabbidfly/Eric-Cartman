@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json.schemastore.org/mcp.json",
+  "mcpServers": {
+    "playwright": {
+      "command": "npx",
+      "args": ["@playwright/mcp@latest"],
+      "description": "Browser automation for E2E testing and debugging. Provides browser control, page inspection, and screenshot capabilities."
+    },
+    "azure-cli": {
+      "command": "npx",
+      "args": ["-y", "@anthropic/mcp-server-az-cli"],
+      "description": "Azure CLI integration for resource management, deployment commands, and infrastructure operations."
+    }
+  }
+}

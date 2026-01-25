@@ -1,0 +1,193 @@
+# Agentic Evaluation Report Template
+
+Copy this template when generating evaluation reports.
+
+---
+
+# Agentic Evaluation Report
+
+**Repository**: [repository-name]  
+**Evaluated**: [YYYY-MM-DD HH:MM UTC]  
+**Evaluator**: agentic-evaluator v1.0.0  
+**Overall Score**: **X/100** (Grade: **X**)
+
+---
+
+## Executive Summary
+
+[2-3 sentence summary of findings. Highlight the strongest area and the most critical gap.]
+
+---
+
+## Score Breakdown
+
+| Category | Score | Max | Status | Notes |
+|----------|-------|-----|--------|-------|
+| Foundation | X | 25 | ✅/⚠️/❌ | [brief note] |
+| Skills | X | 25 | ✅/⚠️/❌ | [brief note] |
+| Agents | X | 20 | ✅/⚠️/❌ | [brief note] |
+| Instructions | X | 20 | ✅/⚠️/❌ | [brief note] |
+| Consistency | X | 10 | ✅/⚠️/❌ | [brief note] |
+| **TOTAL** | **X** | **100** | | |
+
+**Status key**: ✅ Good (>80%) | ⚠️ Needs work (50-80%) | ❌ Critical (<50%)
+
+---
+
+## Artifacts Inventory
+
+### Files Found
+
+| Type | Location | Count | Avg Lines |
+|------|----------|-------|-----------|
+| Root instructions | `.github/copilot-instructions.md` | X | X |
+| Skills | `.github/skills/*/SKILL.md` | X | X |
+| Agents | `.github/agents/*.md` | X | X |
+| Instructions | `.github/instructions/*.md` | X | X |
+| Prompts | `.github/prompts/*.md` | X | X |
+| MCP config | `.github/mcp.json` | X | X |
+| References | `.github/references/*.md` | X | X |
+
+### Skills Detail
+
+| Skill | Lines | Has Examples | Has "When to Use" | Version |
+|-------|-------|--------------|-------------------|---------|
+| [name] | X | ✅/❌ | ✅/❌ | X.X.X/— |
+
+### Agents Detail
+
+| Agent | Lines | Tools Declared | Has Workflow | Has Handoffs |
+|-------|-------|----------------|--------------|--------------|
+| [name] | X | X tools | ✅/❌ | ✅/❌ |
+
+### Instructions Detail
+
+| File | Lines | applyTo Pattern | Files Matched |
+|------|-------|-----------------|---------------|
+| [name] | X | `pattern` | X files |
+
+---
+
+## Issues Found
+
+### P0 — Critical (Must Fix)
+
+| Issue | Impact | Remediation |
+|-------|--------|-------------|
+| [description] | [why it matters] | [specific fix] |
+
+### P1 — High Priority
+
+| Issue | Impact | Remediation |
+|-------|--------|-------------|
+| [description] | [why it matters] | [specific fix] |
+
+### P2 — Medium Priority
+
+| Issue | Impact | Remediation |
+|-------|--------|-------------|
+| [description] | [why it matters] | [specific fix] |
+
+### P3 — Low Priority / Nice to Have
+
+| Issue | Impact | Remediation |
+|-------|--------|-------------|
+| [description] | [why it matters] | [specific fix] |
+
+---
+
+## Coverage Analysis
+
+### Instruction Coverage
+
+| Folder | Has Matching Instruction | Coverage Status |
+|--------|--------------------------|-----------------|
+| `app/api/` | ✅ api-routes.instructions.md | Covered |
+| `lib/auth/` | ✅ auth.instructions.md | Covered |
+| `components/` | ❌ None | **Gap** |
+
+### Skill Coverage
+
+| Workflow | Has Skill | Status |
+|----------|-----------|--------|
+| Testing | ✅ testing | Covered |
+| Deployment | ✅ deployment | Covered |
+| Code Review | ❌ None | **Gap** |
+
+---
+
+## Recommendations
+
+### 🎯 Quick Wins (< 1 hour)
+
+1. **[Action]** — [Expected impact]
+2. **[Action]** — [Expected impact]
+
+### 📈 Next Steps (1-4 hours)
+
+1. **[Action]** — [Expected impact]
+2. **[Action]** — [Expected impact]
+
+### 🏗️ Long Term (> 4 hours)
+
+1. **[Action]** — [Expected impact]
+
+---
+
+## Appendix: Scoring Details
+
+### Foundation (X/25)
+
+| Check | Points | Status | Notes |
+|-------|--------|--------|-------|
+| Root instructions exist | X/5 | ✅/❌ | |
+| Root instructions quality | X/5 | ✅/❌ | |
+| Organized structure | X/5 | ✅/❌ | |
+| README documents AI | X/5 | ✅/❌ | |
+| MCP config exists | X/5 | ✅/❌ | |
+
+### Skills (X/25)
+
+| Check | Points | Status | Notes |
+|-------|--------|--------|-------|
+| Folder exists | X/3 | ✅/❌ | |
+| Valid frontmatter | X/5 | ✅/❌ | |
+| "When to Use" section | X/4 | ✅/❌ | |
+| Examples included | X/4 | ✅/❌ | |
+| Right-sized | X/4 | ✅/❌ | |
+| Cover key workflows | X/5 | ✅/❌ | |
+
+### Agents (X/20)
+
+| Check | Points | Status | Notes |
+|-------|--------|--------|-------|
+| Folder exists | X/2 | ✅/❌ | |
+| Valid frontmatter | X/4 | ✅/❌ | |
+| Clear mission | X/4 | ✅/❌ | |
+| Handoff patterns | X/3 | ✅/❌ | |
+| Right-sized | X/3 | ✅/❌ | |
+| Tools match MCP | X/4 | ✅/❌ | |
+
+### Instructions (X/20)
+
+| Check | Points | Status | Notes |
+|-------|--------|--------|-------|
+| Folder exists | X/2 | ✅/❌ | |
+| Has applyTo patterns | X/4 | ✅/❌ | |
+| Has code examples | X/5 | ✅/❌ | |
+| Right-sized | X/4 | ✅/❌ | |
+| Coverage analysis | X/5 | ✅/❌ | |
+
+### Consistency (X/10)
+
+| Check | Points | Status | Notes |
+|-------|--------|--------|-------|
+| Naming conventions | X/2 | ✅/❌ | |
+| No duplicates | X/2 | ✅/❌ | |
+| Cross-refs resolve | X/2 | ✅/❌ | |
+| Version fields | X/2 | ✅/❌ | |
+| Supporting files organized | X/2 | ✅/❌ | |
+
+---
+
+*Report generated by agentic-evaluator skill*
