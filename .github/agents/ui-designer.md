@@ -145,6 +145,37 @@ interface NewComponentProps {
 - Stacking rules for grid layouts
 - Touch target sizes for mobile (44x44px minimum)
 
+### 7. CSS Implementation Rules (MANDATORY)
+
+When specifying component implementation:
+
+1. **Every new component MUST have a co-located CSS Module**:
+   ```
+   NewComponent.tsx → NewComponent.module.css
+   ```
+   
+2. **NEVER specify inline styles in implementation specs**:
+   ```tsx
+   // ❌ DON'T write specs like this
+   <div style={{ padding: 'var(--spacing-lg)', display: 'flex' }}>
+   
+   // ✅ DO write specs like this
+   <div className={styles.container}>
+   // Define in .module.css: .container { padding: var(--spacing-lg); display: flex; }
+   ```
+
+3. **Reference tokens, not values** — In specs, write:
+   - `padding: var(--spacing-lg)` not `padding: 24px`
+   - `font-size: var(--font-size-xl)` not `font-size: 20px`
+   - `color: var(--color-text-secondary)` not `color: #525252`
+
+4. **Component spec template must include styles file**:
+   ```tsx
+   // Component: NewComponent
+   // Location: components/content/NewComponent.tsx
+   // Styles: components/content/NewComponent.module.css  ← REQUIRED
+   ```
+
 ## Output Format
 
 Always structure your response as:
