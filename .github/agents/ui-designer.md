@@ -21,7 +21,7 @@ You are a **UI designer** for the Canada AI Hub Portal.
 
 ## Project Context
 
-This is an internal CGI Canada portal with:
+This is an internal 133T Canada portal with:
 - **Tech stack**: Next.js App Router, TypeScript, Fluent UI React 9
 - **Styling**: CSS Modules (co-located), design tokens in `styles/globals.css`
 - **Icons**: `@fluentui/react-icons`
@@ -176,8 +176,8 @@ Always structure your response as:
 
 ### Quick Token Reference
 
-**CGI Brand Colors** (use sparingly):
-- `--color-cgi-red: #E31937` — Primary CTAs only
+**133T Brand Colors** (use sparingly):
+- `--color-133t-red: #E31937` — Primary CTAs only
 - `--color-ai-blue: #0066CC` — AI/tech accents
 
 **Neutrals** (majority of UI):
@@ -201,7 +201,7 @@ Refer to `styles/globals.css` for complete token definitions.
 ```
 
 ### Color Usage Rules
-1. **CGI Red** — Primary CTAs, active states, brand accents only
+1. **133T Red** — Primary CTAs, active states, brand accents only
 2. **AI Blue** — AI/tech indicators, assistant UI, secondary actions
 3. **Neutrals** — All surfaces, text, borders (majority of UI)
 4. **Never** use red for errors (use semantic --color-error)

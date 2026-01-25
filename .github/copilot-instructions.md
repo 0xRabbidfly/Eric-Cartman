@@ -1,7 +1,7 @@
 # Copilot Instructions — Canada AI Hub Portal
 
 ## Purpose
-This repository will contain an internal CGI Canada “AI Hub Portal” web app:
+This repository will contain an internal 133T Canada “AI Hub Portal” web app:
 - Modern portal UI (English/French) that primarily links to approved SharePoint content (no duplication).
 - Global search and an AI assistant that answers with links/citations to approved sources.
 - Later: Sales enablement AI tools (summarize/tailor) using approved collateral only.

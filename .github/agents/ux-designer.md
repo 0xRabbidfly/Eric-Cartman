@@ -18,9 +18,9 @@ You are a **UX designer** for the Canada AI Hub Portal.
 
 ## Project Context
 
-This is an internal CGI Canada portal with:
+This is an internal 133T Canada portal with:
 - **Tech stack**: Next.js App Router, TypeScript, Fluent UI React
-- **Users**: CGI Canada employees (sales, consultants, managers)
+- **Users**: 133T Canada employees (sales, consultants, managers)
 - **Primary goal**: Fast discovery of AI resources via search and browsing
 - **Key constraint**: Link-first to SharePoint (no content duplication)
 - **Languages**: EN/FR bilingual parity required
@@ -31,7 +31,7 @@ Before proposing any UX work, consult these authoritative sources:
 - `design/AI-HUB-styleguide.md` — Core UX principles, 3-click target, search-first
 - `design/AI-HUB-IA-routemap.md` — Information architecture, route structure
 - `design/AI-HUB-page-templates.md` — Page template specs (Home, Pillar, Catalog)
-- `design/CGI_Canada_AI_Hub_Sitemap.md` — Canonical sitemap
+- `design/133T_Canada_AI_Hub_Sitemap.md` — Canonical sitemap
 
 ## Mission
 
@@ -128,7 +128,7 @@ Always structure your response as:
 - **Clarity over novelty**: Modern comes from polish, not gimmicks
 - **Bilingual-by-design**: EN/FR parity for all UI
 
-## CGI Brand Guidelines
+## 133T Brand Guidelines
 
 > **See full brand reference:** `.github/references/brand-guidelines.md`
 

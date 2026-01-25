@@ -112,6 +112,75 @@ node .github/skills/health-audit/count-tokens.js
 
 ---
 
+### 4. 📚 Session Learning
+
+**Extract reusable patterns from coding sessions to build institutional knowledge.**
+
+Analyzes completed coding sessions to identify patterns worth capturing as persistent instructions or skills. Turns one-time solutions into reusable knowledge.
+
+**Use When:**
+- At the end of long coding sessions (30+ minutes)
+- After solving tricky debugging problems
+- When you corrected the AI multiple times on the same issue
+- After discovering framework quirks or workarounds
+- When establishing new project conventions
+
+**What It Extracts:**
+- **Error Resolutions** — How specific errors were diagnosed and fixed
+- **User Corrections** — Patterns where you corrected the AI's approach
+- **Workarounds** — Solutions to framework/library quirks
+- **Debugging Techniques** — Effective debugging patterns
+- **Project Conventions** — New conventions established during the session
+
+**Output Locations:**
+| Pattern Type | Saved To |
+|--------------|----------|
+| Quick rules | `copilot-instructions.md` |
+| File-specific rules | `instructions/*.instructions.md` |
+| Complex workflows | `skills/*/SKILL.md` |
+
+```
+📍 Location: .github/skills/session-learning/
+```
+
+---
+
+### 5. ✅ Verification Loop
+
+**Pre-PR quality gate running comprehensive validation in 7 phases.**
+
+Runs build, type-check, lint, tests, security scans, and hygiene checks before creating a pull request. Catches issues locally before they reach CI/CD.
+
+**Use When:**
+- Before creating a pull request
+- After completing a feature or significant refactoring
+- After merging main into your branch
+- As a final check before deployment
+- Every 30 minutes during long coding sessions
+
+**Verification Phases:**
+| Phase | Type | Checks |
+|-------|------|--------|
+| Build | ✅ Blocking | Syntax, imports, compilation |
+| Type Check | ⚠️ Soft | Type safety, `any` leaks |
+| Lint | ⚠️ Soft | Code style, unused vars |
+| Tests | ✅ Blocking | Unit tests, 80% coverage target |
+| Security | ✅ Blocking | Constitutional violations, secrets |
+| Hygiene | ⚠️ Soft | Import style, ARIA labels |
+| Git Diff | 📋 Info | Changed files review |
+
+**Constitutional Checks:**
+- No `localStorage`/`sessionStorage` usage
+- No hardcoded secrets or API keys
+- No `console.log` in production code
+- No hardcoded English text (i18n compliance)
+
+```
+📍 Location: .github/skills/verification-loop/
+```
+
+---
+
 ## 📁 Repository Structure
 
 ```
@@ -121,7 +190,9 @@ node .github/skills/health-audit/count-tokens.js
 ├── skills/                     # Reusable AI skills
 │   ├── agentic-evaluator/      # ⭐ Featured
 │   ├── project-scaffold/       # ⭐ Featured
-│   └── health-audit/           # ⭐ Featured
+│   ├── health-audit/           # ⭐ Featured
+│   ├── session-learning/       # ⭐ Featured
+│   └── verification-loop/      # ⭐ Featured
 ├── agents/                     # Specialized agent configs
 ├── instructions/               # File-pattern-specific rules
 └── prompts/                    # Reusable prompt templates

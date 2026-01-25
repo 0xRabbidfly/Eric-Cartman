@@ -288,7 +288,7 @@ NEXTAUTH_URL=http://localhost:3000
 // vitest.setup.ts
 vi.mock('@/lib/auth/next-auth-config', () => ({
   auth: vi.fn(() => Promise.resolve({
-    user: { id: 'test-user', name: 'Test User', email: 'test@cgi.com' },
+    user: { id: 'test-user', name: 'Test User', email: 'test@133t.com' },
     accessToken: 'mock-token',
   })),
 }));

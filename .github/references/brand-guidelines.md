@@ -1,6 +1,6 @@
-# CGI Brand Guidelines — AI Hub Portal
+# 133T Brand Guidelines — AI Hub Portal
 
-This document defines the CGI brand guidelines for the Canada AI Hub Portal. Reference this file from agents and design documents to maintain consistency.
+This document defines the 133T brand guidelines for the Canada AI Hub Portal. Reference this file from agents and design documents to maintain consistency.
 
 ## Brand Tone
 
@@ -23,20 +23,20 @@ This document defines the CGI brand guidelines for the Canada AI Hub Portal. Ref
 - Purposeful imagery (innovation, teams, technology themes)
 - Minimal UI chrome — let content breathe
 - Avoid busy backgrounds behind text
-- Do NOT copy public CGI web designs verbatim — use high-level patterns only
+- Do NOT copy public 133T web designs verbatim — use high-level patterns only
 
 ## Color Palette
 
-### Primary — CGI Red
+### Primary — 133T Red
 
 Use sparingly for primary CTAs and brand accents only.
 
 | Token | Value | Usage |
 |-------|-------|-------|
-| `--color-cgi-red` | #E31937 | Primary brand color, main CTAs |
-| `--color-cgi-red-dark` | #C01530 | Hover states |
-| `--color-cgi-red-light` | #FF3D5C | Light variant |
-| `--color-cgi-red-subtle` | #FFE8EC | Subtle backgrounds, badges |
+| `--color-133t-red` | #E31937 | Primary brand color, main CTAs |
+| `--color-133t-red-dark` | #C01530 | Hover states |
+| `--color-133t-red-light` | #FF3D5C | Light variant |
+| `--color-133t-red-subtle` | #FFE8EC | Subtle backgrounds, badges |
 
 ### AI Accent — Blue
 
@@ -76,7 +76,7 @@ Never use brand colors for semantic meaning.
 
 ## Color Usage Rules
 
-1. **CGI Red** — Primary CTAs, active navigation, brand accents only
+1. **133T Red** — Primary CTAs, active navigation, brand accents only
 2. **AI Blue** — AI/tech indicators, assistant UI, secondary actions
 3. **Neutrals** — All surfaces, text, borders (majority of UI)
 4. **Never** use brand red for errors (use semantic `--color-error`)
@@ -138,7 +138,7 @@ Target 70-90 characters for body paragraphs.
 | `--shadow-sm` | Default cards, subtle elevation |
 | `--shadow-md` | Hover states, raised elements |
 | `--shadow-lg` | Modals, drawers |
-| `--shadow-primary` | CGI red glow for brand hover states |
+| `--shadow-primary` | 133T red glow for brand hover states |
 
 ## Motion
 

@@ -119,13 +119,13 @@ export function PillarCard({ title, description }: Props) {
 
 ## Color Usage
 
-### CGI Brand Palette
+### 133T Brand Palette
 
 ```css
-/* Primary - CGI Red (use sparingly) */
---color-cgi-red: #E31937;        /* Primary CTAs, brand accents */
---color-cgi-red-dark: #C01530;   /* Hover states */
---color-cgi-red-subtle: #FFE8EC; /* Subtle backgrounds */
+/* Primary - 133T Red (use sparingly) */
+--color-133t-red: #E31937;        /* Primary CTAs, brand accents */
+--color-133t-red-dark: #C01530;   /* Hover states */
+--color-133t-red-subtle: #FFE8EC; /* Subtle backgrounds */
 
 /* AI Accent - Blue (tech/AI elements) */
 --color-ai-blue: #0066CC;
@@ -144,7 +144,7 @@ export function PillarCard({ title, description }: Props) {
 ```css
 /* ✅ Good: Semantic color usage */
 .button-primary {
-  background: var(--color-primary);      /* CGI Red for primary CTA */
+  background: var(--color-primary);      /* 133T Red for primary CTA */
 }
 
 .ai-indicator {
@@ -157,7 +157,7 @@ export function PillarCard({ title, description }: Props) {
 
 /* ❌ Bad: Brand red for errors */
 .error-message {
-  color: var(--color-cgi-red);           /* Don't use brand color for errors */
+  color: var(--color-133t-red);           /* Don't use brand color for errors */
 }
 ```
 
@@ -258,7 +258,7 @@ export function PillarCard({ title, description }: Props) {
 }
 ```
 
-### CGI Red Glow (Brand Accent)
+### 133T Red Glow (Brand Accent)
 
 ```css
 /* Use for primary CTAs on hover */
