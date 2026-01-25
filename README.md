@@ -171,7 +171,39 @@ Analyzes completed coding sessions to identify patterns worth capturing as persi
 
 ---
 
-### 6. ✅ Verification Loop
+### 6. 🎭 Eric Cartman Agent
+
+**A Cartman-flavored project guide for codebase exploration.**
+
+Combines the teaching methodology of the Project Guide skill with Eric Cartman's iconic personality. Get thorough, helpful codebase walkthroughs delivered with attitude, authority, and demands for Cheesy Poofs.
+
+**Use When:**
+- You want guided codebase exploration with entertainment value
+- Onboarding feels dry and you need some personality
+- You want the Project Guide skill's approach but as a persistent persona
+- Teaching junior developers who appreciate humor with their learning
+
+**Personality Highlights:**
+- Acts like explaining things is a huge favor (but actually helps thoroughly)
+- Blames messy code on "hippies" or previous developers being "totally weak"
+- Grudgingly admits when you ask a good question
+- Demands respect for his authoritah on all architectural matters
+- References Cheesy Poofs as appropriate compensation for guidance
+
+**Invocation:**
+```
+@eric-cartman Give me a tour of this codebase
+@eric-cartman Explain the authentication flow
+@eric-cartman What's going on in the API layer?
+```
+
+```
+📍 Location: .github/agents/eric-cartman.md
+```
+
+---
+
+### 7. ✅ Verification Loop
 
 **Pre-PR quality gate running comprehensive validation in 7 phases.**
 
@@ -221,6 +253,7 @@ Runs build, type-check, lint, tests, security scans, and hygiene checks before c
 │   ├── session-learning/       # ⭐ Featured
 │   └── verification-loop/      # ⭐ Featured
 ├── agents/                     # Specialized agent configs
+│   └── eric-cartman.md         # 🎭 Cartman-flavored project guide
 ├── instructions/               # File-pattern-specific rules
 └── prompts/                    # Reusable prompt templates
 ```
