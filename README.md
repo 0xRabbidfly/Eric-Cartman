@@ -57,7 +57,33 @@ Audits a codebase for best practices in agents, skills, instructions, MCP config
 
 ---
 
-### 2. 🏗️ Project Scaffold
+### 2. 🧭 Project Guide
+
+**A teaching-first exploration companion for any codebase.**
+
+Simulates plan mode with an educational focus. Provides high-level overviews, architecture diagrams, and guided deep-dives into any area of the project. Emphasizes building mental models and offers follow-up questions to continue the learning journey.
+
+**Use When:**
+- Onboarding to a new or unfamiliar codebase
+- Understanding architectural decisions and trade-offs
+- Exploring a specific subsystem in depth
+- Preparing for a code review or contribution
+- Explaining a codebase to stakeholders or new team members
+
+**Teaching Approach:**
+- Starts with bird's-eye overview, zooms in on request
+- Uses Mermaid and ASCII diagrams for visual learning
+- Acknowledges complexity; layers understanding gradually
+- Ends interactions with 2-3 thoughtful follow-up questions
+- Adapts to beginner, experienced, or returning developer
+
+```
+📍 Location: .github/skills/project-guide/
+```
+
+---
+
+### 3. 🏗️ Project Scaffold
 
 **Interactive wizard for creating a comprehensive agentic development scaffold.**
 
@@ -82,7 +108,7 @@ Guides you through creating custom instructions, skills, agents, and MCP configu
 
 ---
 
-### 3. 🩺 Health Audit
+### 4. 🩺 Health Audit
 
 **Regular audit checklist for maintaining quality across all agentic artifacts.**
 
@@ -112,7 +138,7 @@ node .github/skills/health-audit/count-tokens.js
 
 ---
 
-### 4. 📚 Session Learning
+### 5. 📚 Session Learning
 
 **Extract reusable patterns from coding sessions to build institutional knowledge.**
 
@@ -145,7 +171,7 @@ Analyzes completed coding sessions to identify patterns worth capturing as persi
 
 ---
 
-### 5. ✅ Verification Loop
+### 6. ✅ Verification Loop
 
 **Pre-PR quality gate running comprehensive validation in 7 phases.**
 
@@ -189,6 +215,7 @@ Runs build, type-check, lint, tests, security scans, and hygiene checks before c
 ├── mcp.json                    # MCP server configuration
 ├── skills/                     # Reusable AI skills
 │   ├── agentic-evaluator/      # ⭐ Featured
+│   ├── project-guide/          # ⭐ Featured
 │   ├── project-scaffold/       # ⭐ Featured
 │   ├── health-audit/           # ⭐ Featured
 │   ├── session-learning/       # ⭐ Featured
