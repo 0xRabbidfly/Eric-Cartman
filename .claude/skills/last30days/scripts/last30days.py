@@ -15,12 +15,18 @@ Options:
 """
 
 import argparse
+import io
 import json
 import os
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
+
+# Force UTF-8 encoding for stdout/stderr on Windows to handle Unicode characters
+if sys.platform == 'win32':
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
 # Add lib to path
 SCRIPT_DIR = Path(__file__).parent.resolve()
