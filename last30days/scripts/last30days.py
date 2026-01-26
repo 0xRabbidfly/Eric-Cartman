@@ -44,6 +44,7 @@ from lib import (
     render,
     schema,
     score,
+    synthesize,
     ui,
     websearch,
     xai_x,
@@ -471,11 +472,29 @@ def main():
     report.reddit_error = reddit_error
     report.x_error = x_error
 
+    # Run AI synthesis if we have an OpenAI key and data to synthesize
+    synthesis_result = None
+    if config.get("OPENAI_API_KEY") and (deduped_reddit or deduped_x):
+        progress.start_processing()
+        try:
+            # Use a fast model for synthesis
+            synthesis_model = "gpt-4o-mini"
+            synthesis_result = synthesize.synthesize(
+                config["OPENAI_API_KEY"],
+                synthesis_model,
+                report,
+            )
+        except Exception as e:
+            # Synthesis is optional - continue without it
+            if args.debug:
+                print(f"Synthesis error: {e}", file=sys.stderr)
+        progress.end_processing()
+
     # Generate context snippet
     report.context_snippet_md = render.render_context_snippet(report)
 
-    # Write outputs
-    render.write_outputs(report, raw_openai, raw_xai, raw_reddit_enriched)
+    # Write outputs (include synthesis)
+    render.write_outputs(report, raw_openai, raw_xai, raw_reddit_enriched, synthesis_result)
 
     # Show completion
     if sources == "web":
@@ -484,7 +503,7 @@ def main():
         progress.show_complete(len(deduped_reddit), len(deduped_x))
 
     # Output result
-    output_result(report, args.emit, web_needed, topic, from_date, to_date, missing_keys)
+    output_result(report, args.emit, web_needed, topic, from_date, to_date, missing_keys, synthesis_result)
 
 
 def output_result(
@@ -495,12 +514,22 @@ def output_result(
     from_date: str = "",
     to_date: str = "",
     missing_keys: str = "none",
+    synthesis: dict = None,
 ):
     """Output the result based on emit mode."""
     if emit_mode == "compact":
-        print(render.render_compact(report, missing_keys=missing_keys))
+        # If we have synthesis, use the new synthesized output
+        if synthesis and synthesis.get("what_i_learned"):
+            print(render.render_synthesized(report, synthesis, missing_keys=missing_keys))
+        else:
+            # Fallback to raw data output
+            print(render.render_compact(report, missing_keys=missing_keys))
     elif emit_mode == "json":
-        print(json.dumps(report.to_dict(), indent=2))
+        # Include synthesis in JSON output
+        output = report.to_dict()
+        if synthesis:
+            output["synthesis"] = synthesis
+        print(json.dumps(output, indent=2))
     elif emit_mode == "md":
         print(render.render_full_report(report))
     elif emit_mode == "context":
@@ -524,6 +553,7 @@ def output_result(
         print("results above. WebSearch items should rank LOWER than comparable")
         print("Reddit/X items (they lack engagement metrics).")
         print("="*60)
+
 
 
 if __name__ == "__main__":

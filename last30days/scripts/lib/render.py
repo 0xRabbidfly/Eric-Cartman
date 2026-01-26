@@ -2,7 +2,7 @@
 
 import json
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from . import schema
 
@@ -32,6 +32,55 @@ def _assess_data_freshness(report: schema.Report) -> dict:
         "is_sparse": total_recent < 5,
         "mostly_evergreen": total_items > 0 and total_recent < total_items * 0.3,
     }
+
+
+def render_synthesized(
+    report: schema.Report,
+    synthesis: Dict[str, Any],
+    missing_keys: str = "none",
+) -> str:
+    """Render synthesized output with What I learned, KEY PATTERNS, and stats tree.
+    
+    Args:
+        report: Research report data
+        synthesis: Synthesis results from synthesize.synthesize()
+        missing_keys: 'both', 'reddit', 'x', or 'none'
+        
+    Returns:
+        Formatted markdown string
+    """
+    from . import synthesize as synth_module
+    
+    lines = []
+    
+    # What I learned section
+    what_i_learned = synthesis.get("what_i_learned", "")
+    if what_i_learned:
+        lines.append("What I learned:")
+        lines.append(what_i_learned)
+        lines.append("")
+    
+    # KEY PATTERNS section
+    patterns = synthesis.get("key_patterns", [])
+    if patterns:
+        lines.append("KEY PATTERNS:")
+        lines.append("")
+        for p in patterns:
+            name = p.get("name", "Pattern")
+            explanation = p.get("explanation", "")
+            lines.append(f"- **{name}** - {explanation}")
+        lines.append("")
+    
+    # Stats tree
+    stats_tree = synth_module.generate_stats_tree(report, synthesis)
+    lines.append(stats_tree)
+    lines.append("")
+    
+    # Context stored section
+    context_stored = synth_module.generate_context_stored(report, synthesis)
+    lines.append(context_stored)
+    
+    return "\n".join(lines)
 
 
 def render_compact(report: schema.Report, limit: int = 15, missing_keys: str = "none") -> str:
@@ -233,15 +282,18 @@ def render_context_snippet(report: schema.Report) -> str:
     return "\n".join(lines)
 
 
-def render_full_report(report: schema.Report) -> str:
+def render_full_report(report: schema.Report, synthesis: Optional[Dict[str, Any]] = None) -> str:
     """Render full markdown report.
 
     Args:
         report: Report data
+        synthesis: Optional synthesis results from AI
 
     Returns:
         Full report markdown
     """
+    from . import synthesize as synth_module
+    
     lines = []
 
     # Title
@@ -251,6 +303,42 @@ def render_full_report(report: schema.Report) -> str:
     lines.append(f"**Date Range:** {report.range_from} to {report.range_to}")
     lines.append(f"**Mode:** {report.mode}")
     lines.append("")
+
+    # Executive Summary (if synthesis available)
+    if synthesis and synthesis.get("what_i_learned"):
+        lines.append("## Executive Summary")
+        lines.append("")
+        lines.append("### What I Learned")
+        lines.append("")
+        lines.append(synthesis.get("what_i_learned", ""))
+        lines.append("")
+        
+        patterns = synthesis.get("key_patterns", [])
+        if patterns:
+            lines.append("### Key Patterns")
+            lines.append("")
+            for p in patterns:
+                name = p.get("name", "Pattern")
+                explanation = p.get("explanation", "")
+                lines.append(f"- **{name}** - {explanation}")
+            lines.append("")
+        
+        # Stats tree
+        lines.append("### Research Stats")
+        lines.append("")
+        lines.append("```")
+        lines.append(synth_module.generate_stats_tree(report, synthesis))
+        lines.append("```")
+        lines.append("")
+        
+        # Key findings
+        findings = synthesis.get("key_findings_bullets", [])
+        if findings:
+            lines.append("### Key Findings")
+            lines.append("")
+            for finding in findings:
+                lines.append(f"- {finding}")
+            lines.append("")
 
     # Models
     lines.append("## Models Used")
@@ -322,17 +410,6 @@ def render_full_report(report: schema.Report) -> str:
             lines.append(f"> {item.snippet}")
             lines.append("")
 
-    # Placeholders for Claude synthesis
-    lines.append("## Best Practices")
-    lines.append("")
-    lines.append("*To be synthesized by Claude*")
-    lines.append("")
-
-    lines.append("## Prompt Pack")
-    lines.append("")
-    lines.append("*To be synthesized by Claude*")
-    lines.append("")
-
     return "\n".join(lines)
 
 
@@ -341,6 +418,7 @@ def write_outputs(
     raw_openai: Optional[dict] = None,
     raw_xai: Optional[dict] = None,
     raw_reddit_enriched: Optional[list] = None,
+    synthesis: Optional[Dict[str, Any]] = None,
 ):
     """Write all output files.
 
@@ -349,16 +427,20 @@ def write_outputs(
         raw_openai: Raw OpenAI API response
         raw_xai: Raw xAI API response
         raw_reddit_enriched: Raw enriched Reddit thread data
+        synthesis: AI synthesis results
     """
     ensure_output_dir()
 
-    # report.json
+    # report.json (include synthesis)
+    report_dict = report.to_dict()
+    if synthesis:
+        report_dict["synthesis"] = synthesis
     with open(OUTPUT_DIR / "report.json", 'w', encoding='utf-8') as f:
-        json.dump(report.to_dict(), f, indent=2)
+        json.dump(report_dict, f, indent=2)
 
-    # report.md
+    # report.md (with synthesis)
     with open(OUTPUT_DIR / "report.md", 'w', encoding='utf-8') as f:
-        f.write(render_full_report(report))
+        f.write(render_full_report(report, synthesis))
 
     # last30days.context.md
     with open(OUTPUT_DIR / "last30days.context.md", 'w', encoding='utf-8') as f:
