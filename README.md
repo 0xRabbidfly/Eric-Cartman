@@ -243,119 +243,43 @@ Runs build, type-check, lint, tests, security scans, and hygiene checks before c
 
 **Research any topic across Reddit, X, and the web from the last 30 days.**
 
-Surfaces what people are actually discussing, recommending, and debating right now. Returns engagement-weighted results with copy-paste-ready prompts for your target tool.
+Surfaces what people are actually discussing, recommending, and debating right now. Returns AI-synthesized insights with engagement metrics, key patterns, and source citations.
+
+**Available for both Claude Code and GitHub Copilot:**
+- **Claude Code:** `.claude/skills/last30days/`
+- **GitHub Copilot:** `.github/skills/last30days/`
 
 **Use When:**
 - Learning new prompting techniques for AI tools (Midjourney, ChatGPT, etc.)
 - Finding recommendations ("best Claude Code skills", "top AI tools")
 - Catching up on news ("what's happening with OpenAI")
 - Understanding current community sentiment on any topic
+- Market research ("Markham housing market", "Toronto condo prices")
 
-**Query Types:**
-| Type | Example | Output |
-|------|---------|--------|
-| Prompting | "photorealistic people for Midjourney" | Techniques + copy-paste prompts |
-| Recommendations | "best RAG frameworks 2026" | Ranked list with engagement metrics |
-| News | "latest AI announcements" | Recent developments with sources |
-| General | "skills vs RAG for document analysis" | Community insights + discussion summary |
+**Output Includes:**
+| Section | Description |
+|---------|-------------|
+| What I Learned | AI-synthesized narrative paragraph |
+| Key Patterns | 3-5 actionable insights with bold labels |
+| Stats Tree | Source counts with engagement totals |
+| Full Report | Detailed posts/threads with URLs and quotes |
 
-**Modes:**
-- **Full Mode** (OpenAI + xAI keys): Reddit + X + Web search with engagement metrics
-- **Partial Mode** (one key): Single platform + web fallback
-- **Web-Only Mode** (no keys): WebSearch only — still useful
+**API Keys (Optional):**
+- Works without any API keys using web search fallback
+- Add `OPENAI_API_KEY` → Reddit threads with real upvotes & comments
+- Add `XAI_API_KEY` → X posts with real likes & reposts
+- Keys go in `~/.config/last30days/.env`
 
+**Copilot Version Notes:**
+The GitHub Copilot version saves a full `report.md` to your local share folder:
 ```
-📍 Location: .claude/skills/last30days/
-```
-
----
-
-## 💻 Windows Setup for Claude Code Skills
-
-Claude Code skills with Python scripts require specific setup on Windows. Follow these steps:
-
-### Prerequisites
-
-1. **Python 3.10+** installed and in PATH
-2. **Claude Code** CLI installed (`npm install -g @anthropic-ai/claude-code`)
-
-### Installing the `last30days` Skill
-
-#### Step 1: Locate the Skills Directory
-
-Skills live in `~/.claude/skills/` (your user profile). On Windows:
-```powershell
-# Check if directory exists
-Test-Path "$env:USERPROFILE\.claude\skills"
-
-# Create if needed
-New-Item -ItemType Directory -Path "$env:USERPROFILE\.claude\skills" -Force
+%USERPROFILE%\.local\share\last30days\out\report.md
 ```
 
-#### Step 2: Copy the Skill
-
-From this repo, copy the skill folder:
-```powershell
-# From the Eric-Cartman repo root
-Copy-Item -Recurse ".\.claude\skills\last30days" "$env:USERPROFILE\.claude\skills\"
 ```
-
-#### Step 3: Install Python Dependencies
-
-```powershell
-# Navigate to the skill's scripts folder
-cd "$env:USERPROFILE\.claude\skills\last30days\scripts"
-
-# Install dependencies (if requirements.txt exists)
-pip install requests python-dotenv
-```
-
-#### Step 4: Configure API Keys (Optional but Recommended)
-
-Create a config file for enhanced Reddit/X search:
-```powershell
-# Create config directory
-New-Item -ItemType Directory -Path "$env:USERPROFILE\.config\last30days" -Force
-
-# Create .env file
-@"
-# last30days API Configuration
-# Both keys are optional - skill works with WebSearch fallback
-
-# For Reddit research (uses OpenAI's web_search tool)
-OPENAI_API_KEY=your-openai-key-here
-
-# For X/Twitter research (uses xAI's x_search tool)  
-XAI_API_KEY=your-xai-key-here
-"@ | Out-File -FilePath "$env:USERPROFILE\.config\last30days\.env" -Encoding UTF8
-```
-
-#### Step 5: Verify Installation
-
-Open Claude Code and test:
-```
-/last30days best Claude Code skills
-```
-
-### Troubleshooting Windows Issues
-
-| Issue | Solution |
-|-------|----------|
-| `python3` not found | Windows uses `python` not `python3`. The skill handles this. |
-| Permission denied on scripts | Run PowerShell as Administrator or check execution policy |
-| Path too long errors | Enable long paths: `git config --system core.longpaths true` |
-| `.env` not loading | Ensure no BOM in file: save as UTF-8 without BOM |
-
-### Windows vs. Unix Path Notes
-
-The skill uses `~/.config/last30days/.env` which translates on Windows to:
-```
-%USERPROFILE%\.config\last30days\.env
-```
-
-If you prefer a Windows-native location, set the environment variable:
-```powershell
-$env:LAST30DAYS_CONFIG = "C:\Users\YourName\.last30days\.env"
+📍 Locations: 
+   Claude Code: .claude/skills/last30days/
+   GitHub Copilot: .github/skills/last30days/
 ```
 
 ---
@@ -372,7 +296,8 @@ $env:LAST30DAYS_CONFIG = "C:\Users\YourName\.last30days\.env"
 │   ├── project-scaffold/       # ⭐ Featured
 │   ├── health-audit/           # ⭐ Featured
 │   ├── session-learning/       # ⭐ Featured
-│   └── verification-loop/      # ⭐ Featured
+│   ├── verification-loop/      # ⭐ Featured
+│   └── last30days/             # 🔍 Research skill (Copilot version)
 ├── agents/                     # Specialized agent configs
 │   └── eric-cartman.md         # 🎭 Cartman-flavored project guide
 ├── instructions/               # File-pattern-specific rules
@@ -381,19 +306,13 @@ $env:LAST30DAYS_CONFIG = "C:\Users\YourName\.last30days\.env"
 .claude/
 ├── settings.local.json         # Local Claude Code permissions (gitignored)
 └── skills/                     # Claude Code skills
-    └── last30days/             # 🔍 Research skill
+    └── last30days/             # 🔍 Research skill (Claude version)
         ├── SKILL.md            # Skill definition
-        ├── SPEC.md             # Technical specification
-        ├── TASKS.md            # Implementation checklist
-        ├── scripts/            # Python implementation
-        │   ├── last30days.py   # Main CLI script
-        │   └── lib/            # Modules (cache, search, render)
-        ├── fixtures/           # Test data samples
-        └── tests/              # Unit tests
+        └── scripts/            # Python implementation
 ```
 
 > **Note:** `.github/skills/` is for GitHub Copilot, `.claude/skills/` is for Claude Code.
-> The same skill can be adapted for both by adjusting frontmatter and paths.
+> The `last30days` skill is available for both — same Python scripts, different SKILL.md frontmatter.
 
 ---
 
