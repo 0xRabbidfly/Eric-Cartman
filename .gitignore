@@ -43,6 +43,18 @@ out/
 # Cursor specific
 .cursor/
 
+# Claude Code
+.claude/settings.local.json
+.claude/**/.__pycache__/
+.claude/**/__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+
+# Skills local config (API keys)
+.claude/skills/**/config/.env
+~/.config/last30days/
+
 # Backup files
 *.bak
 *.backup
