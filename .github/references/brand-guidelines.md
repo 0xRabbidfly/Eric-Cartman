@@ -1,11 +1,11 @@
-# 133T Brand Guidelines — AI Hub Portal
+# Brand Guidelines — [Your Project Name]
 
-This document defines the 133T brand guidelines for the Canada AI Hub Portal. Reference this file from agents and design documents to maintain consistency.
+This document defines the brand guidelines for [Your Project]. Reference this file from agents and design documents to maintain consistency.
 
 ## Brand Tone
 
-- **Confident, modern, insights-driven** — not playful
-- **Calm and premium** — professional internal tool, not consumer app
+- **[Tone adjective 1], [Tone adjective 2], [Tone adjective 3]** — describe your voice
+- **[Feeling]** — how should users feel
 - Clean neutral surfaces with strong typographic hierarchy
 - Generous whitespace, card-based discovery patterns
 
@@ -23,30 +23,30 @@ This document defines the 133T brand guidelines for the Canada AI Hub Portal. Re
 - Purposeful imagery (innovation, teams, technology themes)
 - Minimal UI chrome — let content breathe
 - Avoid busy backgrounds behind text
-- Do NOT copy public 133T web designs verbatim — use high-level patterns only
+- Use high-level brand patterns, adapted for your project
 
 ## Color Palette
 
-### Primary — 133T Red
+### Primary — Brand Color
 
 Use sparingly for primary CTAs and brand accents only.
 
 | Token | Value | Usage |
 |-------|-------|-------|
-| `--color-133t-red` | #E31937 | Primary brand color, main CTAs |
-| `--color-133t-red-dark` | #C01530 | Hover states |
-| `--color-133t-red-light` | #FF3D5C | Light variant |
-| `--color-133t-red-subtle` | #FFE8EC | Subtle backgrounds, badges |
+| `--color-brand-primary` | #6366F1 | Primary brand color, main CTAs |
+| `--color-brand-primary-dark` | #4F46E5 | Hover states |
+| `--color-brand-primary-light` | #818CF8 | Light variant |
+| `--color-brand-primary-subtle` | #EEF2FF | Subtle backgrounds, badges |
 
-### AI Accent — Blue
+### Accent — Secondary Color
 
-Use for AI/tech indicators and secondary actions.
+Use for secondary actions and highlights.
 
 | Token | Value | Usage |
 |-------|-------|-------|
-| `--color-ai-blue` | #0066CC | AI elements, tech indicators |
-| `--color-ai-blue-light` | #3399FF | Light variant |
-| `--color-ai-blue-subtle` | #E6F2FF | Subtle backgrounds |
+| `--color-accent` | #0EA5E9 | Accent elements, highlights |
+| `--color-accent-light` | #38BDF8 | Light variant |
+| `--color-accent-subtle` | #E0F2FE | Subtle backgrounds |
 
 ### Neutrals — Professional Grays
 
@@ -76,10 +76,10 @@ Never use brand colors for semantic meaning.
 
 ## Color Usage Rules
 
-1. **133T Red** — Primary CTAs, active navigation, brand accents only
-2. **AI Blue** — AI/tech indicators, assistant UI, secondary actions
+1. **Brand Primary** — Primary CTAs, active navigation, brand accents only
+2. **Accent Color** — Highlights, secondary actions, feature indicators
 3. **Neutrals** — All surfaces, text, borders (majority of UI)
-4. **Never** use brand red for errors (use semantic `--color-error`)
+4. **Never** use brand color for errors (use semantic `--color-error`)
 5. **WCAG AA contrast required** for all text
 
 ## Typography
@@ -138,7 +138,7 @@ Target 70-90 characters for body paragraphs.
 | `--shadow-sm` | Default cards, subtle elevation |
 | `--shadow-md` | Hover states, raised elements |
 | `--shadow-lg` | Modals, drawers |
-| `--shadow-primary` | 133T red glow for brand hover states |
+| `--shadow-primary` | Brand color glow for hover states |
 
 ## Motion
 

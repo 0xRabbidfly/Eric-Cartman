@@ -43,28 +43,28 @@ The script produces output like this:
 
 ```
 What I learned:
-The Markham housing market is in correction mode with clear downward price pressure. A recent post showed a Markham home selling 300K below 2017 prices, and official data confirms a 6.4% year-over-year decline to an average of ~$1.04M (detached homes averaging $1.39M). York Region inventory is rising—3,782 active listings, up 2.91%—with homes taking about 36 days to sell.
+The Seattle housing market shows signs of cooling with inventory levels rising. Recent data indicates a 5.2% year-over-year price adjustment to an average of ~$750K (single-family homes averaging $890K). King County inventory is up to 4,200 active listings, a 3.1% increase, with homes taking about 28 days to sell on average.
 
 KEY PATTERNS:
 
-- **Price resets are real** - Individual homes selling far below 2017-2022 peaks
-- **Inventory is normalizing** - Rising active listings creating buyer negotiation power
-- **Regional decline, not isolated** - Markham shares GTA-wide correction dynamics
+- **Price adjustments ongoing** - Sellers becoming more realistic with asking prices
+- **Inventory is normalizing** - Rising active listings creating buyer negotiation power  
+- **Regional trends align** - Seattle mirrors broader Pacific Northwest market dynamics
 
 ✅ All agents reported back!
 ├─ 🟠 Reddit: 0 threads (no relevant discussions found)
 ├─ 🔵 X: 19 posts │ 12,797 likes │ 2,596 reposts
-├─ 🌐 Web: 10+ pages │ wahi.com, zolo.ca, realosophy.com
-└─ Top voices: @ManyBeenRinsed, @JonFlynnREstats │ Wahi, Zolo
+├─ 🌐 Web: 10+ pages │ zillow.com, redfin.com, realtor.com
+└─ Top voices: @RealEstateExpert, @HousingAnalyst │ Zillow, Redfin
 
 📚 CONTEXT STORED - I'm now an expert on this topic.
 
 For the rest of our conversation, I have this research loaded:
 
-TOPIC: Markham housing market
-KEY FINDINGS: 6.4% YoY decline, homes selling 300K below 2017, York Region inventory up 2.91%
+TOPIC: Seattle housing market
+KEY FINDINGS: 5.2% YoY change, inventory up 3.1%, median days on market rising
 
-What would you like to know about the Markham market?
+What would you like to know about this market?
 ```
 
 ---
@@ -74,7 +74,7 @@ What would you like to know about the Markham market?
 - **Prompting**: "photorealistic people in Nano Banana Pro", "Midjourney prompts" → learn techniques, get prompts
 - **Recommendations**: "best Claude Code skills", "top AI tools" → get a LIST of specific things
 - **News**: "what's happening with OpenAI", "latest AI announcements" → current events
-- **Market Research**: "Markham housing market", "Toronto condo prices" → real-time data
+- **Market Research**: "Seattle housing market", "Austin rent prices" → real-time data
 - **General**: any topic you're curious about → understand what the community is saying
 
 ---

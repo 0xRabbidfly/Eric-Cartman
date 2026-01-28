@@ -71,7 +71,7 @@ For each changed file, determine which docs might be affected:
 Scan and catalog ALL documentation files:
 
 ```
-001-ait-intake-triage/
+docs/                        # Or your project's design folder
 ├── spec.md              # User stories, FRs, acceptance criteria, key entities
 ├── plan.md              # Architecture decisions, module descriptions
 ├── tasks.md             # Phased tasks with [x]/[ ] status
@@ -80,14 +80,13 @@ Scan and catalog ALL documentation files:
 ├── quickstart.md        # Getting started guide
 ├── *.html               # Generated infographics/diagrams
 ├── *.mmd                # Mermaid diagrams
-├── pipeline-*.txt       # ASCII architecture diagrams
+├── architecture-*.txt   # ASCII architecture diagrams
 └── checklists/*.md      # Requirement checklists
 
-openspec/
-├── AGENTS.md            # OpenSpec instructions
+specs/                       # (Optional) OpenSpec-style specifications
 ├── project.md           # Project-wide specifications
-├── changes/*.md         # Change proposals (01-*, 02-*, etc.)
-└── specs/**/*.md        # Feature specifications
+├── changes/*.md         # Change proposals (numbered)
+└── features/**/*.md     # Feature specifications
 
 .github/
 ├── copilot-instructions.md  # Session onboarding, skills list

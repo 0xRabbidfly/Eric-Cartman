@@ -140,7 +140,7 @@ jobs:
 | Timeout | Long build, stuck process | Set `timeout-minutes: 30` on job |
 | Permission denied (Azure) | Missing OIDC permissions | Add `permissions: id-token: write` |
 | npm install fails | Permission issues | Use `npm ci --prefer-offline` |
-| Tests pass locally, fail in CI | Environment differences | Set `env: CI: true, TZ: America/Toronto` |
+| Tests pass locally, fail in CI | Environment differences | Set `env: CI: true, TZ: UTC` |
 
 **See**: `debugging.md` for detailed troubleshooting guide
 

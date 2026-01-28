@@ -119,17 +119,17 @@ export function PillarCard({ title, description }: Props) {
 
 ## Color Usage
 
-### 133T Brand Palette
+### Brand Palette
 
 ```css
-/* Primary - 133T Red (use sparingly) */
---color-133t-red: #E31937;        /* Primary CTAs, brand accents */
---color-133t-red-dark: #C01530;   /* Hover states */
---color-133t-red-subtle: #FFE8EC; /* Subtle backgrounds */
+/* Primary - Brand Color (use sparingly) */
+--color-brand-primary: #6366F1;        /* Primary CTAs, brand accents */
+--color-brand-primary-dark: #4F46E5;   /* Hover states */
+--color-brand-primary-subtle: #EEF2FF; /* Subtle backgrounds */
 
-/* AI Accent - Blue (tech/AI elements) */
---color-ai-blue: #0066CC;
---color-ai-blue-subtle: #E6F2FF;
+/* Accent - Secondary Color */
+--color-accent: #0EA5E9;
+--color-accent-subtle: #E0F2FE;
 
 /* Neutrals - Primary UI (most of the interface) */
 --color-neutral-50: #fafafa;   /* Page background */
@@ -144,20 +144,20 @@ export function PillarCard({ title, description }: Props) {
 ```css
 /* ✅ Good: Semantic color usage */
 .button-primary {
-  background: var(--color-primary);      /* 133T Red for primary CTA */
+  background: var(--color-primary);      /* Brand color for primary CTA */
 }
 
-.ai-indicator {
-  color: var(--color-ai-blue);           /* Blue for AI elements */
+.accent-indicator {
+  color: var(--color-accent);            /* Accent for highlights */
 }
 
 .error-message {
-  color: var(--color-error);             /* Semantic error, NOT brand red */
+  color: var(--color-error);             /* Semantic error, NOT brand color */
 }
 
-/* ❌ Bad: Brand red for errors */
+/* ❌ Bad: Brand color for errors */
 .error-message {
-  color: var(--color-133t-red);           /* Don't use brand color for errors */
+  color: var(--color-brand-primary);     /* Don't use brand color for errors */
 }
 ```
 
@@ -258,7 +258,7 @@ export function PillarCard({ title, description }: Props) {
 }
 ```
 
-### 133T Red Glow (Brand Accent)
+### Brand Primary Glow (Brand Accent)
 
 ```css
 /* Use for primary CTAs on hover */

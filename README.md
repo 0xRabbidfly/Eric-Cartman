@@ -254,7 +254,7 @@ Surfaces what people are actually discussing, recommending, and debating right n
 - Finding recommendations ("best Claude Code skills", "top AI tools")
 - Catching up on news ("what's happening with OpenAI")
 - Understanding current community sentiment on any topic
-- Market research ("Markham housing market", "Toronto condo prices")
+- Market research ("Seattle housing market", "NYC rent trends")
 
 **Output Includes:**
 | Section | Description |
@@ -272,9 +272,8 @@ Surfaces what people are actually discussing, recommending, and debating right n
 
 **Copilot Version Notes:**
 The GitHub Copilot version saves a full `report.md` to your local share folder:
-```
-%USERPROFILE%\.local\share\last30days\out\report.md
-```
+- **Windows:** `%USERPROFILE%\.local\share\last30days\out\report.md`
+- **macOS/Linux:** `~/.local/share/last30days/out/report.md`
 
 ```
 📍 Locations: 

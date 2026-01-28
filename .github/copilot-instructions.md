@@ -1,10 +1,10 @@
-# Copilot Instructions — Canada AI Hub Portal
+# Copilot Instructions — [Your Project Name]
 
 ## Purpose
-This repository will contain an internal 133T Canada “AI Hub Portal” web app:
-- Modern portal UI (English/French) that primarily links to approved SharePoint content (no duplication).
-- Global search and an AI assistant that answers with links/citations to approved sources.
-- Later: Sales enablement AI tools (summarize/tailor) using approved collateral only.
+This repository contains [describe your project]:
+- [Key feature 1]
+- [Key feature 2]
+- [Key feature 3]
 
 ## Tech Stack (selected)
 - Frontend: Next.js (React) + TypeScript

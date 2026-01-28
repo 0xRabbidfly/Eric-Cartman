@@ -102,7 +102,7 @@ export async function searchContent(
   id: 'doc-123',
   title: 'AI Playbook',
   snippet: 'Overview of AI capabilities...',
-  url: 'https://133t.sharepoint.com/sites/ai-hub/docs/playbook.pdf',
+  url: 'https://example.sharepoint.com/sites/project/docs/playbook.pdf',
   type: 'document'
 }
 

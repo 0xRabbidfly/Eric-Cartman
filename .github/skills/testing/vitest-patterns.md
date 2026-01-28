@@ -101,7 +101,7 @@ describe('API Route: /api/search', () => {
 
   it('returns search results for authenticated user', async () => {
     vi.mocked(getServerSession).mockResolvedValue({
-      user: { email: 'test@133t.com', name: 'Test User' }
+      user: { email: 'test@example.com', name: 'Test User' }
     });
 
     const request = new NextRequest('http://localhost:3000/api/search?q=AI');
@@ -326,7 +326,7 @@ export function mockNextIntl() {
 // test-fixtures.ts
 export const mockUser = {
   id: 'test-user-id',
-  email: 'test@133t.com',
+  email: 'test@example.com',
   name: 'Test User',
 };
 
