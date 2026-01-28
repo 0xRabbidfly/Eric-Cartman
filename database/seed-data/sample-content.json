@@ -58,8 +58,8 @@
       "rowKey": "home",
       "titleEn": "Home",
       "titleFr": "Accueil",
-      "descriptionEn": "Welcome to the Canada AI Hub - your gateway to AI excellence and innovation.",
-      "descriptionFr": "Bienvenue au Hub AI Canada - votre porte d'entrée vers l'excellence et l'innovation en IA.",
+      "descriptionEn": "Welcome to [Your Project] - your gateway to [value proposition].",
+      "descriptionFr": "Bienvenue à [Votre Projet] - votre passerelle vers [proposition de valeur].",
       "route": "/",
       "parentPageId": null,
       "pillarId": null,
@@ -199,7 +199,7 @@
   "contentItems": [
     {
       "rowKey": "doc-ai-strategy-2026",
-      "title": "133T AI Strategy 2026",
+      "title": "AI Strategy 2026",
       "url": "https://sharepoint.example.com/documents/ai-strategy-2026.pdf",
       "type": "document",
       "pillarIds": ["people-enablement"],

@@ -41,12 +41,12 @@ Read and analyze the project's constitutional documents to establish review crit
    - API contracts
    - Data models
 
-3. **Design Documentation**: `design/` directory
-   - `AI-HUB-Architecture.md`: System architecture
-   - `AI-HUB-component-inventory.md`: Component catalog
-   - `AI-HUB-content-metadata.md`: Content structure
-   - `AI-HUB-IA-routemap.md`: Information architecture
-   - `canada-ai-hub-portal-reqs.md`: Requirements baseline
+3. **Design Documentation**: `design/` or `docs/` directory
+   - Architecture documentation
+   - Component catalog
+   - Content structure specifications
+   - Information architecture
+   - Requirements baseline
 
 ### Phase 2: Systematic Codebase Analysis
 

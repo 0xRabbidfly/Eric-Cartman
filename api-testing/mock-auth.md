@@ -23,7 +23,7 @@ import { getServerSession } from 'next-auth';
 vi.mocked(getServerSession).mockResolvedValue({
   user: {
     id: 'test-user-123',
-    email: 'test.user@133t.com',
+    email: 'test.user@example.com',
     name: 'Test User',
     image: null
   },
@@ -43,7 +43,7 @@ vi.mocked(getServerSession).mockResolvedValue(null);
 vi.mocked(getServerSession).mockResolvedValue({
   user: {
     id: 'admin-user',
-    email: 'admin@133t.com',
+    email: 'admin@example.com',
     name: 'Admin User',
     roles: ['admin', 'editor']  // Custom roles
   },
@@ -57,7 +57,7 @@ vi.mocked(getServerSession).mockResolvedValue({
 vi.mocked(getServerSession).mockResolvedValue({
   user: {
     id: 'test-user',
-    email: 'test@133t.com',
+    email: 'test@example.com',
     name: 'Test User'
   },
   expires: new Date(Date.now() - 1000).toISOString()  // Expired
@@ -71,7 +71,7 @@ describe('Protected API Route', () => {
   beforeEach(() => {
     // Default: authenticated user
     vi.mocked(getServerSession).mockResolvedValue({
-      user: { id: '1', email: 'test@133t.com', name: 'Test' },
+      user: { id: '1', email: 'test@example.com', name: 'Test' },
       expires: new Date(Date.now() + 86400000).toISOString()
     });
   });
@@ -114,7 +114,7 @@ it('should reject non-admin users', async () => {
   vi.mocked(getServerSession).mockResolvedValue({
     user: {
       id: 'user-1',
-      email: 'user@133t.com',
+      email: 'user@example.com',
       name: 'Regular User',
       roles: ['user']  // Not admin
     },

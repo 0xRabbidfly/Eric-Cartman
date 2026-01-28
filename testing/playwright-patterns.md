@@ -155,7 +155,7 @@ test.describe('Contact Form', () => {
     await page.goto('/contact');
 
     await page.fill('[name="name"]', 'Test User');
-    await page.fill('[name="email"]', 'test@133t.com');
+    await page.fill('[name="email"]', 'test@example.com');
     await page.fill('[name="message"]', 'This is a test message');
 
     await page.click('button[type="submit"]');

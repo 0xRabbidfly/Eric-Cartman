@@ -40,7 +40,7 @@ For each key area, note:
 Check ALL documentation sources for current project state:
 
 ```
-001-ait-intake-triage/
+docs/                     # Or your project's design folder
   ├── spec.md           # User stories, acceptance criteria
   ├── plan.md           # Architecture decisions
   ├── tasks.md          # Phased task breakdown with completion status
@@ -48,10 +48,10 @@ Check ALL documentation sources for current project state:
   ├── research.md       # Technical research notes
   └── quickstart.md     # Getting started guide
 
-openspec/
+specs/                    # (Optional) OpenSpec-style specifications
   ├── project.md        # Project-wide specifications
   ├── changes/          # Change proposals (numbered)
-  └── specs/            # Feature specifications
+  └── features/         # Feature specifications
 
 policies/               # Validation templates
 README.md               # Project overview

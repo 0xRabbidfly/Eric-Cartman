@@ -71,7 +71,7 @@ az role assignment create \
 1. **Timezone issues**:
    ```yaml
    env:
-     TZ: America/Toronto
+     TZ: UTC  # Or your project's canonical timezone
    ```
 
 2. **Environment variables**:

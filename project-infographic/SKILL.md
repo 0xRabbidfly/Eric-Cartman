@@ -118,9 +118,9 @@ Use this CSS design token pattern:
 
 ```css
 :root {
-  /* Brand colors - adapt to project */
-  --brand-primary: #e31937; /* CGI red or project brand */
-  --brand-secondary: #0066cc; /* Accent blue */
+  /* Brand colors - adapt to your project */
+  --brand-primary: #6366f1; /* Indigo - customize to your brand */
+  --brand-secondary: #0ea5e9; /* Sky blue accent */
 
   /* Semantic colors */
   --success: #22c55e;
@@ -192,8 +192,8 @@ For decision points (YES/NO gates):
 ```css
 /* System boundary container */
 .agent-container {
-  background: linear-gradient(135deg, rgba(227, 25, 55, 0.04), rgba(227, 25, 55, 0.08));
-  border: 2px solid rgba(227, 25, 55, 0.25);
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.04), rgba(99, 102, 241, 0.08));
+  border: 2px solid rgba(99, 102, 241, 0.25);
   border-radius: 16px;
   padding: 20px;
   position: relative;
