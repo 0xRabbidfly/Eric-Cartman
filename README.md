@@ -284,6 +284,163 @@ The GitHub Copilot version saves a full `report.md` to your local share folder:
 
 ---
 
+### 9. ✍️ Content Research Writer
+
+**Your AI writing partner for research-backed content creation.**
+
+Acts as a collaborative writing partner — helps with outlining, research, citations, hook improvement, and section-by-section feedback while preserving your unique voice.
+
+**Use When:**
+- Writing blog posts, articles, or newsletters
+- Creating educational content or tutorials
+- Drafting thought leadership pieces with citations
+- Researching and writing case studies
+- Getting real-time feedback as you write
+
+**What It Does:**
+| Capability | Description |
+|------------|-------------|
+| Collaborative Outlining | Structures ideas into coherent outlines |
+| Research Assistance | Finds information and adds citations |
+| Hook Improvement | Strengthens openings to capture attention |
+| Section Feedback | Reviews each section as you write |
+| Voice Preservation | Maintains your writing style and tone |
+
+**Workflow Example:**
+1. Start with an outline together
+2. Research key points with citations
+3. Write introduction → get feedback
+4. Write body sections → feedback each
+5. Final review and polish
+
+```
+📍 Location: .github/skills/content-research-writer/
+```
+
+---
+
+### 10. 🔄 Doc-Sync-All
+
+**Comprehensive documentation synchronization across all project artifacts.**
+
+Scans local git changes and propagates updates to ALL design docs, task lists, specs, diagrams, and planning artifacts. Ensures documentation reflects reality, not aspirations.
+
+**Use When:**
+- After completing a development phase or feature
+- When new architectural decisions are made
+- After adding new skills, tools, or modules
+- Before creating a PR to ensure docs match implementation
+- User says "sync all docs", "update design docs"
+
+**What It Syncs:**
+| Document Type | Updates |
+|---------------|---------|
+| `tasks.md` | Marks completed tasks, updates phase summaries |
+| `spec.md` | Syncs FRs, entities, success criteria |
+| `research.md` | Adds new decision entries |
+| `data-model.md` | Keeps in sync with TypeScript types |
+| Diagrams | Updates Mermaid and ASCII architecture flows |
+
+**Core Principle:** If code exists, docs should describe it. If code changed, docs should be updated. If a task is done, it should be checked off everywhere.
+
+```
+📍 Location: .github/skills/doc-sync-all/
+```
+
+---
+
+### 11. 🎨 Project Infographic
+
+**Generate polished HTML infographics for sprint demos and stakeholder presentations.**
+
+Scans the codebase and design docs, then produces a beautiful single-page HTML infographic suitable for sprint demos. Targets non-technical stakeholders with visual-first communication.
+
+**Use When:**
+- Before sprint demos or stakeholder presentations
+- When onboarding new team members visually
+- To complement technical documentation with executive-friendly visuals
+- User says "generate infographic", "create demo doc", "visual overview"
+
+**Output Sections:**
+- Hero with project name and key stats
+- The Challenge (pain points solved)
+- How It Works (visual pipeline/flow diagram)
+- Current Status (phase completion, metrics)
+- Tech Stack (pill badges with emoji icons)
+
+**Design Features:**
+- Self-contained HTML with embedded CSS
+- Dark gradient hero sections
+- Interactive hover effects
+- Premium architectural diagrams with system boundaries
+- Responsive for meeting room displays
+
+```
+📍 Location: .github/skills/project-infographic/
+```
+
+---
+
+### 12. 🔃 Repo State Sync
+
+**Keep your Session Onboarding section current with actual codebase state.**
+
+Scans the entire codebase and design documentation to produce an up-to-date "Session Onboarding" section for `copilot-instructions.md`. Detects staleness and refreshes project context.
+
+**Use When:**
+- At the start of a new development phase
+- After significant architecture changes
+- When copilot-instructions.md seems stale
+- User says "sync repo state", "update onboarding", "refresh copilot instructions"
+
+**What It Updates:**
+- Key Files table with current paths
+- Runtime dependencies and verification
+- Current working features (✅/🚧/⬜ status)
+- Common development tasks
+- Phase status from tasks.md
+- Sync timestamp for freshness tracking
+
+**Staleness Detection:**
+Suggests running when it notices discrepancies between docs and reality (chunk counts, phase status, missing skills).
+
+```
+📍 Location: .github/skills/repo-state-sync/
+```
+
+---
+
+### 13. 🔍 Skill Lookup
+
+**Search, discover, and install Agent Skills from prompts.chat.**
+
+Connects to the prompts.chat MCP server to find reusable AI skills. Search by keyword, category, or tag, then install skills directly into your project.
+
+**Use When:**
+- Looking for existing skills before creating your own
+- Searching for skills ("What skills are available for testing?")
+- Installing a skill ("Install the documentation skill")
+- Extending Claude's capabilities with community skills
+
+**Available Operations:**
+| Action | Description |
+|--------|-------------|
+| Search | Find skills by keyword, category, or tag |
+| Get | Retrieve a specific skill with all its files |
+| Install | Save skill to `.claude/skills/{slug}/` |
+
+**Skill Structure:**
+- `SKILL.md` (required) — Main instructions with frontmatter
+- Reference docs — Additional documentation
+- Scripts — Helper scripts (Python, shell, etc.)
+- Config files — JSON, YAML configurations
+
+```
+📍 Location: .github/skills/skill-lookup/
+```
+
+---
+
 ## 📁 Repository Structure
 
 ```
@@ -297,7 +454,12 @@ The GitHub Copilot version saves a full `report.md` to your local share folder:
 │   ├── health-audit/           # ⭐ Featured
 │   ├── session-learning/       # ⭐ Featured
 │   ├── verification-loop/      # ⭐ Featured
-│   └── last30days/             # 🔍 Research skill (Copilot version)
+│   ├── last30days/             # 🔍 Research skill (Copilot version)
+│   ├── content-research-writer/ # ✍️ Writing partner
+│   ├── doc-sync-all/           # 🔄 Documentation sync
+│   ├── project-infographic/    # 🎨 Sprint demo visuals
+│   ├── repo-state-sync/        # 🔃 Onboarding sync
+│   └── skill-lookup/           # 🔍 Skill discovery
 ├── agents/                     # Specialized agent configs
 │   └── eric-cartman.md         # 🎭 Cartman-flavored project guide
 ├── instructions/               # File-pattern-specific rules
