@@ -1,538 +1,208 @@
 ---
 name: content-research-writer
-description: Assists in writing high-quality content by conducting research, adding citations, improving hooks, iterating on outlines, and providing real-time feedback on each section. Transforms your writing process from solo effort to collaborative partnership.
+description: A token-efficient writing partner that uses bounded research, numbered citations, evidence packets, and parallel sub-agents to outline, draft, and refine high-quality content with minimal context growth.
 ---
 
 # Content Research Writer
 
 This skill acts as your writing partner, helping you research, outline, draft, and refine content while maintaining your unique voice and style.
 
+It is designed to stay context-efficient:
+
+- Research is intentionally bounded (you choose a mode; default is **Light**).
+- Citations are **numbered by default**.
+- Research outputs are stored as small, reusable **evidence packets** on disk.
+- Parallel sub-agents can do most extraction work with strict, small outputs.
+
+## Defaults (User Can Override)
+
+- **Research mode:** Light (default)
+- **Citation style:** Numbered references (default)
+- **Evidence unit:** One evidence packet per claim (most token-efficient)
+
 ## When to Use This Skill
 
-- Writing blog posts, articles, or newsletters
-- Creating educational content or tutorials
-- Drafting thought leadership pieces
-- Researching and writing case studies
-- Producing technical documentation with sources
-- Writing with proper citations and references
-- Improving hooks and introductions
-- Getting section-by-section feedback while writing
-
-## What This Skill Does
-
-1. **Collaborative Outlining**: Helps you structure ideas into coherent outlines
-2. **Research Assistance**: Finds relevant information and adds citations
-3. **Hook Improvement**: Strengthens your opening to capture attention
-4. **Section Feedback**: Reviews each section as you write
-5. **Voice Preservation**: Maintains your writing style and tone
-6. **Citation Management**: Adds and formats references properly
-7. **Iterative Refinement**: Helps you improve through multiple drafts
-
-## How to Use
-
-### Setup Your Writing Environment
-
-Create a dedicated folder for your article:
-```
-mkdir ~/writing/my-article-title
-cd ~/writing/my-article-title
-```
-
-Create your draft file:
-```
-touch article-draft.md
-```
-
-Open Claude Code from this directory and start writing.
-
-### Basic Workflow
-
-1. **Start with an outline**:
-```
-Help me create an outline for an article about [topic]
-```
-
-2. **Research and add citations**:
-```
-Research [specific topic] and add citations to my outline
-```
-
-3. **Improve the hook**:
-```
-Here's my introduction. Help me make the hook more compelling.
-```
-
-4. **Get section feedback**:
-```
-I just finished the "Why This Matters" section. Review it and give feedback.
-```
-
-5. **Refine and polish**:
-```
-Review the full draft for flow, clarity, and consistency.
-```
-
-## Instructions
-
-When a user requests writing assistance:
-
-1. **Understand the Writing Project**
-   
-   Ask clarifying questions:
-   - What's the topic and main argument?
-   - Who's the target audience?
-   - What's the desired length/format?
-   - What's your goal? (educate, persuade, entertain, explain)
-   - Any existing research or sources to include?
-   - What's your writing style? (formal, conversational, technical)
-
-2. **Collaborative Outlining**
-   
-   Help structure the content:
-   
-   ```markdown
-   # Article Outline: [Title]
-   
-   ## Hook
-   - [Opening line/story/statistic]
-   - [Why reader should care]
-   
-   ## Introduction
-   - Context and background
-   - Problem statement
-   - What this article covers
-   
-   ## Main Sections
-   
-   ### Section 1: [Title]
-   - Key point A
-   - Key point B
-   - Example/evidence
-   - [Research needed: specific topic]
-   
-   ### Section 2: [Title]
-   - Key point C
-   - Key point D
-   - Data/citation needed
-   
-   ### Section 3: [Title]
-   - Key point E
-   - Counter-arguments
-   - Resolution
-   
-   ## Conclusion
-   - Summary of main points
-   - Call to action
-   - Final thought
-   
-   ## Research To-Do
-   - [ ] Find data on [topic]
-   - [ ] Get examples of [concept]
-   - [ ] Source citation for [claim]
-   ```
-   
-   **Iterate on outline**:
-   - Adjust based on feedback
-   - Ensure logical flow
-   - Identify research gaps
-   - Mark sections for deep dives
-
-3. **Conduct Research**
-   
-   When user requests research on a topic:
-   
-   - Search for relevant information
-   - Find credible sources
-   - Extract key facts, quotes, and data
-   - Add citations in requested format
-   
-   Example output:
-   ```markdown
-   ## Research: AI Impact on Productivity
-   
-   Key Findings:
-   
-   1. **Productivity Gains**: Studies show 40% time savings for 
-      content creation tasks [1]
-   
-   2. **Adoption Rates**: 67% of knowledge workers use AI tools 
-      weekly [2]
-   
-   3. **Expert Quote**: "AI augments rather than replaces human 
-      creativity" - Dr. Jane Smith, MIT [3]
-   
-   Citations:
-   [1] McKinsey Global Institute. (2024). "The Economic Potential 
-       of Generative AI"
-   [2] Stack Overflow Developer Survey (2024)
-   [3] Smith, J. (2024). MIT Technology Review interview
-   
-   Added to outline under Section 2.
-   ```
-
-4. **Improve Hooks**
-   
-   When user shares an introduction, analyze and strengthen:
-   
-   **Current Hook Analysis**:
-   - What works: [positive elements]
-   - What could be stronger: [areas for improvement]
-   - Emotional impact: [current vs. potential]
-   
-   **Suggested Alternatives**:
-   
-   Option 1: [Bold statement]
-   > [Example]
-   *Why it works: [explanation]*
-   
-   Option 2: [Personal story]
-   > [Example]
-   *Why it works: [explanation]*
-   
-   Option 3: [Surprising data]
-   > [Example]
-   *Why it works: [explanation]*
-   
-   **Questions to hook**:
-   - Does it create curiosity?
-   - Does it promise value?
-   - Is it specific enough?
-   - Does it match the audience?
-
-5. **Provide Section-by-Section Feedback**
-   
-   As user writes each section, review for:
-   
-   ```markdown
-   # Feedback: [Section Name]
-   
-   ## What Works Well ✓
-   - [Strength 1]
-   - [Strength 2]
-   - [Strength 3]
-   
-   ## Suggestions for Improvement
-   
-   ### Clarity
-   - [Specific issue] → [Suggested fix]
-   - [Complex sentence] → [Simpler alternative]
-   
-   ### Flow
-   - [Transition issue] → [Better connection]
-   - [Paragraph order] → [Suggested reordering]
-   
-   ### Evidence
-   - [Claim needing support] → [Add citation or example]
-   - [Generic statement] → [Make more specific]
-   
-   ### Style
-   - [Tone inconsistency] → [Match your voice better]
-   - [Word choice] → [Stronger alternative]
-   
-   ## Specific Line Edits
-   
-   Original:
-   > [Exact quote from draft]
-   
-   Suggested:
-   > [Improved version]
-   
-   Why: [Explanation]
-   
-   ## Questions to Consider
-   - [Thought-provoking question 1]
-   - [Thought-provoking question 2]
-   
-   Ready to move to next section!
-   ```
-
-6. **Preserve Writer's Voice**
-   
-   Important principles:
-   
-   - **Learn their style**: Read existing writing samples
-   - **Suggest, don't replace**: Offer options, not directives
-   - **Match tone**: Formal, casual, technical, friendly
-   - **Respect choices**: If they prefer their version, support it
-   - **Enhance, don't override**: Make their writing better, not different
-   
-   Ask periodically:
-   - "Does this sound like you?"
-   - "Is this the right tone?"
-   - "Should I be more/less [formal/casual/technical]?"
-
-7. **Citation Management**
-   
-   Handle references based on user preference:
-   
-   **Inline Citations**:
-   ```markdown
-   Studies show 40% productivity improvement (McKinsey, 2024).
-   ```
-   
-   **Numbered References**:
-   ```markdown
-   Studies show 40% productivity improvement [1].
-   
-   [1] McKinsey Global Institute. (2024)...
-   ```
-   
-   **Footnote Style**:
-   ```markdown
-   Studies show 40% productivity improvement^1
-   
-   ^1: McKinsey Global Institute. (2024)...
-   ```
-   
-   Maintain a running citations list:
-   ```markdown
-   ## References
-   
-   1. Author. (Year). "Title". Publication.
-   2. Author. (Year). "Title". Publication.
-   ...
-   ```
-
-8. **Final Review and Polish**
-   
-   When draft is complete, provide comprehensive feedback:
-   
-   ```markdown
-   # Full Draft Review
-   
-   ## Overall Assessment
-   
-   **Strengths**:
-   - [Major strength 1]
-   - [Major strength 2]
-   - [Major strength 3]
-   
-   **Impact**: [Overall effectiveness assessment]
-   
-   ## Structure & Flow
-   - [Comments on organization]
-   - [Transition quality]
-   - [Pacing assessment]
-   
-   ## Content Quality
-   - [Argument strength]
-   - [Evidence sufficiency]
-   - [Example effectiveness]
-   
-   ## Technical Quality
-   - Grammar and mechanics: [assessment]
-   - Consistency: [assessment]
-   - Citations: [completeness check]
-   
-   ## Readability
-   - Clarity score: [evaluation]
-   - Sentence variety: [evaluation]
-   - Paragraph length: [evaluation]
-   
-   ## Final Polish Suggestions
-   
-   1. **Introduction**: [Specific improvements]
-   2. **Body**: [Specific improvements]
-   3. **Conclusion**: [Specific improvements]
-   4. **Title**: [Options if needed]
-   
-   ## Pre-Publish Checklist
-   - [ ] All claims sourced
-   - [ ] Citations formatted
-   - [ ] Examples clear
-   - [ ] Transitions smooth
-   - [ ] Call to action present
-   - [ ] Proofread for typos
-   
-   Ready to publish! 🚀
-   ```
-
-## Examples
-
-### Example 1: Teresa Torres's Workflow
-
-**User**: "I'm writing an article about continuous discovery. Help me create an outline."
-
-**Process**:
-1. Collaborates on outline structure
-2. Identifies research needs
-3. User starts writing introduction
-4. Reviews and improves the hook
-5. User writes each section
-6. Provides feedback after each section
-7. Conducts research and adds citations
-8. Final review of complete draft
-9. Polish and prep for publishing
-
-**Result**: Well-researched, properly cited article written in Teresa's voice with strong structure and flow.
-
-### Example 2: Research-Heavy Article
-
-**User**: "I'm writing about AI's impact on product management. Help me find current data and examples."
-
-**Output**:
-```markdown
-## Research Compiled
-
-### Recent Data
-- Gartner: 80% of PMs will use AI tools by 2025 [1]
-- Survey: 45% report faster feature shipping [2]
-- Case study: Airbnb's AI-assisted prioritization [3]
-
-### Expert Quotes
-- "AI amplifies PM judgment, not replaces it" - Marty Cagan
-- [Additional quotes with citations]
-
-### Real Examples
-1. **Company A**: Used AI for user research synthesis
-   - Result: 60% time savings
-   - Source: [citation]
-
-2. **Company B**: AI-powered roadmap analysis
-   - Result: Better stakeholder alignment
-   - Source: [citation]
-
-All added to your outline with proper citations.
-```
-
-### Example 3: Hook Improvement
-
-**User's Original Hook**:
-> "Product management is changing because of AI. In this article, I'll discuss some ways AI affects product managers."
-
-**Improved Options**:
-
-**Option 1 (Data-driven)**:
-> "Last month, I asked AI to analyze 500 customer interviews. It took 30 minutes instead of 3 weeks. Product management will never be the same."
-
-**Option 2 (Question)**:
-> "What if you could talk to every customer, read every review, and analyze every support ticket—all before your morning coffee?"
-
-**Option 3 (Story)**:
-> "Sarah spent two weeks building the wrong feature. Not because she didn't understand her users, but because she couldn't process the hundreds of interviews fast enough to spot the pattern."
-
-### Example 4: Section Feedback
-
-**User**: "Just finished my 'Common Mistakes' section. Thoughts?"
-
-**Response**:
-```markdown
-# Feedback: Common Mistakes Section
-
-## What Works Well ✓
-- Strong examples (the Slack notification story)
-- Clear structure (3 mistakes, clean layout)
-- Practical advice for each mistake
-
-## Suggestions
-
-### Make It More Specific
-Your second point says "Bad prioritization" but could be stronger:
-
-Current:
-> "Many teams prioritize badly by focusing on features instead of outcomes."
-
-Suggested:
-> "I've watched teams ship 14 features in a quarter yet move none of their key metrics. They prioritized activity over progress."
-
-### Add Data
-The third mistake would benefit from evidence:
-> "[Add citation]: Studies show teams without regular user contact are 3x more likely to build unused features [needs source]"
-
-### Flow Improvement
-Consider reordering: Mistake 3 → Mistake 2 → Mistake 1
-This builds from small to big impact.
-
-Ready for the next section!
-```
-
-## Writing Workflows
-
-### Blog Post Workflow
-1. Outline together
-2. Research key points
-3. Write introduction → get feedback
-4. Write body sections → feedback each
-5. Write conclusion → final review
-6. Polish and edit
-
-### Newsletter Workflow
-1. Discuss hook ideas
-2. Quick outline (shorter format)
-3. Draft in one session
-4. Review for clarity and links
-5. Quick polish
-
-### Technical Tutorial Workflow
-1. Outline steps
-2. Write code examples
-3. Add explanations
-4. Test instructions
-5. Add troubleshooting section
-6. Final review for accuracy
-
-### Thought Leadership Workflow
-1. Brainstorm unique angle
-2. Research existing perspectives
-3. Develop your thesis
-4. Write with strong POV
-5. Add supporting evidence
-6. Craft compelling conclusion
-
-## Pro Tips
-
-1. **Work in VS Code**: Better than web Claude for long-form writing
-2. **One section at a time**: Get feedback incrementally
-3. **Save research separately**: Keep a research.md file
-4. **Version your drafts**: article-v1.md, article-v2.md, etc.
-5. **Read aloud**: Use feedback to identify clunky sentences
-6. **Set deadlines**: "I want to finish the draft today"
-7. **Take breaks**: Write, get feedback, pause, revise
-
-## File Organization
-
-Recommended structure for writing projects:
-
-```
-~/writing/article-name/
-├── outline.md          # Your outline
-├── research.md         # All research and citations
-├── draft-v1.md         # First draft
-├── draft-v2.md         # Revised draft
-├── final.md            # Publication-ready
-├── feedback.md         # Collected feedback
-└── sources/            # Reference materials
-    ├── study1.pdf
-    └── article2.md
-```
-
-## Best Practices
-
-### For Research
-- Verify sources before citing
-- Use recent data when possible
-- Balance different perspectives
-- Link to original sources
-
-### For Feedback
-- Be specific about what you want: "Is this too technical?"
-- Share your concerns: "I'm worried this section drags"
-- Ask questions: "Does this flow logically?"
-- Request alternatives: "What's another way to explain this?"
-
-### For Voice
-- Share examples of your writing
-- Specify tone preferences
-- Point out good matches: "That sounds like me!"
-- Flag mismatches: "Too formal for my style"
-
-## Related Use Cases
-
-- Creating social media posts from articles
-- Adapting content for different audiences
-- Writing email newsletters
-- Drafting technical documentation
-- Creating presentation content
-- Writing case studies
-- Developing course outlines
+- Writing blog posts, articles, newsletters, memos, or technical explainers
+- Drafting thought leadership or decision-support content
+- Creating tutorials and technical documentation that needs citations
+- Improving hooks, outlines, and section-by-section clarity
+
+## When Not to Use This Skill
+
+- Exhaustive literature reviews or “collect everything” research
+- Situations where you cannot cite sources but need to assert factual claims
+
+## What This Skill Produces
+
+- A **Research Brief** (scope, audience, claims-to-prove)
+- An **Outline v0** with a claim map and evidence needs
+- A **Source Plan** with a fixed budget (selected + rejected)
+- **Evidence Packets** (atomic claim support with short quotes + citations)
+- A **Draft** written from packets
+- A **Review** (logic, flow, missing evidence, numbered references)
+
+## Operating Principles (Stay Token-Efficient)
+
+1. **Citation-first**: No new factual claim gets written without an evidence packet and a numbered reference.
+2. **Progressive disclosure**: Skim to decide; extract only what supports your claim.
+3. **Fixed source budget**: Default to fewer sources; expand only via explicit escalation.
+4. **Evidence packets over raw notes**: Store proof, not prose.
+5. **Section-at-a-time collaboration**: Review only the current section and minimal surrounding context.
+
+## Workflow (Phases)
+
+### Phase 0 — Research Brief (Inputs)
+
+Collect only decisions and constraints:
+
+- Working title / angle
+- Audience + what they already know
+- Goal (educate, persuade, decision support) + success criteria
+- Scope boundaries (in/out; timeframe; geo; assumptions)
+- Length/format constraints
+- Voice constraints (tone, POV, taboo phrases)
+- **Claims-to-prove** (3–7 bullets; mark each as factual / interpretive / anecdotal)
+- Allowed/disallowed sources (domains, publishers)
+
+Output: a brief file plus a claim list.
+
+### Phase 1 — Outline v0 + Evidence Needs
+
+Create an outline where each section lists:
+
+- The key takeaway
+- The claims that must be supported
+- Evidence needed (what would prove it)
+
+Rule: If a section has no evidence plan, label it explicitly as opinion/experience.
+
+### Phase 2 — Choose a Research Mode (Bounded)
+
+Give the user a choice. Default to **Light**.
+
+**Light (default)**
+
+- Source budget: **3–5 total sources**
+- Evidence packets: **up to 8–12** total packets
+- Per packet: **max 5 bullets**, **max 2 short quotes**
+
+**Deep (escalation)**
+
+- Source budget: **6–10 total sources**
+- Evidence packets: **up to 15–25** total packets
+- Per packet: same caps (keep packets atomic)
+
+Stop condition: Stop researching as soon as every factual claim in the outline has at least one “sufficient” evidence packet.
+
+### Phase 3 — Build a Source Plan (Before Reading Deeply)
+
+Select sources deliberately before extracting:
+
+- Prefer first-party docs/standards/regulators/original datasets
+- Prefer sources with a clear publication date/version
+- Avoid long secondary writeups unless they add unique primary data
+
+Output: a source log with selected/rejected decisions.
+
+### Phase 4 — Parallel Sub-Agents (Async Extraction)
+
+Use sub-agents to keep the main thread small.
+
+**Recommended sub-agent roles**
+
+- **Source Scout**: finds candidates within the source budget
+- **Evidence Extractor**: produces evidence packets for specific claims
+- **Counterpoint Finder**: finds credible limitations/caveats
+- **Hook Crafter**: proposes hooks that map to supported claims
+
+**Strict output schema (required)**
+
+Each sub-agent must return only:
+
+- Packet ID (or “source-candidate list” for Source Scout)
+- Target claim (one sentence)
+- Source(s): canonical title + canonical URL + publication date/version (if any) + access date
+- Evidence bullets (max 5)
+- Short direct quote(s) (max 2; short)
+- What this does NOT prove (1 bullet)
+- Confidence (high/med/low)
+
+Merge rule: The main thread converts sub-agent outputs into evidence packets on disk and references them by ID (do not paste full pages).
+
+### Phase 5 — Draft from Evidence Packets
+
+Write by pulling from packets:
+
+- Every factual sentence should cite a numbered reference (or be removed/softened)
+- Avoid copying large chunks of evidence into the draft; paraphrase and cite
+- If a new claim appears while drafting, pause and request a new evidence packet
+
+### Phase 6 — Review (Minimal Context)
+
+Review section-by-section, focusing on:
+
+- Claim-to-evidence trace (every factual claim has a packet + reference)
+- Flow and transitions
+- Counterpoints are addressed
+- Numbered references are complete and consistent
+
+## Research Storage (Folder Structure)
+
+Research tasks are isolated writing tasks. Use a per-article folder so findings persist without ballooning chat context.
+
+Suggested structure:
+
+- `00-brief/` — research brief + constraints
+- `01-outline/` — outline iterations + claim map
+- `02-research/` — source logs by theme (definitions, methods, market, counterpoints)
+- `03-evidence-packets/` — one file per claim (atomic)
+- `04-drafts/` — draft iterations
+- `05-review/` — checklists, open questions, final QA
+- `06-assets/` — images/charts
+- `99-archive/` — rejected sources, dead ends
+
+Naming conventions:
+
+- Evidence packets: `EP-###-claim-slug.md` (small, self-contained)
+- Source log: `sources.md` (or `sources-definitions.md`, etc.)
+- Drafts: `draft-v1.md`, `draft-v2.md` (avoid giant single files)
+
+## Evidence Packet (What Goes In One)
+
+Keep it atomic (one claim), and keep it small:
+
+- Packet ID
+- Target claim
+- Source IDs used
+- Evidence bullets (max 5)
+- Quote(s) (max 2)
+- Context note + “does not prove”
+- Confidence
+- Intended placement (outline section)
+- Citation-ready reference entry
+
+## Citations (Numbered by Default)
+
+Default style in text: `... claim ... [1]`.
+
+References section entry should include:
+
+- `[n]` Organization/Author. Title. Publication date/version. Canonical URL. Accessed YYYY-MM-DD.
+
+Rule: If a source is too long, cite only the relevant section and capture one short quote in an evidence packet.
+
+## Guardrails to Prevent Compaction
+
+- Do not paste full documents into chat; only store short quotes in evidence packets.
+- Keep sub-agent outputs schema-bound and short.
+- Review only the current section being written plus minimal surrounding text.
+- Use an escalation ladder instead of expanding context:
+   1) Skim headings/TOC/abstract only.
+   2) Extract only the section relevant to the claim.
+   3) If blocked (paywall/login), ask for a short pasted excerpt of the relevant section.
+   4) If evidence still can’t be captured within budget, narrow or remove the claim.
+   5) Only then expand the source budget (+1) with explicit justification.
+
+
+
 
