@@ -10,6 +10,12 @@ version: 1.0.0
 
 Analyze the current coding session to extract reusable patterns, workarounds, and project-specific knowledge. Unlike Claude Code's automatic hook-based extraction, this is a **manual skill** invoked at session end.
 
+## Primary Objective (Non-Negotiable)
+
+When a session surfaces recurring issues (especially linting, architectural guardrails, security constraints, or repeated user corrections), the primary objective is to **update the project’s developer guidelines** so the same mistakes are less likely to happen again.
+
+This means producing persistent artifacts under `.github/` (instructions/skills) and wiring them into the “front-door” docs developers actually read.
+
 ## When to Use
 
 - At the end of a long coding session (30+ min)
@@ -340,3 +346,44 @@ While VS Code Copilot doesn't have Claude Code's hook system, you can:
 - `code-review` - Uses existing instructions; session-learning creates them
 - `project-scaffold` - Initial setup; session-learning evolves over time
 - `agentic-evaluator` - Audits instruction quality
+
+---
+
+## Completion Criteria (Definition of “Done”)
+
+This skill is only “done” when:
+
+1. The immediate issue is resolved (or explicitly documented as intentionally deferred), AND
+2. The relevant developer guidelines are updated so it won’t regress.
+
+For example, if a session involved lint errors:
+- Fix the errors.
+- Capture the exact lint-safe patterns that prevented recurrence.
+- Update the *relevant* instructions docs (not just a new file) so future changes follow the same patterns.
+
+---
+
+## Required Output (What to Produce)
+
+When patterns are detected, produce at least one of:
+
+1. Update an existing instructions file that already applies to the affected area (preferred).
+2. Create a new `.github/instructions/*.instructions.md` if no existing file is appropriate.
+3. Create or update a `.github/skills/*/SKILL.md` if it’s a multi-step workflow.
+
+And always add a cross-reference in a “front-door” doc when appropriate:
+- `.github/copilot-instructions.md` for repo-wide guidance.
+- `.github/instructions/ui-react.instructions.md` for UI/React rules.
+- `.github/instructions/api-routes.instructions.md` for API handler rules.
+
+---
+
+## Session-End Checklist (Use Every Time)
+
+- [ ] Identify the highest-cost mistakes that recurred (lint, security, architecture, UX constraints).
+- [ ] Fix the immediate issue(s) where feasible.
+- [ ] Write down the minimal repeatable rule(s) and the preferred code pattern(s).
+- [ ] Update the most relevant existing instructions file(s) FIRST.
+- [ ] If needed, add a new instructions file (scoped `applyTo`), but don’t rely on new files alone.
+- [ ] Add a cross-reference from `.github/copilot-instructions.md` or another front-door doc.
+- [ ] Re-run the validation step that caught the issue (e.g., `npm run lint`) to confirm.
