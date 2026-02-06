@@ -55,6 +55,9 @@ out/
 .claude/skills/**/config/.env
 ~/.config/last30days/
 
+# Content research writer workspace (generated briefs, evidence packets, drafts)
+.github/skills/content-research-writer/research/
+
 # Backup files
 *.bak
 *.backup
