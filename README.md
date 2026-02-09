@@ -171,7 +171,57 @@ Analyzes completed coding sessions to identify patterns worth capturing as persi
 
 ---
 
-### 6. 🎭 Eric Cartman Agent
+### 6. 🗒️ Session Log
+
+**Capture session insights and metrics for later analysis.**
+
+Logs incremental notes (challenges, insights, metrics) and can generate a full end-of-session summary into `.github/sessions/` so other skills can analyze what happened over time.
+
+**Use When:**
+- You want lightweight logging during a long session
+- You want a structured end-of-session summary for later reference
+- You want to build a dataset for process improvement over time
+- You want to capture friction points and successful workflows as you go
+
+**Invocation:**
+```
+/session-log challenge "Hit 39 TypeScript errors in auth module"
+/session-log insight "Typecheck after each file is faster than batch fixing"
+/session-log metric "Fixed 39 errors across 12 files"
+/session-log end
+```
+
+```
+📍 Location: .github/skills/session-log/
+```
+
+---
+
+### 7. 📈 Insights Report
+
+**Generate a comprehensive cross-session insights report from your session logs.**
+
+Analyzes everything in `.github/sessions/` to surface patterns (what’s working, what’s causing friction, and what to change next). Useful for retrospectives, onboarding, and tightening project conventions.
+
+**Use When:**
+- Weekly/monthly retrospectives
+- Preparing to improve team workflows and developer guidance
+- Identifying recurring issues across multiple sessions
+- Summarizing progress across multiple workstreams
+
+**Invocation:**
+```
+/insights-report
+/insights-report --from 2026-02-01 --to 2026-02-09
+```
+
+```
+📍 Location: .github/skills/insights-report/
+```
+
+---
+
+### 8. 🎭 Eric Cartman Agent
 
 **A Cartman-flavored project guide for codebase exploration.**
 
@@ -203,7 +253,7 @@ Combines the teaching methodology of the Project Guide skill with Eric Cartman's
 
 ---
 
-### 7. ✅ Verification Loop
+### 9. ✅ Verification Loop
 
 **Pre-PR quality gate running comprehensive validation in 7 phases.**
 
@@ -239,7 +289,7 @@ Runs build, type-check, lint, tests, security scans, and hygiene checks before c
 
 ---
 
-### 8. 🔍 Last 30 Days Research
+### 10. 🔍 Last 30 Days Research
 
 **Research any topic across Reddit, X, and the web from the last 30 days.**
 
@@ -283,7 +333,7 @@ The GitHub Copilot version saves a full `report.md` to your local share folder:
 
 ---
 
-### 9. ✍️ Content Research Writer
+### 11. ✍️ Content Research Writer
 
 **Your AI writing partner for research-backed content creation.**
 
@@ -318,7 +368,7 @@ Acts as a collaborative writing partner — helps with outlining, research, cita
 
 ---
 
-### 10. 🔄 Doc-Sync-All
+### 12. 🔄 Doc-Sync-All
 
 **Comprehensive documentation synchronization across all project artifacts.**
 
@@ -348,7 +398,7 @@ Scans local git changes and propagates updates to ALL design docs, task lists, s
 
 ---
 
-### 11. 🎨 Project Infographic
+### 13. 🎨 Project Infographic
 
 **Generate polished HTML infographics for sprint demos and stakeholder presentations.**
 
@@ -380,7 +430,7 @@ Scans the codebase and design docs, then produces a beautiful single-page HTML i
 
 ---
 
-### 12. 🔃 Repo State Sync
+### 14. 🔃 Repo State Sync
 
 **Keep your Session Onboarding section current with actual codebase state.**
 
@@ -409,7 +459,7 @@ Suggests running when it notices discrepancies between docs and reality (chunk c
 
 ---
 
-### 13. 🔍 Skill Lookup
+### 15. 🔍 Skill Lookup
 
 **Search, discover, and install Agent Skills from prompts.chat.**
 
@@ -452,6 +502,8 @@ Connects to the prompts.chat MCP server to find reusable AI skills. Search by ke
 │   ├── project-scaffold/       # ⭐ Featured
 │   ├── health-audit/           # ⭐ Featured
 │   ├── session-learning/       # ⭐ Featured
+│   ├── session-log/            # ⭐ Featured
+│   ├── insights-report/        # ⭐ Featured
 │   ├── verification-loop/      # ⭐ Featured
 │   ├── last30days/             # 🔍 Research skill (Copilot version)
 │   ├── content-research-writer/ # ✍️ Writing partner
