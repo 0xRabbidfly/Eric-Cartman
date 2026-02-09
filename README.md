@@ -463,31 +463,6 @@ Suggests running when it notices discrepancies between docs and reality (chunk c
 
 ---
 
-### 15. 🔍 Skill Lookup
-
-**Search, discover, and install Agent Skills from prompts.chat.**
-
-Connects to the prompts.chat MCP server to find reusable AI skills. Search by keyword, category, or tag, then install skills directly into your project.
-
-**Use When:**
-- Looking for existing skills before creating your own
-- Searching for skills ("What skills are available for testing?")
-- Installing a skill ("Install the documentation skill")
-- Extending Claude's capabilities with community skills
-
-**Available Operations:**
-| Action | Description |
-|--------|-------------|
-| Search | Find skills by keyword, category, or tag |
-| Get | Retrieve a specific skill with all its files |
-| Install | Save skill to `.claude/skills/{slug}/` |
-
-**Skill Structure:**
-- `SKILL.md` (required) — Main instructions with frontmatter
-- Reference docs — Additional documentation
-- Scripts — Helper scripts (Python, shell, etc.)
-- Config files — JSON, YAML configurations
-
 ```
 📍 Location: .github/skills/skill-lookup/
 ```
@@ -514,7 +489,6 @@ Connects to the prompts.chat MCP server to find reusable AI skills. Search by ke
 │   ├── doc-sync-all/           # 🔄 Documentation sync
 │   ├── project-infographic/    # 🎨 Sprint demo visuals
 │   ├── repo-state-sync/        # 🔃 Onboarding sync
-│   └── skill-lookup/           # 🔍 Skill discovery
 ├── agents/                     # Specialized agent configs
 │   └── eric-cartman.md         # 🎭 Cartman-flavored project guide
 ├── instructions/               # File-pattern-specific rules
