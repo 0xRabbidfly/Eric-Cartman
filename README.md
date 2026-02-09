@@ -488,7 +488,7 @@ Suggests running when it notices discrepancies between docs and reality (chunk c
 │   ├── content-research-writer/ # ✍️ Writing partner
 │   ├── doc-sync-all/           # 🔄 Documentation sync
 │   ├── project-infographic/    # 🎨 Sprint demo visuals
-│   ├── repo-state-sync/        # 🔃 Onboarding sync
+│   └── repo-state-sync/        # 🔃 Onboarding sync
 ├── agents/                     # Specialized agent configs
 │   └── eric-cartman.md         # 🎭 Cartman-flavored project guide
 ├── instructions/               # File-pattern-specific rules
