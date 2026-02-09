@@ -175,7 +175,12 @@ Analyzes completed coding sessions to identify patterns worth capturing as persi
 
 **Capture session insights and metrics for later analysis.**
 
-Logs incremental notes (challenges, insights, metrics) and can generate a full end-of-session summary into `.github/sessions/` so other skills can analyze what happened over time.
+Logs checkpoint snapshots and end-of-session summaries into `.github/sessions/` so other skills can analyze what happened over time.
+
+**3 Modes of Usage:**
+- **Checkpoint** — `/session-log checkpoint` auto-extracts recent insights/challenges/metrics
+- **End** — `/session-log end` generates a comprehensive session report
+- **Message** — `/session-log "..."` logs a specific note (auto-categorized)
 
 **Use When:**
 - You want lightweight logging during a long session
@@ -185,9 +190,8 @@ Logs incremental notes (challenges, insights, metrics) and can generate a full e
 
 **Invocation:**
 ```
-/session-log challenge "Hit 39 TypeScript errors in auth module"
-/session-log insight "Typecheck after each file is faster than batch fixing"
-/session-log metric "Fixed 39 errors across 12 files"
+/session-log checkpoint
+/session-log "Hit 39 TypeScript errors in auth module"
 /session-log end
 ```
 

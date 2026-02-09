@@ -4,18 +4,23 @@ Capture session insights and metrics for later analysis.
 
 ## Usage
 
-**Light automated logging** (during session):
+**Checkpoint logging** (auto-extracts insights during session):
 ```
-/session-log challenge "Hit 39 TypeScript errors in auth module"
-/session-log insight "Typecheck after each file is faster than batch fixing"
-/session-log metric "Fixed 39 errors across 12 files"
-/session-log issue "Missing type definitions for third-party library"
+/session-log checkpoint
 ```
+→ I analyze recent conversation and automatically extract/categorize insights, challenges, metrics, etc.
 
 **Manual end-of-session** (comprehensive summary):
 ```
 /session-log end
 ```
+→ Full analysis of entire session with comprehensive report
+
+**Optional: Manual logging** (if you want to add something specific):
+```
+/session-log "Hit 39 TypeScript errors in auth module"
+```
+→ I'll categorize it and log it for you
 
 ---
 
@@ -25,18 +30,87 @@ You are logging insights about this Claude Code session to `.github/sessions/<da
 
 ### Determine the Mode
 
-**If the user provides a category and message:**
-- Categories: `challenge`, `insight`, `metric`, `issue`, `goal`, `friction`, `outcome`, `learning`
-- This is **incremental logging** mode
+**If the user says "checkpoint":**
+- This is **checkpoint mode** - analyze recent conversation and auto-extract insights
 
 **If the user says "end" or provides no arguments:**
 - This is **end-of-session summary** mode
 
+**If the user provides a message (without category):**
+- This is **manual logging** mode - analyze their message, categorize it, and log it
+
 ---
 
-## Mode 1: Incremental Logging
+## Mode 1: Checkpoint (Auto-Extract)
 
-When the user provides a category and message:
+When the user calls `/session-log checkpoint`:
+
+1. **Determine session file:**
+   - Check if `.github/sessions/<today>/*.md` exists from today
+   - If multiple files, ask which session (show list of filenames)
+   - If none exist, ask for session name and create it
+
+2. **Analyze recent conversation:**
+
+   Look at the conversation since the last checkpoint (or session start) and identify:
+
+   - **Insights**: Learnings, discoveries, "aha" moments, patterns found
+     - Example: "Running typecheck after each file is faster than batch fixing"
+     - Example: "The auth module's type errors were all related to missing User interface properties"
+
+   - **Challenges**: Problems encountered, blockers, errors
+     - Example: "Hit 39 TypeScript errors in the auth module"
+     - Example: "Third-party library missing type definitions"
+
+   - **Metrics**: Quantifiable outcomes, counts, measurements
+     - Example: "Fixed 39 type errors across 12 files"
+     - Example: "Reduced bundle size by 15%"
+
+   - **Issues**: Bugs, problems to investigate, technical debt
+     - Example: "Authentication flow has race condition with session storage"
+
+   - **Friction**: Misunderstandings, missing context, back-and-forth needed
+     - Example: "Had to clarify which project to run typecheck on"
+
+   - **Learnings**: Knowledge gained, patterns understood
+     - Example: "Learned that the project uses Zod for runtime validation"
+
+   - **What Worked**: Successful approaches
+     - Example: "Using task agents to parallelize fixes across files was very efficient"
+
+   - **What Didn't Work**: Failed approaches, dead ends
+     - Example: "Tried fixing types top-down but bottom-up was more effective"
+
+3. **Create timestamped entries:**
+
+   For each item found, create an entry:
+   ```markdown
+   ## [10:34 AM] Challenge
+   Hit 39 TypeScript errors in the auth module. Errors primarily related to missing type annotations on User interface and session handling.
+
+   ## [10:45 AM] Insight
+   Running typecheck after each file fix is faster than batch fixing all files then rechecking.
+
+   ## [11:02 AM] Metric
+   Fixed 39 type errors across 12 files in approximately 45 minutes.
+
+   ## [11:15 AM] What Worked
+   Using task agents to parallelize fixes across different modules was highly efficient.
+   ```
+
+4. **Append to session file:**
+   - Add all entries with current timestamps
+   - Preserve existing content
+
+5. **Confirm:**
+   - Tell user: "Checkpoint logged to `.github/sessions/2026-02-09/fix-auth-types.md`"
+   - Summarize what was captured: "Captured 2 insights, 1 challenge, 1 metric"
+
+---
+
+## Mode 2: Manual Logging
+
+When the user provides a message without a category:
 
 1. **Determine session file:**
    - Check if `.github/sessions/<today>/*.md` exists from today
@@ -58,7 +132,19 @@ When the user provides a category and message:
 
 ---
 
-## Mode 2: End-of-Session Summary
+1. **Analyze the message:**
+   - Determine what category it belongs to (challenge, insight, metric, issue, friction, learning, etc.)
+   - Extract a concise title
+
+2. **Follow checkpoint Mode 1 steps** to append the entry
+
+3. **Confirm:**
+   - Tell user what category it was logged as
+   - Example: "Logged as Challenge to `.github/sessions/2026-02-09/fix-auth-types.md`"
+
+---
+
+## Mode 3: End-of-Session Summary
 
 When the user wants a comprehensive summary:
 
@@ -226,10 +312,18 @@ When creating a new session file, start with this header:
 
 ## Examples
 
-**Incremental during session:**
+**Checkpoint (auto-extract):**
 ```
-User: /session-log challenge "39 TypeScript errors in auth module"
-Claude: Logged to .github/sessions/2026-02-09/fix-auth-types.md
+User: /session-log checkpoint
+Claude: Analyzing recent conversation...
+Checkpoint logged to .github/sessions/2026-02-09/fix-auth-types.md
+Captured: 2 insights, 1 challenge, 1 metric, 1 learning
+```
+
+**Manual logging:**
+```
+User: /session-log "Hit 39 TypeScript errors in the auth module"
+Claude: Logged as Challenge to .github/sessions/2026-02-09/fix-auth-types.md
 ```
 
 **End of session:**

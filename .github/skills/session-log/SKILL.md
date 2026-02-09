@@ -10,18 +10,23 @@ Capture session insights and metrics for later analysis.
 
 ## Usage
 
-**Light automated logging** (during session):
+**Checkpoint logging** (auto-extracts insights during session):
 ```
-/session-log challenge "Hit 39 TypeScript errors in auth module"
-/session-log insight "Typecheck after each file is faster than batch fixing"
-/session-log metric "Fixed 39 errors across 12 files"
-/session-log issue "Missing type definitions for third-party library"
+/session-log checkpoint
 ```
+→ Analyze recent conversation and automatically extract/categorize insights, challenges, metrics, etc.
 
 **Manual end-of-session** (comprehensive summary):
 ```
 /session-log end
 ```
+→ Full analysis of the entire session with a comprehensive report
+
+**Optional: manual logging** (add a specific note):
+```
+/session-log "Hit 39 TypeScript errors in auth module"
+```
+→ Categorize it and log it to the current session file
 
 ---
 
@@ -31,40 +36,96 @@ You are logging insights about this Copilot Chat session to `.github/sessions/<d
 
 ### Determine the Mode
 
-**If the user provides a category and message:**
-- Categories: `challenge`, `insight`, `metric`, `issue`, `goal`, `friction`, `outcome`, `learning`
-- This is **incremental logging** mode
+**If the user says "checkpoint":**
+- This is **checkpoint mode** — analyze recent conversation and auto-extract insights
 
 **If the user says "end" or provides no arguments:**
 - This is **end-of-session summary** mode
 
+**If the user provides a message (without a category):**
+- This is **manual logging** mode — analyze their message, categorize it, and log it
+
 ---
 
-## Mode 1: Incremental Logging
+## Mode 1: Checkpoint (Auto-Extract)
 
-When the user provides a category and message:
+When the user calls `/session-log checkpoint`:
+
+1. **Determine session file:**
+   - Check if `.github/sessions/<today>/*.md` exists from today
+   - If multiple files, ask which session (show list of filenames)
+   - If none exist, ask for session name and create it
+
+2. **Analyze recent conversation:**
+
+   Look at the conversation since the last checkpoint (or session start) and identify:
+
+   - **Insights**: learnings, discoveries, “aha” moments, patterns found
+   - **Challenges**: problems encountered, blockers, errors
+   - **Metrics**: quantifiable outcomes, counts, measurements
+   - **Issues**: bugs, problems to investigate, technical debt
+   - **Friction**: misunderstandings, missing context, back-and-forth needed
+   - **Learnings**: knowledge gained, patterns understood
+   - **What Worked**: successful approaches
+   - **What Didn’t Work**: failed approaches, dead ends
+
+3. **Create timestamped entries:**
+
+   For each item found, create an entry:
+   ```markdown
+   ## [10:34 AM] Challenge
+   Hit 39 TypeScript errors in the auth module. Errors primarily related to missing type annotations on the User interface and session handling.
+
+   ## [10:45 AM] Insight
+   Running typecheck after each file fix is faster than batch fixing all files then rechecking.
+
+   ## [11:02 AM] Metric
+   Fixed 39 type errors across 12 files in approximately 45 minutes.
+
+   ## [11:15 AM] What Worked
+   Parallelizing fixes across modules was highly efficient.
+   ```
+
+4. **Append to the session file:**
+   - Add all entries with current timestamps
+   - Preserve existing content
+
+5. **Confirm:**
+   - Tell user: "Checkpoint logged to `.github/sessions/2026-02-09/fix-auth-types.md`"
+   - Summarize what was captured (e.g., "Captured 2 insights, 1 challenge, 1 metric")
+
+---
+
+## Mode 2: Manual Logging (Message)
+
+When the user provides a message without a category:
 
 1. **Determine session file:**
    - Check if `.github/sessions/<today>/*.md` exists from today
    - If multiple files, ask which session (show list of filenames)
    - If none exist, ask for session name: "What should we call this session?" (suggest a name based on recent work)
 
-2. **Create or append entry:**
-   - Format: `## [HH:MM AM/PM] <Category>: <Title>`
-   - Add the user's message as content
-   - If this is a new file, create header first (see template below)
+2. **Analyze the message:**
+   - Determine what category it belongs to (challenge, insight, metric, issue, friction, learning, etc.)
+   - Extract a concise title
 
-3. **Append to file:**
+3. **Append an entry:**
+   - Format: `## [HH:MM AM/PM] <Category>: <Title>`
+   - Include the user’s message as the entry body
+
+   Example:
    ```markdown
    ## [10:34 AM] Challenge: TypeScript errors in auth module
    Hit 39 TypeScript errors across authentication files. Need to systematically fix type issues with user model and session handling.
    ```
 
-4. **Confirm:** "Logged to `.github/sessions/2026-02-09/fix-auth-types.md`"
+4. **Confirm:**
+   - Tell user what category it was logged as
+   - Example: "Logged as Challenge to `.github/sessions/2026-02-09/fix-auth-types.md`"
 
 ---
 
-## Mode 2: End-of-Session Summary
+## Mode 3: End-of-Session Summary
 
 When the user wants a comprehensive summary:
 
@@ -232,10 +293,18 @@ When creating a new session file, start with this header:
 
 ## Examples
 
-**Incremental during session:**
+**Checkpoint (auto-extract):**
 ```
-User: /session-log challenge "39 TypeScript errors in auth module"
-Copilot: Logged to .github/sessions/2026-02-09/fix-auth-types.md
+User: /session-log checkpoint
+Copilot: Analyzing recent conversation...
+Checkpoint logged to .github/sessions/2026-02-09/fix-auth-types.md
+Captured: 2 insights, 1 challenge, 1 metric, 1 learning
+```
+
+**Manual logging (message):**
+```
+User: /session-log "Hit 39 TypeScript errors in the auth module"
+Copilot: Logged as Challenge to .github/sessions/2026-02-09/fix-auth-types.md
 ```
 
 **End of session:**

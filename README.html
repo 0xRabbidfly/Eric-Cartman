@@ -1,0 +1,651 @@
+<!DOCTYPE html><html><head>
+      <title>README</title>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      
+      <link rel="stylesheet" href="file:///c:\Users\nuno_\.vscode\extensions\shd101wyy.markdown-preview-enhanced-0.8.20\crossnote\dependencies\katex\katex.min.css">
+      
+      
+      
+      
+      
+      <style>
+      code[class*=language-],pre[class*=language-]{color:#333;background:0 0;font-family:Consolas,"Liberation Mono",Menlo,Courier,monospace;text-align:left;white-space:pre;word-spacing:normal;word-break:normal;word-wrap:normal;line-height:1.4;-moz-tab-size:8;-o-tab-size:8;tab-size:8;-webkit-hyphens:none;-moz-hyphens:none;-ms-hyphens:none;hyphens:none}pre[class*=language-]{padding:.8em;overflow:auto;border-radius:3px;background:#f5f5f5}:not(pre)>code[class*=language-]{padding:.1em;border-radius:.3em;white-space:normal;background:#f5f5f5}.token.blockquote,.token.comment{color:#969896}.token.cdata{color:#183691}.token.doctype,.token.macro.property,.token.punctuation,.token.variable{color:#333}.token.builtin,.token.important,.token.keyword,.token.operator,.token.rule{color:#a71d5d}.token.attr-value,.token.regex,.token.string,.token.url{color:#183691}.token.atrule,.token.boolean,.token.code,.token.command,.token.constant,.token.entity,.token.number,.token.property,.token.symbol{color:#0086b3}.token.prolog,.token.selector,.token.tag{color:#63a35c}.token.attr-name,.token.class,.token.class-name,.token.function,.token.id,.token.namespace,.token.pseudo-class,.token.pseudo-element,.token.url-reference .token.variable{color:#795da3}.token.entity{cursor:help}.token.title,.token.title .token.punctuation{font-weight:700;color:#1d3e81}.token.list{color:#ed6a43}.token.inserted{background-color:#eaffea;color:#55a532}.token.deleted{background-color:#ffecec;color:#bd2c00}.token.bold{font-weight:700}.token.italic{font-style:italic}.language-json .token.property{color:#183691}.language-markup .token.tag .token.punctuation{color:#333}.language-css .token.function,code.language-css{color:#0086b3}.language-yaml .token.atrule{color:#63a35c}code.language-yaml{color:#183691}.language-ruby .token.function{color:#333}.language-markdown .token.url{color:#795da3}.language-makefile .token.symbol{color:#795da3}.language-makefile .token.variable{color:#183691}.language-makefile .token.builtin{color:#0086b3}.language-bash .token.keyword{color:#0086b3}pre[data-line]{position:relative;padding:1em 0 1em 3em}pre[data-line] .line-highlight-wrapper{position:absolute;top:0;left:0;background-color:transparent;display:block;width:100%}pre[data-line] .line-highlight{position:absolute;left:0;right:0;padding:inherit 0;margin-top:1em;background:hsla(24,20%,50%,.08);background:linear-gradient(to right,hsla(24,20%,50%,.1) 70%,hsla(24,20%,50%,0));pointer-events:none;line-height:inherit;white-space:pre}pre[data-line] .line-highlight:before,pre[data-line] .line-highlight[data-end]:after{content:attr(data-start);position:absolute;top:.4em;left:.6em;min-width:1em;padding:0 .5em;background-color:hsla(24,20%,50%,.4);color:#f4f1ef;font:bold 65%/1.5 sans-serif;text-align:center;vertical-align:.3em;border-radius:999px;text-shadow:none;box-shadow:0 1px #fff}pre[data-line] .line-highlight[data-end]:after{content:attr(data-end);top:auto;bottom:.4em}html body{font-family:'Helvetica Neue',Helvetica,'Segoe UI',Arial,freesans,sans-serif;font-size:16px;line-height:1.6;color:#333;background-color:#fff;overflow:initial;box-sizing:border-box;word-wrap:break-word}html body>:first-child{margin-top:0}html body h1,html body h2,html body h3,html body h4,html body h5,html body h6{line-height:1.2;margin-top:1em;margin-bottom:16px;color:#000}html body h1{font-size:2.25em;font-weight:300;padding-bottom:.3em}html body h2{font-size:1.75em;font-weight:400;padding-bottom:.3em}html body h3{font-size:1.5em;font-weight:500}html body h4{font-size:1.25em;font-weight:600}html body h5{font-size:1.1em;font-weight:600}html body h6{font-size:1em;font-weight:600}html body h1,html body h2,html body h3,html body h4,html body h5{font-weight:600}html body h5{font-size:1em}html body h6{color:#5c5c5c}html body strong{color:#000}html body del{color:#5c5c5c}html body a:not([href]){color:inherit;text-decoration:none}html body a{color:#08c;text-decoration:none}html body a:hover{color:#00a3f5;text-decoration:none}html body img{max-width:100%}html body>p{margin-top:0;margin-bottom:16px;word-wrap:break-word}html body>ol,html body>ul{margin-bottom:16px}html body ol,html body ul{padding-left:2em}html body ol.no-list,html body ul.no-list{padding:0;list-style-type:none}html body ol ol,html body ol ul,html body ul ol,html body ul ul{margin-top:0;margin-bottom:0}html body li{margin-bottom:0}html body li.task-list-item{list-style:none}html body li>p{margin-top:0;margin-bottom:0}html body .task-list-item-checkbox{margin:0 .2em .25em -1.8em;vertical-align:middle}html body .task-list-item-checkbox:hover{cursor:pointer}html body blockquote{margin:16px 0;font-size:inherit;padding:0 15px;color:#5c5c5c;background-color:#f0f0f0;border-left:4px solid #d6d6d6}html body blockquote>:first-child{margin-top:0}html body blockquote>:last-child{margin-bottom:0}html body hr{height:4px;margin:32px 0;background-color:#d6d6d6;border:0 none}html body table{margin:10px 0 15px 0;border-collapse:collapse;border-spacing:0;display:block;width:100%;overflow:auto;word-break:normal;word-break:keep-all}html body table th{font-weight:700;color:#000}html body table td,html body table th{border:1px solid #d6d6d6;padding:6px 13px}html body dl{padding:0}html body dl dt{padding:0;margin-top:16px;font-size:1em;font-style:italic;font-weight:700}html body dl dd{padding:0 16px;margin-bottom:16px}html body code{font-family:Menlo,Monaco,Consolas,'Courier New',monospace;font-size:.85em;color:#000;background-color:#f0f0f0;border-radius:3px;padding:.2em 0}html body code::after,html body code::before{letter-spacing:-.2em;content:'\00a0'}html body pre>code{padding:0;margin:0;word-break:normal;white-space:pre;background:0 0;border:0}html body .highlight{margin-bottom:16px}html body .highlight pre,html body pre{padding:1em;overflow:auto;line-height:1.45;border:#d6d6d6;border-radius:3px}html body .highlight pre{margin-bottom:0;word-break:normal}html body pre code,html body pre tt{display:inline;max-width:initial;padding:0;margin:0;overflow:initial;line-height:inherit;word-wrap:normal;background-color:transparent;border:0}html body pre code:after,html body pre code:before,html body pre tt:after,html body pre tt:before{content:normal}html body blockquote,html body dl,html body ol,html body p,html body pre,html body ul{margin-top:0;margin-bottom:16px}html body kbd{color:#000;border:1px solid #d6d6d6;border-bottom:2px solid #c7c7c7;padding:2px 4px;background-color:#f0f0f0;border-radius:3px}@media print{html body{background-color:#fff}html body h1,html body h2,html body h3,html body h4,html body h5,html body h6{color:#000;page-break-after:avoid}html body blockquote{color:#5c5c5c}html body pre{page-break-inside:avoid}html body table{display:table}html body img{display:block;max-width:100%;max-height:100%}html body code,html body pre{word-wrap:break-word;white-space:pre}}.markdown-preview{width:100%;height:100%;box-sizing:border-box}.markdown-preview ul{list-style:disc}.markdown-preview ul ul{list-style:circle}.markdown-preview ul ul ul{list-style:square}.markdown-preview ol{list-style:decimal}.markdown-preview ol ol,.markdown-preview ul ol{list-style-type:lower-roman}.markdown-preview ol ol ol,.markdown-preview ol ul ol,.markdown-preview ul ol ol,.markdown-preview ul ul ol{list-style-type:lower-alpha}.markdown-preview .newpage,.markdown-preview .pagebreak{page-break-before:always}.markdown-preview pre.line-numbers{position:relative;padding-left:3.8em;counter-reset:linenumber}.markdown-preview pre.line-numbers>code{position:relative}.markdown-preview pre.line-numbers .line-numbers-rows{position:absolute;pointer-events:none;top:1em;font-size:100%;left:0;width:3em;letter-spacing:-1px;border-right:1px solid #999;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none}.markdown-preview pre.line-numbers .line-numbers-rows>span{pointer-events:none;display:block;counter-increment:linenumber}.markdown-preview pre.line-numbers .line-numbers-rows>span:before{content:counter(linenumber);color:#999;display:block;padding-right:.8em;text-align:right}.markdown-preview .mathjax-exps .MathJax_Display{text-align:center!important}.markdown-preview:not([data-for=preview]) .code-chunk .code-chunk-btn-group{display:none}.markdown-preview:not([data-for=preview]) .code-chunk .status{display:none}.markdown-preview:not([data-for=preview]) .code-chunk .output-div{margin-bottom:16px}.markdown-preview .md-toc{padding:0}.markdown-preview .md-toc .md-toc-link-wrapper .md-toc-link{display:inline;padding:.25rem 0}.markdown-preview .md-toc .md-toc-link-wrapper .md-toc-link div,.markdown-preview .md-toc .md-toc-link-wrapper .md-toc-link p{display:inline}.markdown-preview .md-toc .md-toc-link-wrapper.highlighted .md-toc-link{font-weight:800}.scrollbar-style::-webkit-scrollbar{width:8px}.scrollbar-style::-webkit-scrollbar-track{border-radius:10px;background-color:transparent}.scrollbar-style::-webkit-scrollbar-thumb{border-radius:5px;background-color:rgba(150,150,150,.66);border:4px solid rgba(150,150,150,.66);background-clip:content-box}html body[for=html-export]:not([data-presentation-mode]){position:relative;width:100%;height:100%;top:0;left:0;margin:0;padding:0;overflow:auto}html body[for=html-export]:not([data-presentation-mode]) .markdown-preview{position:relative;top:0;min-height:100vh}@media screen and (min-width:914px){html body[for=html-export]:not([data-presentation-mode]) .markdown-preview{padding:2em calc(50% - 457px + 2em)}}@media screen and (max-width:914px){html body[for=html-export]:not([data-presentation-mode]) .markdown-preview{padding:2em}}@media screen and (max-width:450px){html body[for=html-export]:not([data-presentation-mode]) .markdown-preview{font-size:14px!important;padding:1em}}@media print{html body[for=html-export]:not([data-presentation-mode]) #sidebar-toc-btn{display:none}}html body[for=html-export]:not([data-presentation-mode]) #sidebar-toc-btn{position:fixed;bottom:8px;left:8px;font-size:28px;cursor:pointer;color:inherit;z-index:99;width:32px;text-align:center;opacity:.4}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] #sidebar-toc-btn{opacity:1}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc{position:fixed;top:0;left:0;width:300px;height:100%;padding:32px 0 48px 0;font-size:14px;box-shadow:0 0 4px rgba(150,150,150,.33);box-sizing:border-box;overflow:auto;background-color:inherit}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc::-webkit-scrollbar{width:8px}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc::-webkit-scrollbar-track{border-radius:10px;background-color:transparent}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc::-webkit-scrollbar-thumb{border-radius:5px;background-color:rgba(150,150,150,.66);border:4px solid rgba(150,150,150,.66);background-clip:content-box}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc a{text-decoration:none}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc{padding:0 16px}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc .md-toc-link-wrapper .md-toc-link{display:inline;padding:.25rem 0}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc .md-toc-link-wrapper .md-toc-link div,html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc .md-toc-link-wrapper .md-toc-link p{display:inline}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc .md-toc-link-wrapper.highlighted .md-toc-link{font-weight:800}html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .markdown-preview{left:300px;width:calc(100% - 300px);padding:2em calc(50% - 457px - 300px / 2);margin:0;box-sizing:border-box}@media screen and (max-width:1274px){html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .markdown-preview{padding:2em}}@media screen and (max-width:450px){html body[for=html-export]:not([data-presentation-mode])[html-show-sidebar-toc] .markdown-preview{width:100%}}html body[for=html-export]:not([data-presentation-mode]):not([html-show-sidebar-toc]) .markdown-preview{left:50%;transform:translateX(-50%)}html body[for=html-export]:not([data-presentation-mode]):not([html-show-sidebar-toc]) .md-sidebar-toc{display:none}
+/* Please visit the URL below for more information: */
+/*   https://shd101wyy.github.io/markdown-preview-enhanced/#/customize-css */
+
+      </style>
+      <!-- The content below will be included at the end of the <head> element. --><script type="text/javascript">
+  document.addEventListener("DOMContentLoaded", function () {
+    // your code here
+  });
+</script></head><body for="html-export">
+    
+    
+      <div class="crossnote markdown-preview  ">
+      
+<div align="center">
+<img src="https://upload.wikimedia.org/wikipedia/en/7/77/EricCartman.png" alt="Eric Cartman - The King of Meta Prompting" width="200">
+<h1 id="-eric-cartman">🎯 Eric Cartman </h1>
+<h3 id="the-meta-prompt-library"><em>The Meta Prompt Library</em> </h3>
+<p><strong>A development scaffold for leveraging the power of agents, commands, skills, and prompts in your projects.</strong></p>
+<p><a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a><br>
+<a href="http://makeapullrequest.com"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs Welcome"></a></p>
+<p><em>"Respect my authority!"</em> — Eric Cartman knows what he wants, and so should your AI agents.</p>
+</div>
+<hr>
+<h2 id="-what-is-this">🤔 What is This? </h2>
+<p><strong>Eric Cartman</strong> is a meta prompt library — a springboard of Gen AI IDE artifacts to bootstrap any project with agentic development capabilities. Whether you're using GitHub Copilot, Claude, Cursor, or other AI coding assistants, this library provides battle-tested prompts, skills, and scaffolding to get you off on the right path.</p>
+<h3 id="why-eric-cartman">Why "Eric Cartman"? </h3>
+<p>Because Cartman is the ultimate meta-prompter. He knows exactly how to manipulate situations to get what he wants. Your AI agents should be just as effective (but, you know, for good).</p>
+<hr>
+<h2 id="-featured-prompts">🚀 Featured Prompts </h2>
+<h3 id="1--agentic-evaluator">1. 🔍 Agentic Evaluator </h3>
+<p><strong>Score any repository's agentic development maturity.</strong></p>
+<p>Audits a codebase for best practices in agents, skills, instructions, MCP config, and prompts. Produces a scored report (A-F grade, 0-100 points) with specific remediation steps.</p>
+<p><strong>Use When:</strong></p>
+<ul>
+<li>Auditing a new repository before contributing</li>
+<li>Evaluating your project's agentic maturity</li>
+<li>Onboarding to a codebase with agentic features</li>
+<li>CI gate to enforce minimum agentic standards</li>
+<li>Comparing multiple repos' implementations</li>
+</ul>
+<p><strong>Scoring Categories:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Category</th>
+<th>Points</th>
+<th>Focus</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Foundation</td>
+<td>25</td>
+<td>Root instructions, structure, MCP config</td>
+</tr>
+<tr>
+<td>Skills</td>
+<td>25</td>
+<td>Frontmatter, examples, right-sizing</td>
+</tr>
+<tr>
+<td>Agents</td>
+<td>20</td>
+<td>Tools, mission, handoffs</td>
+</tr>
+<tr>
+<td>Instructions</td>
+<td>20</td>
+<td>applyTo patterns, coverage</td>
+</tr>
+<tr>
+<td>Consistency</td>
+<td>10</td>
+<td>Naming, no duplicates, cross-refs</td>
+</tr>
+</tbody>
+</table>
+<pre data-role="codeBlock" data-info="" class="language-text"><code>📍 Location: .github/skills/agentic-evaluator/
+</code></pre><hr>
+<h3 id="2--project-guide">2. 🧭 Project Guide </h3>
+<p><strong>A teaching-first exploration companion for any codebase.</strong></p>
+<p>Simulates plan mode with an educational focus. Provides high-level overviews, architecture diagrams, and guided deep-dives into any area of the project. Emphasizes building mental models and offers follow-up questions to continue the learning journey.</p>
+<p><strong>Use When:</strong></p>
+<ul>
+<li>Onboarding to a new or unfamiliar codebase</li>
+<li>Understanding architectural decisions and trade-offs</li>
+<li>Exploring a specific subsystem in depth</li>
+<li>Preparing for a code review or contribution</li>
+<li>Explaining a codebase to stakeholders or new team members</li>
+</ul>
+<p><strong>Teaching Approach:</strong></p>
+<ul>
+<li>Starts with bird's-eye overview, zooms in on request</li>
+<li>Uses Mermaid and ASCII diagrams for visual learning</li>
+<li>Acknowledges complexity; layers understanding gradually</li>
+<li>Ends interactions with 2-3 thoughtful follow-up questions</li>
+<li>Adapts to beginner, experienced, or returning developer</li>
+</ul>
+<pre data-role="codeBlock" data-info="" class="language-text"><code>📍 Location: .github/skills/project-guide/
+</code></pre><hr>
+<h3 id="3-️-project-scaffold">3. 🏗️ Project Scaffold </h3>
+<p><strong>Interactive wizard for creating a comprehensive agentic development scaffold.</strong></p>
+<p>Guides you through creating custom instructions, skills, agents, and MCP configurations tailored to your specific project needs.</p>
+<p><strong>Use When:</strong></p>
+<ul>
+<li>Starting a new development project</li>
+<li>Adding AI coding assistant capabilities to existing codebase</li>
+<li>Standardizing team's AI tooling approach</li>
+<li>Migrating from basic to advanced agentic features</li>
+</ul>
+<p><strong>What It Generates:</strong></p>
+<ul>
+<li><code>copilot-instructions.md</code> — Root instructions for AI context</li>
+<li>Custom skills for your workflows (testing, deployment, etc.)</li>
+<li>Agent configurations for specialized tasks</li>
+<li>MCP (Model Context Protocol) server configs</li>
+<li>Progressive disclosure structure (metadata → body → bundled files)</li>
+</ul>
+<pre data-role="codeBlock" data-info="" class="language-text"><code>📍 Location: .github/skills/project-scaffold/
+</code></pre><hr>
+<h3 id="4--health-audit">4. 🩺 Health Audit </h3>
+<p><strong>Regular audit checklist for maintaining quality across all agentic artifacts.</strong></p>
+<p>Validates YAML frontmatter, checks cross-references, counts tokens, and ensures your skills stay accurate and useful.</p>
+<p><strong>Use When:</strong></p>
+<ul>
+<li>Quarterly skill reviews</li>
+<li>After major project changes</li>
+<li>Before onboarding new team members</li>
+<li>Post-incident documentation review</li>
+</ul>
+<p><strong>Automated Checks:</strong></p>
+<pre data-role="codeBlock" data-info="bash" class="language-bash bash"><code><span class="token comment"># Validate YAML frontmatter</span>
+<span class="token function">node</span> .github/skills/health-audit/validate-frontmatter.js
+
+<span class="token comment"># Check cross-references</span>
+<span class="token function">node</span> .github/skills/health-audit/check-cross-refs.js
+
+<span class="token comment"># Count tokens in skills</span>
+<span class="token function">node</span> .github/skills/health-audit/count-tokens.js
+</code></pre><pre data-role="codeBlock" data-info="" class="language-text"><code>📍 Location: .github/skills/health-audit/
+</code></pre><hr>
+<h3 id="5--session-learning">5. 📚 Session Learning </h3>
+<p><strong>Extract reusable patterns from coding sessions to build institutional knowledge.</strong></p>
+<p>Analyzes completed coding sessions to identify patterns worth capturing as persistent instructions or skills. Turns one-time solutions into reusable knowledge.</p>
+<p><strong>Use When:</strong></p>
+<ul>
+<li>At the end of long coding sessions (30+ minutes)</li>
+<li>After solving tricky debugging problems</li>
+<li>When you corrected the AI multiple times on the same issue</li>
+<li>After discovering framework quirks or workarounds</li>
+<li>When establishing new project conventions</li>
+</ul>
+<p><strong>What It Extracts:</strong></p>
+<ul>
+<li><strong>Error Resolutions</strong> — How specific errors were diagnosed and fixed</li>
+<li><strong>User Corrections</strong> — Patterns where you corrected the AI's approach</li>
+<li><strong>Workarounds</strong> — Solutions to framework/library quirks</li>
+<li><strong>Debugging Techniques</strong> — Effective debugging patterns</li>
+<li><strong>Project Conventions</strong> — New conventions established during the session</li>
+</ul>
+<p><strong>Output Locations:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Pattern Type</th>
+<th>Saved To</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Quick rules</td>
+<td><code>copilot-instructions.md</code></td>
+</tr>
+<tr>
+<td>File-specific rules</td>
+<td><code>instructions/*.instructions.md</code></td>
+</tr>
+<tr>
+<td>Complex workflows</td>
+<td><code>skills/*/SKILL.md</code></td>
+</tr>
+</tbody>
+</table>
+<pre data-role="codeBlock" data-info="" class="language-text"><code>📍 Location: .github/skills/session-learning/
+</code></pre><hr>
+<h3 id="6-️-session-log">6. 🗒️ Session Log </h3>
+<p><strong>Capture session insights and metrics for later analysis.</strong></p>
+<p>Logs incremental notes (challenges, insights, metrics) and can generate a full end-of-session summary into <code>.github/sessions/</code> so other skills can analyze what happened over time.</p>
+<p><strong>Use When:</strong></p>
+<ul>
+<li>You want lightweight logging during a long session</li>
+<li>You want a structured end-of-session summary for later reference</li>
+<li>You want to build a dataset for process improvement over time</li>
+<li>You want to capture friction points and successful workflows as you go</li>
+</ul>
+<p><strong>Invocation:</strong></p>
+<pre data-role="codeBlock" data-info="" class="language-text"><code>/session-log challenge "Hit 39 TypeScript errors in auth module"
+/session-log insight "Typecheck after each file is faster than batch fixing"
+/session-log metric "Fixed 39 errors across 12 files"
+/session-log end
+</code></pre><pre data-role="codeBlock" data-info="" class="language-text"><code>📍 Location: .github/skills/session-log/
+</code></pre><hr>
+<h3 id="7--insights-report">7. 📈 Insights Report </h3>
+<p><strong>Generate a comprehensive cross-session insights report from your session logs.</strong></p>
+<p>Analyzes everything in <code>.github/sessions/</code> to surface patterns (what’s working, what’s causing friction, and what to change next). Useful for retrospectives, onboarding, and tightening project conventions.</p>
+<p><strong>Use When:</strong></p>
+<ul>
+<li>Weekly/monthly retrospectives</li>
+<li>Preparing to improve team workflows and developer guidance</li>
+<li>Identifying recurring issues across multiple sessions</li>
+<li>Summarizing progress across multiple workstreams</li>
+</ul>
+<p><strong>Invocation:</strong></p>
+<pre data-role="codeBlock" data-info="" class="language-text"><code>/insights-report
+/insights-report --from 2026-02-01 --to 2026-02-09
+</code></pre><pre data-role="codeBlock" data-info="" class="language-text"><code>📍 Location: .github/skills/insights-report/
+</code></pre><hr>
+<h3 id="8--eric-cartman-agent">8. 🎭 Eric Cartman Agent </h3>
+<p><strong>A Cartman-flavored project guide for codebase exploration.</strong></p>
+<p>Combines the teaching methodology of the Project Guide skill with Eric Cartman's iconic personality. Get thorough, helpful codebase walkthroughs delivered with attitude, authority, and demands for Cheesy Poofs.</p>
+<p><strong>Use When:</strong></p>
+<ul>
+<li>You want guided codebase exploration with entertainment value</li>
+<li>Onboarding feels dry and you need some personality</li>
+<li>You want the Project Guide skill's approach but as a persistent persona</li>
+<li>Teaching junior developers who appreciate humor with their learning</li>
+</ul>
+<p><strong>Personality Highlights:</strong></p>
+<ul>
+<li>Acts like explaining things is a huge favor (but actually helps thoroughly)</li>
+<li>Blames messy code on "hippies" or previous developers being "totally weak"</li>
+<li>Grudgingly admits when you ask a good question</li>
+<li>Demands respect for his authoritah on all architectural matters</li>
+<li>References Cheesy Poofs as appropriate compensation for guidance</li>
+</ul>
+<p><strong>Invocation:</strong></p>
+<pre data-role="codeBlock" data-info="" class="language-text"><code>@eric-cartman Give me a tour of this codebase
+@eric-cartman Explain the authentication flow
+@eric-cartman What's going on in the API layer?
+</code></pre><pre data-role="codeBlock" data-info="" class="language-text"><code>📍 Location: .github/agents/eric-cartman.md
+</code></pre><hr>
+<h3 id="9--verification-loop">9. ✅ Verification Loop </h3>
+<p><strong>Pre-PR quality gate running comprehensive validation in 7 phases.</strong></p>
+<p>Runs build, type-check, lint, tests, security scans, and hygiene checks before creating a pull request. Catches issues locally before they reach CI/CD.</p>
+<p><strong>Use When:</strong></p>
+<ul>
+<li>Before creating a pull request</li>
+<li>After completing a feature or significant refactoring</li>
+<li>After merging main into your branch</li>
+<li>As a final check before deployment</li>
+<li>Every 30 minutes during long coding sessions</li>
+</ul>
+<p><strong>Verification Phases:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>Type</th>
+<th>Checks</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Build</td>
+<td>✅ Blocking</td>
+<td>Syntax, imports, compilation</td>
+</tr>
+<tr>
+<td>Type Check</td>
+<td>⚠️ Soft</td>
+<td>Type safety, <code>any</code> leaks</td>
+</tr>
+<tr>
+<td>Lint</td>
+<td>⚠️ Soft</td>
+<td>Code style, unused vars</td>
+</tr>
+<tr>
+<td>Tests</td>
+<td>✅ Blocking</td>
+<td>Unit tests, 80% coverage target</td>
+</tr>
+<tr>
+<td>Security</td>
+<td>✅ Blocking</td>
+<td>Constitutional violations, secrets</td>
+</tr>
+<tr>
+<td>Hygiene</td>
+<td>⚠️ Soft</td>
+<td>Import style, ARIA labels</td>
+</tr>
+<tr>
+<td>Git Diff</td>
+<td>📋 Info</td>
+<td>Changed files review</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Constitutional Checks:</strong></p>
+<ul>
+<li>No <code>localStorage</code>/<code>sessionStorage</code> usage</li>
+<li>No hardcoded secrets or API keys</li>
+<li>No <code>console.log</code> in production code</li>
+<li>No hardcoded English text (i18n compliance)</li>
+</ul>
+<pre data-role="codeBlock" data-info="" class="language-text"><code>📍 Location: .github/skills/verification-loop/
+</code></pre><hr>
+<h3 id="10--last-30-days-research">10. 🔍 Last 30 Days Research </h3>
+<p><strong>Research any topic across Reddit, X, and the web from the last 30 days.</strong></p>
+<p>Surfaces what people are actually discussing, recommending, and debating right now. Returns AI-synthesized insights with engagement metrics, key patterns, and source citations.</p>
+<p><strong>Available for both Claude Code and GitHub Copilot:</strong></p>
+<ul>
+<li><strong>Claude Code:</strong> <code>.claude/skills/last30days/</code></li>
+<li><strong>GitHub Copilot:</strong> <code>.github/skills/last30days/</code></li>
+</ul>
+<p><strong>Use When:</strong></p>
+<ul>
+<li>Learning new prompting techniques for AI tools (Midjourney, ChatGPT, etc.)</li>
+<li>Finding recommendations ("best Claude Code skills", "top AI tools")</li>
+<li>Catching up on news ("what's happening with OpenAI")</li>
+<li>Understanding current community sentiment on any topic</li>
+<li>Market research ("Seattle housing market", "NYC rent trends")</li>
+</ul>
+<p><strong>Output Includes:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Section</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>What I Learned</td>
+<td>AI-synthesized narrative paragraph</td>
+</tr>
+<tr>
+<td>Key Patterns</td>
+<td>3-5 actionable insights with bold labels</td>
+</tr>
+<tr>
+<td>Stats Tree</td>
+<td>Source counts with engagement totals</td>
+</tr>
+<tr>
+<td>Full Report</td>
+<td>Detailed posts/threads with URLs and quotes</td>
+</tr>
+</tbody>
+</table>
+<p><strong>API Keys (Optional):</strong></p>
+<ul>
+<li>Works without any API keys using web search fallback</li>
+<li>Add <code>OPENAI_API_KEY</code> → Reddit threads with real upvotes &amp; comments</li>
+<li>Add <code>XAI_API_KEY</code> → X posts with real likes &amp; reposts</li>
+<li>Keys go in <code>~/.config/last30days/.env</code></li>
+</ul>
+<p><strong>Copilot Version Notes:</strong><br>
+The GitHub Copilot version saves a full <code>report.md</code> to your local share folder:</p>
+<ul>
+<li><strong>Windows:</strong> <code>%USERPROFILE%\.local\share\last30days\out\report.md</code></li>
+<li><strong>macOS/Linux:</strong> <code>~/.local/share/last30days/out/report.md</code></li>
+</ul>
+<pre data-role="codeBlock" data-info="" class="language-text"><code>📍 Locations: 
+   Claude Code: .claude/skills/last30days/
+   GitHub Copilot: .github/skills/last30days/
+</code></pre><hr>
+<h3 id="11-️-content-research-writer">11. ✍️ Content Research Writer </h3>
+<p><strong>Your AI writing partner for research-backed content creation.</strong></p>
+<p>Acts as a collaborative writing partner — helps with outlining, research, citations, hook improvement, and section-by-section feedback while preserving your unique voice.</p>
+<p><strong>Use When:</strong></p>
+<ul>
+<li>Writing blog posts, articles, or newsletters</li>
+<li>Creating educational content or tutorials</li>
+<li>Drafting thought leadership pieces with citations</li>
+<li>Researching and writing case studies</li>
+<li>Getting real-time feedback as you write</li>
+</ul>
+<p><strong>What It Does:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Capability</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Collaborative Outlining</td>
+<td>Structures ideas into coherent outlines</td>
+</tr>
+<tr>
+<td>Research Assistance</td>
+<td>Finds information and adds citations</td>
+</tr>
+<tr>
+<td>Hook Improvement</td>
+<td>Strengthens openings to capture attention</td>
+</tr>
+<tr>
+<td>Section Feedback</td>
+<td>Reviews each section as you write</td>
+</tr>
+<tr>
+<td>Voice Preservation</td>
+<td>Maintains your writing style and tone</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Workflow Example:</strong></p>
+<ol>
+<li>Start with an outline together</li>
+<li>Research key points with citations</li>
+<li>Write introduction → get feedback</li>
+<li>Write body sections → feedback each</li>
+<li>Final review and polish</li>
+</ol>
+<pre data-role="codeBlock" data-info="" class="language-text"><code>📍 Location: .github/skills/content-research-writer/
+</code></pre><hr>
+<h3 id="12--doc-sync-all">12. 🔄 Doc-Sync-All </h3>
+<p><strong>Comprehensive documentation synchronization across all project artifacts.</strong></p>
+<p>Scans local git changes and propagates updates to ALL design docs, task lists, specs, diagrams, and planning artifacts. Ensures documentation reflects reality, not aspirations.</p>
+<p><strong>Use When:</strong></p>
+<ul>
+<li>After completing a development phase or feature</li>
+<li>When new architectural decisions are made</li>
+<li>After adding new skills, tools, or modules</li>
+<li>Before creating a PR to ensure docs match implementation</li>
+<li>User says "sync all docs", "update design docs"</li>
+</ul>
+<p><strong>What It Syncs:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Document Type</th>
+<th>Updates</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>tasks.md</code></td>
+<td>Marks completed tasks, updates phase summaries</td>
+</tr>
+<tr>
+<td><code>spec.md</code></td>
+<td>Syncs FRs, entities, success criteria</td>
+</tr>
+<tr>
+<td><code>research.md</code></td>
+<td>Adds new decision entries</td>
+</tr>
+<tr>
+<td><code>data-model.md</code></td>
+<td>Keeps in sync with TypeScript types</td>
+</tr>
+<tr>
+<td>Diagrams</td>
+<td>Updates Mermaid and ASCII architecture flows</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Core Principle:</strong> If code exists, docs should describe it. If code changed, docs should be updated. If a task is done, it should be checked off everywhere.</p>
+<pre data-role="codeBlock" data-info="" class="language-text"><code>📍 Location: .github/skills/doc-sync-all/
+</code></pre><hr>
+<h3 id="13--project-infographic">13. 🎨 Project Infographic </h3>
+<p><strong>Generate polished HTML infographics for sprint demos and stakeholder presentations.</strong></p>
+<p>Scans the codebase and design docs, then produces a beautiful single-page HTML infographic suitable for sprint demos. Targets non-technical stakeholders with visual-first communication.</p>
+<p><strong>Use When:</strong></p>
+<ul>
+<li>Before sprint demos or stakeholder presentations</li>
+<li>When onboarding new team members visually</li>
+<li>To complement technical documentation with executive-friendly visuals</li>
+<li>User says "generate infographic", "create demo doc", "visual overview"</li>
+</ul>
+<p><strong>Output Sections:</strong></p>
+<ul>
+<li>Hero with project name and key stats</li>
+<li>The Challenge (pain points solved)</li>
+<li>How It Works (visual pipeline/flow diagram)</li>
+<li>Current Status (phase completion, metrics)</li>
+<li>Tech Stack (pill badges with emoji icons)</li>
+</ul>
+<p><strong>Design Features:</strong></p>
+<ul>
+<li>Self-contained HTML with embedded CSS</li>
+<li>Dark gradient hero sections</li>
+<li>Interactive hover effects</li>
+<li>Premium architectural diagrams with system boundaries</li>
+<li>Responsive for meeting room displays</li>
+</ul>
+<pre data-role="codeBlock" data-info="" class="language-text"><code>📍 Location: .github/skills/project-infographic/
+</code></pre><hr>
+<h3 id="14--repo-state-sync">14. 🔃 Repo State Sync </h3>
+<p><strong>Keep your Session Onboarding section current with actual codebase state.</strong></p>
+<p>Scans the entire codebase and design documentation to produce an up-to-date "Session Onboarding" section for <code>copilot-instructions.md</code>. Detects staleness and refreshes project context.</p>
+<p><strong>Use When:</strong></p>
+<ul>
+<li>At the start of a new development phase</li>
+<li>After significant architecture changes</li>
+<li>When <a href="http://copilot-instructions.md">copilot-instructions.md</a> seems stale</li>
+<li>User says "sync repo state", "update onboarding", "refresh copilot instructions"</li>
+</ul>
+<p><strong>What It Updates:</strong></p>
+<ul>
+<li>Key Files table with current paths</li>
+<li>Runtime dependencies and verification</li>
+<li>Current working features (✅/🚧/⬜ status)</li>
+<li>Common development tasks</li>
+<li>Phase status from <a href="http://tasks.md">tasks.md</a></li>
+<li>Sync timestamp for freshness tracking</li>
+</ul>
+<p><strong>Staleness Detection:</strong><br>
+Suggests running when it notices discrepancies between docs and reality (chunk counts, phase status, missing skills).</p>
+<pre data-role="codeBlock" data-info="" class="language-text"><code>📍 Location: .github/skills/repo-state-sync/
+</code></pre><hr>
+<h3 id="15--skill-lookup">15. 🔍 Skill Lookup </h3>
+<p><strong>Search, discover, and install Agent Skills from prompts.chat.</strong></p>
+<p>Connects to the prompts.chat MCP server to find reusable AI skills. Search by keyword, category, or tag, then install skills directly into your project.</p>
+<p><strong>Use When:</strong></p>
+<ul>
+<li>Looking for existing skills before creating your own</li>
+<li>Searching for skills ("What skills are available for testing?")</li>
+<li>Installing a skill ("Install the documentation skill")</li>
+<li>Extending Claude's capabilities with community skills</li>
+</ul>
+<p><strong>Available Operations:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Action</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Search</td>
+<td>Find skills by keyword, category, or tag</td>
+</tr>
+<tr>
+<td>Get</td>
+<td>Retrieve a specific skill with all its files</td>
+</tr>
+<tr>
+<td>Install</td>
+<td>Save skill to <code>.claude/skills/{slug}/</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Skill Structure:</strong></p>
+<ul>
+<li><code>SKILL.md</code> (required) — Main instructions with frontmatter</li>
+<li>Reference docs — Additional documentation</li>
+<li>Scripts — Helper scripts (Python, shell, etc.)</li>
+<li>Config files — JSON, YAML configurations</li>
+</ul>
+<pre data-role="codeBlock" data-info="" class="language-text"><code>📍 Location: .github/skills/skill-lookup/
+</code></pre><hr>
+<h2 id="-repository-structure">📁 Repository Structure </h2>
+<pre data-role="codeBlock" data-info="" class="language-text"><code>.github/
+├── copilot-instructions.md     # Root AI instructions
+├── mcp.json                    # MCP server configuration
+├── skills/                     # Reusable AI skills (GitHub Copilot)
+│   ├── agentic-evaluator/      # ⭐ Featured
+│   ├── project-guide/          # ⭐ Featured
+│   ├── project-scaffold/       # ⭐ Featured
+│   ├── health-audit/           # ⭐ Featured
+│   ├── session-learning/       # ⭐ Featured
+│   ├── session-log/            # ⭐ Featured
+│   ├── insights-report/        # ⭐ Featured
+│   ├── verification-loop/      # ⭐ Featured
+│   ├── last30days/             # 🔍 Research skill (Copilot version)
+│   ├── content-research-writer/ # ✍️ Writing partner
+│   ├── doc-sync-all/           # 🔄 Documentation sync
+│   ├── project-infographic/    # 🎨 Sprint demo visuals
+│   ├── repo-state-sync/        # 🔃 Onboarding sync
+│   └── skill-lookup/           # 🔍 Skill discovery
+├── agents/                     # Specialized agent configs
+│   └── eric-cartman.md         # 🎭 Cartman-flavored project guide
+├── instructions/               # File-pattern-specific rules
+└── prompts/                    # Reusable prompt templates
+
+.claude/
+├── settings.local.json         # Local Claude Code permissions (gitignored)
+└── skills/                     # Claude Code skills
+    └── last30days/             # 🔍 Research skill (Claude version)
+        ├── SKILL.md            # Skill definition
+        └── scripts/            # Python implementation
+</code></pre><blockquote>
+<p><strong>Note:</strong> <code>.github/skills/</code> is for GitHub Copilot, <code>.claude/skills/</code> is for Claude Code.<br>
+The <code>last30days</code> skill is available for both — same Python scripts, different <a href="http://SKILL.md">SKILL.md</a> frontmatter.</p>
+</blockquote>
+<hr>
+<h2 id="-getting-started">🎬 Getting Started </h2>
+<h3 id="1-clone-or-copy">1. Clone or Copy </h3>
+<p>Copy the <code>.github/</code> folder structure into your project, or fork this repo as a starting point.</p>
+<h3 id="2-run-the-evaluator">2. Run the Evaluator </h3>
+<p>Ask your AI assistant:</p>
+<pre data-role="codeBlock" data-info="" class="language-text"><code>Evaluate this repository's agentic development patterns using the agentic-evaluator skill.
+</code></pre><h3 id="3-generate-your-scaffold">3. Generate Your Scaffold </h3>
+<p>If starting fresh:</p>
+<pre data-role="codeBlock" data-info="" class="language-text"><code>Help me create a project scaffold using the project-scaffold skill.
+</code></pre><h3 id="4-maintain-with-health-audits">4. Maintain with Health Audits </h3>
+<p>Run periodic checks:</p>
+<pre data-role="codeBlock" data-info="" class="language-text"><code>Run a health audit on our agentic artifacts.
+</code></pre><hr>
+<h2 id="-philosophy">🧠 Philosophy </h2>
+<p>This library follows key principles for effective agentic development:</p>
+<ol>
+<li><strong>Progressive Disclosure</strong> — Metadata first, details on-demand</li>
+<li><strong>Right-Sizing</strong> — Skills should be 100-500 lines, not monolithic</li>
+<li><strong>Clear Triggers</strong> — Every skill has explicit "When to Use" scenarios</li>
+<li><strong>Actionable Output</strong> — Graded scores and specific remediation steps</li>
+<li><strong>Cross-Platform</strong> — Works with Copilot, Claude, Cursor, and more</li>
+</ol>
+<hr>
+<h2 id="-contributing">🤝 Contributing </h2>
+<p>PRs welcome! If you have prompts, skills, or patterns that have worked well for your team, we'd love to include them.</p>
+<hr>
+<h2 id="-license">📜 License </h2>
+<p>MIT — Use freely, fork wildly, prompt responsibly.</p>
+<hr>
+<div align="center">
+<p><em>"Screw you guys, I'm going home... to write better prompts."</em></p>
+<p><strong>Made with 🍟 by developers who respect Cartman's authority</strong></p>
+</div>
+
+      </div>
+      
+      
+    
+    
+    
+    
+    
+    
+  
+    </body></html>
