@@ -51,6 +51,10 @@ out/
 *.pyc
 *.pyo
 
+# MCP config (local server setups)
+.mcp.json
+.mcp-sse.json
+
 # Skills local config (API keys)
 .claude/skills/**/config/.env
 ~/.config/last30days/
@@ -66,3 +70,6 @@ out/
 private/
 notes/
 scratch/
+
+# RBC Banking - entire folder (contains sensitive credentials and automation)
+.claude/skills/rbc-banking/
