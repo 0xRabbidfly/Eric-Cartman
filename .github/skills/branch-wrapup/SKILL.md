@@ -1,14 +1,14 @@
 ---
-name: verification-loop
-description: Pre-PR quality gate that runs build, type-check, lint, test, and security scans in sequence. Use before creating a PR, after completing features, or when you want comprehensive validation against project constitution.
-version: 1.0.0
+name: branch-wrapup
+description: Pre-PR quality gate that runs build, type-check, lint, test, security scans, and finishes with a conventional commit. Use before creating a PR, after completing features, or when wrapping up a branch.
+version: 2.0.0
 ---
 
-# Verification Loop Skill
+# Branch Wrapup Skill
 
 ## Purpose
 
-Run a comprehensive 7-phase verification before code is considered "ready" for pull request. Catches issues locally before they reach CI/CD, ensuring constitutional compliance.
+Run a comprehensive 8-phase verification and commit workflow before code is considered "ready" for pull request. Catches issues locally before they reach CI/CD, ensures constitutional compliance, and closes with a proper conventional commit summarizing all branch changes.
 
 ## When to Use
 
@@ -23,13 +23,13 @@ Run a comprehensive 7-phase verification before code is considered "ready" for p
 ## Quick Start
 
 ```
-Run the verification loop before I create a PR.
+Run branch-wrapup before I create a PR.
 ```
 
 Or invoke specific phases:
 
 ```
-Run only the security scan phase of verification.
+Run only the security scan phase of branch-wrapup.
 ```
 
 ---
@@ -135,7 +135,20 @@ Select-String -Path "components/**/*.tsx" -Pattern 'style=\{\{.*\d+.*\}\}' -Recu
 
 # 6c. Check for missing ARIA labels on interactive elements
 Select-String -Path "components/**/*.tsx" -Pattern '<(button|a|input)[^>]*(?<!aria-label)[^>]*>' -Recurse | Select-Object -First 5
+
+# 6d. Stale .gitignore entries (paths that no longer exist)
+Get-Content .gitignore | Where-Object { $_ -match '^[^#\s]' -and $_ -notmatch '[\*\?]' } |
+  ForEach-Object { $p = $_.TrimEnd('/'); if (-not (Test-Path $p)) { "Stale: $_" } }
+
+# 6e. Orphan scripts (scripts/ files not referenced in package.json)
+$pkgJson = Get-Content package.json -Raw
+Get-ChildItem scripts/*.ts | Where-Object { $pkgJson -notmatch $_.Name } |
+  ForEach-Object { "Orphan: scripts/$($_.Name)" }
 ```
+
+**Additional hygiene checks:**
+- ⚠️ Stale `.gitignore` entries for deleted paths (vestigial clutter)
+- ⚠️ Orphan scripts not wired into `package.json` (dev artifacts that should be deleted)
 
 ---
 
@@ -157,6 +170,34 @@ git diff HEAD~1 --name-only 2>$null || git diff --cached --name-only
 
 ---
 
+### Phase 8: Commit
+
+Only runs if all blocking phases passed. Stages all changes and creates a conventional commit summarizing the branch work.
+
+```powershell
+# Stage all changes
+git add -A
+
+# Generate commit message from branch diff
+$branch = git rev-parse --abbrev-ref HEAD
+$diffSummary = git diff --cached --stat
+$filesChanged = git diff --cached --name-only
+
+# Commit with conventional message
+# Format: <type>(scope): summary of changes
+# Body: list of changed files grouped by area
+git commit -m "<type>(scope): <summary>" -m "<body with file list>"
+```
+
+**Commit message rules:**
+- Use conventional commit format: `type(scope): description`
+- Type from: `feat`, `fix`, `refactor`, `docs`, `chore`, `test`, `style`
+- Scope = primary area changed (e.g., `auth`, `search`, `infra`)
+- Body lists key changes, not every file
+- If branch name contains a ticket ID, include it
+
+---
+
 ## Output Format
 
 After running all phases, produce this verification report:
@@ -173,9 +214,10 @@ After running all phases, produce this verification report:
 ║  Security:   [PASS/FAIL] (X constitutional violations)       ║
 ║  Hygiene:    [PASS/FAIL] (X issues)                          ║
 ║  Diff:       X files changed                                 ║
+║  Commit:     [DONE / SKIPPED]                                ║
 ║                                                               ║
 ╠══════════════════════════════════════════════════════════════╣
-║  Overall:    [READY / NOT READY] for PR                      ║
+║  Overall:    [COMMITTED / NOT READY] for PR                  ║
 ╚══════════════════════════════════════════════════════════════╝
 
 Issues to Fix (by priority):
@@ -205,6 +247,7 @@ P2 - Quality Issues:
 | Security | ✅ Yes | Constitutional violations block PR |
 | Hygiene | ⚠️ Soft | Report for cleanup |
 | Diff | 📋 Info | Human review checkpoint |
+| Commit | ✅ Yes | Only runs if no P0/P1 blockers. Stages + commits all changes. |
 
 ---
 
@@ -227,10 +270,11 @@ Run a quick verification check (build + types + lint only).
 
 | Skill | Relationship |
 |-------|--------------|
-| `code-review` | Verification-loop is tactical (pass/fail); code-review is strategic (architectural) |
-| `testing` | Verification-loop runs tests; testing skill helps write them |
-| `deployment` | Run verification-loop before deployment skill |
-| `ci-cd` | Verification-loop is local preview of what CI will check |
+| `code-review` | Branch-wrapup is tactical (pass/fail); code-review is strategic (architectural) |
+| `testing` | Branch-wrapup runs tests; testing skill helps write them |
+| `git-commit` | Branch-wrapup uses git-commit conventions for Phase 8 |
+| `deployment` | Run branch-wrapup before deployment skill |
+| `ci-cd` | Branch-wrapup is local preview of what CI will check |
 
 ---
 
@@ -241,11 +285,14 @@ For automated runs, use the bundled script:
 **See**: `verify.ps1` for standalone verification script
 
 ```powershell
-# Run full verification
-.\.github\skills\verification-loop\verify.ps1
+# Run full wrapup (verify + commit)
+.\.github\skills\branch-wrapup\verify.ps1
 
 # Run specific phases
-.\.github\skills\verification-loop\verify.ps1 -Phases Build,Types,Lint
+.\.github\skills\branch-wrapup\verify.ps1 -Phases Build,Types,Lint
+
+# Skip commit (verify only)
+.\.github\skills\branch-wrapup\verify.ps1 -NoCommit
 ```
 
 ---

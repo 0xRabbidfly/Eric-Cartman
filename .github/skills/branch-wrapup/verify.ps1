@@ -1,40 +1,50 @@
 <# 
 .SYNOPSIS
-    AI-HUB-Portal Verification Loop - Pre-PR Quality Gate
+    AI-HUB-Portal Branch Wrapup - Pre-PR Quality Gate + Commit
     
 .DESCRIPTION
-    Runs 7-phase verification against project constitution before PR creation.
+    Runs 8-phase verification against project constitution before PR creation,
+    then commits all changes with a conventional commit message.
     
 .PARAMETER Phases
     Specific phases to run. Default: all phases.
-    Valid values: Build, Types, Lint, Tests, Security, Hygiene, Diff
+    Valid values: Build, Types, Lint, Tests, Security, Hygiene, Diff, Commit
     
 .PARAMETER Quick
-    Run only Build, Types, Lint (faster iteration)
+    Run only Build, Types, Lint (faster iteration, no commit)
     
 .PARAMETER Strict
     Fail on any warning (not just errors)
+
+.PARAMETER NoCommit
+    Skip the final commit phase (verify only)
     
 .EXAMPLE
     .\verify.ps1
-    # Runs all phases
+    # Runs all phases including commit
     
 .EXAMPLE
     .\verify.ps1 -Quick
     # Runs Build, Types, Lint only
     
 .EXAMPLE
+    .\verify.ps1 -NoCommit
+    # Runs all verification phases but skips commit
+
+.EXAMPLE
     .\verify.ps1 -Phases Build,Tests
     # Runs only Build and Tests phases
 #>
 
 param(
-    [ValidateSet('Build', 'Types', 'Lint', 'Tests', 'Security', 'Hygiene', 'Diff')]
-    [string[]]$Phases = @('Build', 'Types', 'Lint', 'Tests', 'Security', 'Hygiene', 'Diff'),
+    [ValidateSet('Build', 'Types', 'Lint', 'Tests', 'Security', 'Hygiene', 'Diff', 'Commit')]
+    [string[]]$Phases = @('Build', 'Types', 'Lint', 'Tests', 'Security', 'Hygiene', 'Diff', 'Commit'),
     
     [switch]$Quick,
     
-    [switch]$Strict
+    [switch]$Strict,
+
+    [switch]$NoCommit
 )
 
 # Colors for output
@@ -55,6 +65,7 @@ $results = @{
     Security = $null
     Hygiene = $null
     Diff = $null
+    Commit = $null
 }
 
 $issues = @{
@@ -109,7 +120,7 @@ $projectRoot = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSScr
 Push-Location $projectRoot
 
 try {
-    Write-Header "VERIFICATION LOOP - AI-HUB-Portal"
+    Write-Header "BRANCH WRAPUP - AI-HUB-Portal"
     Write-Host "Running phases: $($Phases -join ', ')" -ForegroundColor Gray
     Write-Host ""
 
@@ -297,6 +308,31 @@ try {
             }
         }
         
+        # 6c. Stale .gitignore entries (paths that no longer exist)
+        if (Test-Path ".gitignore") {
+            $gitignoreLines = Get-Content ".gitignore" | Where-Object { $_ -match '^[^#\s]' -and $_ -notmatch '[\*\?]' }
+            foreach ($line in $gitignoreLines) {
+                $cleanPath = $line.TrimEnd('/')
+                if ($cleanPath -and -not (Test-Path $cleanPath)) {
+                    $hygieneIssues += "Stale .gitignore entry: $line (path does not exist)"
+                    $issues.P2 += "Stale .gitignore: $line"
+                }
+            }
+        }
+        
+        # 6d. Orphan scripts (scripts/ files not referenced in package.json)
+        if (Test-Path "scripts") {
+            $pkgContent = Get-Content "package.json" -Raw -ErrorAction SilentlyContinue
+            if ($pkgContent) {
+                Get-ChildItem -Path "scripts" -Include "*.ts","*.js" -File -ErrorAction SilentlyContinue | ForEach-Object {
+                    if ($pkgContent -notmatch [regex]::Escape($_.Name)) {
+                        $hygieneIssues += "Orphan script: scripts/$($_.Name) (not in package.json)"
+                        $issues.P2 += "Orphan script: scripts/$($_.Name)"
+                    }
+                }
+            }
+        }
+        
         if ($hygieneIssues.Count -eq 0) {
             $results.Hygiene = 'PASS'
             Write-Phase "Hygiene" "PASS" "(0 issues)"
@@ -333,6 +369,81 @@ try {
     }
 
     # ═══════════════════════════════════════════════════════════
+    # PHASE 8: COMMIT
+    # ═══════════════════════════════════════════════════════════
+    if (($Phases -contains 'Commit') -and -not $NoCommit -and -not $Quick) {
+        Write-Host "`n📝 Phase 8: Commit" -ForegroundColor $colors.Header
+        
+        # Only commit if no P0 or P1 blockers
+        if ($issues.P0.Count -gt 0 -or $issues.P1.Count -gt 0) {
+            $results.Commit = 'SKIP'
+            Write-Phase "Commit" "SKIP" "(blocked by P0/P1 issues)"
+        } else {
+            # Check if there are changes to commit
+            $stagedOrUnstaged = git status --porcelain 2>&1
+            
+            if (-not $stagedOrUnstaged) {
+                $results.Commit = 'SKIP'
+                Write-Phase "Commit" "SKIP" "(no changes to commit)"
+            } else {
+                # Stage all changes
+                git add -A 2>&1 | Out-Null
+                
+                # Build commit message from branch changes
+                $branch = git rev-parse --abbrev-ref HEAD 2>&1
+                $filesChanged = git diff --cached --name-only 2>&1
+                $fileCount = ($filesChanged | Measure-Object -Line).Lines
+                
+                # Detect primary areas changed
+                $areas = @()
+                if ($filesChanged | Where-Object { $_ -match '^app/' }) { $areas += 'app' }
+                if ($filesChanged | Where-Object { $_ -match '^components/' }) { $areas += 'components' }
+                if ($filesChanged | Where-Object { $_ -match '^lib/' }) { $areas += 'lib' }
+                if ($filesChanged | Where-Object { $_ -match '^docs/' }) { $areas += 'docs' }
+                if ($filesChanged | Where-Object { $_ -match '^infra/' }) { $areas += 'infra' }
+                if ($filesChanged | Where-Object { $_ -match '^\.github/' }) { $areas += 'ci' }
+                if ($filesChanged | Where-Object { $_ -match '^styles/' }) { $areas += 'styles' }
+                if ($filesChanged | Where-Object { $_ -match '^tests/' }) { $areas += 'tests' }
+                
+                $scope = if ($areas.Count -eq 1) { $areas[0] } elseif ($areas.Count -le 3) { $areas -join ',' } else { 'multiple' }
+                
+                # Determine commit type from file patterns
+                $type = 'chore'
+                if ($filesChanged | Where-Object { $_ -match '^docs/' }) { $type = 'docs' }
+                if ($filesChanged | Where-Object { $_ -match '\.(tsx?|css)$' -and $_ -match '^(app|components)/' }) { $type = 'feat' }
+                if ($filesChanged | Where-Object { $_ -match '\.test\.' }) { $type = 'test' }
+                
+                # Build body with file summary
+                $body = "Files changed ($fileCount):`n"
+                $filesChanged | ForEach-Object { $body += "  - $_`n" }
+                $body += "`nBranch: $branch"
+                
+                # Prompt-style summary (agent or user fills in the actual description)
+                $summary = "branch wrapup: $fileCount files across $scope"
+                
+                Write-Host "`nProposed commit:" -ForegroundColor Gray
+                Write-Host "  $type($scope): $summary" -ForegroundColor Cyan
+                Write-Host ""
+                $filesChanged | ForEach-Object { Write-Host "  - $_" -ForegroundColor Gray }
+                Write-Host ""
+                
+                git commit -m "$type($scope): $summary" -m "$body" 2>&1 | Out-Null
+                
+                if ($LASTEXITCODE -eq 0) {
+                    $results.Commit = 'DONE'
+                    Write-Phase "Commit" "PASS" "($type($scope): $summary)"
+                } else {
+                    $results.Commit = 'FAIL'
+                    Write-Phase "Commit" "FAIL" "(git commit failed)"
+                }
+            }
+        }
+    } elseif ($NoCommit -or $Quick) {
+        $results.Commit = 'SKIP'
+        Write-Phase "Commit" "SKIP" "(-NoCommit or -Quick)"
+    }
+
+    # ═══════════════════════════════════════════════════════════
     # FINAL REPORT
     # ═══════════════════════════════════════════════════════════
     Write-Header "VERIFICATION REPORT"
@@ -341,7 +452,7 @@ try {
     $hasP0 = $issues.P0.Count -gt 0
     $hasP1 = $issues.P1.Count -gt 0
     
-    foreach ($phase in @('Build', 'Types', 'Lint', 'Tests', 'Security', 'Hygiene')) {
+    foreach ($phase in @('Build', 'Types', 'Lint', 'Tests', 'Security', 'Hygiene', 'Commit')) {
         if ($results[$phase]) {
             $status = $results[$phase]
             $color = switch ($status) {
@@ -392,8 +503,11 @@ try {
     } elseif ($hasP1) {
         Write-Host "⚠️ NOT READY for PR - Type/build errors must be fixed" -ForegroundColor Yellow
         exit 1
+    } elseif ($allPassed -and $results.Commit -eq 'DONE') {
+        Write-Host "✅ COMMITTED & READY for PR - All checks passed!" -ForegroundColor Green
+        exit 0
     } elseif ($allPassed) {
-        Write-Host "✅ READY for PR - All checks passed!" -ForegroundColor Green
+        Write-Host "✅ READY for PR - All checks passed! (commit skipped)" -ForegroundColor Green
         exit 0
     } else {
         Write-Host "⚠️ READY for PR with warnings - Consider fixing P2 issues" -ForegroundColor Yellow
