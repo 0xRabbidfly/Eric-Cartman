@@ -305,7 +305,7 @@ Fluent UI Button loses styling when wrapped in Next.js Link.
 After extracting patterns, run verification to ensure new instructions don't conflict:
 
 ```
-Run verification-loop to check the changes.
+Run branch-wrapup to check the changes.
 ```
 
 ---
