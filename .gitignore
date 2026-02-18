@@ -45,6 +45,8 @@ out/
 
 # Claude Code
 .claude/settings.local.json
+.claude/mcp.json
+.claude/mcp.example.json
 .claude/**/.__pycache__/
 .claude/**/__pycache__/
 **/__pycache__/
@@ -54,6 +56,7 @@ out/
 # MCP config (local server setups)
 .mcp.json
 .mcp-sse.json
+mcp-servers/
 
 # Skills local config (API keys)
 .claude/skills/**/config/.env
@@ -73,3 +76,6 @@ scratch/
 
 # RBC Banking - entire folder (contains sensitive credentials and automation)
 .claude/skills/rbc-banking/
+
+# Used Car Search - private skill with API keys and results
+.claude/skills/used-car-search/
