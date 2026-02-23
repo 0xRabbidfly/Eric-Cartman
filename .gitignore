@@ -4,6 +4,9 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+# Playwright
+.playwright-mcp/
+
 # Environment variables
 .env
 .env.local
@@ -44,6 +47,7 @@ out/
 .cursor/
 
 # Claude Code
+.claude/CLAUDE.md
 .claude/settings.local.json
 .claude/mcp.json
 .claude/mcp.example.json
