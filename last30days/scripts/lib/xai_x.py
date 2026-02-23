@@ -18,6 +18,7 @@ XAI_RESPONSES_URL = "https://api.x.ai/v1/responses"
 
 # Depth configurations: (min, max) posts to request
 DEPTH_CONFIG = {
+    "scan": (5, 8),
     "quick": (8, 12),
     "default": (20, 30),
     "deep": (40, 60),

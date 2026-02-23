@@ -18,6 +18,7 @@ OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses"
 # Depth configurations: (min, max) threads to request
 # Request MORE than needed since many get filtered by date
 DEPTH_CONFIG = {
+    "scan": (8, 12),
     "quick": (15, 25),
     "default": (30, 50),
     "deep": (70, 100),

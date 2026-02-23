@@ -99,8 +99,8 @@ def _search_reddit(
     # Parse response
     reddit_items = openai_reddit.parse_reddit_response(raw_openai or {})
 
-    # Quick retry with simpler query if few results
-    if len(reddit_items) < 5 and not mock and not reddit_error:
+    # Quick retry with simpler query if few results (skip in scan mode to save tokens)
+    if len(reddit_items) < 5 and not mock and not reddit_error and depth != "scan":
         core = openai_reddit._extract_core_subject(topic)
         if core.lower() != topic.lower():
             try:
@@ -175,8 +175,23 @@ def run_research(
     depth: str = "default",
     mock: bool = False,
     progress: ui.ProgressDisplay = None,
+    use_cache: bool = False,
+    enrich_limit: int = -1,
 ) -> tuple:
     """Run the research pipeline.
+
+    Args:
+        topic: Search topic
+        sources: Source selection mode
+        config: API keys config
+        selected_models: Selected models dict
+        from_date: Start date
+        to_date: End date
+        depth: Research depth - "scan", "quick", "default", or "deep"
+        mock: Use fixtures
+        progress: Progress display
+        use_cache: If True, check/save result cache (24h TTL)
+        enrich_limit: Max Reddit threads to enrich. -1 = all, 0 = skip enrichment
 
     Returns:
         Tuple of (reddit_items, x_items, web_needed, raw_openai, raw_xai, raw_reddit_enriched, reddit_error, x_error)
@@ -184,6 +199,32 @@ def run_research(
     Note: web_needed is True when WebSearch should be performed by Claude.
     The script outputs a marker and Claude handles WebSearch in its session.
     """
+    from lib import cache as result_cache
+
+    # Check result cache if enabled
+    if use_cache and not mock:
+        cache_key = result_cache.get_cache_key(topic, from_date, to_date, sources)
+        cached_data = result_cache.load_cache(cache_key, ttl_hours=24)
+        if cached_data:
+            if progress:
+                progress.show_complete(
+                    cached_data.get("reddit_count", 0),
+                    cached_data.get("x_count", 0),
+                )
+            return (
+                cached_data.get("reddit_items", []),
+                cached_data.get("x_items", []),
+                cached_data.get("web_needed", False),
+                None, None, [],
+                cached_data.get("reddit_error"),
+                cached_data.get("x_error"),
+            )
+
+    # Scan mode defaults: skip enrichment
+    if depth == "scan":
+        if enrich_limit == -1:
+            enrich_limit = 0  # Skip enrichment by default in scan mode
+
     reddit_items = []
     x_items = []
     raw_openai = None
@@ -254,13 +295,20 @@ def run_research(
                 progress.end_x(len(x_items))
 
     # Enrich Reddit items with real data (sequential, but with error handling per-item)
-    if reddit_items:
-        if progress:
-            progress.start_reddit_enrich(1, len(reddit_items))
+    # In scan mode (enrich_limit=0), skip enrichment entirely for speed
+    items_to_enrich = reddit_items
+    if enrich_limit == 0:
+        items_to_enrich = []
+    elif enrich_limit > 0:
+        items_to_enrich = reddit_items[:enrich_limit]
 
-        for i, item in enumerate(reddit_items):
+    if items_to_enrich:
+        if progress:
+            progress.start_reddit_enrich(1, len(items_to_enrich))
+
+        for i, item in enumerate(items_to_enrich):
             if progress and i > 0:
-                progress.update_reddit_enrich(i + 1, len(reddit_items))
+                progress.update_reddit_enrich(i + 1, len(items_to_enrich))
 
             try:
                 if mock:
@@ -277,6 +325,19 @@ def run_research(
 
         if progress:
             progress.end_reddit_enrich()
+
+    # Save to result cache if enabled
+    if use_cache and not mock:
+        cache_key = result_cache.get_cache_key(topic, from_date, to_date, sources)
+        result_cache.save_cache(cache_key, {
+            "reddit_items": reddit_items,
+            "x_items": x_items,
+            "web_needed": web_needed,
+            "reddit_error": reddit_error,
+            "x_error": x_error,
+            "reddit_count": len(reddit_items),
+            "x_count": len(x_items),
+        })
 
     return reddit_items, x_items, web_needed, raw_openai, raw_xai, raw_reddit_enriched, reddit_error, x_error
 
@@ -305,6 +366,11 @@ def main():
         help="Faster research with fewer sources (8-12 each)",
     )
     parser.add_argument(
+        "--scan",
+        action="store_true",
+        help="Lightweight daily scan mode: gpt-4o-mini, no enrichment, cached (cheapest)",
+    )
+    parser.add_argument(
         "--deep",
         action="store_true",
         help="Comprehensive research with more sources (50-70 Reddit, 40-60 X)",
@@ -330,9 +396,12 @@ def main():
         http_module.DEBUG = True
 
     # Determine depth
-    if args.quick and args.deep:
-        print("Error: Cannot use both --quick and --deep", file=sys.stderr)
+    depth_flags = [args.quick, args.deep, args.scan]
+    if sum(depth_flags) > 1:
+        print("Error: Cannot use multiple depth flags (--quick, --scan, --deep)", file=sys.stderr)
         sys.exit(1)
+    elif args.scan:
+        depth = "scan"
     elif args.quick:
         depth = "quick"
     elif args.deep:
@@ -430,6 +499,7 @@ def main():
         depth,
         args.mock,
         progress,
+        use_cache=(depth == "scan"),
     )
 
     # Processing phase
