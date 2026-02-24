@@ -1,7 +1,6 @@
 ---
 name: insights-report
-description: Generate a comprehensive cross-session insights report by analyzing all captured session logs in `.github/sessions/`.
-version: 1.0.0
+description: Generate a comprehensive cross-session insights report by analyzing all captured session logs in `.github/sessions/`. Use when reviewing patterns across sessions or preparing retrospectives.
 ---
 
 # Insights Report Skill

@@ -1,7 +1,6 @@
 ---
 name: branch-wrapup
 description: Pre-PR quality gate that runs build, type-check, lint, test, security scans, and finishes with a conventional commit. Use before creating a PR, after completing features, or when wrapping up a branch.
-version: 2.0.0
 ---
 
 # Branch Wrapup Skill

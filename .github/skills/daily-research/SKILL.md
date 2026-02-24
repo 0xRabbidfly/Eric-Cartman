@@ -1,8 +1,8 @@
 ---
 name: daily-research
 description: Daily AI research pipeline → Obsidian vault. Scans Reddit + X for agents, skills, models, MCP, RAG topics. Deduplicates against vault history, writes structured daily notes. Tag #keep to promote to long-term library.
-version: 1.0.0
-argument-hint: "daily research" | "run research pipeline" | "what's new in AI"
+argument-hint: daily research, run pipeline, what's new in AI
+user-invokable: true
 ---
 
 # Daily Research Pipeline
@@ -91,11 +91,13 @@ Run `scripts/schedule.ps1` to register a Windows Task Scheduler task at 7:00 AM 
 ## Dependencies
 
 - Reuses `last30days` lib modules (openai_reddit, xai_x, normalize, score, dedupe)
+- Composes with `obsidian` skill for all vault I/O (read, write, search, list files)
 - API keys from `~/.config/last30days/.env` (OPENAI_API_KEY, XAI_API_KEY)
 - Python 3.10+ (stdlib only — zero pip dependencies)
+- Obsidian must be running with CLI enabled
 
 ## Related Skills
 
+- **obsidian** — Vault operations (composed — required)
 - **last30days** — Full deep research (use for `#deep-dive` tagged topics)
 - **session-log** — Capture coding session insights
-- **session-learning** — Extract reusable patterns

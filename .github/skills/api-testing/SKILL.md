@@ -1,7 +1,6 @@
 ---
 name: api-testing
 description: Next.js API route testing patterns for the AI-HUB-Portal. Use when testing API endpoints, debugging route handlers, validating request/response contracts, or setting up integration tests.
-version: 1.0.0
 ---
 
 # API Testing Skill

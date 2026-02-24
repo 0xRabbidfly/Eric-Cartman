@@ -1,8 +1,8 @@
 ---
 name: last30days
 description: Research a topic from the last 30 days on Reddit + X + Web, become an expert, and write copy-paste-ready prompts for the user's target tool.
-version: 1.1.0
-argument-hint: "[topic] for [tool]" or "[topic]"
+argument-hint: topic, topic for tool
+user-invokable: true
 ---
 
 # last30days: Research Any Topic from the Last 30 Days

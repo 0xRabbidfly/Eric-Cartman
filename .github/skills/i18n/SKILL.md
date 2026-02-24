@@ -1,7 +1,6 @@
 ---
 name: i18n
 description: Bilingual EN/FR content validation using next-intl. Use when adding translated content, testing language switching, or validating message key coverage before deployment.
-version: 1.0.0
 ---
 
 # i18n Validation Skill

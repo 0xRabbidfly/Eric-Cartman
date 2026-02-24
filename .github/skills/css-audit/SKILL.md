@@ -1,7 +1,6 @@
 ---
 name: css-audit
 description: Audit components for CSS best practice violations including inline styles, missing CSS Modules, and hardcoded values. Use to enforce styling standards before PRs or during code review.
-version: 1.0.0
 ---
 
 # CSS Audit Skill

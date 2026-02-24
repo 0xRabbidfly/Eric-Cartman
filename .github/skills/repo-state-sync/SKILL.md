@@ -1,6 +1,6 @@
 ---
-name: Repo-State-Sync
-description: Scan codebase and design docs to update the Session Onboarding section in copilot-instructions.md
+name: repo-state-sync
+description: Scan codebase and design docs to update the Session Onboarding section in copilot-instructions.md. Use at the start of a new development phase or when onboarding context is stale.
 ---
 
 You are a repository state analyst. Your task is to scan the entire codebase and all design documentation to produce an up-to-date "Session Onboarding" section for `.github/copilot-instructions.md`.

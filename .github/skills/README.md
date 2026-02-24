@@ -109,6 +109,52 @@ Ready to start Sprint 1 (P0 critical fixes)?
 
 ---
 
+### 📓 Obsidian (`/obsidian`)
+
+**Purpose**: Composable Obsidian vault operations via CLI — the sole interface for all vault reads/writes
+
+**Slash command**: `/obsidian search query, create note, daily append, tags`
+
+**Triggers**: When you ask Copilot to:
+- "Save to vault", "research note", "daily note"
+- "Summarize and save", "tag", "obsidian"
+- Any vault read, write, search, or query operation
+
+**What it does**:
+1. 🔍 **Search** — vault-wide or scoped text search with context
+2. 📝 **Create/Append/Prepend** — write notes directly via CLI
+3. 📅 **Daily Notes** — read, append, prepend today's daily note
+4. 🏷️ **Properties & Tags** — read/set frontmatter, list tags
+5. 🔗 **Links & Graph** — backlinks, outgoing links, orphans, unresolved
+6. ✅ **Tasks** — list, toggle, complete tasks in any note
+
+**Usage**: One `python -c` call in the terminal — no temp scripts, no intermediary files.
+
+```python
+python -c "import sys; sys.path.insert(0,'.github/skills/obsidian/scripts'); from obsidian import Obsidian; ob=Obsidian(); print(ob.search('meeting notes'))"
+```
+
+---
+
+### 📰 Daily Research (`/daily-research`)
+
+**Purpose**: AI research pipeline that scans Reddit + X and saves structured notes to Obsidian vault
+
+**Slash command**: `/daily-research daily research, run pipeline, what's new in AI`
+
+**Triggers**: When you ask Copilot to:
+- "Run daily research", "what's new in AI"
+- "Scan Reddit/X for AI topics"
+- "Run research pipeline"
+
+**What it does**:
+1. 🌐 Scans configured topics across Reddit and X
+2. 🔄 Deduplicates against vault history (seen URLs/titles)
+3. 📝 Writes structured daily notes to `Research/Dailies/`
+4. 🏷️ Tag items with `#keep` to promote to long-term library
+
+---
+
 ### 🧠 Session Learning (`session-learning/`)
 
 **Purpose**: Extract reusable patterns from coding sessions
