@@ -167,6 +167,7 @@ class Obsidian:
                 cmd,
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
                 timeout=kwargs.pop("timeout", self._timeout) if "timeout" in kwargs else self._timeout,
             )
         except subprocess.TimeoutExpired as exc:
@@ -651,9 +652,59 @@ def obsidian(vault: Optional[str] = None) -> Obsidian:
 
 
 if __name__ == "__main__":
-    # Quick smoke test
-    ob = Obsidian()
-    print(f"Binary: {ob._binary}")
-    info = ob.vault_info()
-    print(f"Vault: {info}")
-    print(f"Files: {ob.files(total=True)}")
+    import argparse
+
+    # Force UTF-8 for stdin/stdout so piped Unicode (arrows, em-dashes, etc.)
+    # survives PowerShell → Python on Windows (default is cp1252).
+    if sys.platform == "win32":
+        for stream in ("stdin", "stdout", "stderr"):
+            s = getattr(sys, stream)
+            if hasattr(s, "reconfigure"):
+                s.reconfigure(encoding="utf-8")
+
+    parser = argparse.ArgumentParser(
+        description="Obsidian CLI wrapper — pipe-friendly vault operations.",
+        epilog="Content is read from stdin when --content is omitted.",
+    )
+    parser.add_argument("action", choices=["create", "append", "prepend", "read", "info"],
+                        help="Vault operation to perform.")
+    parser.add_argument("--path", required=False, help="Vault-relative path (e.g. Research/Library/note.md).")
+    parser.add_argument("--file", required=False, help="File name (Obsidian title match).")
+    parser.add_argument("--vault", required=False, help="Target vault name.")
+    parser.add_argument("--content", required=False, help="Inline content (if omitted, reads stdin).")
+    parser.add_argument("--overwrite", action="store_true", help="Overwrite existing file on create.")
+    parser.add_argument("--template", required=False, help="Template name for create.")
+
+    args = parser.parse_args()
+    ob = Obsidian(vault=args.vault)
+
+    if args.action == "info":
+        print(ob.vault_info())
+        sys.exit(0)
+
+    if args.action == "read":
+        print(ob.read(file=args.file, path=args.path))
+        sys.exit(0)
+
+    # For create/append/prepend — get content from --content or stdin
+    content = args.content
+    if content is None:
+        if sys.stdin.isatty():
+            parser.error(f"'{args.action}' needs content. Pipe via stdin or pass --content.")
+        content = sys.stdin.read()
+
+    if args.action == "create":
+        r = ob.create(path=args.path, name=args.file, content=content,
+                      overwrite=args.overwrite, template=args.template)
+    elif args.action == "append":
+        r = ob.append(content, file=args.file, path=args.path)
+    elif args.action == "prepend":
+        r = ob.prepend(content, file=args.file, path=args.path)
+    else:
+        parser.error(f"Unknown action: {args.action}")
+
+    if r.ok:
+        print("OK")
+    else:
+        print(f"FAIL: {r.stderr}", file=sys.stderr)
+        sys.exit(1)
