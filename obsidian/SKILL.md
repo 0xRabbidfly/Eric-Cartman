@@ -25,41 +25,84 @@ reimplementing filesystem reads/writes.
 
 ### How to call (correct)
 
-Run a single `python -c` one-liner in the terminal. For long content, use a
-heredoc or write content to a variable first. **Never create a .py file just to
-call `ob.create()`.**
+**Preferred: Pipe content via PowerShell single-quoted heredoc (`@'...'@`).**
+This avoids backtick/dollar-sign escaping issues entirely.
+The script is at `.github/skills/obsidian/scripts/obsidian.py`.
 
 ```powershell
-# Short content — inline
-python -c "import sys; sys.path.insert(0,'.github/skills/obsidian/scripts'); from obsidian import Obsidian; ob=Obsidian(); print(ob.create(path='Research/Library/my-note.md', content='# Title\n\nBody text').text)"
+# ═══ PREFERRED — Pipe via heredoc (handles backticks, $, any markdown) ═══
 
-# Long content — use a temp variable with heredoc-style
-python -c "
-import sys, textwrap
-sys.path.insert(0, '.github/skills/obsidian/scripts')
-from obsidian import Obsidian
-ob = Obsidian()
-content = textwrap.dedent('''
+# Create a note — content piped from stdin
+@'
 ---
 tags: [topic-a, topic-b]
 status: unread
 ---
 # My Note Title
 
-Body goes here.
-''').strip()
-r = ob.create(path='Research/Library/my-note.md', content=content)
-print('OK' if r.ok else f'FAIL: {r.stderr}')
-"
+Body with `backticks`, $variables, and **any** markdown.
+'@ | python .github/skills/obsidian/scripts/obsidian.py create --path "Research/Library/my-note.md"
+
+# Append to existing note
+@'
+## New Section
+
+More content here.
+'@ | python .github/skills/obsidian/scripts/obsidian.py append --path "Research/Library/my-note.md"
+
+# Prepend to existing note
+@'
+**Updated 2026-02-23**
+'@ | python .github/skills/obsidian/scripts/obsidian.py prepend --file "Recipe"
+
+# Overwrite an existing note
+@'
+# Replacement content
+'@ | python .github/skills/obsidian/scripts/obsidian.py create --path "Research/Library/my-note.md" --overwrite
+
+# Read a note
+python .github/skills/obsidian/scripts/obsidian.py read --path "Research/Library/my-note.md"
+
+# Vault info
+python .github/skills/obsidian/scripts/obsidian.py info
+```
+
+```powershell
+# ═══ SIMPLE — python -c one-liner (only for short content without special chars) ═══
+python -c "import sys; sys.path.insert(0,'.github/skills/obsidian/scripts'); from obsidian import Obsidian; ob=Obsidian(); print(ob.create(path='Research/Library/my-note.md', content='# Title\n\nBody text').text)"
+```
+
+> **IMPORTANT**: Always use `@'...'@` (single-quoted heredoc), never `@"..."@`
+> (double-quoted). Double-quoted heredocs still interpret backticks and `$`.
+
+### Unicode / UTF-8
+
+The wrapper auto-configures UTF-8 on Windows (`sys.stdin.reconfigure`),
+so Unicode characters (arrows, em-dashes, etc.) survive the pipe.
+
+If you still see encoding issues, set PowerShell's pipe encoding **once per
+session** (or permanently in your `$PROFILE`):
+
+```powershell
+$OutputEncoding = [System.Text.Encoding]::UTF8
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+```
+
+Or set the environment variable system-wide (survives reboots):
+
+```powershell
+[System.Environment]::SetEnvironmentVariable("PYTHONUTF8", "1", "User")
 ```
 
 ### What NOT to do
 
 ```
 ❌  create_file("_save_post.py", ...)   # never create temp scripts
+❌  create_file("_tmp_note.py", ...)    # never create temp scripts, use pipe
 ❌  import from daily-research/scripts  # never route through other skills
 ❌  Write content to a .md file on disk # vault writes go through CLI only
-❌  Multiple tool calls for one note    # one python -c call is enough
+❌  Multiple tool calls for one note    # one pipe call is enough
+❌  @"..."@ (double-quoted heredoc)     # still mangles backticks and $
 ```
 
 ## Quick Reference
