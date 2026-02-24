@@ -1,7 +1,6 @@
 ---
 name: ci-cd
 description: GitHub Actions workflow creation, debugging, and optimization for CI/CD pipelines. Use when setting up automated builds, deployment pipelines, debugging workflow failures, or optimizing build performance.
-version: 1.0.0
 ---
 
 # CI/CD Skill

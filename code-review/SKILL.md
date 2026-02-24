@@ -1,7 +1,6 @@
 ---
 name: code-review
 description: Comprehensive constitutional code review against project standards, design specifications, and best practices. Use when reviewing code quality, before major releases, after significant refactoring, or when technical debt assessment is needed.
-version: 1.0.0
 ---
 
 # Skill Instructions

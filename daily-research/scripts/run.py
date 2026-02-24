@@ -52,11 +52,8 @@ def _load_local_module(name: str, filepath: Path):
 
 _local_lib = SCRIPT_DIR / "lib"
 topics_mod = _load_local_module("dr_topics", _local_lib / "topics.py")
-vault = _load_local_module("dr_vault", _local_lib / "vault.py")
-promote = _load_local_module("dr_promote", _local_lib / "promote.py")
-
-# Fix promote's reference to vault (since it uses relative import)
-promote.vault = vault
+vault = _load_local_module("dr_vault", _local_lib / "vault_v2.py")
+promote = _load_local_module("dr_promote", _local_lib / "promote_v2.py")
 
 
 def load_config() -> dict:
@@ -461,11 +458,21 @@ def main():
 
     # --promote-only: just run promotion pass and exit
     if args.promote_only:
-        promoted = promote.promote_items(config, dry_run=args.dry_run)
+        # Load API key for LLM enrichment
+        from lib import env as l30_env
+        l30_config = l30_env.get_config()
+        openai_key = l30_config.get("OPENAI_API_KEY")
+        if not openai_key:
+            print("[warn] No OPENAI_API_KEY — will create basic notes without summaries")
+
+        promoted = promote.promote_items(
+            config, api_key=openai_key, dry_run=args.dry_run,
+        )
         if promoted:
             print(f"Promoted {len(promoted)} items to Library:")
             for item in promoted:
-                print(f"  [{item['topic_slug']}] {item['title']}")
+                path = item.get('library_path', item['topic_slug'])
+                print(f"  [{item['topic_slug']}] {item['title']} → {path}")
         else:
             print("No #keep items found to promote.")
         return
@@ -475,13 +482,14 @@ def main():
         os.environ["LAST30DAYS_DEBUG"] = "1"
 
     # Run promote pass first (tag-to-library for previous dailies)
-    promoted = promote.promote_items(config)
-    if promoted:
-        print(f"[promote] Moved {len(promoted)} items to Library")
-
-    # Load last30days config for API keys
+    # Load API key early so promote can do LLM enrichment
     from lib import env as l30_env
     l30_config = l30_env.get_config()
+    openai_key = l30_config.get("OPENAI_API_KEY")
+
+    promoted = promote.promote_items(config, api_key=openai_key)
+    if promoted:
+        print(f"[promote] Enriched & moved {len(promoted)} items to Library")
 
     if not l30_config.get("OPENAI_API_KEY") and not l30_config.get("XAI_API_KEY"):
         print("Error: No API keys found. Set them in ~/.config/last30days/.env", file=sys.stderr)
@@ -571,8 +579,7 @@ def main():
         print(note_content)
         return
 
-    # Write to vault
-    vault.ensure_dirs(config)
+    # Write to vault via Obsidian CLI
     filepath = vault.write_daily_note(config, today, note_content)
     print(f"\n[vault] Written → {filepath}")
 

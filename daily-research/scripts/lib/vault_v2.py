@@ -1,0 +1,183 @@
+"""Obsidian vault operations for daily-research pipeline.
+
+Thin wrapper around the shared Obsidian skill. Provides dedup scanning,
+daily note writing, and library management via the Obsidian CLI.
+
+Requires Obsidian to be running with CLI enabled.
+"""
+
+import re
+import sys
+from pathlib import Path
+from typing import Set, Tuple
+
+# Add the obsidian skill to the path
+_SKILLS_DIR = Path(__file__).resolve().parents[3]
+_OBSIDIAN_SCRIPTS = _SKILLS_DIR / "obsidian" / "scripts"
+if str(_OBSIDIAN_SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(_OBSIDIAN_SCRIPTS))
+
+from obsidian import Obsidian
+
+# Module-level client (lazy init)
+_ob: Obsidian | None = None
+
+
+def _client() -> Obsidian:
+    """Get or create the Obsidian client singleton."""
+    global _ob
+    if _ob is None:
+        _ob = Obsidian()
+    return _ob
+
+
+# ---------------------------------------------------------------------------
+# URL / title extraction (pure regex logic — CLI search can't do this)
+# ---------------------------------------------------------------------------
+
+def extract_urls_from_text(text: str) -> Set[str]:
+    """Extract all URLs from markdown text."""
+    urls: Set[str] = set()
+    for match in re.finditer(r'https?://[^\s\)\]>\"\']+', text):
+        url = match.group(0).rstrip(".,;:!?")
+        urls.add(url)
+    return urls
+
+
+def extract_titles_from_text(text: str) -> Set[str]:
+    """Extract article titles from markdown headers and list items."""
+    titles: Set[str] = set()
+    for match in re.finditer(r'[-*]\s*(?:\[[ x]\]\s*)?\[([^\]]+)\]\(', text):
+        title = match.group(1).strip().lower()
+        if len(title) > 10:
+            titles.add(title)
+    for match in re.finditer(r'^#{2,4}\s+(.+)$', text, re.MULTILINE):
+        title = match.group(1).strip().lower()
+        if len(title) > 10:
+            titles.add(title)
+    return titles
+
+
+def title_is_seen(title: str, seen_titles: Set[str], threshold: float = 0.8) -> bool:
+    """Check if a title is similar enough to a seen title (word overlap)."""
+    if not title or not seen_titles:
+        return False
+    title_words = set(title.lower().split())
+    if len(title_words) < 3:
+        return title.lower() in seen_titles
+    for seen in seen_titles:
+        seen_words = set(seen.split())
+        if not seen_words:
+            continue
+        overlap = len(title_words & seen_words) / max(len(title_words), len(seen_words))
+        if overlap >= threshold:
+            return True
+    return False
+
+
+# ---------------------------------------------------------------------------
+# Vault scanning (reads files via CLI, extracts with regex)
+# ---------------------------------------------------------------------------
+
+def _scan_folder_files(folder: str) -> list[str]:
+    """List .md files in a vault folder via CLI."""
+    ob = _client()
+    result = ob.files(folder=folder, ext="md")
+    return result.lines() if result.ok else []
+
+
+def _read_vault_file(filepath: str) -> str:
+    """Read a file from the vault via CLI."""
+    ob = _client()
+    return ob.read(path=filepath)
+
+
+def load_seen_urls(config: dict) -> Set[str]:
+    """Scan all dailies + library notes and return all previously seen URLs.
+
+    Uses Obsidian CLI to list and read files. Zero tokens.
+    """
+    dailies_folder = config.get("dailies_folder", "Research/Dailies")
+    library_folder = config.get("library_folder", "Research/Library")
+    seen: Set[str] = set()
+
+    for folder in [dailies_folder, library_folder]:
+        for filepath in _scan_folder_files(folder):
+            text = _read_vault_file(filepath)
+            seen.update(extract_urls_from_text(text))
+
+    return seen
+
+
+def load_seen_titles(config: dict) -> Set[str]:
+    """Load previously seen article titles for fuzzy dedup."""
+    dailies_folder = config.get("dailies_folder", "Research/Dailies")
+    library_folder = config.get("library_folder", "Research/Library")
+    titles: Set[str] = set()
+
+    for folder in [dailies_folder, library_folder]:
+        for filepath in _scan_folder_files(folder):
+            text = _read_vault_file(filepath)
+            titles.update(extract_titles_from_text(text))
+
+    return titles
+
+
+# ---------------------------------------------------------------------------
+# Writing
+# ---------------------------------------------------------------------------
+
+def write_daily_note(config: dict, date_str: str, content: str) -> str:
+    """Write a daily research note to the vault via CLI.
+
+    Returns the path of the written file.
+    """
+    dailies_folder = config.get("dailies_folder", "Research/Dailies")
+    ob = _client()
+
+    path = f"{dailies_folder}/{date_str}.md"
+
+    # Don't overwrite — find an available filename
+    if ob.exists(path=path):
+        i = 2
+        while ob.exists(path=f"{dailies_folder}/{date_str}-{i}.md"):
+            i += 1
+        path = f"{dailies_folder}/{date_str}-{i}.md"
+
+    ob.create(path=path, content=content)
+    return path
+
+
+def daily_exists(config: dict, date_str: str) -> bool:
+    """Check if a daily note already exists for this date."""
+    dailies_folder = config.get("dailies_folder", "Research/Dailies")
+    return _client().exists(path=f"{dailies_folder}/{date_str}.md")
+
+
+# ---------------------------------------------------------------------------
+# Library / promote helpers
+# ---------------------------------------------------------------------------
+
+def read_file(path: str) -> str:
+    """Read a vault file by path."""
+    return _client().read(path=path)
+
+
+def write_file(path: str, content: str) -> None:
+    """Write (create/overwrite) a vault file by path."""
+    _client().create(path=path, content=content, overwrite=True)
+
+
+def append_to_file(path: str, content: str) -> None:
+    """Append content to a vault file."""
+    _client().append(content, path=path)
+
+
+def file_exists(path: str) -> bool:
+    """Check if a file exists in the vault."""
+    return _client().exists(path=path)
+
+
+def list_md_files(folder: str) -> list[str]:
+    """List .md files in a vault folder."""
+    return _scan_folder_files(folder)

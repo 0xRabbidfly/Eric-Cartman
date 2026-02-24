@@ -1,7 +1,6 @@
 ---
 name: testing
 description: Comprehensive testing workflow for Next.js App Router with Vitest, React Testing Library, and Playwright E2E tests. Use when writing tests, debugging failures, or improving coverage.
-version: 1.0.0
 ---
 
 # Testing Skill
