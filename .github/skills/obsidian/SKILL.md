@@ -223,6 +223,9 @@ ob.property_set("sources", "12", file="Agentic RAG Research", type="number")
    (usually `%LOCALAPPDATA%\Programs\obsidian\`)
 4. Either add that folder to PATH, or the wrapper auto-discovers it.
 
+**Changelog**: <https://obsidian.md/changelog/>
+Check before updating the skill to catch breaking CLI changes or new features to wrap.
+
 ## Dependencies
 
 - Python 3.10+ (stdlib only — subprocess + json)

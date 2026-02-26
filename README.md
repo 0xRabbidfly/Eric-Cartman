@@ -463,8 +463,119 @@ Suggests running when it notices discrepancies between docs and reality (chunk c
 
 ---
 
+### 15. 🪞 Skill Reflection
+
+**Composable after-action review that any skill can invoke at the end of its workflow.**
+
+Analyzes friction encountered during a skill run and produces prioritized, advisory recommendations for improving the calling skill's SKILL.md. Tracks friction history across runs — if the same issue appears twice, it auto-escalates to P0.
+
+**Use When:**
+- At the end of any multi-step skill workflow
+- After a skill encounters friction (errors, workarounds, retries)
+- After a successful run that still had rough edges
+- When a user says "reflect on that run" or "what could be improved"
+
+**Design Principles:**
+| Principle | Meaning |
+|-----------|--------|
+| Generic | Knows nothing about specific skills; receives context as input |
+| Composable | Called inline by other skills, not standalone |
+| Advisory | Produces recommendations, never edits SKILL.md directly |
+| Cumulative | Tracks friction history to detect repeat issues |
+
+**How Other Skills Compose With This:**
+
+Add this as the final step in any skill's SKILL.md:
+
+```markdown
+### Step N: Reflection (composable)
+
+Invoke the `skill-reflection` skill with:
+- **Calling skill**: `<skill-name>`
+- **SKILL.md path**: `.github/skills/<skill-name>/SKILL.md`
+- **Steps completed**: list each step with pass/fail/skipped
+- **Friction notes**: any workarounds, retries, unexpected errors
 ```
-📍 Location: .github/skills/skill-lookup/
+
+**Priority Levels:**
+| Priority | Meaning |
+|----------|--------|
+| P0 - breaking | Will cause failure next time — must fix before next run |
+| P1 - quality | Causes retries or confusion — should fix soon |
+| P2 - nice | Minor clarity improvement — fix when convenient |
+
+**Escalation Rule:** Same friction point in two consecutive runs → auto-escalate to P0.
+
+```
+📍 Location: .github/skills/skill-reflection/
+```
+
+---
+
+### 16. 📡 Daily Research Pipeline
+
+**Automated daily AI research pipeline that writes to your Obsidian vault.**
+
+Scans 5 topic tracks (agents, skills, models, MCP, RAG) across Reddit and X, deduplicates against vault history, and writes a structured daily note with reading list and per-topic breakdowns. Tag `#keep` to promote posts to your long-term Library.
+
+**Use When:**
+- Daily research habit for staying current on AI developments
+- Scanning specific topics across Reddit and X
+- Building a curated research library over time
+- User says "daily research", "what's new in AI", "run pipeline"
+
+**Cost:** ~$0.05-0.15/day (~$3/month) using scan mode with gpt-4o-mini.
+
+**Invocation:**
+```bash
+# Full daily run (all 5 topics)
+python .github/skills/daily-research/scripts/run.py
+
+# Single topic
+python .github/skills/daily-research/scripts/run.py --topic agents
+
+# Preview without writing to vault
+python .github/skills/daily-research/scripts/run.py --dry-run
+```
+
+```
+📍 Location: .github/skills/daily-research/
+```
+
+---
+
+### 17. 📓 Obsidian Vault Operations
+
+**Composable wrapper for Obsidian CLI — the sole interface for all vault operations.**
+
+Thin, composable wrapper around the Obsidian CLI (v1.12+) that other skills import to interact with the vault. Supports read, write, search, tags, properties, tasks, daily notes, backlinks, and more.
+
+**Use When:**
+- Any task needs to read, write, search, tag, or query the Obsidian vault
+- Other skills need to persist output to the vault
+- User says "save to vault", "obsidian", "research note", "daily note"
+
+**Key Operations:**
+| Category | Examples |
+|----------|--------|
+| Files | `read`, `create`, `append`, `prepend`, `move`, `rename`, `delete` |
+| Search | `search`, `search_context` |
+| Daily Notes | `daily_read`, `daily_append`, `daily_prepend` |
+| Properties | `property_read`, `property_set`, `properties` |
+| Tags | `tags`, `tag_info`, `tags_for_file` |
+| Graph | `backlinks`, `links`, `orphans`, `unresolved` |
+| Tasks | `tasks`, `task_toggle`, `task_done` |
+
+**Invocation (PowerShell):**
+```powershell
+@'
+# My Note
+Body content here.
+'@ | python .github/skills/obsidian/scripts/obsidian.py create --path "Research/Library/my-note.md"
+```
+
+```
+📍 Location: .github/skills/obsidian/
 ```
 
 ---
@@ -476,19 +587,23 @@ Suggests running when it notices discrepancies between docs and reality (chunk c
 ├── copilot-instructions.md     # Root AI instructions
 ├── mcp.json                    # MCP server configuration
 ├── skills/                     # Reusable AI skills (GitHub Copilot)
-│   ├── agentic-evaluator/      # ⭐ Featured
-│   ├── project-guide/          # ⭐ Featured
-│   ├── project-scaffold/       # ⭐ Featured
-│   ├── health-audit/           # ⭐ Featured
-│   ├── session-learning/       # ⭐ Featured
-│   ├── session-log/            # ⭐ Featured
-│   ├── insights-report/        # ⭐ Featured
-│   ├── verification-loop/      # ⭐ Featured
-│   ├── last30days/             # 🔍 Research skill (Copilot version)
+│   ├── agentic-evaluator/      # ⭐ Score repo agentic maturity
+│   ├── branch-wrapup/          # ✅ Pre-PR quality gate
 │   ├── content-research-writer/ # ✍️ Writing partner
+│   ├── daily-research/         # 📡 Daily AI research pipeline
 │   ├── doc-sync-all/           # 🔄 Documentation sync
+│   ├── health-audit/           # 🩺 Artifact health checks
+│   ├── insights-report/        # 📈 Cross-session analysis
+│   ├── last30days/             # 🔍 Research (Copilot version)
+│   ├── obsidian/               # 📓 Vault operations (composable)
+│   ├── project-guide/          # 🧭 Codebase exploration
 │   ├── project-infographic/    # 🎨 Sprint demo visuals
-│   └── repo-state-sync/        # 🔃 Onboarding sync
+│   ├── project-scaffold/       # 🏗️ Agentic scaffold wizard
+│   ├── repo-state-sync/        # 🔃 Onboarding sync
+│   ├── session-learning/       # 📚 Pattern extraction
+│   ├── session-log/            # 🗒️ Session capture
+│   ├── skill-reflection/       # 🪞 Composable after-action review
+│   └── 
 ├── agents/                     # Specialized agent configs
 │   └── eric-cartman.md         # 🎭 Cartman-flavored project guide
 ├── instructions/               # File-pattern-specific rules
