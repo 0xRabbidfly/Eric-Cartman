@@ -50,6 +50,7 @@ def _find_obsidian_binary() -> str:
         try:
             result = subprocess.run(
                 [name, "version"],
+                stdin=subprocess.DEVNULL,
                 capture_output=True,
                 text=True,
                 timeout=10,
@@ -165,6 +166,7 @@ class Obsidian:
         try:
             proc = subprocess.run(
                 cmd,
+                stdin=subprocess.DEVNULL,
                 capture_output=True,
                 text=True,
                 encoding="utf-8",
@@ -692,6 +694,9 @@ if __name__ == "__main__":
         if sys.stdin.isatty():
             parser.error(f"'{args.action}' needs content. Pipe via stdin or pass --content.")
         content = sys.stdin.read()
+
+    # Strip UTF-8 BOM that PowerShell injects when piping via heredoc
+    content = content.lstrip("\ufeff")
 
     if args.action == "create":
         r = ob.create(path=args.path, name=args.file, content=content,
