@@ -74,6 +74,81 @@ def load_config() -> dict:
     }
 
 
+# ---------------------------------------------------------------------------
+# Quality filters — engagement floor, long-form bias, priority accounts
+# ---------------------------------------------------------------------------
+
+def apply_quality_filters(result: dict, config: dict) -> dict:
+    """Apply post-scoring quality filters to a topic scan result.
+
+    Three passes, all config-driven via config.json → quality_filters:
+      1. Engagement floor — drop low-engagement noise
+      2. Long-form bonus  — boost articles / long threads
+      3. Priority accounts — boost followed accounts & frontier labs
+
+    Modifies items in-place and removes filtered items from the result.
+    """
+    qf = config.get("quality_filters", {})
+    if not qf:
+        return result
+
+    min_eng = qf.get("min_engagement", {})
+    reddit_floor = min_eng.get("reddit_score", 0)
+    x_likes_floor = min_eng.get("x_likes", 0)
+
+    long_form_bonus = qf.get("long_form_bonus", 0)
+    long_form_min_chars = qf.get("long_form_min_chars", 500)
+    article_domains = [d.lower() for d in qf.get("article_domains", [])]
+
+    priority = qf.get("priority_accounts", {})
+    priority_x = {h.lower() for h in priority.get("x", [])}
+    priority_subs = {s.lower() for s in priority.get("reddit_subreddits", [])}
+    priority_bonus = qf.get("priority_account_bonus", 0)
+
+    # --- 1. Engagement floor (drop low-engagement items) ---
+    if reddit_floor > 0:
+        result["reddit_items"] = [
+            item for item in result["reddit_items"]
+            if item.engagement is None  # keep items with unknown engagement
+            or item.engagement.score is None
+            or item.engagement.score >= reddit_floor
+        ]
+    if x_likes_floor > 0:
+        result["x_items"] = [
+            item for item in result["x_items"]
+            if item.engagement is None
+            or item.engagement.likes is None
+            or item.engagement.likes >= x_likes_floor
+        ]
+
+    # --- 2. Long-form content bonus ---
+    if long_form_bonus > 0:
+        # X: boost items with long text (threads, article links)
+        for item in result["x_items"]:
+            if len(item.text) >= long_form_min_chars:
+                item.score = min(100, item.score + long_form_bonus)
+
+        # Reddit: boost items linking to article domains or with long titles
+        for item in result["reddit_items"]:
+            url_lower = item.url.lower()
+            is_article = any(domain in url_lower for domain in article_domains)
+            is_long_title = len(item.title) > 100
+            if is_article or is_long_title:
+                item.score = min(100, item.score + long_form_bonus)
+
+    # --- 3. Priority account boost ---
+    if priority_bonus > 0:
+        for item in result["x_items"]:
+            if item.author_handle.lower() in priority_x:
+                item.score = min(100, item.score + priority_bonus)
+
+        for item in result["reddit_items"]:
+            if item.subreddit.lower() in priority_subs:
+                item.score = min(100, item.score + priority_bonus)
+
+    return result
+
+
 def run_topic_scan(
     topic: topics_mod.Topic,
     config: dict,
@@ -154,6 +229,9 @@ def run_topic_scan(
             result["x_items"] = deduped
         except Exception as e:
             result["errors"].append(f"X/{topic.slug}: {e}")
+
+    # --- Quality filters: engagement floor, long-form bias, priority accounts ---
+    result = apply_quality_filters(result, config)
 
     # --- Vault dedup: remove items already seen ---
     result["reddit_items"] = [

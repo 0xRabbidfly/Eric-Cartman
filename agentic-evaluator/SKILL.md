@@ -1,6 +1,8 @@
 ---
 name: agentic-evaluator
 description: Evaluates any repository's agentic development maturity. Use when auditing a codebase for best practices in agents, skills, instructions, MCP config, and prompts. Produces a scored report with specific remediation steps.
+user-invokable: true
+disable-model-invocation: true
 ---
 
 # Agentic Evaluator Skill
@@ -48,6 +50,51 @@ Generate a scored report using the agentic-evaluator skill.
 
 ---
 
+## Lean Context Principle
+
+> **Don't tell the agent what it can figure out on its own.**
+>
+> Every line in a context file costs tokens and competes for attention.
+> Instructions that restate discoverable facts add noise, not signal.
+> Keep only rules that **correct specific agent mistakes** your evals reveal.
+>
+> — [Theo vs Maple debate, Feb 2026](https://tessl.io/blog/your-agentsmd-file-isnt-the-problem-your-lack-of-evals-is)
+> — [SkillsBench (Li et al., arXiv:2602.12670)](https://arxiv.org/abs/2602.12670): Curated skills +16.2 pp avg, self-generated −1.3 pp. Comprehensive docs **hurt** (−2.9 pp). Focused 2–3 module skills optimal.
+
+**Domain sensitivity**: Software Engineering tasks benefit *least* from skills (+4.5 pp) — agents already know this domain from pretraining. Be extra ruthless trimming SE-focused rules (TypeScript, React, file conventions). Non-SE domains (auth flows, regulatory, infra) benefit most.
+
+### What counts as noise (remove or never add)
+
+| Noise pattern | Why it's noise |
+|---------------|----------------|
+| "Use TypeScript" | Agent sees `.ts`/`.tsx` files and `tsconfig.json` |
+| "Run `npm run dev` to start" | Agent reads `package.json` scripts |
+| "Project uses React" | Agent sees `react` in `package.json` dependencies |
+| "Files are in `src/`" | Agent explores the folder structure |
+| "Use ESLint" | Agent finds `.eslintrc` / `eslint.config.*` |
+| "Components are in PascalCase" | Agent infers from existing filenames |
+| "Use Jest for testing" | Agent reads `jest.config.*` or `vitest.config.*` |
+
+### What counts as signal (keep)
+
+| Signal pattern | Why it's signal |
+|----------------|------------------|
+| "Never log tokens or auth headers" | Safety rule the agent can't infer |
+| "Use OBO flow, not app-only for Graph" | Architectural decision not in code |
+| "All strings must be localizable (EN/FR)" | Policy the agent would skip |
+| "Prefer discriminated unions over throwing" | Style choice against agent default |
+| "Do not cache user-specific content in shared caches" | Non-obvious constraint |
+| "Use CSS Modules; never duplicate properties in inline + class" | Prevents a specific recurring bug |
+
+### The eval test for any instruction
+
+Before adding a rule, ask: **"Would the agent do the wrong thing without this?"**
+- **Yes** → Keep it. This is high-signal context.
+- **No / Maybe** → Cut it. The agent will discover it from your codebase.
+- **Not sure** → Run a before/after eval to find out.
+
+---
+
 ## Evaluation Workflow
 
 ### Phase 1: Discovery Scan
@@ -80,11 +127,13 @@ Record file counts and line counts per artifact type.
 
 | Check | Points | Criteria |
 |-------|--------|----------|
-| Root instructions exist | 5 | `.github/copilot-instructions.md` OR `AGENTS.md` OR `.claude/claude.md` |
-| Root instructions quality | 5 | Has project context, tech stack, non-negotiables (50+ lines) |
-| `.github/` structure | 5 | Organized folders for artifacts |
-| README mentions agentic features | 5 | Documents how to use AI assistance |
-| MCP config exists | 5 | `.github/mcp.json` or `.vscode/mcp.json` |
+| Root instructions exist | 4 | `.github/copilot-instructions.md` OR `AGENTS.md` OR `.claude/claude.md` |
+| Root instructions quality | 4 | Has project context, tech stack, non-negotiables (50+ lines) |
+| Lean context (low noise) | 5 | No discoverable facts restated (see Lean Context Principle) |
+| No auto-generated context | 2 | Instructions are human-authored; any auto-generated content has eval validation |
+| `.github/` structure | 4 | Organized folders for artifacts |
+| README mentions agentic features | 3 | Documents how to use AI assistance |
+| MCP config exists | 3 | `.github/mcp.json` or `.vscode/mcp.json` |
 
 ### Phase 3: Skills (25 points)
 
@@ -94,14 +143,20 @@ Record file counts and line counts per artifact type.
 | Valid frontmatter | 4 | `name` + `description` in YAML |
 | "When to Use" section | 3 | Clear trigger scenarios |
 | Examples included | 3 | Concrete code/command examples |
-| Right-sized | 3 | 100-500 lines (not monolithic) |
-| Progressive disclosure | 5 | 3-tier: metadata → body → bundled files |
+| Right-sized | 3 | SKILL.md: 100–300 lines / 1–2K tokens; total skill ≤5K tokens |
+| Activation scope | 2 | Trigger patterns limit concurrent skills to 2–3 per task |
+| Progressive disclosure | 3 | 3-tier: metadata → body → bundled files |
 | Cover key workflows | 5 | Testing, deployment, or domain-specific |
 
 **Progressive Disclosure** (per Anthropic guidance):
 1. **Metadata** (~100 tokens): `name` + `description` loaded at startup
-2. **Instructions** (1-5K tokens): Full SKILL.md body loaded when triggered
+2. **Instructions** (1–2K tokens): Full SKILL.md body loaded when triggered
 3. **Resources** (on-demand): Bundled files referenced by name, loaded only as needed
+
+> Per SkillsBench ecosystem data (47K skills): median SKILL.md is ~1.5K tokens,
+> median total skill ~2.5K tokens. "Detailed" skills (+18.8 pp) outperform
+> "Comprehensive" ones (−2.9 pp). Keep SKILL.md focused; move reference
+> tables, templates, and examples into bundled files.
 
 ✅ Good: `See: templates/component.template.tsx for scaffolding`
 ❌ Bad: Embedding 200-line template directly in SKILL.md
@@ -144,9 +199,11 @@ tools: required       # array of allowed tools
 |-------|--------|----------|
 | Instructions folder exists | 2 | `.github/instructions/` present |
 | Has `applyTo` patterns | 4 | Valid glob patterns in frontmatter |
-| Has code examples | 5 | Good/bad pattern comparisons |
-| Right-sized | 4 | 50-200 lines with concrete guidance |
-| Coverage analysis | 5 | Patterns match actual codebase files |
+| Has code examples | 3 | Good/bad pattern comparisons |
+| No discoverable noise | 3 | Every rule fails the "would the agent get this wrong?" test |
+| No conflicting guidance | 2 | No contradictions between root instructions, scoped instructions, and skills |
+| Right-sized | 3 | 50-200 lines with concrete guidance |
+| Coverage analysis | 3 | Patterns match actual codebase files |
 
 **Frontmatter schema:**
 ```yaml
@@ -217,23 +274,47 @@ Output using this structure:
 
 ## Size Guidelines Reference
 
-| Artifact | Min | Max | Notes |
-|----------|-----|-----|-------|
-| Root instructions | 50 | 300 | Project overview, non-negotiables |
-| Skills | 100 | 500 | Single workflow focus |
-| Agents | 100 | 400 | Clear mission, defined workflow |
-| Instructions | 50 | 200 | File-specific patterns |
+| Artifact | Min | Max | Token budget | Notes |
+|----------|-----|-----|-------------|-------|
+| Root instructions | 50 | 300 | ≤3K | Project overview, non-negotiables |
+| Skills (SKILL.md) | 80 | 300 | 1–2K | Single workflow focus; move extras to bundled files |
+| Skills (total) | — | — | ≤5K | SKILL.md + scripts/ + references/ combined |
+| Agents | 100 | 400 | ≤4K | Clear mission, defined workflow |
+| Instructions | 50 | 200 | ≤2K | File-specific patterns |
+
+> **Why these limits?** SkillsBench (Li et al., 2026) tested 47K ecosystem skills:
+> median SKILL.md ~1.5K tokens, median total ~2.5K tokens.
+> "Detailed" skills (+18.8 pp) beat "Comprehensive" ones (−2.9 pp).
+> 4+ skills per task = only +5.9 pp vs +18.6 pp for 2–3 skills.
 
 **Signals to split:**
 - File exceeds max by >20%
 - Multiple unrelated concerns
 - "When to Use" has >5 distinct scenarios
+- Skill token count exceeds 2K (move tables/templates to bundled files)
+
+---
+
+## Skill Quality Dimensions
+
+Rate each skill on four dimensions (0–3 each, /12 total).
+Ecosystem mean is 6.2/12 — aim for ≥9/12 on production skills.
+
+| Dimension | 0 | 1 | 2 | 3 |
+|-----------|---|---|---|---|
+| **Completeness** | Missing required sections | Has frontmatter only | Has workflow + examples | Full structure with bundled resources |
+| **Clarity** | Ambiguous, wall of text | Some structure | Clear headings + steps | Scannable, progressive disclosure |
+| **Specificity** | Vague platitudes | General guidance | Domain-specific procedures | Concrete steps with verifiable outputs |
+| **Examples** | None | Pseudocode only | One working example | Good/bad comparisons with context |
+
+> Source: SkillsBench Appendix A.3 quality rubric, adapted.
 
 ---
 
 ## Skill Development Best Practices
 
-From [Anthropic's Agent Skills guidance](https://www.anthropic.com/engineering/equipping-agents-for-the-real-world-with-agent-skills):
+From [Anthropic's Agent Skills guidance](https://www.anthropic.com/engineering/equipping-agents-for-the-real-world-with-agent-skills)
+and [SkillsBench (Li et al., 2026)](https://arxiv.org/abs/2602.12670):
 
 ### Start with Evaluation
 - Identify gaps by running agents on representative tasks
@@ -256,6 +337,12 @@ From [Anthropic's Agent Skills guidance](https://www.anthropic.com/engineering/e
 - When it goes off track, ask it to self-reflect on what went wrong
 - Discover what context Claude actually needs vs. anticipating upfront
 
+### Less Is More (SkillsBench findings)
+- **2–3 focused skills** outperform 4+ skills (+18.6 pp vs +5.9 pp)
+- **Moderate-length** SKILL.md outperforms comprehensive docs (+18.8 pp vs −2.9 pp)
+- **Self-generated skills provide no benefit** (−1.3 pp avg) — always human-author and validate
+- **Smaller model + skills** can match larger model without — skills partially substitute for model scale
+
 ### Security Considerations
 - Install skills only from trusted sources
 - Audit bundled files before use — check code dependencies
@@ -268,12 +355,12 @@ From [Anthropic's Agent Skills guidance](https://www.anthropic.com/engineering/e
 
 When files exceed size limits, use these splitting strategies:
 
-### Oversized Skill (>500 lines)
+### Oversized Skill (>300 lines or >2K tokens)
 
 **Split into:**
 ```
 skill-name/
-├── SKILL.md           # Core workflow (100-300 lines)
+├── SKILL.md           # Core workflow (80-300 lines, 1-2K tokens)
 ├── reference.md       # Detailed reference material
 ├── patterns.md        # Code patterns and examples  
 ├── checklist.md       # Validation checklist
@@ -281,6 +368,9 @@ skill-name/
     ├── component.template.tsx
     └── test.template.ts
 ```
+
+> Total skill directory should stay ≤5K tokens. The agent loads SKILL.md
+> eagerly but only reads bundled files on demand (`See: reference.md`).
 
 ### Oversized Agent (>400 lines)
 

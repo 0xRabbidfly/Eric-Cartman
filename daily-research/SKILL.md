@@ -84,6 +84,18 @@ Edit `scripts/config.json`:
 
 Custom topics can be added via a `topics` array in config.json.
 
+### Quality Filters
+
+Post-scoring filters applied inside `run_topic_scan()` via `config.json → quality_filters`:
+
+| Filter | What it does | Config key |
+|--------|-------------|------------|
+| **Engagement floor** | Drops Reddit items with `score < 50` and X items with `likes < 50` (~1K views). Items with unknown engagement pass through. | `min_engagement.reddit_score`, `min_engagement.x_likes` |
+| **Long-form bonus** | +10 pts for X posts with ≥500 chars (threads) and Reddit links to article domains (medium, substack, arxiv, etc.) | `long_form_bonus`, `long_form_min_chars`, `article_domains` |
+| **Priority accounts** | +15 pts for posts from followed accounts (Anthropic, OpenAI, key devs). Frontier lab releases always surface. | `priority_accounts.x`, `priority_accounts.reddit_subreddits`, `priority_account_bonus` |
+
+To customize, edit the `quality_filters` block in `scripts/config.json`.
+
 ## Scheduling
 
 Run `scripts/schedule.ps1` to register a Windows Task Scheduler task at 7:00 AM daily.
