@@ -83,3 +83,6 @@ scratch/
 
 # Used Car Search - private skill with API keys and results
 .claude/skills/used-car-search/
+
+# Teams Daily Digest - contains PII and internal channel names
+.claude/skills/teams-daily-digest/

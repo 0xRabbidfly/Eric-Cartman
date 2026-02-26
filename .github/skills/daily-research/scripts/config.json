@@ -6,5 +6,31 @@
   "kept_tag": "#kept",
   "items_per_topic": 8,
   "reading_list_max": 15,
-  "depth": "scan"
+  "depth": "scan",
+
+  "quality_filters": {
+    "min_engagement": {
+      "reddit_score": 50,
+      "x_likes": 50
+    },
+    "long_form_bonus": 10,
+    "long_form_min_chars": 500,
+    "article_domains": [
+      "medium.com", "substack.com", "arxiv.org", "github.com",
+      "huggingface.co", "openai.com", "anthropic.com", "blog.",
+      "notion.site", "dev.to", "towardsdatascience.com"
+    ],
+    "priority_accounts": {
+      "x": [
+        "AnthropicAI", "bcherny", "alexalbert__",
+        "OpenAI", "GoogleDeepMind", "MetaAI", "MistralAI", "xaborai",
+        "karpathy", "swyx", "JeffDean", "ylaborkintern",
+        "sama", "demaboris", "hardmaru"
+      ],
+      "reddit_subreddits": [
+        "Anthropic", "OpenAI", "LocalLLaMA"
+      ]
+    },
+    "priority_account_bonus": 15
+  }
 }
