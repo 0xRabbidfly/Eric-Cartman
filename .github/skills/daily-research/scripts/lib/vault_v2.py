@@ -92,19 +92,55 @@ def _read_vault_file(filepath: str) -> str:
     return ob.read(path=filepath)
 
 
+def _scan_folder_recursive(folder: str) -> list[str]:
+    """List .md files recursively in a vault folder.
+
+    Handles both flat (legacy) and year/month subfolder layouts.
+    Scans the root folder, then any YYYY/ and YYYY/MM/ sub-dirs.
+    """
+    all_files: list[str] = []
+    # Root-level files
+    all_files.extend(_scan_folder_files(folder))
+
+    # Scan year sub-folders (e.g. Research/Dailies/2026/)
+    ob = _client()
+    year_result = ob.files(folder=folder, ext="md")
+    # Also try listing sub-directories by checking for YYYY patterns
+    # The CLI lists files; we probe likely year folders
+    import datetime
+    current_year = datetime.datetime.now().year
+    for year in range(2024, current_year + 2):
+        year_folder = f"{folder}/{year}"
+        for month in range(1, 13):
+            month_folder = f"{year_folder}/{month:02d}"
+            month_files = _scan_folder_files(month_folder)
+            all_files.extend(month_files)
+        # Also check files directly in the year folder
+        year_files = _scan_folder_files(year_folder)
+        all_files.extend(year_files)
+
+    return all_files
+
+
 def load_seen_urls(config: dict) -> Set[str]:
     """Scan all dailies + library notes and return all previously seen URLs.
 
     Uses Obsidian CLI to list and read files. Zero tokens.
+    Scans both flat (legacy) and year/month subfolder layouts.
     """
     dailies_folder = config.get("dailies_folder", "Research/Dailies")
     library_folder = config.get("library_folder", "Research/Library")
     seen: Set[str] = set()
 
-    for folder in [dailies_folder, library_folder]:
-        for filepath in _scan_folder_files(folder):
-            text = _read_vault_file(filepath)
-            seen.update(extract_urls_from_text(text))
+    # Dailies: recursive scan (year/month subfolders)
+    for filepath in _scan_folder_recursive(dailies_folder):
+        text = _read_vault_file(filepath)
+        seen.update(extract_urls_from_text(text))
+
+    # Library: flat scan
+    for filepath in _scan_folder_files(library_folder):
+        text = _read_vault_file(filepath)
+        seen.update(extract_urls_from_text(text))
 
     return seen
 
@@ -115,10 +151,15 @@ def load_seen_titles(config: dict) -> Set[str]:
     library_folder = config.get("library_folder", "Research/Library")
     titles: Set[str] = set()
 
-    for folder in [dailies_folder, library_folder]:
-        for filepath in _scan_folder_files(folder):
-            text = _read_vault_file(filepath)
-            titles.update(extract_titles_from_text(text))
+    # Dailies: recursive scan (year/month subfolders)
+    for filepath in _scan_folder_recursive(dailies_folder):
+        text = _read_vault_file(filepath)
+        titles.update(extract_titles_from_text(text))
+
+    # Library: flat scan
+    for filepath in _scan_folder_files(library_folder):
+        text = _read_vault_file(filepath)
+        titles.update(extract_titles_from_text(text))
 
     return titles
 
@@ -127,22 +168,39 @@ def load_seen_titles(config: dict) -> Set[str]:
 # Writing
 # ---------------------------------------------------------------------------
 
+def _daily_path(dailies_folder: str, date_str: str) -> str:
+    """Build year/month sub-path for a daily note.
+
+    e.g. Research/Dailies/2026/02/2026-02-26.md
+    """
+    try:
+        year = date_str[:4]
+        month = date_str[5:7]
+        return f"{dailies_folder}/{year}/{month}/{date_str}.md"
+    except (IndexError, ValueError):
+        return f"{dailies_folder}/{date_str}.md"
+
+
 def write_daily_note(config: dict, date_str: str, content: str) -> str:
     """Write a daily research note to the vault via CLI.
+
+    Organizes into year/month subfolders:
+      Research/Dailies/2026/02/2026-02-26.md
 
     Returns the path of the written file.
     """
     dailies_folder = config.get("dailies_folder", "Research/Dailies")
     ob = _client()
 
-    path = f"{dailies_folder}/{date_str}.md"
+    path = _daily_path(dailies_folder, date_str)
 
     # Don't overwrite — find an available filename
     if ob.exists(path=path):
+        base = path.rsplit('.md', 1)[0]
         i = 2
-        while ob.exists(path=f"{dailies_folder}/{date_str}-{i}.md"):
+        while ob.exists(path=f"{base}-{i}.md"):
             i += 1
-        path = f"{dailies_folder}/{date_str}-{i}.md"
+        path = f"{base}-{i}.md"
 
     ob.create(path=path, content=content)
     return path
@@ -151,7 +209,11 @@ def write_daily_note(config: dict, date_str: str, content: str) -> str:
 def daily_exists(config: dict, date_str: str) -> bool:
     """Check if a daily note already exists for this date."""
     dailies_folder = config.get("dailies_folder", "Research/Dailies")
-    return _client().exists(path=f"{dailies_folder}/{date_str}.md")
+    # Check both new (year/month) and legacy (flat) paths
+    new_path = _daily_path(dailies_folder, date_str)
+    legacy_path = f"{dailies_folder}/{date_str}.md"
+    ob = _client()
+    return ob.exists(path=new_path) or ob.exists(path=legacy_path)
 
 
 # ---------------------------------------------------------------------------

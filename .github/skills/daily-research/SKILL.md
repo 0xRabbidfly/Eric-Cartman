@@ -1,6 +1,6 @@
 ---
 name: daily-research
-description: Daily AI research pipeline → Obsidian vault. Scans Reddit + X for agents, skills, models, MCP, RAG topics. Deduplicates against vault history, writes structured daily notes. Tag #keep to promote to long-term library.
+description: Daily AI research pipeline → Obsidian vault. Scans Reddit + X for agents, skills, models, MCP, RAG topics. Deduplicates against vault history, writes structured daily notes with Lab Pulse, Deep Dives, and categorized reading lists. Tag #keep to promote to long-term library.
 argument-hint: daily research, run pipeline, what's new in AI
 user-invokable: true
 ---
@@ -11,7 +11,7 @@ user-invokable: true
 
 Automated daily research pipeline that scans 5 topic tracks across Reddit and X,
 deduplicates against your Obsidian vault history, and writes a structured daily note
-with a reading list and per-topic breakdowns.
+with a Lab Pulse rollup, Deep Dives section, and per-topic breakdowns.
 
 **Cost**: ~$0.05-0.15/day (~$3/month) using scan mode with gpt-4o-mini.
 
@@ -36,11 +36,14 @@ python .github/skills/daily-research/scripts/run.py --promote-only
 ### Pipeline Flow
 
 1. **Promote Pass** — Scans previous dailies for `#keep` tags, promotes those items to `Research/Library/{topic}.md`
-2. **Vault Dedup** — Scans all dailies + library files, extracts every URL and title seen before (zero tokens — filesystem only)
+2. **Vault Dedup** — Scans all dailies + library files (including year/month subfolders), extracts every URL and title seen before (zero tokens — filesystem only)
 3. **Multi-Topic Scan** — For each of 5 topics, runs Reddit + X search in scan mode (gpt-4o-mini, no enrichment, 5-12 items each)
-4. **Cross-Dedup** — Filters out any URLs/titles already in the vault
-5. **Batched Synthesis** — Single gpt-4o-mini call to produce briefing + per-topic headlines
-6. **Write Daily Note** — Outputs structured markdown to `Research/Dailies/YYYY-MM-DD.md`
+4. **Spam Detection** — Filters out misleading content (claim/link mismatches like fake "official guides", engagement bait)
+5. **Quality Filters** — Engagement floor (100+ likes on X, 50+ on Reddit), long-form bonus, priority account boost
+6. **Content Classification** — Tags each item as `deep-dive`, `lab-pulse`, or `general`
+7. **Cross-Dedup** — Filters out any URLs/titles already in the vault
+8. **Batched Synthesis** — Single gpt-4o-mini call to produce daily POW briefing + lab pulse summary + per-topic headlines
+9. **Write Daily Note** — Outputs structured markdown to `Research/Dailies/YYYY/MM/YYYY-MM-DD.md`
 
 ### Topics Tracked
 
@@ -52,6 +55,16 @@ python .github/skills/daily-research/scripts/run.py --promote-only
 | MCP & Tool Use | `mcp` | 1.0x |
 | RAG & AI Search | `rag` | 0.9x |
 
+### Content Categories
+
+Each item gets classified into one of three categories:
+
+| Category | What it catches | Where it appears |
+|----------|----------------|------------------|
+| **Lab Pulse** | Posts from Anthropic, OpenAI, Google, Meta, Mistral and their lead devs | Dedicated Lab Pulse section at the top |
+| **Deep Dives** | Long-form threads (≥400 chars), articles from known domains (substack, arxiv, medium, etc.) | Deep Dives section with checkboxes |
+| **General** | Everything else that passes quality filters | Per-topic sections + Reading List |
+
 ### Long-Term Memory
 
 1. Read your daily note in Obsidian
@@ -62,9 +75,11 @@ python .github/skills/daily-research/scripts/run.py --promote-only
 ### Daily Note Structure
 
 ```
-Research/Dailies/2026-02-23.md
-├── YAML frontmatter (date, type, topics, stats)
-├── Key Briefing (executive summary)
+Research/Dailies/2026/02/2026-02-26.md
+├── YAML frontmatter (date, type, topics, stats, deep_dives count, lab_pulse count)
+├── Today's POW (vivid daily summary — the one thing that matters most)
+├── Lab Pulse 🧪 (model provider rollup + table of lab posts)
+├── Deep Dives 📖 (long-form threads and articles, checkboxes)
 ├── Reading List (top 15, checkboxes, topic tags)
 ├── Per-topic sections
 │   ├── Headline + key points
@@ -77,7 +92,7 @@ Research/Dailies/2026-02-23.md
 
 Edit `scripts/config.json`:
 - `vault_path` — Path to your Obsidian vault
-- `dailies_folder` — Subfolder for daily notes (default: `Research/Dailies`)
+- `dailies_folder` — Base subfolder for daily notes (default: `Research/Dailies`). Notes are auto-organized into `YYYY/MM/` subfolders.
 - `library_folder` — Subfolder for library notes (default: `Research/Library`)
 - `items_per_topic` — Max items per topic (default: 8)
 - `reading_list_max` — Max reading list items (default: 15)
@@ -90,15 +105,32 @@ Post-scoring filters applied inside `run_topic_scan()` via `config.json → qual
 
 | Filter | What it does | Config key |
 |--------|-------------|------------|
-| **Engagement floor** | Drops Reddit items with `score < 50` and X items with `likes < 50` (~1K views). Items with unknown engagement pass through. | `min_engagement.reddit_score`, `min_engagement.x_likes` |
-| **Long-form bonus** | +10 pts for X posts with ≥500 chars (threads) and Reddit links to article domains (medium, substack, arxiv, etc.) | `long_form_bonus`, `long_form_min_chars`, `article_domains` |
-| **Priority accounts** | +15 pts for posts from followed accounts (Anthropic, OpenAI, key devs). Frontier lab releases always surface. | `priority_accounts.x`, `priority_accounts.reddit_subreddits`, `priority_account_bonus` |
+| **Spam detection** | Drops fake "official guide" link bait, engagement farming posts. Catches claim/link mismatches and low-effort patterns. | `spam_detection.enabled`, `claim_link_mismatch_patterns`, `low_effort_patterns` |
+| **Engagement floor** | Drops Reddit items with `score < 50` and X items with `likes < 100`. Lab/priority accounts bypass the floor. | `min_engagement.reddit_score`, `min_engagement.x_likes` |
+| **Long-form bonus** | +15 pts for X posts with ≥400 chars (threads) and Reddit links to article domains (medium, substack, arxiv, etc.) | `long_form_bonus`, `long_form_min_chars`, `article_domains` |
+| **Priority accounts** | +20 pts for posts from tracked accounts. Frontier lab releases always surface. | `priority_accounts.x`, `priority_account_bonus` |
+| **Lab accounts** | Accounts from the 5 major labs, used for Lab Pulse rollup. Bypass engagement floor. | `lab_accounts.anthropic`, `lab_accounts.openai`, etc. |
+
+### Followed Accounts
+
+The `followed_accounts.x` list in config.json tracks accounts you follow. These get priority scoring. Since the Grok API doesn't expose your X follow graph, maintain this list manually.
 
 To customize, edit the `quality_filters` block in `scripts/config.json`.
 
 ## Scheduling
 
 Run `scripts/schedule.ps1` to register a Windows Task Scheduler task at 7:00 AM daily.
+
+### Step N: Reflection (composable)
+
+Invoke the `skill-reflection` skill with the following context:
+
+- **Calling skill**: `<skill-name>`
+- **SKILL.md path**: `.github/skills/<skill-name>/SKILL.md`
+- **Steps completed**: list each step with pass/fail/skipped
+- **Friction notes**: any workarounds, retries, unexpected errors, or manual interventions
+
+The reflection skill will analyze the run and produce improvement recommendations.
 
 ## Dependencies
 
