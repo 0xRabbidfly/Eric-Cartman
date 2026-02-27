@@ -21,6 +21,7 @@ import argparse
 import io
 import json
 import os
+import re
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
@@ -78,13 +79,80 @@ def load_config() -> dict:
 # Quality filters — engagement floor, long-form bias, priority accounts
 # ---------------------------------------------------------------------------
 
+def _is_spam(item, config: dict, source: str = "x") -> bool:
+    """Detect spam/misleading content using config-driven patterns.
+
+    Catches:
+    - Claim/link mismatch (e.g., "official Anthropic guide" linking to random GitHub)
+    - Low-effort engagement bait ("follow me for more", "like and retweet")
+    """
+    spam_cfg = config.get("quality_filters", {}).get("spam_detection", {})
+    if not spam_cfg.get("enabled", False):
+        return False
+
+    text = (item.text if source == "x" else item.title).lower()
+    url = item.url.lower()
+
+    # --- Claim/link mismatch ---
+    for pattern in spam_cfg.get("claim_link_mismatch_patterns", []):
+        claim_re = pattern.get("claim_regex", "")
+        link_must = [d.lower() for d in pattern.get("link_must_contain", [])]
+        if claim_re and re.search(claim_re, text, re.IGNORECASE):
+            # The text makes a claim — does the link back it up?
+            if link_must and not any(domain in url for domain in link_must):
+                return True  # Claim made but link is to a random domain
+
+    # --- Low-effort engagement bait ---
+    for bait in spam_cfg.get("low_effort_patterns", []):
+        if re.search(bait, text, re.IGNORECASE):
+            return True
+
+    return False
+
+
+def _classify_content(item, config: dict, source: str = "x") -> str:
+    """Classify an item as 'deep-dive', 'lab-pulse', or 'general'.
+
+    deep-dive:  Long-form threads (≥400 chars) or article links
+    lab-pulse:  Posts from model providers / their lead devs
+    general:    Everything else
+    """
+    qf = config.get("quality_filters", {})
+    lab_accounts = qf.get("lab_accounts", {})
+    long_form_min = qf.get("long_form_min_chars", 400)
+    article_domains = [d.lower() for d in qf.get("article_domains", [])]
+
+    # Build flat set of all lab handles
+    lab_handles = set()
+    for handles in lab_accounts.values():
+        lab_handles.update(h.lower() for h in handles)
+
+    # Lab pulse check
+    if source == "x" and item.author_handle.lower() in lab_handles:
+        return "lab-pulse"
+
+    # Deep dive check
+    if source == "x" and len(item.text) >= long_form_min:
+        return "deep-dive"
+    if source == "reddit":
+        url_lower = item.url.lower()
+        if any(domain in url_lower for domain in article_domains):
+            return "deep-dive"
+        if len(item.title) > 100:
+            return "deep-dive"
+
+    return "general"
+
+
 def apply_quality_filters(result: dict, config: dict) -> dict:
     """Apply post-scoring quality filters to a topic scan result.
 
-    Three passes, all config-driven via config.json → quality_filters:
+    Five passes, all config-driven via config.json → quality_filters:
+      0. Spam detection  — drop misleading/bait content
       1. Engagement floor — drop low-engagement noise
       2. Long-form bonus  — boost articles / long threads
       3. Priority accounts — boost followed accounts & frontier labs
+      4. Content classify  — tag each item as deep-dive/lab-pulse/general
 
     Modifies items in-place and removes filtered items from the result.
     """
@@ -92,12 +160,22 @@ def apply_quality_filters(result: dict, config: dict) -> dict:
     if not qf:
         return result
 
+    # --- 0. Spam detection (remove misleading content) ---
+    result["x_items"] = [
+        item for item in result["x_items"]
+        if not _is_spam(item, config, "x")
+    ]
+    result["reddit_items"] = [
+        item for item in result["reddit_items"]
+        if not _is_spam(item, config, "reddit")
+    ]
+
     min_eng = qf.get("min_engagement", {})
     reddit_floor = min_eng.get("reddit_score", 0)
     x_likes_floor = min_eng.get("x_likes", 0)
 
     long_form_bonus = qf.get("long_form_bonus", 0)
-    long_form_min_chars = qf.get("long_form_min_chars", 500)
+    long_form_min_chars = qf.get("long_form_min_chars", 400)
     article_domains = [d.lower() for d in qf.get("article_domains", [])]
 
     priority = qf.get("priority_accounts", {})
@@ -106,6 +184,11 @@ def apply_quality_filters(result: dict, config: dict) -> dict:
     priority_bonus = qf.get("priority_account_bonus", 0)
 
     # --- 1. Engagement floor (drop low-engagement items) ---
+    # Exception: priority/lab accounts bypass engagement floor
+    lab_handles = set()
+    for handles in qf.get("lab_accounts", {}).values():
+        lab_handles.update(h.lower() for h in handles)
+
     if reddit_floor > 0:
         result["reddit_items"] = [
             item for item in result["reddit_items"]
@@ -116,7 +199,9 @@ def apply_quality_filters(result: dict, config: dict) -> dict:
     if x_likes_floor > 0:
         result["x_items"] = [
             item for item in result["x_items"]
-            if item.engagement is None
+            if item.author_handle.lower() in lab_handles  # lab accounts bypass floor
+            or item.author_handle.lower() in priority_x   # priority accounts bypass floor
+            or item.engagement is None
             or item.engagement.likes is None
             or item.engagement.likes >= x_likes_floor
         ]
@@ -145,6 +230,12 @@ def apply_quality_filters(result: dict, config: dict) -> dict:
         for item in result["reddit_items"]:
             if item.subreddit.lower() in priority_subs:
                 item.score = min(100, item.score + priority_bonus)
+
+    # --- 4. Classify content (attach category metadata) ---
+    for item in result["x_items"]:
+        item._category = _classify_content(item, config, "x")
+    for item in result["reddit_items"]:
+        item._category = _classify_content(item, config, "reddit")
 
     return result
 
@@ -295,18 +386,21 @@ def synthesize_all(
             section += "(No new results)\n"
         sections.append(section)
 
-    prompt = f"""You are a research analyst creating a daily briefing.
+    prompt = f"""You are a research analyst writing a DAILY morning briefing for an AI practitioner.
+This is NOT a weekly summary. This covers what happened TODAY ({to_date}).
 
-DATE: {from_date} to {to_date}
+DATE: {to_date}
+SCAN WINDOW: {from_date} to {to_date}
 
 ## SOURCE DATA
 {chr(10).join(sections)}
 
 ## YOUR TASK
-Generate a JSON synthesis covering ALL topics above:
+Produce a JSON daily briefing:
 
 {{
-  "briefing": "3-5 sentence executive summary of today's most important findings across all topics. Be specific — mention names, numbers, tools.",
+  "briefing": "4-6 sentence summary of the biggest AI happenings TODAY. Lead with the single most impactful story. Be vivid and specific — name the companies, people, models, numbers. Write like a sharp morning newsletter opener, not a boring corporate recap. End with one forward-looking thought.",
+  "lab_pulse_summary": "2-3 sentences summarizing what the major model providers (Anthropic, OpenAI, Google, Meta, Mistral) and their lead devs said or shipped today. If nothing notable, say so.",
   "topics": [
     {{
       "slug": "topic-slug",
@@ -317,9 +411,11 @@ Generate a JSON synthesis covering ALL topics above:
 }}
 
 RULES:
-- briefing should highlight the MOST actionable/interesting items
-- Each topic should have 1-3 key_points (short, specific)
-- If a topic had no results, say "No new activity detected"
+- This is a DAILY briefing, not weekly. Use "today" language.
+- briefing: lead with the POW moment — the one thing that matters most
+- lab_pulse_summary: focus on the 3 big labs (Anthropic, OpenAI, Google) + any notable from Meta/Mistral
+- Each topic: 1-3 key_points (short, specific, actionable)
+- If a topic had no results, say "Quiet day for this topic"
 - Output ONLY valid JSON"""
 
     headers = {
@@ -360,6 +456,22 @@ def render_daily_note(
     total_reddit = sum(len(tr["reddit_items"]) for tr in topic_results)
     total_x = sum(len(tr["x_items"]) for tr in topic_results)
 
+    # Collect categorized items across all topics
+    deep_dives = []
+    lab_pulse_items = []
+    for tr in topic_results:
+        topic = tr["topic"]
+        for item in tr["x_items"]:
+            cat = getattr(item, '_category', 'general')
+            if cat == 'deep-dive':
+                deep_dives.append((item, topic, 'x'))
+            elif cat == 'lab-pulse':
+                lab_pulse_items.append((item, topic, 'x'))
+        for item in tr["reddit_items"]:
+            cat = getattr(item, '_category', 'general')
+            if cat == 'deep-dive':
+                deep_dives.append((item, topic, 'reddit'))
+
     lines = [
         "---",
         f"date: {date_str}",
@@ -368,21 +480,57 @@ def render_daily_note(
         "status: unread",
         f"reddit_items: {total_reddit}",
         f"x_items: {total_x}",
+        f"deep_dives: {len(deep_dives)}",
+        f"lab_pulse: {len(lab_pulse_items)}",
         "---",
         "",
         f"# Daily Research — {_format_date(date_str)}",
         "",
     ]
 
-    # Briefing
+    # Briefing — the POW moment
     briefing = synthesis.get("briefing", "")
     if briefing:
         lines.extend([
-            "## Key Briefing",
+            "## Today's POW",
             "",
             briefing,
             "",
         ])
+
+    # Lab Pulse — what the model providers said/shipped today
+    lab_pulse_summary = synthesis.get("lab_pulse_summary", "")
+    if lab_pulse_summary or lab_pulse_items:
+        lines.extend([
+            "## Lab Pulse \U0001f9ea",
+            "",
+        ])
+        if lab_pulse_summary:
+            lines.extend([lab_pulse_summary, ""])
+        if lab_pulse_items:
+            lines.append("| Author | Post | Likes | Link |")
+            lines.append("|--------|------|-------|------|")
+            for item, topic, source in lab_pulse_items[:10]:
+                likes = item.engagement.likes if item.engagement and item.engagement.likes else 0
+                text_short = item.text[:80] + "..." if len(item.text) > 80 else item.text
+                lines.append(
+                    f"| @{item.author_handle} | {text_short} | {likes} | [→]({item.url}) |"
+                )
+            lines.append("")
+
+    # Deep Dives — long-form threads and articles
+    if deep_dives:
+        lines.extend([
+            "## Deep Dives \U0001f4d6",
+            "",
+        ])
+        for item, topic, source in deep_dives[:8]:
+            if source == 'x':
+                title = item.text[:100] + "..." if len(item.text) > 100 else item.text
+                lines.append(f"- [ ] [{title}]({item.url}) — @{item.author_handle} #{topic.slug}")
+            else:
+                lines.append(f"- [ ] [{item.title}]({item.url}) — r/{item.subreddit} #{topic.slug}")
+        lines.append("")
 
     # Reading list (top items across all topics, ranked by score)
     reading_list = _build_reading_list(topic_results, config)

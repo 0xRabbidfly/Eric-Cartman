@@ -38,11 +38,15 @@ _spec.loader.exec_module(vault)
 def scan_for_keeps(dailies_folder: str) -> List[Tuple[str, List[dict]]]:
     """Scan all daily notes for items tagged #keep.
 
+    Scans both flat (legacy) and year/month subfolder layouts.
     Returns list of (filepath, [item_dicts]) tuples.
     Each item_dict has: title, url, summary, line_number, raw_line, topic_slug, date_found
     """
     results = []
-    md_files = sorted(vault.list_md_files(dailies_folder))
+    # Use recursive scan to find dailies in year/month subfolders
+    md_files = sorted(vault._scan_folder_recursive(dailies_folder)
+                      if hasattr(vault, '_scan_folder_recursive')
+                      else vault.list_md_files(dailies_folder))
 
     for filepath in md_files:
         text = vault.read_file(filepath)

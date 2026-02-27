@@ -3,6 +3,7 @@ name: skill-reflection
 description: Generic post-workflow self-reflection that any skill can invoke at the end of its run. Analyzes friction encountered during execution and produces advisory recommendations for improving the calling skill's SKILL.md. Use when a skill finishes (success or failure) and wants to capture improvement opportunities.
 argument-hint: skill name, step results, friction notes
 user-invokable: true
+disable-model-invocation: true
 ---
 
 # Skill Reflection (Composable)
@@ -107,7 +108,20 @@ Extract from the caller's input:
 If the caller didn't provide structured input, ask:
 > What skill just ran, and what friction did you encounter?
 
-### 2. Categorize Friction
+### 2. Reflect On the Run
+
+Before categorizing, walk through these prompts to surface friction that the caller may not have explicitly reported:
+
+1. **Commands that failed or needed workarounds** — did any step's commands throw errors, need flag changes, or require rewriting before they worked?
+2. **False positives in scans** — did any automated check flag legitimate code that should be exempted or allowlisted?
+3. **Missing checks** — were there issues found manually that the automated steps didn't catch?
+4. **Step sequencing** — would a different order have saved time or caught blockers earlier?
+5. **New patterns in the codebase** — did new file locations, file types, or conventions appear that the skill doesn't yet handle?
+6. **Time sinks** — which steps required the most retries or additional investigation?
+
+Add any findings to the friction list alongside what the caller already reported.
+
+### 3. Categorize Friction
 
 Classify each friction point into one of these **generic categories**:
 
@@ -121,7 +135,7 @@ Classify each friction point into one of these **generic categories**:
 | **Missing step** | A manual action was needed that isn't in the skill | Had to run an extra command between steps |
 | **Ambiguous instruction** | A step was unclear and required interpretation | Vague wording, missing parameter, unclear order |
 
-### 3. Read the Calling Skill's SKILL.md
+### 4. Read the Calling Skill's SKILL.md
 
 Read the SKILL.md to understand:
 - What steps are documented
@@ -129,7 +143,7 @@ Read the SKILL.md to understand:
 - What estimates or assumptions are stated
 - Whether the friction point is already addressed (but poorly)
 
-### 4. Check Friction History
+### 5. Check Friction History
 
 Look for previous reflection output in the vault or in `.github/sessions/`:
 
@@ -141,9 +155,9 @@ If the **same friction category + same step** appears in a previous reflection:
 - **Escalate to P0** (repeat friction = must fix)
 - Note: "This is a repeat issue — first seen on [date]"
 
-### 5. Produce Recommendations
+### 6. Produce Recommendations
 
-Output using this format:
+Output using this verbose format:
 
 ```
 --- SKILL REFLECTION — <skill-name> ---
@@ -168,8 +182,12 @@ Prioritized recommendations for <skill-name>/SKILL.md:
 
 Repeat friction: [none | list of issues seen before with dates]
 
+Self-improvement rule:
+  If the same friction point appears in two consecutive runs,
+  escalate to P0 and flag as a required fix before the next run.
+
 No SKILL.md changes made — recommendations are advisory.
-To apply: ask Copilot to "apply <skill-name> reflection recommendations from last run".
+To apply: tell Copilot "apply the <skill-name> reflection recommendations and fix the SKILL.md".
 ---
 ```
 
