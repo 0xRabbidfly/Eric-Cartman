@@ -1,0 +1,46 @@
+{
+  "good": [
+    {
+      "date": "2026-02-28",
+      "title": "> Tag any item with `#good` or `#bad` to give feedback.",
+      "url": "",
+      "source_file": "Research/Dailies/2026/02/2026-02-28.md"
+    },
+    {
+      "date": "2026-02-28",
+      "title": "> Tag any item with `#good` or `#bad` to give feedback.",
+      "url": "",
+      "source_file": "Research/Dailies/2026/02/2026-02-28.md"
+    },
+    {
+      "date": "2026-02-28",
+      "title": "> Tag any item with `#good` or `#bad` to give feedback.",
+      "url": "",
+      "source_file": "Research/Dailies/2026/02/2026-02-28.md"
+    }
+  ],
+  "bad": [
+    {
+      "date": "2026-02-28",
+      "title": "> Tag any item with `#good` or `#bad` to give feedback.",
+      "url": "",
+      "source_file": "Research/Dailies/2026/02/2026-02-28.md"
+    },
+    {
+      "date": "2026-02-28",
+      "title": "> Tag any item with `#good` or `#bad` to give feedback.",
+      "url": "",
+      "source_file": "Research/Dailies/2026/02/2026-02-28.md"
+    },
+    {
+      "date": "2026-02-28",
+      "title": "> Tag any item with `#good` or `#bad` to give feedback.",
+      "url": "",
+      "source_file": "Research/Dailies/2026/02/2026-02-28.md"
+    }
+  ],
+  "stats": {
+    "total_good": 3,
+    "total_bad": 3
+  }
+}

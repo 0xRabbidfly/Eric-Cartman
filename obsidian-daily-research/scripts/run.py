@@ -35,7 +35,7 @@ if sys.platform == "win32":
 # Resolve paths
 SCRIPT_DIR = Path(__file__).parent.resolve()
 SKILL_DIR = SCRIPT_DIR.parent
-CONFIG_FILE = SCRIPT_DIR / "config.json"
+PIPELINE_MD = SKILL_DIR / "pipeline.md"
 
 # Vendor dir holds selective copies of last30days + obsidian modules
 # (no external skill dependencies at runtime)
@@ -68,7 +68,7 @@ FEEDBACK_FILE = SCRIPT_DIR / "feedback.json"
 # Default cost rates per 1M tokens (USD) — used ONLY as fallback when the API
 # does not return an exact cost.  xAI responses include `cost_in_usd_ticks`
 # (exact cost), so rates below are irrelevant for Grok models in practice.
-# Override in config.json → cost_rates.
+# Override via DEFAULT_COST_RATES dict above.
 DEFAULT_COST_RATES = {
     # OpenAI Responses API (web_search)
     "gpt-4o":        {"input": 2.50, "output": 10.00},
@@ -210,13 +210,75 @@ def _extract_usage(response: dict) -> dict | None:
     return response.get("usage") if isinstance(response, dict) else None
 
 
-def load_config() -> dict:
-    """Load pipeline config from config.json."""
-    if CONFIG_FILE.exists():
-        with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    # Fallback defaults
-    return {
+# ---------------------------------------------------------------------------
+# Pipeline config — parsed from pipeline.md (single source of truth)
+# ---------------------------------------------------------------------------
+
+# Hardcoded quality filter defaults (were in config.json, now inlined)
+DEFAULT_QUALITY_FILTERS = {
+    "min_engagement": {"reddit_score": 50, "x_likes": 100},
+    "long_form_bonus": 15,
+    "long_form_min_chars": 400,
+    "article_domains": [
+        "medium.com", "substack.com", "arxiv.org", "github.com",
+        "huggingface.co", "openai.com", "anthropic.com", "blog.",
+        "notion.site", "dev.to", "towardsdatascience.com",
+        "newsletter.", "mirror.xyz", "deepmind.google",
+    ],
+    "priority_accounts": {
+        "x": [
+            "AnthropicAI", "alexalbert__", "amandaaskell", "bcherny",
+            "OpenAI", "sama", "markchen90",
+            "GoogleDeepMind", "JeffDean",
+            "MetaAI", "ylecun",
+            "MistralAI", "arthurmensch",
+            "karpathy", "swyx", "hardmaru", "DrJimFan",
+        ],
+        "reddit_subreddits": [
+            "Anthropic", "OpenAI", "LocalLLaMA", "MachineLearning",
+        ],
+    },
+    "priority_account_bonus": 20,
+    "spam_detection": {
+        "enabled": True,
+        "claim_link_mismatch_patterns": [
+            {"claim_regex": r"official\s+(anthropic|openai|google|meta)\b",
+             "link_must_contain": ["anthropic.com", "openai.com", "google.com",
+                                   "deepmind.google", "meta.com",
+                                   "github.com/anthropics", "github.com/openai",
+                                   "github.com/google"]},
+            {"claim_regex": r"official\s+guide|official\s+docs",
+             "link_must_contain": [".com/anthropics/", ".com/openai/",
+                                   ".com/google/", "docs.anthropic.com",
+                                   "platform.openai.com"]},
+        ],
+        "low_effort_patterns": [
+            "follow me for more", "like and retweet",
+            "DM me for", "link in bio", r"drop a .* if you",
+        ],
+    },
+    "lab_accounts": {
+        "anthropic": ["AnthropicAI", "alexalbert__", "amandaaskell", "bcherny", "jack_clark", "DarioAmodei"],
+        "openai": ["OpenAI", "sama", "markchen90"],
+        "google": ["GoogleDeepMind", "JeffDean", "googleai"],
+        "meta": ["MetaAI", "ylecun"],
+        "mistral": ["MistralAI", "arthurmensch"],
+    },
+}
+
+
+def _parse_pipeline_md(path: Path) -> dict:
+    """Parse pipeline.md into a config dict.
+
+    Extracts three sections:
+      # Topics      → config["topics"]  (list of dicts)
+      # Must-Follow → config["must_follow_accounts"]  (list of dicts with group)
+      # Settings    → merged into config top-level keys
+
+    Lines starting with `>` are comments. Blank lines are ignored.
+    """
+    config = {
+        # Sensible defaults
         "vault_path": str(Path.home() / "Documents" / "Obsidian Vault"),
         "dailies_folder": "Research/Dailies",
         "library_folder": "Research/Library",
@@ -225,7 +287,97 @@ def load_config() -> dict:
         "items_per_topic": 8,
         "reading_list_max": 15,
         "depth": "scan",
+        "quality_filters": DEFAULT_QUALITY_FILTERS,
+        "topics": [],
+        "must_follow_accounts": [],
     }
+
+    if not path.exists():
+        return config
+
+    section = None  # "topics" | "must-follow" | "settings"
+    current_group = "Other"
+
+    with open(path, "r", encoding="utf-8") as f:
+        for raw_line in f:
+            line = raw_line.strip()
+
+            # Skip blanks and comments
+            if not line or line.startswith(">"):
+                continue
+
+            # Top-level section headers (# Topics, # Must-Follow, # Settings)
+            if line.startswith("# ") and not line.startswith("## "):
+                header = line[2:].strip().lower()
+                if "topic" in header:
+                    section = "topics"
+                elif "must" in header or "follow" in header:
+                    section = "must-follow"
+                elif "setting" in header:
+                    section = "settings"
+                else:
+                    section = None
+                continue
+
+            # Ignore horizontal rules
+            if line.startswith("---"):
+                continue
+
+            # Group sub-headers (## Group Name) — only for must-follow
+            if line.startswith("## "):
+                current_group = line[3:].strip()
+                continue
+
+            # Parse items based on current section
+            if section == "topics" and line.startswith("- "):
+                parts = line[2:].split("|")
+                if len(parts) >= 2:
+                    slug = parts[0].strip()
+                    display = parts[1].strip()
+                    weight = float(parts[2].strip()) if len(parts) >= 3 else 1.0
+                    config["topics"].append({
+                        "slug": slug,
+                        "display_name": display,
+                        "weight": weight,
+                    })
+
+            elif section == "must-follow" and line.startswith("- @"):
+                rest = line[3:]  # strip "- @"
+                for sep in (" — ", " – ", " - "):
+                    if sep in rest:
+                        handle, label = rest.split(sep, 1)
+                        config["must_follow_accounts"].append({
+                            "handle": handle.strip(),
+                            "label": label.strip(),
+                            "group": current_group,
+                        })
+                        break
+                else:
+                    config["must_follow_accounts"].append({
+                        "handle": rest.strip(),
+                        "label": rest.strip(),
+                        "group": current_group,
+                    })
+
+            elif section == "settings" and line.startswith("- "):
+                kv = line[2:]
+                if ":" in kv:
+                    key, val = kv.split(":", 1)
+                    key = key.strip()
+                    val = val.strip()
+                    # Type coercion
+                    if val.isdigit():
+                        val = int(val)
+                    elif val.startswith("~/"):
+                        val = str(Path.home() / val[2:])
+                    config[key] = val
+
+    return config
+
+
+def load_config() -> dict:
+    """Load pipeline config from pipeline.md."""
+    return _parse_pipeline_md(PIPELINE_MD)
 
 
 # ---------------------------------------------------------------------------
@@ -321,7 +473,7 @@ def _classify_content(item, config: dict, source: str = "x") -> str:
 def apply_quality_filters(result: dict, config: dict) -> dict:
     """Apply post-scoring quality filters to a topic scan result.
 
-    Five passes, all config-driven via config.json → quality_filters:
+    Five passes, all driven by DEFAULT_QUALITY_FILTERS:
       0. Spam detection  — drop misleading/bait content
       1. Engagement floor — drop low-engagement noise
       2. Long-form bonus  — boost articles / long threads
@@ -628,56 +780,8 @@ RULES:
 
 
 # ---------------------------------------------------------------------------
-# Must-Follow Account Scanning
+# Must-Follow Account Scanning (batched by group)
 # ---------------------------------------------------------------------------
-
-MUST_FOLLOW_MD = SCRIPT_DIR.parent / "must-follow.md"
-
-
-def _parse_must_follow_md(path: Path) -> list[dict]:
-    """Parse must-follow.md into a list of account dicts.
-
-    Format per line:  `- @handle — Display Name`
-    Group headers:    `## Group Name`
-    Lines starting with `>` or blank lines are ignored.
-
-    Returns:
-        List of {"handle": str, "label": str, "group": str}
-    """
-    accounts = []
-    current_group = "Other"
-    if not path.exists():
-        return accounts
-    with open(path, "r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line or line.startswith(">") or line == "# Must-Follow Accounts":
-                continue
-            # Group header: ## Group Name
-            if line.startswith("## "):
-                current_group = line[3:].strip()
-                continue
-            # Account line: - @handle — Display Name
-            if line.startswith("- @"):
-                rest = line[3:]  # strip "- @"
-                # Split on " — " (em dash) or " - " (hyphen)
-                for sep in (" — ", " – ", " - "):
-                    if sep in rest:
-                        handle, label = rest.split(sep, 1)
-                        accounts.append({
-                            "handle": handle.strip(),
-                            "label": label.strip(),
-                            "group": current_group,
-                        })
-                        break
-                else:
-                    # No separator — handle is the whole thing
-                    accounts.append({
-                        "handle": rest.strip(),
-                        "label": rest.strip(),
-                        "group": current_group,
-                    })
-    return accounts
 
 
 def run_must_follow_scan(
@@ -687,89 +791,101 @@ def run_must_follow_scan(
     to_date: str,
     tracker: TokenTracker | None = None,
 ) -> list:
-    """Scan must-follow accounts on X. No filters — every tweet is captured.
+    """Scan must-follow accounts on X, batched by group.
 
-    Uses a strict prompt that only returns original posts authored BY the
-    account (no replies, no @-mentions from other users). A hard post-filter
-    verifies author_handle matches the expected handle.
+    Groups accounts by their org group (from pipeline.md ## headers) and
+    makes ONE API call per group using search_x_must_follow_batch (up to
+    10 handles per call). A hard post-filter verifies author_handle matches
+    one of the expected handles.
 
     Returns a list of dicts: {handle, label, group, items: [x_item, ...]}
     """
     from vendor.last30days import xai_x, normalize
 
-    # Load from must-follow.md first, fall back to config.json
-    accounts = _parse_must_follow_md(MUST_FOLLOW_MD)
-    if not accounts:
-        must_follow = config.get("must_follow", {})
-        accounts = must_follow.get("accounts", [])
+    accounts = config.get("must_follow_accounts", [])
     if not accounts or not l30_config.get("XAI_API_KEY"):
         return []
 
     model = l30_config.get("xai_model", "grok-4-1-fast")
+
+    # Group accounts by org group
+    groups: dict[str, list[dict]] = {}
+    for acct in accounts:
+        grp = acct.get("group", "Other")
+        groups.setdefault(grp, []).append(acct)
+
     results = []
 
-    for acct in accounts:
-        handle = acct["handle"]
-        label = acct.get("label", handle)
-        group = acct.get("group", "Other")
+    for group_name, group_accounts in groups.items():
+        handles = [a["handle"].lstrip("@") for a in group_accounts]
+        handle_set = {h.lower() for h in handles}
+
+        print(f"  [{group_name}] {', '.join('@' + h for h in handles)}...", end=" ", flush=True)
 
         try:
-            # Use the dedicated must-follow search (strict prompt)
-            raw = xai_x.search_x_must_follow(
+            raw = xai_x.search_x_must_follow_batch(
                 l30_config["XAI_API_KEY"],
                 model,
-                handle,
+                handles,
                 from_date,
                 to_date,
                 depth="scan",
             )
             if tracker:
-                tracker.record(f"MustFollow/@{handle}", model, _extract_usage(raw))
+                tracker.record(f"MustFollow/{group_name}", model, _extract_usage(raw))
+
             items = xai_x.parse_x_response(raw)
             normalized = normalize.normalize_x_items(items, from_date, to_date)
 
-            # Hard post-filter: ONLY keep items actually authored by this handle.
-            # This is the belt-and-suspenders safety net — even if the LLM
-            # returns a post from someone else who @-mentioned this account,
-            # we drop it here.
-            clean_handle = handle.lower().lstrip("@")
-            before_count = len(normalized)
+            # Hard post-filter: only keep items from handles in this group
             filtered = []
+            dropped = 0
             for item in normalized:
                 item_author = item.author_handle.lower().lstrip("@")
-                # Accept if author matches (exact or close enough for org handles)
-                if item_author == clean_handle:
+                if item_author in handle_set:
                     filtered.append(item)
                 else:
-                    print(f"  [must-follow] @{handle}: DROPPED post by @{item.author_handle} (not from @{handle})")
-            dropped = before_count - len(filtered)
+                    dropped += 1
             if dropped:
-                print(f"  [must-follow] @{handle}: filtered out {dropped}/{before_count} posts from wrong authors")
+                print(f"(dropped {dropped} wrong-author posts)", end=" ")
 
-            # Also filter out replies (posts that start with "@someone")
+            # Filter out replies (posts starting with "@someone")
             final = []
             for item in filtered:
                 text = item.text.strip()
-                if text.startswith("@") and not text.lower().startswith(f"@{clean_handle}"):
-                    print(f"  [must-follow] @{handle}: DROPPED reply: {text[:80]}...")
+                author = item.author_handle.lower().lstrip("@")
+                if text.startswith("@") and not text.lower().startswith(f"@{author}"):
                     continue
                 final.append(item)
 
-            results.append({
-                "handle": handle,
-                "label": label,
-                "group": group,
-                "items": final,
-            })
+            # Distribute items back to per-account results
+            per_handle: dict[str, list] = {h.lower(): [] for h in handles}
+            for item in final:
+                author = item.author_handle.lower().lstrip("@")
+                if author in per_handle:
+                    per_handle[author].append(item)
+
+            for acct in group_accounts:
+                clean = acct["handle"].lstrip("@").lower()
+                results.append({
+                    "handle": acct["handle"],
+                    "label": acct.get("label", acct["handle"]),
+                    "group": group_name,
+                    "items": per_handle.get(clean, []),
+                })
+
+            print(f"→ {len(final)} tweets")
+
         except Exception as e:
-            print(f"  [must-follow] @{handle}: error — {e}")
-            results.append({
-                "handle": handle,
-                "label": label,
-                "group": group,
-                "items": [],
-                "error": str(e),
-            })
+            print(f"error — {e}")
+            for acct in group_accounts:
+                results.append({
+                    "handle": acct["handle"],
+                    "label": acct.get("label", acct["handle"]),
+                    "group": group_name,
+                    "items": [],
+                    "error": str(e),
+                })
 
     return results
 
@@ -1274,11 +1390,7 @@ def render_daily_note(
     # Efficiency recommendations (at the very end)
     if tracker and tracker.num_calls > 0:
         topic_count = len(topic_results)
-        # Account count: prefer must-follow.md, fall back to config.json
-        mf_accts = _parse_must_follow_md(MUST_FOLLOW_MD)
-        if not mf_accts:
-            mf_accts = config.get("must_follow", {}).get("accounts", [])
-        mf_count_accts = len(mf_accts)
+        mf_count_accts = len(config.get("must_follow_accounts", []))
         lines.extend(["---", ""])
         lines.extend(_render_efficiency_recommendations(
             tracker, config, topic_count, mf_count_accts,
@@ -1420,7 +1532,7 @@ def main():
     from vendor.last30days import models as l30_models
     selected_models = l30_models.get_models(l30_config)
 
-    # Initialize token tracker (cost_rates can be overridden in config.json)
+    # Initialize token tracker
     tracker = TokenTracker(config.get("cost_rates"))
 
     # Run topic scans sequentially (to stay within rate limits)
@@ -1453,11 +1565,15 @@ def main():
         for err in total_errors:
             print(f"  ! {err}")
 
-    # Must-follow account scan (dedicated per-person X search, no filters)
+    # Must-follow account scan (batched by group, no quality filters)
     must_follow_results = []
-    mf_accounts = config.get("must_follow", {}).get("accounts", [])
+    mf_accounts = config.get("must_follow_accounts", [])
     if mf_accounts and l30_config.get("XAI_API_KEY"):
-        print(f"\n[must-follow] Scanning {len(mf_accounts)} accounts...")
+        # Group accounts by org for batched API calls
+        groups = {}
+        for a in mf_accounts:
+            groups.setdefault(a.get("group", "Other"), []).append(a)
+        print(f"\n[must-follow] Scanning {len(mf_accounts)} accounts in {len(groups)} batches...")
         must_follow_results = run_must_follow_scan(
             config, l30_config, from_date, to_date,
             tracker=tracker,

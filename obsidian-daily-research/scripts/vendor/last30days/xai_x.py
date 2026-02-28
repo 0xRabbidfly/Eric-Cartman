@@ -8,6 +8,12 @@ from typing import Any, Dict, List, Optional
 from . import http
 
 
+def _log(msg: str):
+    """Log info to stderr."""
+    sys.stderr.write(f"[X] {msg}\n")
+    sys.stderr.flush()
+
+
 def _log_error(msg: str):
     """Log error to stderr."""
     sys.stderr.write(f"[X ERROR] {msg}\n")
@@ -28,7 +34,11 @@ X_SEARCH_PROMPT = """You have access to real-time X (Twitter) data. Search for p
 
 Focus on posts from {from_date} to {to_date}. Find {min_items}-{max_items} high-quality, relevant posts.
 
-IMPORTANT: Return ONLY valid JSON in this exact format, no other text:
+IMPORTANT RULES:
+1. For EACH post, include an inline citation link so I can trace the source.
+2. Return ONLY valid JSON in the exact format below, no other text.
+3. The url for each item MUST be the real X post URL from your search results. Do NOT fabricate or guess status IDs.
+
 {{
   "items": [
     {{
@@ -49,6 +59,7 @@ IMPORTANT: Return ONLY valid JSON in this exact format, no other text:
 }}
 
 Rules:
+- url MUST be the exact URL from the search results — never invent a status ID
 - relevance is 0.0 to 1.0 (1.0 = highly relevant)
 - date must be YYYY-MM-DD format or null
 - engagement can be null if unknown
@@ -69,6 +80,7 @@ CRITICAL RULES — read carefully:
 4. Do NOT return retweets/reposts — only original content from @{handle}.
 5. Every item in your response MUST have author_handle = "{handle}".
 6. If @{handle} has fewer than {min_items} original posts in this date range, return whatever exists — do NOT pad with other accounts' posts.
+7. The url for each item MUST be the real X post URL from your search results. Do NOT fabricate or guess status IDs.
 
 IMPORTANT: Return ONLY valid JSON in this exact format, no other text:
 {{
@@ -91,7 +103,36 @@ IMPORTANT: Return ONLY valid JSON in this exact format, no other text:
   ]
 }}
 
-Remember: author_handle MUST be "{handle}" for every single item. Any item from a different account is WRONG."""
+Remember: author_handle MUST be "{handle}" for every single item. URLs MUST be real — never invent status IDs."""
+
+
+def _build_x_search_tool(
+    from_date: str = "",
+    to_date: str = "",
+    allowed_handles: Optional[List[str]] = None,
+) -> Dict[str, Any]:
+    """Build x_search tool definition with API-level parameters.
+
+    Uses xAI Responses API tool parameters for filtering, which is far
+    more reliable than prompt-based filtering.
+
+    See: https://docs.x.ai/developers/tools/x-search
+    """
+    tool: Dict[str, Any] = {"type": "x_search"}
+    params: Dict[str, Any] = {}
+
+    if from_date:
+        params["from_date"] = from_date
+    if to_date:
+        params["to_date"] = to_date
+    if allowed_handles:
+        # API supports max 10 handles
+        params["allowed_x_handles"] = allowed_handles[:10]
+
+    if params:
+        tool["x_search"] = params
+
+    return tool
 
 
 def search_x(
@@ -130,11 +171,11 @@ def search_x(
     # Adjust timeout based on depth (generous for API response time)
     timeout = 90 if depth == "quick" else 120 if depth == "default" else 180
 
-    # Use Agent Tools API with x_search tool
+    # Use Agent Tools API with x_search — pass date range as API params
     payload = {
         "model": model,
         "tools": [
-            {"type": "x_search"}
+            _build_x_search_tool(from_date=from_date, to_date=to_date)
         ],
         "input": [
             {
@@ -164,8 +205,9 @@ def search_x_must_follow(
 ) -> Dict[str, Any]:
     """Search X for original posts by a specific must-follow account.
 
-    Uses a strict prompt that requests ONLY original posts authored
-    by the exact handle — no replies, no @-mentions from other users.
+    Uses the x_search API's allowed_x_handles parameter to filter at
+    the API level (not just prompt), plus a strict prompt for additional
+    safety.
 
     Args:
         api_key: xAI API key
@@ -194,10 +236,16 @@ def search_x_must_follow(
     # Clean handle (remove @ if present)
     clean_handle = handle.lstrip("@")
 
+    # Use allowed_x_handles + from_date/to_date at API level — this is
+    # the primary filter. The prompt is belt-and-suspenders.
     payload = {
         "model": model,
         "tools": [
-            {"type": "x_search"}
+            _build_x_search_tool(
+                from_date=from_date,
+                to_date=to_date,
+                allowed_handles=[clean_handle],
+            )
         ],
         "input": [
             {
@@ -216,32 +264,185 @@ def search_x_must_follow(
     return http.post(XAI_RESPONSES_URL, payload, headers=headers, timeout=timeout)
 
 
-def parse_x_response(response: Dict[str, Any]) -> List[Dict[str, Any]]:
-    """Parse xAI response to extract X items.
+# Batched must-follow prompt — searches multiple handles in a single API call.
+# Uses the allowed_x_handles API param (max 10) to filter at the API level.
+MUST_FOLLOW_BATCH_PROMPT = """You have access to real-time X (Twitter) data.
+
+Find ORIGINAL posts from these accounts: {handles_list}
+Date range: {from_date} to {to_date}.
+Target: {min_items}-{max_items} posts total across all accounts.
+
+CRITICAL RULES — read carefully:
+1. ONLY return posts AUTHORED by the accounts listed above.
+2. Do NOT return posts by other users that merely @-mention or tag these accounts.
+3. Do NOT return replies to other users (no posts starting with "@someone").
+4. Do NOT return retweets/reposts — only original content.
+5. Every item MUST have the correct author_handle matching the actual author.
+6. If an account has no original posts in this date range, skip it — do NOT pad with other accounts' posts.
+7. The url for each item MUST be the real X post URL from your search results. Do NOT fabricate or guess status IDs.
+
+IMPORTANT: Return ONLY valid JSON in this exact format, no other text:
+{{
+  "items": [
+    {{
+      "text": "Post text content (truncated if long)",
+      "url": "https://x.com/username/status/...",
+      "author_handle": "username",
+      "date": "YYYY-MM-DD or null if unknown",
+      "is_reply": false,
+      "engagement": {{
+        "likes": 100,
+        "reposts": 25,
+        "replies": 15,
+        "quotes": 5
+      }},
+      "why_relevant": "Brief description of what this post is about",
+      "relevance": 0.85
+    }}
+  ]
+}}
+
+Remember: author_handle MUST match the ACTUAL author for every item. URLs MUST be real — never invent status IDs."""
+
+
+def search_x_must_follow_batch(
+    api_key: str,
+    model: str,
+    handles: List[str],
+    from_date: str,
+    to_date: str,
+    depth: str = "scan",
+    mock_response: Optional[Dict] = None,
+) -> Dict[str, Any]:
+    """Search X for original posts by multiple must-follow accounts in one call.
+
+    Uses allowed_x_handles (max 10) to batch API-level filtering for an entire
+    group of accounts. Dramatically reduces API call count vs per-handle calls.
 
     Args:
-        response: Raw API response
+        api_key: xAI API key
+        model: Model to use
+        handles: List of X handles (without @), max 10
+        from_date: Start date (YYYY-MM-DD)
+        to_date: End date (YYYY-MM-DD)
+        depth: Research depth
+        mock_response: Mock response for testing
 
     Returns:
-        List of item dicts
+        Raw API response
     """
-    items = []
+    if mock_response is not None:
+        return mock_response
 
-    # Check for API errors first
-    if "error" in response and response["error"]:
-        error = response["error"]
-        err_msg = error.get("message", str(error)) if isinstance(error, dict) else str(error)
-        _log_error(f"xAI API error: {err_msg}")
-        if http.DEBUG:
-            _log_error(f"Full error response: {json.dumps(response, indent=2)[:1000]}")
-        return items
+    min_items, max_items = DEPTH_CONFIG.get(depth, DEPTH_CONFIG["default"])
+    # Scale items target with number of handles
+    max_items = min(max_items * len(handles), 60)
+    min_items = min(min_items * len(handles), max_items)
 
-    # Try to find the output text
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+
+    timeout = 180  # batched calls need more time
+
+    # Clean handles
+    clean_handles = [h.lstrip("@") for h in handles[:10]]
+    handles_list = ", ".join(f"@{h}" for h in clean_handles)
+
+    payload = {
+        "model": model,
+        "tools": [
+            _build_x_search_tool(
+                from_date=from_date,
+                to_date=to_date,
+                allowed_handles=clean_handles,
+            )
+        ],
+        "input": [
+            {
+                "role": "user",
+                "content": MUST_FOLLOW_BATCH_PROMPT.format(
+                    handles_list=handles_list,
+                    from_date=from_date,
+                    to_date=to_date,
+                    min_items=min_items,
+                    max_items=max_items,
+                ),
+            }
+        ],
+    }
+
+    return http.post(XAI_RESPONSES_URL, payload, headers=headers, timeout=timeout)
+
+
+# ---------------------------------------------------------------------------
+# Citation / annotation extraction — get REAL URLs from the API response
+# ---------------------------------------------------------------------------
+
+_X_STATUS_RE = re.compile(r'https://x\.com/\w+/status/\d+')
+_X_STATUS_I_RE = re.compile(r'https://x\.com/i/status/(\d+)')
+
+
+def _extract_citation_urls(response: Dict[str, Any]) -> List[str]:
+    """Extract real x.com status URLs from the xAI response.
+
+    Checks TWO reliable sources (NOT the model's output text, which may
+    contain fabricated URLs):
+    1. Top-level `citations` list (always returned by the API)
+    2. `annotations` on output_text items (url_citation type)
+
+    Returns:
+        List of real x.com/*/status/* URLs (deduplicated, order preserved)
+    """
+    seen = set()
+    urls: List[str] = []
+
+    def _add(url: str):
+        if url and url not in seen:
+            seen.add(url)
+            urls.append(url)
+
+    # 1. Top-level citations (most reliable — complete list of all sources)
+    for cit in response.get("citations", []):
+        if isinstance(cit, str) and "/status/" in cit:
+            _add(cit)
+        elif isinstance(cit, dict):
+            u = cit.get("url", "")
+            if "/status/" in u:
+                _add(u)
+
+    # 2. Annotations on output_text items (url_citation entries from the API)
+    output = response.get("output", [])
+    if isinstance(output, list):
+        for item in output:
+            if not isinstance(item, dict):
+                continue
+            # Check message content annotations
+            if item.get("type") == "message":
+                for content_item in item.get("content", []):
+                    if not isinstance(content_item, dict):
+                        continue
+                    for ann in content_item.get("annotations", []):
+                        if isinstance(ann, dict):
+                            u = ann.get("url", "")
+                            if "/status/" in u:
+                                _add(u)
+
+    # NOTE: We intentionally do NOT scan the model's output text for URLs.
+    # The model may fabricate plausible-looking status IDs. Only the API's
+    # citations and annotations contain verified real URLs.
+
+    return urls
+
+
+def _extract_output_text(response: Dict[str, Any]) -> str:
+    """Extract the model's output text from the response."""
     output_text = ""
     if "output" in response:
         output = response["output"]
         if isinstance(output, str):
-            output_text = output
+            return output
         elif isinstance(output, list):
             for item in output:
                 if isinstance(item, dict):
@@ -265,7 +466,119 @@ def parse_x_response(response: Dict[str, Any]) -> List[Dict[str, Any]]:
                 output_text = choice["message"].get("content", "")
                 break
 
+    return output_text
+
+
+def _fix_urls_from_citations(
+    items: List[Dict[str, Any]],
+    citation_urls: List[str],
+) -> List[Dict[str, Any]]:
+    """Cross-reference model-generated URLs with real citation URLs.
+
+    The model often fabricates plausible-looking status IDs. This function
+    matches each item to a real citation URL by author handle, and replaces
+    the fabricated URL with the real one.
+
+    Args:
+        items: Parsed model items (may have fabricated URLs)
+        citation_urls: Real URLs extracted from citations/annotations
+
+    Returns:
+        Items with URLs fixed where possible
+    """
+    if not citation_urls:
+        return items
+
+    # Build lookup: author_handle -> [real_urls]
+    author_urls: Dict[str, List[str]] = {}
+    for url in citation_urls:
+        # Extract handle from x.com/{handle}/status/... or x.com/i/status/...
+        m = re.match(r'https://x\.com/(\w+)/status/\d+', url)
+        if m:
+            handle = m.group(1).lower()
+            if handle != "i":  # x.com/i/status/* is handle-less
+                author_urls.setdefault(handle, []).append(url)
+
+    # Also collect all citation URLs as a flat set for validation
+    citation_set = set(citation_urls)
+
+    # Pool of unmatched x.com/i/status/* URLs (no handle in URL)
+    anon_urls = [u for u in citation_urls if "/i/status/" in u]
+    anon_idx = 0
+
+    for item in items:
+        model_url = item.get("url", "")
+
+        # If the model's URL is already in citations, it's real — keep it
+        if model_url in citation_set:
+            continue
+
+        # Try to match by author handle
+        author = item.get("author_handle", "").lower().lstrip("@")
+        if author and author in author_urls and author_urls[author]:
+            real_url = author_urls[author].pop(0)
+            if http.DEBUG:
+                _log(f"URL fix: {model_url} → {real_url} (matched @{author})")
+            item["url"] = real_url
+        elif anon_urls and anon_idx < len(anon_urls):
+            # Fall back to anonymous x.com/i/status/* URLs
+            real_url = anon_urls[anon_idx]
+            anon_idx += 1
+            if http.DEBUG:
+                _log(f"URL fix (anon): {model_url} → {real_url}")
+            item["url"] = real_url
+        else:
+            # No match found — flag it but keep the model's URL
+            if http.DEBUG:
+                _log(f"URL unverified (no citation match): {model_url}")
+
+    return items
+
+
+def parse_x_response(response: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Parse xAI response to extract X items.
+
+    Extracts items from the model's JSON output, then cross-references
+    URLs with real citation URLs from the API response to fix any
+    fabricated status IDs.
+
+    Args:
+        response: Raw API response
+
+    Returns:
+        List of item dicts with real URLs where possible
+    """
+    items = []
+
+    # Check for API errors first
+    if "error" in response and response["error"]:
+        error = response["error"]
+        err_msg = error.get("message", str(error)) if isinstance(error, dict) else str(error)
+        _log_error(f"xAI API error: {err_msg}")
+        if http.DEBUG:
+            _log_error(f"Full error response: {json.dumps(response, indent=2)[:1000]}")
+        return items
+
+    # Debug: dump response structure
+    if http.DEBUG:
+        _log(f"Response keys: {list(response.keys())}")
+        if "citations" in response:
+            _log(f"Citations ({len(response['citations'])}): {response['citations'][:5]}")
+        if "output" in response and isinstance(response["output"], list):
+            types = [item.get("type", "?") if isinstance(item, dict) else type(item).__name__
+                     for item in response["output"]]
+            _log(f"Output item types: {types}")
+
+    # Extract real URLs from citations/annotations
+    citation_urls = _extract_citation_urls(response)
+    if http.DEBUG:
+        _log(f"Extracted {len(citation_urls)} citation URLs")
+
+    # Extract the model's text output
+    output_text = _extract_output_text(response)
     if not output_text:
+        # If no model text but we have citation URLs, we can't build items
+        # (we need the metadata from the model's JSON)
         return items
 
     # Extract JSON from the response
@@ -316,5 +629,9 @@ def parse_x_response(response: Dict[str, Any]) -> List[Dict[str, Any]]:
                 clean_item["date"] = None
 
         clean_items.append(clean_item)
+
+    # Cross-reference model URLs with real citation URLs
+    if citation_urls:
+        clean_items = _fix_urls_from_citations(clean_items, citation_urls)
 
     return clean_items
