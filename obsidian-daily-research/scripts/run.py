@@ -343,6 +343,11 @@ def _parse_pipeline_md(path: Path) -> dict:
 
             elif section == "must-follow" and line.startswith("- @"):
                 rest = line[3:]  # strip "- @"
+                # Detect (solo) tag — gives this account a dedicated API call
+                solo = False
+                if rest.rstrip().endswith("(solo)"):
+                    solo = True
+                    rest = rest[:rest.rfind("(solo)")].rstrip()
                 for sep in (" — ", " – ", " - "):
                     if sep in rest:
                         handle, label = rest.split(sep, 1)
@@ -350,6 +355,7 @@ def _parse_pipeline_md(path: Path) -> dict:
                             "handle": handle.strip(),
                             "label": label.strip(),
                             "group": current_group,
+                            "solo": solo,
                         })
                         break
                 else:
@@ -357,6 +363,7 @@ def _parse_pipeline_md(path: Path) -> dict:
                         "handle": rest.strip(),
                         "label": rest.strip(),
                         "group": current_group,
+                        "solo": solo,
                     })
 
             elif section == "settings" and line.startswith("- "):
@@ -780,7 +787,7 @@ RULES:
 
 
 # ---------------------------------------------------------------------------
-# Must-Follow Account Scanning (batched by group)
+# Must-Follow Account Scanning (hybrid batch/solo)
 # ---------------------------------------------------------------------------
 
 
@@ -791,12 +798,12 @@ def run_must_follow_scan(
     to_date: str,
     tracker: TokenTracker | None = None,
 ) -> list:
-    """Scan must-follow accounts on X, batched by group.
+    """Scan must-follow accounts on X, hybrid batch/solo strategy.
 
-    Groups accounts by their org group (from pipeline.md ## headers) and
-    makes ONE API call per group using search_x_must_follow_batch (up to
-    10 handles per call). A hard post-filter verifies author_handle matches
-    one of the expected handles.
+    Corp accounts (solo=False) are batched into ONE API call using
+    search_x_must_follow_batch (up to 10 handles). Individual accounts
+    (solo=True) each get a dedicated search_x_must_follow call for
+    maximum reliability.
 
     Returns a list of dicts: {handle, label, group, items: [x_item, ...]}
     """
@@ -807,20 +814,18 @@ def run_must_follow_scan(
         return []
 
     model = l30_config.get("xai_model", "grok-4-1-fast")
-
-    # Group accounts by org group
-    groups: dict[str, list[dict]] = {}
-    for acct in accounts:
-        grp = acct.get("group", "Other")
-        groups.setdefault(grp, []).append(acct)
-
     results = []
 
-    for group_name, group_accounts in groups.items():
-        handles = [a["handle"].lstrip("@") for a in group_accounts]
-        handle_set = {h.lower() for h in handles}
+    # Separate into batch (corp) and solo (individual) accounts
+    batch_accounts = [a for a in accounts if not a.get("solo")]
+    solo_accounts = [a for a in accounts if a.get("solo")]
 
-        print(f"  [{group_name}] {', '.join('@' + h for h in handles)}...", end=" ", flush=True)
+    # --- Batch call for corp accounts (one API call) ---
+    if batch_accounts:
+        handles = [a["handle"].lstrip("@") for a in batch_accounts]
+        handle_set = {h.lower() for h in handles}
+        corp_list = ", ".join(f"@{h}" for h in handles)
+        print(f"  [batch] {corp_list}...", end=" ", flush=True)
 
         try:
             raw = xai_x.search_x_must_follow_batch(
@@ -832,12 +837,12 @@ def run_must_follow_scan(
                 depth="scan",
             )
             if tracker:
-                tracker.record(f"MustFollow/{group_name}", model, _extract_usage(raw))
+                tracker.record("MustFollow/batch", model, _extract_usage(raw))
 
             items = xai_x.parse_x_response(raw)
             normalized = normalize.normalize_x_items(items, from_date, to_date)
 
-            # Hard post-filter: only keep items from handles in this group
+            # Hard post-filter: only keep items from handles in this batch
             filtered = []
             dropped = 0
             for item in normalized:
@@ -847,9 +852,9 @@ def run_must_follow_scan(
                 else:
                     dropped += 1
             if dropped:
-                print(f"(dropped {dropped} wrong-author posts)", end=" ")
+                print(f"(dropped {dropped} wrong-author)", end=" ")
 
-            # Filter out replies (posts starting with "@someone")
+            # Filter out replies
             final = []
             for item in filtered:
                 text = item.text.strip()
@@ -865,12 +870,12 @@ def run_must_follow_scan(
                 if author in per_handle:
                     per_handle[author].append(item)
 
-            for acct in group_accounts:
+            for acct in batch_accounts:
                 clean = acct["handle"].lstrip("@").lower()
                 results.append({
                     "handle": acct["handle"],
                     "label": acct.get("label", acct["handle"]),
-                    "group": group_name,
+                    "group": acct["group"],
                     "items": per_handle.get(clean, []),
                 })
 
@@ -878,14 +883,67 @@ def run_must_follow_scan(
 
         except Exception as e:
             print(f"error — {e}")
-            for acct in group_accounts:
+            for acct in batch_accounts:
                 results.append({
                     "handle": acct["handle"],
                     "label": acct.get("label", acct["handle"]),
-                    "group": group_name,
+                    "group": acct["group"],
                     "items": [],
                     "error": str(e),
                 })
+
+    # --- Solo calls for individual accounts (one API call each) ---
+    for acct in solo_accounts:
+        handle = acct["handle"].lstrip("@")
+        print(f"  [solo] @{handle}...", end=" ", flush=True)
+
+        try:
+            raw = xai_x.search_x_must_follow(
+                l30_config["XAI_API_KEY"],
+                model,
+                handle,
+                from_date,
+                to_date,
+                depth="scan",
+            )
+            if tracker:
+                tracker.record(f"MustFollow/@{handle}", model, _extract_usage(raw))
+
+            items = xai_x.parse_x_response(raw)
+            normalized = normalize.normalize_x_items(items, from_date, to_date)
+
+            # Hard post-filter: only this handle
+            filtered = [
+                item for item in normalized
+                if item.author_handle.lower().lstrip("@") == handle.lower()
+            ]
+
+            # Filter out replies
+            final = []
+            for item in filtered:
+                text = item.text.strip()
+                if text.startswith("@") and not text.lower().startswith(f"@{handle.lower()}"):
+                    continue
+                final.append(item)
+
+            results.append({
+                "handle": acct["handle"],
+                "label": acct.get("label", acct["handle"]),
+                "group": acct["group"],
+                "items": final,
+            })
+
+            print(f"→ {len(final)} tweets")
+
+        except Exception as e:
+            print(f"error — {e}")
+            results.append({
+                "handle": acct["handle"],
+                "label": acct.get("label", acct["handle"]),
+                "group": acct["group"],
+                "items": [],
+                "error": str(e),
+            })
 
     return results
 
@@ -1138,6 +1196,65 @@ def _render_efficiency_recommendations(tracker: TokenTracker, config: dict,
     return lines
 
 
+# ---------------------------------------------------------------------------
+# Vault Connections — wikilink today's note to existing Library notes
+# ---------------------------------------------------------------------------
+
+# Map topic slugs → search terms for vault search (tight, specific terms)
+_TOPIC_SEARCH_TERMS: dict[str, list[str]] = {
+    "agents": ["agentic workflow", "multi-agent", "agent development"],
+    "skills": ["agent skill", "SKILL.md", "skillsbench"],
+    "models": ["frontier model", "GPT-5", "Claude Opus", "Grok 4"],
+    "mcp": ["Model Context Protocol", "MCP server"],
+    "rag": ["RAG pipeline", "retrieval augmented", "vector search", "hybrid search"],
+}
+
+
+def _find_vault_connections(topic_slugs: list[str], config: dict) -> dict[str, list[str]]:
+    """Search the Obsidian vault for Library notes related to each topic.
+
+    Uses the vendored Obsidian client to search the Library folder.
+    Returns {topic_slug: [note_stem, ...]} — note stems are suitable
+    for [[wikilink]] syntax.
+
+    No new scripts — uses the same Obsidian CLI wrapper the vault module uses.
+    """
+    try:
+        ob = vault._client()
+    except Exception:
+        return {}
+
+    library_folder = config.get("library_folder", "Research/Library")
+    connections: dict[str, list[str]] = {}
+
+    for slug in topic_slugs:
+        terms = _TOPIC_SEARCH_TERMS.get(slug, [slug])
+        matched_stems: set[str] = set()
+
+        for term in terms:
+            try:
+                results = ob.search(term, path=library_folder)
+                text = results.text if hasattr(results, "text") else str(results)
+                for line in text.strip().split("\n"):
+                    line = line.strip()
+                    if not line or not line.endswith(".md"):
+                        continue
+                    # Extract stem (filename without .md)
+                    stem = Path(line).stem
+                    # Skip the MOC itself — it's linked via frontmatter `up:`
+                    if "MOC" in stem:
+                        continue
+                    matched_stems.add(stem)
+            except Exception:
+                continue
+
+        if matched_stems:
+            # Cap at 5 most relevant notes per topic
+            connections[slug] = sorted(matched_stems)[:5]
+
+    return connections
+
+
 def render_daily_note(
     date_str: str,
     topic_results: list,
@@ -1154,6 +1271,9 @@ def render_daily_note(
 
     # Count must-follow tweets
     mf_count = sum(len(r["items"]) for r in (must_follow_results or []))
+
+    # Find vault connections — wikilink to existing Library notes
+    vault_connections = _find_vault_connections(topic_slugs, config)
 
     # Collect categorized items across all topics
     deep_dives = []
@@ -1177,7 +1297,9 @@ def render_daily_note(
         f"date: {date_str}",
         "type: daily-research",
         f"topics: [{', '.join(topic_slugs)}]",
+        f"tags: [{', '.join('#' + s for s in topic_slugs)}]",
         "status: unread",
+        f"up: \"[[🤖 MOC - AI Agent Development]]\"",
         f"reddit_items: {total_reddit}",
         f"x_items: {total_x}",
         f"must_follow_tweets: {mf_count}",
@@ -1215,6 +1337,30 @@ def render_daily_note(
             briefing,
             "",
         ])
+
+    # Vault Connections — wikilink to existing Library notes
+    if vault_connections:
+        lines.extend([
+            "## Vault Connections \U0001f517",
+            "",
+            "> Today's topics link to these existing notes in your vault.",
+            "",
+        ])
+        # Collect all unique stems across all topics for later use
+        all_linked = set()
+        for slug in topic_slugs:
+            stems = vault_connections.get(slug, [])
+            if stems:
+                # Use the topic's display name from topic_results
+                display = slug
+                for tr in topic_results:
+                    if tr["topic"].slug == slug:
+                        display = tr["topic"].display_name
+                        break
+                links = ", ".join(f"[[{s}]]" for s in stems)
+                lines.append(f"- **{display}**: {links}")
+                all_linked.update(stems)
+        lines.append("")
 
     # Must Follow — every tweet from tracked accounts, grouped
     if must_follow_results:
@@ -1313,6 +1459,12 @@ def render_daily_note(
             f"## {topic.display_name}",
             "",
         ])
+
+        # Vault see-also — wikilinks to related Library notes
+        related_stems = vault_connections.get(topic.slug, [])
+        if related_stems:
+            see_also = " · ".join(f"[[{s}]]" for s in related_stems[:5])
+            lines.extend([f"> See also: {see_also}", ""])
 
         # Topic headline
         headline = synth.get("headline", "")
@@ -1565,15 +1717,14 @@ def main():
         for err in total_errors:
             print(f"  ! {err}")
 
-    # Must-follow account scan (batched by group, no quality filters)
+    # Must-follow account scan (hybrid batch/solo, no quality filters)
     must_follow_results = []
     mf_accounts = config.get("must_follow_accounts", [])
     if mf_accounts and l30_config.get("XAI_API_KEY"):
-        # Group accounts by org for batched API calls
-        groups = {}
-        for a in mf_accounts:
-            groups.setdefault(a.get("group", "Other"), []).append(a)
-        print(f"\n[must-follow] Scanning {len(mf_accounts)} accounts in {len(groups)} batches...")
+        n_batch = sum(1 for a in mf_accounts if not a.get("solo"))
+        n_solo = sum(1 for a in mf_accounts if a.get("solo"))
+        n_calls = (1 if n_batch else 0) + n_solo
+        print(f"\n[must-follow] Scanning {len(mf_accounts)} accounts ({n_batch} batch + {n_solo} solo = {n_calls} calls)...")
         must_follow_results = run_must_follow_scan(
             config, l30_config, from_date, to_date,
             tracker=tracker,
