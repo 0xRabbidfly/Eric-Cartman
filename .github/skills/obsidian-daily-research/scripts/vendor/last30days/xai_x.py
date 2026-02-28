@@ -261,7 +261,7 @@ def search_x_must_follow(
         ],
     }
 
-    return http.post(XAI_RESPONSES_URL, payload, headers=headers, timeout=timeout)
+    return http.post(XAI_RESPONSES_URL, payload, headers=headers, timeout=timeout, retries=1)
 
 
 # Batched must-follow prompt — searches multiple handles in a single API call.
@@ -373,7 +373,7 @@ def search_x_must_follow_batch(
         ],
     }
 
-    return http.post(XAI_RESPONSES_URL, payload, headers=headers, timeout=timeout)
+    return http.post(XAI_RESPONSES_URL, payload, headers=headers, timeout=timeout, retries=1)
 
 
 # ---------------------------------------------------------------------------

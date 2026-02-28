@@ -23,32 +23,35 @@
 # Must-Follow Accounts
 
 > Every tweet from these accounts is captured — no engagement filter, no quality
-> filter. Grouped by org for batched API calls (one call per group, max 10 handles).
+> filter. Corp accounts are batched into one API call. Individual accounts get
+> dedicated solo calls for maximum reliability.
 >
-> **Format:** `- @handle — Display Name`
-> `##` headers are group names. To disable an account, comment it out with `>`.
+> **Format:** `- @handle — Display Name` or `- @handle — Display Name (solo)`
+> Append `(solo)` to give an account its own dedicated API call.
+> `##` headers are org groups (used for display grouping in the daily note).
+> To disable an account, comment it out with `>`.
 
 ## Thought Leaders
 
-- @karpathy — Andrej Karpathy
+- @karpathy — Andrej Karpathy (solo)
 
 ## Anthropic
 
-- @bcherny — Boris (Anthropic/Claude Code)
-- @alexalbert__ — Alex Albert (Anthropic)
-- @DarioAmodei — Dario Amodei (Anthropic)
+- @bcherny — Boris (solo)
+- @alexalbert__ — Alex Albert (solo)
+- @DarioAmodei — Dario Amodei (solo)
 - @AnthropicAI — Anthropic
 
 ## OpenAI
 
 - @OpenAI — OpenAI
-- @sama — Sam Altman
-- @markchen90 — Mark Chen (OpenAI)
+- @sama — Sam Altman (solo)
+- @markchen90 — Mark Chen (solo)
 
 ## Google
 
 - @GoogleDeepMind — Google DeepMind
-- @JeffDean — Jeff Dean (Google)
+- @JeffDean — Jeff Dean (solo)
 
 ## xAI
 
