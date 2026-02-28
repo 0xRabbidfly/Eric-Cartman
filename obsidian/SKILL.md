@@ -20,7 +20,7 @@ reimplementing filesystem reads/writes.
 
 > **This skill is the SOLE interface for all vault operations.**
 > Do NOT create temporary Python scripts, helper files, or intermediary modules.
-> Do NOT route vault writes through other skills (e.g. daily-research, session-log).
+> Do NOT route vault writes through other skills (e.g. obsidian-daily-research, session-log).
 > Instead, call the wrapper **directly inline** in the terminal.
 
 ### How to call (correct)
@@ -99,7 +99,7 @@ Or set the environment variable system-wide (survives reboots):
 ```
 ❌  create_file("_save_post.py", ...)   # never create temp scripts
 ❌  create_file("_tmp_note.py", ...)    # never create temp scripts, use pipe
-❌  import from daily-research/scripts  # never route through other skills
+❌  import from obsidian-daily-research/scripts  # never route through other skills
 ❌  Write content to a .md file on disk # vault writes go through CLI only
 ❌  Multiple tool calls for one note    # one pipe call is enough
 ❌  @"..."@ (double-quoted heredoc)     # still mangles backticks and $
@@ -182,7 +182,7 @@ ob.eval("app.vault.getFiles().length")          # run JS in Obsidian
 
 ## Composing with Other Skills
 
-### From daily-research
+### From obsidian-daily-research
 ```python
 from obsidian import Obsidian
 ob = Obsidian()
@@ -226,9 +226,49 @@ ob.property_set("sources", "12", file="Agentic RAG Research", type="number")
 **Changelog**: <https://obsidian.md/changelog/>
 Check before updating the skill to catch breaking CLI changes or new features to wrap.
 
+## Upgrading After a CLI Update
+
+When Obsidian ships a new CLI version, run the sync audit to discover what changed:
+
+```powershell
+# 1. Coverage report — what's wrapped vs unwrapped right now
+python .github/skills/obsidian/scripts/cli_sync.py
+
+# 2. Diff against last-synced manifest — what's NEW since you last updated
+python .github/skills/obsidian/scripts/cli_sync.py --diff
+
+# 3. Generate a Markdown upgrade guide (checklist of what to add/update)
+python .github/skills/obsidian/scripts/cli_sync.py --guide
+
+# 4. After updating obsidian.py + SKILL.md, snapshot the new CLI state
+python .github/skills/obsidian/scripts/cli_sync.py --save
+```
+
+### Upgrade Workflow
+
+1. **Update Obsidian** to the new version, restart it
+2. Run `--diff` to see new/removed commands and parameters since last sync
+3. Run `--guide` to get a task checklist (pipe to a file if large: `--guide > upgrade.md`)
+4. Update `obsidian.py` — add methods for new commands, add params to existing methods
+5. Update the **Quick Reference** section in this SKILL.md
+6. Update `README.md` method table if categories changed
+7. Run `--save` to snapshot the new CLI state as the baseline for next time
+8. Commit: `feat(obsidian): sync wrapper with CLI vX.Y.Z`
+
+### Manifest
+
+The file `scripts/.cli-manifest.json` tracks the last-synced CLI version and full
+command inventory. It's checked into git so the diff works across sessions.
+
 ## Dependencies
 
 - Python 3.10+ (stdlib only — subprocess + json)
 - Obsidian running with CLI enabled
 - No pip dependencies
+
+## Friction Rule
+
+> If you hit unexpected errors, encoding issues, missing CLI commands, or had to
+> retry/workaround anything while using this skill, run **`/skill-reflection`**
+> before ending the task. Capture what went wrong so the skill can be hardened.
 ````

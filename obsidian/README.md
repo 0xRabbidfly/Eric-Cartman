@@ -82,7 +82,9 @@ $env:PYTHONPATH = ".github/skills/obsidian/scripts;$env:PYTHONPATH"
 ├── SKILL.md              # Skill declaration (composable)
 ├── README.md             # This file
 └── scripts/
-    └── obsidian.py       # CLI wrapper (stdlib only, zero deps)
+    ├── obsidian.py       # CLI wrapper (stdlib only, zero deps)
+    ├── cli_sync.py       # CLI upgrade audit & diff tool
+    └── .cli-manifest.json # Last-synced CLI command inventory
 ```
 
 **Design choices:**
@@ -91,6 +93,26 @@ $env:PYTHONPATH = ".github/skills/obsidian/scripts;$env:PYTHONPATH"
 - `CLIResult` dataclass wraps every response with `.text`, `.json()`, `.lines()`, `.ok`
 - Auto-discovers binary: `OBSIDIAN_CLI` env → PATH → default Windows install
 - Vault targeting via constructor, not per-call (but `run()` allows anything)
+
+## Upgrading After a CLI Update
+
+When Obsidian ships a new version with CLI changes:
+
+```powershell
+# See what's wrapped vs unwrapped
+python .github/skills/obsidian/scripts/cli_sync.py
+
+# See what changed since last sync
+python .github/skills/obsidian/scripts/cli_sync.py --diff
+
+# Get a task checklist for updating the wrapper
+python .github/skills/obsidian/scripts/cli_sync.py --guide
+
+# After updating, snapshot the new state
+python .github/skills/obsidian/scripts/cli_sync.py --save
+```
+
+See SKILL.md for the full upgrade workflow.
 
 ## Dependencies
 
