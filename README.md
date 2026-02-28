@@ -529,17 +529,17 @@ Scans 5 topic tracks (agents, skills, models, MCP, RAG) across Reddit and X, ded
 **Invocation:**
 ```bash
 # Full daily run (all 5 topics)
-python .github/skills/daily-research/scripts/run.py
+python .github/skills/obsidian-daily-research/scripts/run.py
 
 # Single topic
-python .github/skills/daily-research/scripts/run.py --topic agents
+python .github/skills/obsidian-daily-research/scripts/run.py --topic agents
 
 # Preview without writing to vault
-python .github/skills/daily-research/scripts/run.py --dry-run
+python .github/skills/obsidian-daily-research/scripts/run.py --dry-run
 ```
 
 ```
-📍 Location: .github/skills/daily-research/
+📍 Location: .github/skills/obsidian-daily-research/
 ```
 
 ---
@@ -580,6 +580,155 @@ Body content here.
 
 ---
 
+### 18. 🔍 Obsidian Vault Digest
+
+**Ask your vault what you already know about any topic.**
+
+Searches your entire Obsidian vault for everything related to a topic, reads the matching notes, and produces a **synthesized briefing** with citations back to source notes. This is the "what do I already know about X?" skill.
+
+**Use When:**
+- Before starting a writing project — find all prior thinking on the topic
+- Before a meeting or decision — get a briefing from your own notes
+- When you can't remember where you wrote about something
+- To find contradictions in your own thinking across notes
+- User says "what do I know about X?", "digest my notes on X", "vault briefing"
+
+**Output format:**
+| Section | Description |
+|---------|-------------|
+| Executive Summary | Key themes synthesized across all matches |
+| Source Notes | Each note with relevance score and key excerpts |
+| Connections | Links between notes the user may not have noticed |
+| Gaps | Topics partially covered — may need more research |
+| Citations | `[[Note Name]]` backlinks for every claim |
+
+```
+📍 Location: .github/skills/obsidian-vault-digest/
+```
+
+---
+
+### 19. 🔗 Obsidian Vault Linker
+
+**Surface hidden connections and missing links across your knowledge base.**
+
+Analyzes the vault's link graph to find orphaned notes, missing bidirectional links, thematic clusters, and connection opportunities you haven't noticed. The knowledge gardening skill — it doesn't create content, it strengthens the connective tissue.
+
+**Use When:**
+- Vault has grown organically and linking is inconsistent
+- After importing a batch of new notes
+- You want to discover thematic clusters you've forgotten
+- Periodic vault hygiene (monthly)
+- User says "find missing links", "what's connected?", "link my vault", "vault audit"
+
+**Report Includes:**
+| Section | Description |
+|---------|-------------|
+| Health Metrics | Orphan count, dead-ends, broken links, avg links/note |
+| Missing Link Opportunities | Top 20 pairs of notes that should be linked |
+| Orphaned Notes | Isolated notes worth connecting |
+| Suggested MOCs | Map of Content notes to create for disconnected clusters |
+| Broken Links | Unresolved references with fix suggestions |
+| Tag Cleanup | Duplicate/similar tags to merge |
+
+**Modes:**
+- **Quick** — Scoped to a single topic or folder
+- **Full Audit** — Whole-vault analysis with comprehensive report
+
+```
+📍 Location: .github/skills/obsidian-vault-linker/
+```
+
+---
+
+### 20. 🔬 Session Context Audit
+
+**Lint your AI's operating instructions for health and coherence.**
+
+A lightweight diagnostic that checks freshness, contradictions, coverage gaps, and redundancy across all context files the AI reads at startup. Think of it as a linter for your AI's instructions.
+
+**Use When:**
+- The AI keeps making the same mistake despite instructions
+- After merging a large PR that changed project conventions
+- Monthly hygiene (takes ~2 minutes)
+- After running `session-learning` several times
+- User says "audit my context", "why do you keep getting this wrong?"
+
+**Automated Checks:**
+| Check | What It Catches |
+|-------|----------------|
+| Freshness | Files older than 30/90 days |
+| Contradictions | Conflicting rules across files |
+| Coverage Gaps | Areas used heavily but not documented |
+| Redundancy | Same rule duplicated in multiple files |
+| Token Budget | Files exceeding recommended size limits |
+
+```
+📍 Location: .github/skills/session-context-audit/
+```
+
+---
+
+### 21. ⚒️ Session Skill Forge
+
+**Turn any productive workflow into a reusable, callable skill.**
+
+After completing a multi-step workflow, this skill extracts it into a permanent SKILL.md — complete with triggers, steps, decision points, and quality criteria. The skill that creates other skills.
+
+**Use When:**
+- You just completed a multi-step workflow that worked well
+- You find yourself repeating the same sequence across sessions
+- You want to formalize a process before you forget the steps
+- User says "make this a skill", "save this workflow", "forge a skill"
+
+**How It Differs from Session Learning:**
+| | Session Learning | Skill Forge |
+|-|-----------------|-------------|
+| Extracts | Rules and corrections (defensive) | Workflows and capabilities (generative) |
+| Output | Instructions / rules | Full SKILL.md with steps |
+| Purpose | "Don't do X again" | "Here's how to do Y every time" |
+
+**What It Generates:**
+- Complete `SKILL.md` with frontmatter, triggers, workflow steps
+- Helper scripts (if the workflow used code)
+- README registration update
+- Wiring into `copilot-instructions.md` skill list
+
+```
+📍 Location: .github/skills/session-skill-forge/
+```
+
+---
+
+### 22. 🧹 Session Context Optimizer
+
+**Let the AI restructure its own context files for maximum efficiency.**
+
+Analyzes and restructures `.github/copilot-instructions.md`, scoped instructions, and skill manifests to reduce redundancy, resolve contradictions, and improve organization. The meta-optimization skill.
+
+**Use When:**
+- Context files feel bloated or contain redundant sections
+- You've been adding instructions for weeks without cleanup
+- After a major project phase change (old context no longer relevant)
+- Periodically (every 2–4 weeks) as context hygiene
+- User says "optimize your instructions", "clean up context", "meta-optimize"
+
+**What It Fixes:**
+| Issue | Action |
+|-------|--------|
+| Duplication | Consolidate to single authoritative location |
+| Contradiction | Resolve — keep intended behavior |
+| Staleness | Remove rules referencing removed packages |
+| Bloat | Compress verbose explanations into concise rules |
+| Poor hierarchy | Re-order by frequency of impact |
+| Scope mismatch | Move file-specific rules to `.instructions.md` |
+
+```
+📍 Location: .github/skills/session_context_optimizer/
+```
+
+---
+
 ## 📁 Repository Structure
 
 ```
@@ -590,18 +739,23 @@ Body content here.
 │   ├── agentic-evaluator/      # ⭐ Score repo agentic maturity
 │   ├── branch-wrapup/          # ✅ Pre-PR quality gate
 │   ├── content-research-writer/ # ✍️ Writing partner
-│   ├── daily-research/         # 📡 Daily AI research pipeline
+│   ├── obsidian-daily-research/ # 📡 Daily AI research pipeline
 │   ├── doc-sync-all/           # 🔄 Documentation sync
 │   ├── health-audit/           # 🩺 Artifact health checks
 │   ├── insights-report/        # 📈 Cross-session analysis
 │   ├── last30days/             # 🔍 Research (Copilot version)
 │   ├── obsidian/               # 📓 Vault operations (composable)
+│   ├── obsidian-vault-digest/  # 🔍 Vault topic synthesis
+│   ├── obsidian-vault-linker/  # 🔗 Missing links & graph health
 │   ├── project-guide/          # 🧭 Codebase exploration
 │   ├── project-infographic/    # 🎨 Sprint demo visuals
 │   ├── project-scaffold/       # 🏗️ Agentic scaffold wizard
 │   ├── repo-state-sync/        # 🔃 Onboarding sync
 │   ├── session-learning/       # 📚 Pattern extraction
 │   ├── session-log/            # 🗒️ Session capture
+│   ├── session-context-audit/  # 🔬 Context file health check
+│   ├── session-skill-forge/    # ⚒️ Workflow → reusable skill
+│   ├── session_context_optimizer/ # 🧹 Meta-optimize AI context
 │   ├── skill-reflection/       # 🪞 Composable after-action review
 │   └── 
 ├── agents/                     # Specialized agent configs

@@ -1,0 +1,107 @@
+{
+  "vault_path": "C:\\Users\\nuno_\\Documents\\Obsidian Vault",
+  "dailies_folder": "Research/Dailies",
+  "library_folder": "Research/Library",
+  "feedback_file": "Research/feedback.json",
+  "keep_tag": "#keep",
+
+  "must_follow": {
+    "_comment": "Every tweet from these accounts is captured — no engagement filter, no quality filter. Grouped by label for the daily note.",
+    "accounts": [
+      { "handle": "karpathy", "label": "Andrej Karpathy", "group": "Thought Leaders" },
+      { "handle": "bcherny", "label": "Boris (Anthropic/Claude Code)", "group": "Anthropic" },
+      { "handle": "alexalbert__", "label": "Alex Albert (Anthropic)", "group": "Anthropic" },
+      { "handle": "DarioAmodei", "label": "Dario Amodei (Anthropic)", "group": "Anthropic" },
+      { "handle": "AnthropicAI", "label": "Anthropic", "group": "Anthropic" },
+      { "handle": "OpenAI", "label": "OpenAI", "group": "OpenAI" },
+      { "handle": "sama", "label": "Sam Altman", "group": "OpenAI" },
+      { "handle": "markchen90", "label": "Mark Chen (OpenAI)", "group": "OpenAI" },
+      { "handle": "GoogleDeepMind", "label": "Google DeepMind", "group": "Google" },
+      { "handle": "JeffDean", "label": "Jeff Dean (Google)", "group": "Google" },
+      { "handle": "xaborai", "label": "xAI", "group": "xAI" },
+      { "handle": "MistralAI", "label": "Mistral AI", "group": "Mistral" },
+      { "handle": "ylecun", "label": "Yann LeCun (Meta)", "group": "Meta" },
+      { "handle": "MetaAI", "label": "Meta AI", "group": "Meta" },
+      { "handle": "Alibaba_Qwen", "label": "Alibaba Qwen", "group": "Alibaba" }
+    ]
+  },
+
+  "feedback_tags": {
+    "_comment": "Tag items in dailies with #good or #bad to train scoring. Processed on next run.",
+    "good_tag": "#good",
+    "bad_tag": "#bad",
+    "processed_tag_suffix": "-noted"
+  },
+  "kept_tag": "#kept",
+  "items_per_topic": 8,
+  "reading_list_max": 15,
+  "depth": "scan",
+
+  "quality_filters": {
+    "min_engagement": {
+      "reddit_score": 50,
+      "x_likes": 100
+    },
+    "long_form_bonus": 15,
+    "long_form_min_chars": 400,
+    "article_domains": [
+      "medium.com", "substack.com", "arxiv.org", "github.com",
+      "huggingface.co", "openai.com", "anthropic.com", "blog.",
+      "notion.site", "dev.to", "towardsdatascience.com",
+      "newsletter.", "mirror.xyz", "deepmind.google"
+    ],
+    "priority_accounts": {
+      "x": [
+        "AnthropicAI", "alexalbert__", "amandaaskell", "daboris",
+        "OpenAI", "sama", "gabormehi", "markchen90",
+        "GoogleDeepMind", "JeffDean", "demaboris",
+        "MetaAI", "ylecun",
+        "MistralAI", "arthurmensch",
+        "karpathy", "swyx", "hardmaru", "DrJimFan",
+        "bindureddy", "emaborsa", "shaborinsky",
+        "siaborj", "rasaboraj", "oaborfficiallyai"
+      ],
+      "reddit_subreddits": [
+        "Anthropic", "OpenAI", "LocalLLaMA", "MachineLearning"
+      ]
+    },
+    "priority_account_bonus": 20,
+
+    "spam_detection": {
+      "enabled": true,
+      "claim_link_mismatch_patterns": [
+        { "claim_regex": "official\\s+(anthropic|openai|google|meta)\\b", "link_must_contain": ["anthropic.com", "openai.com", "google.com", "deepmind.google", "meta.com", "github.com/anthropics", "github.com/openai", "github.com/google"] },
+        { "claim_regex": "official\\s+guide|official\\s+docs", "link_must_contain": [".com/anthropics/", ".com/openai/", ".com/google/", "docs.anthropic.com", "platform.openai.com"] }
+      ],
+      "low_effort_patterns": [
+        "follow me for more",
+        "like and retweet",
+        "DM me for",
+        "link in bio",
+        "drop a .* if you"
+      ]
+    },
+
+    "lab_accounts": {
+      "_comment": "Accounts treated as model-provider lab voices for Lab Pulse rollup",
+      "anthropic": ["AnthropicAI", "alexalbert__", "amandaaskell", "daboris", "jack_clark"],
+      "openai": ["OpenAI", "sama", "markchen90", "gabormehi"],
+      "google": ["GoogleDeepMind", "JeffDean", "demaboris", "googleai"],
+      "meta": ["MetaAI", "ylecun"],
+      "mistral": ["MistralAI", "arthurmensch"]
+    },
+
+    "followed_accounts": {
+      "_comment": "Your followed accounts — searched explicitly in Lab Pulse scan. Add handles here to track.",
+      "x": [
+        "AnthropicAI", "alexalbert__", "amandaaskell",
+        "OpenAI", "sama", "markchen90",
+        "GoogleDeepMind", "JeffDean",
+        "MetaAI", "ylecun",
+        "MistralAI", "arthurmensch",
+        "karpathy", "swyx", "hardmaru", "DrJimFan",
+        "bindureddy", "emaborsa"
+      ]
+    }
+  }
+}

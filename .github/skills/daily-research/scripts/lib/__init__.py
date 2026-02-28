@@ -1,1 +1,0 @@
-# daily-research library modules

@@ -1,0 +1,1748 @@
+{
+  "synced_at": "2026-02-28T04:52:33.444762+00:00",
+  "cli_version": "1.12.4 (installer 1.11.7)",
+  "commands": {
+    "aliases": {
+      "description": "List aliases in the vault",
+      "category": "Commands",
+      "params": {
+        "file": {
+          "description": "File name",
+          "required": false,
+          "values": null
+        },
+        "path": {
+          "description": "File path",
+          "required": false,
+          "values": null
+        },
+        "total": {
+          "description": "Return alias count",
+          "required": false,
+          "values": null
+        },
+        "verbose": {
+          "description": "Include file paths",
+          "required": false,
+          "values": null
+        },
+        "active": {
+          "description": "Show aliases for active file",
+          "required": false,
+          "values": null
+        }
+      }
+    },
+    "append": {
+      "description": "Append content to a file",
+      "category": "Commands",
+      "params": {
+        "file": {
+          "description": "File name",
+          "required": false,
+          "values": null
+        },
+        "path": {
+          "description": "File path",
+          "required": false,
+          "values": null
+        },
+        "content": {
+          "description": "Content to append (required)",
+          "required": true,
+          "values": null
+        },
+        "inline": {
+          "description": "Append without newline",
+          "required": false,
+          "values": null
+        }
+      }
+    },
+    "backlinks": {
+      "description": "List backlinks to a file",
+      "category": "Commands",
+      "params": {
+        "file": {
+          "description": "Target file name",
+          "required": false,
+          "values": null
+        },
+        "path": {
+          "description": "Target file path",
+          "required": false,
+          "values": null
+        },
+        "counts": {
+          "description": "Include link counts",
+          "required": false,
+          "values": null
+        },
+        "total": {
+          "description": "Return backlink count",
+          "required": false,
+          "values": null
+        }
+      }
+    },
+    "base:create": {
+      "description": "Create a new item in a base",
+      "category": "Commands",
+      "params": {
+        "file": {
+          "description": "Base file name",
+          "required": false,
+          "values": null
+        },
+        "path": {
+          "description": "Base file path",
+          "required": false,
+          "values": null
+        },
+        "view": {
+          "description": "View name",
+          "required": false,
+          "values": null
+        },
+        "name": {
+          "description": "New file name",
+          "required": false,
+          "values": null
+        },
+        "content": {
+          "description": "Initial content",
+          "required": false,
+          "values": null
+        },
+        "open": {
+          "description": "Open file after creating",
+          "required": false,
+          "values": null
+        },
+        "newtab": {
+          "description": "Open in new tab",
+          "required": false,
+          "values": null
+        }
+      }
+    },
+    "base:query": {
+      "description": "Query a base and return results",
+      "category": "Commands",
+      "params": {
+        "file": {
+          "description": "Base file name",
+          "required": false,
+          "values": null
+        },
+        "path": {
+          "description": "Base file path",
+          "required": false,
+          "values": null
+        },
+        "view": {
+          "description": "View name to query",
+          "required": false,
+          "values": null
+        }
+      }
+    },
+    "base:views": {
+      "description": "List views in the current base file",
+      "category": "Commands",
+      "params": {}
+    },
+    "bases": {
+      "description": "List all base files in vault",
+      "category": "Commands",
+      "params": {}
+    },
+    "bookmark": {
+      "description": "Add a bookmark",
+      "category": "Commands",
+      "params": {
+        "file": {
+          "description": "File to bookmark",
+          "required": false,
+          "values": null
+        },
+        "subpath": {
+          "description": "Subpath (heading or block) within file",
+          "required": false,
+          "values": null
+        },
+        "folder": {
+          "description": "Folder to bookmark",
+          "required": false,
+          "values": null
+        },
+        "search": {
+          "description": "Search query to bookmark",
+          "required": false,
+          "values": null
+        },
+        "url": {
+          "description": "URL to bookmark",
+          "required": false,
+          "values": null
+        },
+        "title": {
+          "description": "Bookmark title",
+          "required": false,
+          "values": null
+        }
+      }
+    },
+    "bookmarks": {
+      "description": "List bookmarks",
+      "category": "Commands",
+      "params": {
+        "total": {
+          "description": "Return bookmark count",
+          "required": false,
+          "values": null
+        },
+        "verbose": {
+          "description": "Include bookmark types",
+          "required": false,
+          "values": null
+        }
+      }
+    },
+    "command": {
+      "description": "Execute an Obsidian command",
+      "category": "Commands",
+      "params": {
+        "id": {
+          "description": "Command ID to execute (required)",
+          "required": true,
+          "values": null
+        }
+      }
+    },
+    "commands": {
+      "description": "List available command IDs",
+      "category": "Commands",
+      "params": {
+        "filter": {
+          "description": "Filter by ID prefix",
+          "required": false,
+          "values": null
+        }
+      }
+    },
+    "create": {
+      "description": "Create a new file",
+      "category": "Commands",
+      "params": {
+        "name": {
+          "description": "File name",
+          "required": false,
+          "values": null
+        },
+        "path": {
+          "description": "File path",
+          "required": false,
+          "values": null
+        },
+        "content": {
+          "description": "Initial content",
+          "required": false,
+          "values": null
+        },
+        "template": {
+          "description": "Template to use",
+          "required": false,
+          "values": null
+        },
+        "overwrite": {
+          "description": "Overwrite if file exists",
+          "required": false,
+          "values": null
+        },
+        "open": {
+          "description": "Open file after creating",
+          "required": false,
+          "values": null
+        },
+        "newtab": {
+          "description": "Open in new tab",
+          "required": false,
+          "values": null
+        }
+      }
+    },
+    "daily": {
+      "description": "Open daily note",
+      "category": "Commands",
+      "params": {}
+    },
+    "daily:append": {
+      "description": "Append content to daily note",
+      "category": "Commands",
+      "params": {
+        "content": {
+          "description": "Content to append (required)",
+          "required": true,
+          "values": null
+        },
+        "inline": {
+          "description": "Append without newline",
+          "required": false,
+          "values": null
+        },
+        "open": {
+          "description": "Open file after adding",
+          "required": false,
+          "values": null
+        }
+      }
+    },
+    "daily:path": {
+      "description": "Get daily note path",
+      "category": "Commands",
+      "params": {}
+    },
+    "daily:prepend": {
+      "description": "Prepend content to daily note",
+      "category": "Commands",
+      "params": {
+        "content": {
+          "description": "Content to prepend (required)",
+          "required": true,
+          "values": null
+        },
+        "inline": {
+          "description": "Prepend without newline",
+          "required": false,
+          "values": null
+        },
+        "open": {
+          "description": "Open file after adding",
+          "required": false,
+          "values": null
+        }
+      }
+    },
+    "daily:read": {
+      "description": "Read daily note contents",
+      "category": "Commands",
+      "params": {}
+    },
+    "deadends": {
+      "description": "List files with no outgoing links",
+      "category": "Commands",
+      "params": {
+        "total": {
+          "description": "Return dead-end count",
+          "required": false,
+          "values": null
+        },
+        "all": {
+          "description": "Include non-markdown files",
+          "required": false,
+          "values": null
+        }
+      }
+    },
+    "delete": {
+      "description": "Delete a file",
+      "category": "Commands",
+      "params": {
+        "file": {
+          "description": "File name",
+          "required": false,
+          "values": null
+        },
+        "path": {
+          "description": "File path",
+          "required": false,
+          "values": null
+        },
+        "permanent": {
+          "description": "Skip trash, delete permanently",
+          "required": false,
+          "values": null
+        }
+      }
+    },
+    "diff": {
+      "description": "List or diff local/sync versions",
+      "category": "Commands",
+      "params": {
+        "file": {
+          "description": "File name",
+          "required": false,
+          "values": null
+        },
+        "path": {
+          "description": "File path",
+          "required": false,
+          "values": null
+        },
+        "from": {
+          "description": "Version number to diff from",
+          "required": false,
+          "values": null
+        },
+        "to": {
+          "description": "Version number to diff to",
+          "required": false,
+          "values": null
+        }
+      }
+    },
+    "file": {
+      "description": "Show file info",
+      "category": "Commands",
+      "params": {
+        "file": {
+          "description": "File name",
+          "required": false,
+          "values": null
+        },
+        "path": {
+          "description": "File path",
+          "required": false,
+          "values": null
+        }
+      }
+    },
+    "files": {
+      "description": "List files in the vault",
+      "category": "Commands",
+      "params": {
+        "folder": {
+          "description": "Filter by folder",
+          "required": false,
+          "values": null
+        },
+        "ext": {
+          "description": "Filter by extension",
+          "required": false,
+          "values": null
+        },
+        "total": {
+          "description": "Return file count",
+          "required": false,
+          "values": null
+        }
+      }
+    },
+    "folder": {
+      "description": "Show folder info",
+      "category": "Commands",
+      "params": {
+        "path": {
+          "description": "Folder path (required)",
+          "required": true,
+          "values": null
+        }
+      }
+    },
+    "folders": {
+      "description": "List folders in the vault",
+      "category": "Commands",
+      "params": {
+        "folder": {
+          "description": "Filter by parent folder",
+          "required": false,
+          "values": null
+        },
+        "total": {
+          "description": "Return folder count",
+          "required": false,
+          "values": null
+        }
+      }
+    },
+    "help": {
+      "description": "Show list of all available commands",
+      "category": "Commands",
+      "params": {}
+    },
+    "history": {
+      "description": "List file history versions",
+      "category": "Commands",
+      "params": {
+        "file": {
+          "description": "File name",
+          "required": false,
+          "values": null
+        },
+        "path": {
+          "description": "File path",
+          "required": false,
+          "values": null
+        }
+      }
+    },
+    "history:list": {
+      "description": "List files with history",
+      "category": "Commands",
+      "params": {}
+    },
+    "history:open": {
+      "description": "Open file recovery",
+      "category": "Commands",
+      "params": {
+        "file": {
+          "description": "File name",
+          "required": false,
+          "values": null
+        },
+        "path": {
+          "description": "File path",
+          "required": false,
+          "values": null
+        }
+      }
+    },
+    "history:read": {
+      "description": "Read a file history version",
+      "category": "Commands",
+      "params": {
+        "file": {
+          "description": "File name",
+          "required": false,
+          "values": null
+        },
+        "path": {
+          "description": "File path",
+          "required": false,
+          "values": null
+        },
+        "version": {
+          "description": "Version number (default: 1)",
+          "required": false,
+          "values": null
+        }
+      }
+    },
+    "history:restore": {
+      "description": "Restore a file history version",
+      "category": "Commands",
+      "params": {
+        "file": {
+          "description": "File name",
+          "required": false,
+          "values": null
+        },
+        "path": {
+          "description": "File path",
+          "required": false,
+          "values": null
+        },
+        "version": {
+          "description": "Version number (required)",
+          "required": true,
+          "values": null
+        }
+      }
+    },
+    "hotkey": {
+      "description": "Get hotkey for a command",
+      "category": "Commands",
+      "params": {
+        "id": {
+          "description": "Command ID (required)",
+          "required": true,
+          "values": null
+        },
+        "verbose": {
+          "description": "Show if custom or default",
+          "required": false,
+          "values": null
+        }
+      }
+    },
+    "hotkeys": {
+      "description": "List hotkeys",
+      "category": "Commands",
+      "params": {
+        "total": {
+          "description": "Return hotkey count",
+          "required": false,
+          "values": null
+        },
+        "verbose": {
+          "description": "Show if hotkey is custom",
+          "required": false,
+          "values": null
+        },
+        "all": {
+          "description": "Include commands without hotkeys",
+          "required": false,
+          "values": null
+        }
+      }
+    },
+    "links": {
+      "description": "List outgoing links from a file",
+      "category": "Commands",
+      "params": {
+        "file": {
+          "description": "File name",
+          "required": false,
+          "values": null
+        },
+        "path": {
+          "description": "File path",
+          "required": false,
+          "values": null
+        },
+        "total": {
+          "description": "Return link count",
+          "required": false,
+          "values": null
+        }
+      }
+    },
+    "move": {
+      "description": "Move or rename a file",
+      "category": "Commands",
+      "params": {
+        "file": {
+          "description": "File name",
+          "required": false,
+          "values": null
+        },
+        "path": {
+          "description": "File path",
+          "required": false,
+          "values": null
+        },
+        "to": {
+          "description": "Destination folder or path (required)",
+          "required": true,
+          "values": null
+        }
+      }
+    },
+    "open": {
+      "description": "Open a file",
+      "category": "Commands",
+      "params": {
+        "file": {
+          "description": "File name",
+          "required": false,
+          "values": null
+        },
+        "path": {
+          "description": "File path",
+          "required": false,
+          "values": null
+        },
+        "newtab": {
+          "description": "Open in new tab",
+          "required": false,
+          "values": null
+        }
+      }
+    },
+    "orphans": {
+      "description": "List files with no incoming links",
+      "category": "Commands",
+      "params": {
+        "total": {
+          "description": "Return orphan count",
+          "required": false,
+          "values": null
+        },
+        "all": {
+          "description": "Include non-markdown files",
+          "required": false,
+          "values": null
+        }
+      }
+    },
+    "outline": {
+      "description": "Show headings for the current file",
+      "category": "Commands",
+      "params": {
+        "file": {
+          "description": "File name",
+          "required": false,
+          "values": null
+        },
+        "path": {
+          "description": "File path",
+          "required": false,
+          "values": null
+        },
+        "total": {
+          "description": "Return heading count",
+          "required": false,
+          "values": null
+        }
+      }
+    },
+    "plugin": {
+      "description": "Get plugin info",
+      "category": "Commands",
+      "params": {
+        "id": {
+          "description": "Plugin ID (required)",
+          "required": true,
+          "values": null
+        }
+      }
+    },
+    "plugin:disable": {
+      "description": "Disable a plugin",
+      "category": "Commands",
+      "params": {
+        "id": {
+          "description": "Plugin ID (required)",
+          "required": true,
+          "values": null
+        }
+      }
+    },
+    "plugin:enable": {
+      "description": "Enable a plugin",
+      "category": "Commands",
+      "params": {
+        "id": {
+          "description": "Plugin ID (required)",
+          "required": true,
+          "values": null
+        }
+      }
+    },
+    "plugin:install": {
+      "description": "Install a community plugin",
+      "category": "Commands",
+      "params": {
+        "id": {
+          "description": "Plugin ID (required)",
+          "required": true,
+          "values": null
+        },
+        "enable": {
+          "description": "Enable after install",
+          "required": false,
+          "values": null
+        }
+      }
+    },
+    "plugin:reload": {
+      "description": "Reload a plugin (for developers)",
+      "category": "Commands",
+      "params": {
+        "id": {
+          "description": "Plugin ID (required)",
+          "required": true,
+          "values": null
+        }
+      }
+    },
+    "plugin:uninstall": {
+      "description": "Uninstall a community plugin",
+      "category": "Commands",
+      "params": {
+        "id": {
+          "description": "Plugin ID (required)",
+          "required": true,
+          "values": null
+        }
+      }
+    },
+    "plugins": {
+      "description": "List installed plugins",
+      "category": "Commands",
+      "params": {
+        "versions": {
+          "description": "Include version numbers",
+          "required": false,
+          "values": null
+        }
+      }
+    },
+    "plugins:enabled": {
+      "description": "List enabled plugins",
+      "category": "Commands",
+      "params": {
+        "versions": {
+          "description": "Include version numbers",
+          "required": false,
+          "values": null
+        }
+      }
+    },
+    "plugins:restrict": {
+      "description": "Toggle or check restricted mode",
+      "category": "Commands",
+      "params": {
+        "on": {
+          "description": "Enable restricted mode",
+          "required": false,
+          "values": null
+        },
+        "off": {
+          "description": "Disable restricted mode",
+          "required": false,
+          "values": null
+        }
+      }
+    },
+    "prepend": {
+      "description": "Prepend content to a file",
+      "category": "Commands",
+      "params": {
+        "file": {
+          "description": "File name",
+          "required": false,
+          "values": null
+        },
+        "path": {
+          "description": "File path",
+          "required": false,
+          "values": null
+        },
+        "content": {
+          "description": "Content to prepend (required)",
+          "required": true,
+          "values": null
+        },
+        "inline": {
+          "description": "Prepend without newline",
+          "required": false,
+          "values": null
+        }
+      }
+    },
+    "properties": {
+      "description": "List properties in the vault",
+      "category": "Commands",
+      "params": {
+        "file": {
+          "description": "Show properties for file",
+          "required": false,
+          "values": null
+        },
+        "path": {
+          "description": "Show properties for path",
+          "required": false,
+          "values": null
+        },
+        "name": {
+          "description": "Get specific property count",
+          "required": false,
+          "values": null
+        },
+        "total": {
+          "description": "Return property count",
+          "required": false,
+          "values": null
+        },
+        "counts": {
+          "description": "Include occurrence counts",
+          "required": false,
+          "values": null
+        },
+        "active": {
+          "description": "Show properties for active file",
+          "required": false,
+          "values": null
+        }
+      }
+    },
+    "property:read": {
+      "description": "Read a property value from a file",
+      "category": "Commands",
+      "params": {
+        "name": {
+          "description": "Property name (required)",
+          "required": true,
+          "values": null
+        },
+        "file": {
+          "description": "File name",
+          "required": false,
+          "values": null
+        },
+        "path": {
+          "description": "File path",
+          "required": false,
+          "values": null
+        }
+      }
+    },
+    "property:remove": {
+      "description": "Remove a property from a file",
+      "category": "Commands",
+      "params": {
+        "name": {
+          "description": "Property name (required)",
+          "required": true,
+          "values": null
+        },
+        "file": {
+          "description": "File name",
+          "required": false,
+          "values": null
+        },
+        "path": {
+          "description": "File path",
+          "required": false,
+          "values": null
+        }
+      }
+    },
+    "property:set": {
+      "description": "Set a property on a file",
+      "category": "Commands",
+      "params": {
+        "name": {
+          "description": "Property name (required)",
+          "required": true,
+          "values": null
+        },
+        "value": {
+          "description": "Property value (required)",
+          "required": true,
+          "values": null
+        },
+        "file": {
+          "description": "File name",
+          "required": false,
+          "values": null
+        },
+        "path": {
+          "description": "File path",
+          "required": false,
+          "values": null
+        }
+      }
+    },
+    "random": {
+      "description": "Open a random note",
+      "category": "Commands",
+      "params": {
+        "folder": {
+          "description": "Limit to folder",
+          "required": false,
+          "values": null
+        },
+        "newtab": {
+          "description": "Open in new tab",
+          "required": false,
+          "values": null
+        }
+      }
+    },
+    "random:read": {
+      "description": "Read a random note",
+      "category": "Commands",
+      "params": {
+        "folder": {
+          "description": "Limit to folder",
+          "required": false,
+          "values": null
+        }
+      }
+    },
+    "read": {
+      "description": "Read file contents",
+      "category": "Commands",
+      "params": {
+        "file": {
+          "description": "File name",
+          "required": false,
+          "values": null
+        },
+        "path": {
+          "description": "File path",
+          "required": false,
+          "values": null
+        }
+      }
+    },
+    "recents": {
+      "description": "List recently opened files",
+      "category": "Commands",
+      "params": {
+        "total": {
+          "description": "Return recent file count",
+          "required": false,
+          "values": null
+        }
+      }
+    },
+    "reload": {
+      "description": "Reload the vault",
+      "category": "Commands",
+      "params": {}
+    },
+    "rename": {
+      "description": "Rename a file",
+      "category": "Commands",
+      "params": {
+        "file": {
+          "description": "File name",
+          "required": false,
+          "values": null
+        },
+        "path": {
+          "description": "File path",
+          "required": false,
+          "values": null
+        },
+        "name": {
+          "description": "New file name (required)",
+          "required": true,
+          "values": null
+        }
+      }
+    },
+    "restart": {
+      "description": "Restart the app",
+      "category": "Commands",
+      "params": {}
+    },
+    "search": {
+      "description": "Search vault for text",
+      "category": "Commands",
+      "params": {
+        "query": {
+          "description": "Search query (required)",
+          "required": true,
+          "values": null
+        },
+        "path": {
+          "description": "Limit to folder",
+          "required": false,
+          "values": null
+        },
+        "limit": {
+          "description": "Max files",
+          "required": false,
+          "values": null
+        },
+        "total": {
+          "description": "Return match count",
+          "required": false,
+          "values": null
+        },
+        "case": {
+          "description": "Case sensitive",
+          "required": false,
+          "values": null
+        }
+      }
+    },
+    "search:context": {
+      "description": "Search with matching line context",
+      "category": "Commands",
+      "params": {
+        "query": {
+          "description": "Search query (required)",
+          "required": true,
+          "values": null
+        },
+        "path": {
+          "description": "Limit to folder",
+          "required": false,
+          "values": null
+        },
+        "limit": {
+          "description": "Max files",
+          "required": false,
+          "values": null
+        },
+        "case": {
+          "description": "Case sensitive",
+          "required": false,
+          "values": null
+        }
+      }
+    },
+    "search:open": {
+      "description": "Open search view",
+      "category": "Commands",
+      "params": {
+        "query": {
+          "description": "Initial search query",
+          "required": false,
+          "values": null
+        }
+      }
+    },
+    "snippet:disable": {
+      "description": "Disable a CSS snippet",
+      "category": "Commands",
+      "params": {
+        "name": {
+          "description": "Snippet name (required)",
+          "required": true,
+          "values": null
+        }
+      }
+    },
+    "snippet:enable": {
+      "description": "Enable a CSS snippet",
+      "category": "Commands",
+      "params": {
+        "name": {
+          "description": "Snippet name (required)",
+          "required": true,
+          "values": null
+        }
+      }
+    },
+    "snippets": {
+      "description": "List installed CSS snippets",
+      "category": "Commands",
+      "params": {}
+    },
+    "snippets:enabled": {
+      "description": "List enabled CSS snippets",
+      "category": "Commands",
+      "params": {}
+    },
+    "sync": {
+      "description": "Pause or resume sync",
+      "category": "Commands",
+      "params": {
+        "on": {
+          "description": "Resume sync",
+          "required": false,
+          "values": null
+        },
+        "off": {
+          "description": "Pause sync",
+          "required": false,
+          "values": null
+        }
+      }
+    },
+    "sync:deleted": {
+      "description": "List deleted files in sync",
+      "category": "Commands",
+      "params": {
+        "total": {
+          "description": "Return deleted file count",
+          "required": false,
+          "values": null
+        }
+      }
+    },
+    "sync:history": {
+      "description": "List sync version history for a file",
+      "category": "Commands",
+      "params": {
+        "file": {
+          "description": "File name",
+          "required": false,
+          "values": null
+        },
+        "path": {
+          "description": "File path",
+          "required": false,
+          "values": null
+        },
+        "total": {
+          "description": "Return version count",
+          "required": false,
+          "values": null
+        }
+      }
+    },
+    "sync:open": {
+      "description": "Open sync history",
+      "category": "Commands",
+      "params": {
+        "file": {
+          "description": "File name",
+          "required": false,
+          "values": null
+        },
+        "path": {
+          "description": "File path",
+          "required": false,
+          "values": null
+        }
+      }
+    },
+    "sync:read": {
+      "description": "Read a sync version",
+      "category": "Commands",
+      "params": {
+        "file": {
+          "description": "File name",
+          "required": false,
+          "values": null
+        },
+        "path": {
+          "description": "File path",
+          "required": false,
+          "values": null
+        },
+        "version": {
+          "description": "Version number (required)",
+          "required": true,
+          "values": null
+        }
+      }
+    },
+    "sync:restore": {
+      "description": "Restore a sync version",
+      "category": "Commands",
+      "params": {
+        "file": {
+          "description": "File name",
+          "required": false,
+          "values": null
+        },
+        "path": {
+          "description": "File path",
+          "required": false,
+          "values": null
+        },
+        "version": {
+          "description": "Version number (required)",
+          "required": true,
+          "values": null
+        }
+      }
+    },
+    "sync:status": {
+      "description": "Show sync status",
+      "category": "Commands",
+      "params": {}
+    },
+    "tab:open": {
+      "description": "Open a new tab",
+      "category": "Commands",
+      "params": {
+        "group": {
+          "description": "Tab group ID",
+          "required": false,
+          "values": null
+        },
+        "file": {
+          "description": "File to open",
+          "required": false,
+          "values": null
+        },
+        "view": {
+          "description": "View type to open",
+          "required": false,
+          "values": null
+        }
+      }
+    },
+    "tabs": {
+      "description": "List open tabs",
+      "category": "Commands",
+      "params": {
+        "ids": {
+          "description": "Include tab IDs",
+          "required": false,
+          "values": null
+        }
+      }
+    },
+    "tag": {
+      "description": "Get tag info",
+      "category": "Commands",
+      "params": {
+        "name": {
+          "description": "Tag name (required)",
+          "required": true,
+          "values": null
+        },
+        "total": {
+          "description": "Return occurrence count",
+          "required": false,
+          "values": null
+        },
+        "verbose": {
+          "description": "Include file list and count",
+          "required": false,
+          "values": null
+        }
+      }
+    },
+    "tags": {
+      "description": "List tags in the vault",
+      "category": "Commands",
+      "params": {
+        "file": {
+          "description": "File name",
+          "required": false,
+          "values": null
+        },
+        "path": {
+          "description": "File path",
+          "required": false,
+          "values": null
+        },
+        "total": {
+          "description": "Return tag count",
+          "required": false,
+          "values": null
+        },
+        "counts": {
+          "description": "Include tag counts",
+          "required": false,
+          "values": null
+        },
+        "active": {
+          "description": "Show tags for active file",
+          "required": false,
+          "values": null
+        }
+      }
+    },
+    "task": {
+      "description": "Show or update a task",
+      "category": "Commands",
+      "params": {
+        "ref": {
+          "description": "Task reference (path:line)",
+          "required": false,
+          "values": null
+        },
+        "file": {
+          "description": "File name",
+          "required": false,
+          "values": null
+        },
+        "path": {
+          "description": "File path",
+          "required": false,
+          "values": null
+        },
+        "line": {
+          "description": "Line number",
+          "required": false,
+          "values": null
+        },
+        "toggle": {
+          "description": "Toggle task status",
+          "required": false,
+          "values": null
+        },
+        "done": {
+          "description": "Mark as done",
+          "required": false,
+          "values": null
+        },
+        "todo": {
+          "description": "Mark as todo",
+          "required": false,
+          "values": null
+        },
+        "daily": {
+          "description": "Use daily note",
+          "required": false,
+          "values": null
+        },
+        "status": {
+          "description": "Set status character",
+          "required": false,
+          "values": null
+        }
+      }
+    },
+    "tasks": {
+      "description": "List tasks in the vault",
+      "category": "Commands",
+      "params": {
+        "file": {
+          "description": "Filter by file name",
+          "required": false,
+          "values": null
+        },
+        "path": {
+          "description": "Filter by file path",
+          "required": false,
+          "values": null
+        },
+        "total": {
+          "description": "Return task count",
+          "required": false,
+          "values": null
+        },
+        "done": {
+          "description": "Show completed tasks",
+          "required": false,
+          "values": null
+        },
+        "todo": {
+          "description": "Show incomplete tasks",
+          "required": false,
+          "values": null
+        },
+        "status": {
+          "description": "Filter by status character",
+          "required": false,
+          "values": null
+        },
+        "verbose": {
+          "description": "Group by file with line numbers",
+          "required": false,
+          "values": null
+        },
+        "active": {
+          "description": "Show tasks for active file",
+          "required": false,
+          "values": null
+        },
+        "daily": {
+          "description": "Show tasks from daily note",
+          "required": false,
+          "values": null
+        }
+      }
+    },
+    "template:insert": {
+      "description": "Insert template into active file",
+      "category": "Commands",
+      "params": {
+        "name": {
+          "description": "Template name (required)",
+          "required": true,
+          "values": null
+        }
+      }
+    },
+    "template:read": {
+      "description": "Read template content",
+      "category": "Commands",
+      "params": {
+        "name": {
+          "description": "Template name (required)",
+          "required": true,
+          "values": null
+        },
+        "resolve": {
+          "description": "Resolve template variables",
+          "required": false,
+          "values": null
+        },
+        "title": {
+          "description": "Title for variable resolution",
+          "required": false,
+          "values": null
+        }
+      }
+    },
+    "templates": {
+      "description": "List templates",
+      "category": "Commands",
+      "params": {
+        "total": {
+          "description": "Return template count",
+          "required": false,
+          "values": null
+        }
+      }
+    },
+    "theme": {
+      "description": "Show active theme or get info",
+      "category": "Commands",
+      "params": {
+        "name": {
+          "description": "Theme name for details",
+          "required": false,
+          "values": null
+        }
+      }
+    },
+    "theme:install": {
+      "description": "Install a community theme",
+      "category": "Commands",
+      "params": {
+        "name": {
+          "description": "Theme name (required)",
+          "required": true,
+          "values": null
+        },
+        "enable": {
+          "description": "Activate after install",
+          "required": false,
+          "values": null
+        }
+      }
+    },
+    "theme:set": {
+      "description": "Set active theme",
+      "category": "Commands",
+      "params": {
+        "name": {
+          "description": "Theme name (empty for default) (required)",
+          "required": true,
+          "values": null
+        }
+      }
+    },
+    "theme:uninstall": {
+      "description": "Uninstall a theme",
+      "category": "Commands",
+      "params": {
+        "name": {
+          "description": "Theme name (required)",
+          "required": true,
+          "values": null
+        }
+      }
+    },
+    "themes": {
+      "description": "List installed themes",
+      "category": "Commands",
+      "params": {
+        "versions": {
+          "description": "Include version numbers",
+          "required": false,
+          "values": null
+        }
+      }
+    },
+    "unresolved": {
+      "description": "List unresolved links in vault",
+      "category": "Commands",
+      "params": {
+        "total": {
+          "description": "Return unresolved link count",
+          "required": false,
+          "values": null
+        },
+        "counts": {
+          "description": "Include link counts",
+          "required": false,
+          "values": null
+        },
+        "verbose": {
+          "description": "Include source files",
+          "required": false,
+          "values": null
+        }
+      }
+    },
+    "vault": {
+      "description": "Show vault info",
+      "category": "Commands",
+      "params": {}
+    },
+    "vaults": {
+      "description": "List known vaults",
+      "category": "Commands",
+      "params": {
+        "total": {
+          "description": "Return vault count",
+          "required": false,
+          "values": null
+        },
+        "verbose": {
+          "description": "Include vault paths",
+          "required": false,
+          "values": null
+        }
+      }
+    },
+    "version": {
+      "description": "Show Obsidian version",
+      "category": "Commands",
+      "params": {}
+    },
+    "wordcount": {
+      "description": "Count words and characters",
+      "category": "Commands",
+      "params": {
+        "file": {
+          "description": "File name",
+          "required": false,
+          "values": null
+        },
+        "path": {
+          "description": "File path",
+          "required": false,
+          "values": null
+        },
+        "words": {
+          "description": "Return word count only",
+          "required": false,
+          "values": null
+        },
+        "characters": {
+          "description": "Return character count only",
+          "required": false,
+          "values": null
+        }
+      }
+    },
+    "workspace": {
+      "description": "Show workspace tree",
+      "category": "Commands",
+      "params": {
+        "ids": {
+          "description": "Include workspace item IDs",
+          "required": false,
+          "values": null
+        }
+      }
+    },
+    "dev:cdp": {
+      "description": "Run a Chrome DevTools Protocol command",
+      "category": "Developer",
+      "params": {
+        "method": {
+          "description": "CDP method to call (required)",
+          "required": true,
+          "values": null
+        },
+        "params": {
+          "description": "Method parameters as JSON",
+          "required": false,
+          "values": null
+        }
+      }
+    },
+    "dev:console": {
+      "description": "Show captured console messages",
+      "category": "Developer",
+      "params": {
+        "clear": {
+          "description": "Clear the console buffer",
+          "required": false,
+          "values": null
+        },
+        "limit": {
+          "description": "Max messages to show (default 50)",
+          "required": false,
+          "values": null
+        }
+      }
+    },
+    "dev:css": {
+      "description": "Inspect CSS with source locations",
+      "category": "Developer",
+      "params": {
+        "selector": {
+          "description": "CSS selector (required)",
+          "required": true,
+          "values": null
+        },
+        "prop": {
+          "description": "Filter by property name",
+          "required": false,
+          "values": null
+        }
+      }
+    },
+    "dev:debug": {
+      "description": "Attach/detach Chrome DevTools Protocol debugger",
+      "category": "Developer",
+      "params": {
+        "on": {
+          "description": "Attach debugger",
+          "required": false,
+          "values": null
+        },
+        "off": {
+          "description": "Detach debugger",
+          "required": false,
+          "values": null
+        }
+      }
+    },
+    "dev:dom": {
+      "description": "Query DOM elements",
+      "category": "Developer",
+      "params": {
+        "selector": {
+          "description": "CSS selector (required)",
+          "required": true,
+          "values": null
+        },
+        "total": {
+          "description": "Return element count",
+          "required": false,
+          "values": null
+        },
+        "text": {
+          "description": "Return text content",
+          "required": false,
+          "values": null
+        },
+        "inner": {
+          "description": "Return innerHTML instead of outerHTML",
+          "required": false,
+          "values": null
+        },
+        "all": {
+          "description": "Return all matches instead of first",
+          "required": false,
+          "values": null
+        },
+        "attr": {
+          "description": "Get attribute value",
+          "required": false,
+          "values": null
+        },
+        "css": {
+          "description": "Get CSS property value",
+          "required": false,
+          "values": null
+        }
+      }
+    },
+    "dev:errors": {
+      "description": "Show captured errors",
+      "category": "Developer",
+      "params": {
+        "clear": {
+          "description": "Clear the error buffer",
+          "required": false,
+          "values": null
+        }
+      }
+    },
+    "dev:mobile": {
+      "description": "Toggle mobile emulation",
+      "category": "Developer",
+      "params": {
+        "on": {
+          "description": "Enable mobile emulation",
+          "required": false,
+          "values": null
+        },
+        "off": {
+          "description": "Disable mobile emulation",
+          "required": false,
+          "values": null
+        }
+      }
+    },
+    "dev:screenshot": {
+      "description": "Take a screenshot",
+      "category": "Developer",
+      "params": {
+        "path": {
+          "description": "Output file path",
+          "required": false,
+          "values": null
+        }
+      }
+    },
+    "devtools": {
+      "description": "Toggle Electron dev tools",
+      "category": "Developer",
+      "params": {}
+    },
+    "eval": {
+      "description": "Execute JavaScript and return result",
+      "category": "Developer",
+      "params": {
+        "code": {
+          "description": "JavaScript code to execute (required)",
+          "required": true,
+          "values": null
+        }
+      }
+    }
+  }
+}
