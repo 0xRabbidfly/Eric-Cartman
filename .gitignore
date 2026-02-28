@@ -86,3 +86,6 @@ scratch/
 
 # Teams Daily Digest - contains PII and internal channel names
 .claude/skills/teams-daily-digest/
+
+# Portugal Lawyer
+.github/agents/portuguese-lawyer.md
