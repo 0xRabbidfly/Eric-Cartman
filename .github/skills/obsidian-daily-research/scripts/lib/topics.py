@@ -133,8 +133,10 @@ DEFAULT_TOPICS: List[Topic] = [
 def load_topics(config: dict) -> List[Topic]:
     """Load topics from config, falling back to defaults.
 
-    Config can override topics via a 'topics' list of dicts with keys:
-    slug, display_name, reddit_queries, x_queries, weight
+    Config can provide topics via:
+    - A 'topics' list of dicts with keys: slug, display_name, weight
+      (parsed from pipeline.md or supplied programmatically)
+    - Falls back to DEFAULT_TOPICS when no topics are configured
     """
     topics_data = config.get("topics")
     if not topics_data:
@@ -142,12 +144,21 @@ def load_topics(config: dict) -> List[Topic]:
 
     topics = []
     for t in topics_data:
+        slug = t["slug"]
+        display_name = t["display_name"]
+        weight = t.get("weight", 1.0)
+
+        # Try to find matching default topic for its queries
+        default = next((d for d in DEFAULT_TOPICS if d.slug == slug), None)
+        reddit_q = t.get("reddit_queries", default.reddit_queries if default else [])
+        x_q = t.get("x_queries", default.x_queries if default else [])
+
         topics.append(Topic(
-            slug=t["slug"],
-            display_name=t["display_name"],
-            reddit_queries=t.get("reddit_queries", []),
-            x_queries=t.get("x_queries", []),
-            weight=t.get("weight", 1.0),
+            slug=slug,
+            display_name=display_name,
+            reddit_queries=reddit_q,
+            x_queries=x_q,
+            weight=weight,
         ))
     return topics
 
