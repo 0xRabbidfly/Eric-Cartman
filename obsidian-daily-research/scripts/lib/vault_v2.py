@@ -1,6 +1,6 @@
 """Obsidian vault operations for obsidian-daily-research pipeline.
 
-Thin wrapper around the shared Obsidian skill. Provides dedup scanning,
+Thin wrapper around the vendored Obsidian module. Provides dedup scanning,
 daily note writing, and library management via the Obsidian CLI.
 
 Requires Obsidian to be running with CLI enabled.
@@ -11,11 +11,10 @@ import sys
 from pathlib import Path
 from typing import Set, Tuple
 
-# Add the obsidian skill to the path
-_SKILLS_DIR = Path(__file__).resolve().parents[3]
-_OBSIDIAN_SCRIPTS = _SKILLS_DIR / "obsidian" / "scripts"
-if str(_OBSIDIAN_SCRIPTS) not in sys.path:
-    sys.path.insert(0, str(_OBSIDIAN_SCRIPTS))
+# Import from vendor/obsidian (self-contained, no external skill dependency)
+_VENDOR_DIR = Path(__file__).resolve().parents[1] / "vendor" / "obsidian"
+if str(_VENDOR_DIR) not in sys.path:
+    sys.path.insert(0, str(_VENDOR_DIR))
 
 from obsidian import Obsidian
 

@@ -6,24 +6,8 @@
   "keep_tag": "#keep",
 
   "must_follow": {
-    "_comment": "Every tweet from these accounts is captured — no engagement filter, no quality filter. Grouped by label for the daily note.",
-    "accounts": [
-      { "handle": "karpathy", "label": "Andrej Karpathy", "group": "Thought Leaders" },
-      { "handle": "bcherny", "label": "Boris (Anthropic/Claude Code)", "group": "Anthropic" },
-      { "handle": "alexalbert__", "label": "Alex Albert (Anthropic)", "group": "Anthropic" },
-      { "handle": "DarioAmodei", "label": "Dario Amodei (Anthropic)", "group": "Anthropic" },
-      { "handle": "AnthropicAI", "label": "Anthropic", "group": "Anthropic" },
-      { "handle": "OpenAI", "label": "OpenAI", "group": "OpenAI" },
-      { "handle": "sama", "label": "Sam Altman", "group": "OpenAI" },
-      { "handle": "markchen90", "label": "Mark Chen (OpenAI)", "group": "OpenAI" },
-      { "handle": "GoogleDeepMind", "label": "Google DeepMind", "group": "Google" },
-      { "handle": "JeffDean", "label": "Jeff Dean (Google)", "group": "Google" },
-      { "handle": "xaborai", "label": "xAI", "group": "xAI" },
-      { "handle": "MistralAI", "label": "Mistral AI", "group": "Mistral" },
-      { "handle": "ylecun", "label": "Yann LeCun (Meta)", "group": "Meta" },
-      { "handle": "MetaAI", "label": "Meta AI", "group": "Meta" },
-      { "handle": "Alibaba_Qwen", "label": "Alibaba Qwen", "group": "Alibaba" }
-    ]
+    "_comment": "Accounts now live in ../must-follow.md — edit that file to add/remove handles. This section is kept as fallback only.",
+    "accounts": []
   },
 
   "feedback_tags": {
