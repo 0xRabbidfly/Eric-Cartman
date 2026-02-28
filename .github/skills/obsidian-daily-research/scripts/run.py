@@ -37,9 +37,10 @@ SCRIPT_DIR = Path(__file__).parent.resolve()
 SKILL_DIR = SCRIPT_DIR.parent
 CONFIG_FILE = SCRIPT_DIR / "config.json"
 
-# Add last30days scripts dir to path FIRST so its 'lib' package is primary
-LAST30DAYS_SCRIPTS = (SKILL_DIR.parent / "last30days" / "scripts").resolve()
-sys.path.insert(0, str(LAST30DAYS_SCRIPTS))
+# Vendor dir holds selective copies of last30days + obsidian modules
+# (no external skill dependencies at runtime)
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
 
 # Import our own modules via direct file import (avoids 'lib' name clash)
 import importlib.util
@@ -60,6 +61,155 @@ promote = _load_local_module("dr_promote", _local_lib / "promote_v2.py")
 FEEDBACK_FILE = SCRIPT_DIR / "feedback.json"
 
 
+# ---------------------------------------------------------------------------
+# Token / cost tracking
+# ---------------------------------------------------------------------------
+
+# Default cost rates per 1M tokens (USD) — used ONLY as fallback when the API
+# does not return an exact cost.  xAI responses include `cost_in_usd_ticks`
+# (exact cost), so rates below are irrelevant for Grok models in practice.
+# Override in config.json → cost_rates.
+DEFAULT_COST_RATES = {
+    # OpenAI Responses API (web_search)
+    "gpt-4o":        {"input": 2.50, "output": 10.00},
+    "gpt-4o-mini":   {"input": 0.15, "output": 0.60},
+    # OpenAI Chat Completions
+    "gpt-5.2":       {"input": 2.00, "output": 8.00},
+    "gpt-4.1":       {"input": 2.00, "output": 8.00},
+    # xAI — fallback only; prefer cost_in_usd_ticks from API response
+    "grok-4-1-fast": {"input": 2.00, "output": 8.00},
+    "grok-3":        {"input": 3.00, "output": 15.00},
+}
+
+
+class TokenTracker:
+    """Accumulates token usage and costs across all API calls.
+
+    Uses exact cost from `cost_in_usd_ticks` when available (xAI),
+    otherwise falls back to rate-based estimation (OpenAI).
+    """
+
+    def __init__(self, cost_rates: dict | None = None):
+        self.calls: list[dict] = []  # individual call records
+        self.rates = {**DEFAULT_COST_RATES, **(cost_rates or {})}
+
+    def record(self, label: str, model: str, usage: dict | None):
+        """Record a single API call's usage.
+
+        Args:
+            label:  Human-readable call label (e.g. 'Reddit/agents')
+            model:  Model name used
+            usage:  Raw usage dict from API response (or None)
+        """
+        if not usage:
+            self.calls.append({"label": label, "model": model,
+                               "input": 0, "output": 0, "total": 0,
+                               "exact_cost": None})
+            return
+        # OpenAI Responses API uses input_tokens/output_tokens
+        # OpenAI Chat Completions uses prompt_tokens/completion_tokens
+        inp = usage.get("input_tokens") or usage.get("prompt_tokens") or 0
+        out = usage.get("output_tokens") or usage.get("completion_tokens") or 0
+        total = usage.get("total_tokens") or (inp + out)
+
+        # xAI returns exact cost in cost_in_usd_ticks (1 tick = 1e-10 USD)
+        exact_cost = None
+        ticks = usage.get("cost_in_usd_ticks")
+        if ticks is not None:
+            exact_cost = ticks / 10_000_000_000
+
+        self.calls.append({"label": label, "model": model,
+                           "input": inp, "output": out, "total": total,
+                           "exact_cost": exact_cost})
+
+    # --- Aggregations -------------------------------------------------------
+
+    @property
+    def total_input(self) -> int:
+        return sum(c["input"] for c in self.calls)
+
+    @property
+    def total_output(self) -> int:
+        return sum(c["output"] for c in self.calls)
+
+    @property
+    def total_tokens(self) -> int:
+        return sum(c["total"] for c in self.calls)
+
+    @property
+    def num_calls(self) -> int:
+        return len(self.calls)
+
+    def _estimate_cost(self, model: str, input_tokens: int, output_tokens: int) -> float:
+        """Estimate cost in USD from per-token rates (fallback when no exact cost)."""
+        rate = self.rates.get(model)
+        if not rate:
+            # Try prefix match (e.g. 'gpt-4o-2024-08-06' → 'gpt-4o')
+            for key in self.rates:
+                if model.startswith(key):
+                    rate = self.rates[key]
+                    break
+        if not rate:
+            return 0.0
+        return (input_tokens * rate["input"] + output_tokens * rate["output"]) / 1_000_000
+
+    def _call_cost(self, c: dict) -> float:
+        """Return cost for a single call: exact if available, otherwise estimated."""
+        if c.get("exact_cost") is not None:
+            return c["exact_cost"]
+        return self._estimate_cost(c["model"], c["input"], c["output"])
+
+    @property
+    def total_cost(self) -> float:
+        return sum(self._call_cost(c) for c in self.calls)
+
+    @property
+    def has_exact_costs(self) -> bool:
+        """True if at least one call provided exact cost from the API."""
+        return any(c.get("exact_cost") is not None for c in self.calls)
+
+    def by_model(self) -> dict:
+        """Aggregate tokens and cost grouped by model."""
+        agg: dict[str, dict] = {}
+        for c in self.calls:
+            m = c["model"]
+            if m not in agg:
+                agg[m] = {"input": 0, "output": 0, "total": 0, "calls": 0,
+                          "cost": 0.0, "has_exact": False}
+            agg[m]["input"] += c["input"]
+            agg[m]["output"] += c["output"]
+            agg[m]["total"] += c["total"]
+            agg[m]["calls"] += 1
+            agg[m]["cost"] += self._call_cost(c)
+            if c.get("exact_cost") is not None:
+                agg[m]["has_exact"] = True
+        return agg
+
+    def summary_dict(self) -> dict:
+        """Return a summary dict for frontmatter / serialization."""
+        bm = self.by_model()
+        all_exact = all(d["has_exact"] for d in bm.values()) if bm else False
+        cost_key = "cost_usd" if all_exact else "estimated_cost_usd"
+        return {
+            "total_tokens": self.total_tokens,
+            "input_tokens": self.total_input,
+            "output_tokens": self.total_output,
+            "api_calls": self.num_calls,
+            cost_key: round(self.total_cost, 4),
+            "by_model": {
+                m: {"tokens": d["total"], "calls": d["calls"],
+                    "cost_usd": round(d["cost"], 4),
+                    "exact": d["has_exact"]}
+                for m, d in bm.items()
+            },
+        }
+
+
+def _extract_usage(response: dict) -> dict | None:
+    """Extract usage dict from an API response (OpenAI or xAI)."""
+    return response.get("usage") if isinstance(response, dict) else None
+
+
 def load_config() -> dict:
     """Load pipeline config from config.json."""
     if CONFIG_FILE.exists():
@@ -76,6 +226,27 @@ def load_config() -> dict:
         "reading_list_max": 15,
         "depth": "scan",
     }
+
+
+# ---------------------------------------------------------------------------
+# Text sanitization for markdown output
+# ---------------------------------------------------------------------------
+
+def _oneline(text: str, max_len: int = 120) -> str:
+    """Collapse text to a single line safe for markdown list items and links.
+
+    Strips newlines, tabs, pipe chars (break tables), and square brackets
+    (break markdown links).  Collapses whitespace, then truncates.
+    """
+    # Replace newlines/tabs with a space
+    t = re.sub(r'[\n\r\t]+', ' ', text)
+    # Remove characters that break markdown link syntax or tables
+    t = t.replace('[', '').replace(']', '').replace('|', '—')
+    # Collapse multiple spaces
+    t = re.sub(r' {2,}', ' ', t).strip()
+    if len(t) > max_len:
+        return t[:max_len] + "..."
+    return t
 
 
 # ---------------------------------------------------------------------------
@@ -252,12 +423,13 @@ def run_topic_scan(
     to_date: str,
     seen_urls: set,
     seen_titles: set,
+    tracker: TokenTracker | None = None,
 ) -> dict:
     """Run a single topic scan. Returns a result dict.
 
     Uses last30days lib modules directly in scan mode.
     """
-    from lib import (
+    from vendor.last30days import (
         openai_reddit,
         xai_x,
         normalize,
@@ -289,6 +461,8 @@ def run_topic_scan(
                 to_date,
                 depth="scan",
             )
+            if tracker:
+                tracker.record(f"Reddit/{topic.slug}", model, _extract_usage(raw))
             items = openai_reddit.parse_reddit_response(raw)
             # Normalize
             normalized = normalize.normalize_reddit_items(items, from_date, to_date)
@@ -314,6 +488,8 @@ def run_topic_scan(
                 to_date,
                 depth="scan",
             )
+            if tracker:
+                tracker.record(f"X/{topic.slug}", model, _extract_usage(raw))
             items = xai_x.parse_x_response(raw)
             normalized = normalize.normalize_x_items(items, from_date, to_date)
             filtered = normalize.filter_by_date_range(normalized, from_date, to_date)
@@ -346,12 +522,13 @@ def synthesize_all(
     topic_results: list,
     from_date: str,
     to_date: str,
+    tracker: TokenTracker | None = None,
 ) -> dict:
     """Single batched synthesis call across all topics.
 
     Sends one gpt-5.2 call with combined data instead of 5 separate calls.
     """
-    from lib import http
+    from vendor.last30days import http
 
     # Build per-topic summaries
     sections = []
@@ -377,7 +554,7 @@ def synthesize_all(
                 if item.engagement.likes is not None:
                     parts.append(f"{item.engagement.likes}likes")
                 eng = f" [{', '.join(parts)}]" if parts else ""
-            text = item.text[:120] + "..." if len(item.text) > 120 else item.text
+            text = _oneline(item.text, 120)
             x_lines.append(f"  - @{item.author_handle}{eng}: \"{text}\"")
 
         section = f"### {topic.display_name}\n"
@@ -439,6 +616,8 @@ RULES:
             headers=headers,
             timeout=60,
         )
+        if tracker:
+            tracker.record("Synthesis", "gpt-5.2", _extract_usage(resp))
         if "choices" in resp and resp["choices"]:
             content = resp["choices"][0].get("message", {}).get("content", "{}")
             return json.loads(content)
@@ -452,20 +631,77 @@ RULES:
 # Must-Follow Account Scanning
 # ---------------------------------------------------------------------------
 
+MUST_FOLLOW_MD = SCRIPT_DIR.parent / "must-follow.md"
+
+
+def _parse_must_follow_md(path: Path) -> list[dict]:
+    """Parse must-follow.md into a list of account dicts.
+
+    Format per line:  `- @handle — Display Name`
+    Group headers:    `## Group Name`
+    Lines starting with `>` or blank lines are ignored.
+
+    Returns:
+        List of {"handle": str, "label": str, "group": str}
+    """
+    accounts = []
+    current_group = "Other"
+    if not path.exists():
+        return accounts
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith(">") or line == "# Must-Follow Accounts":
+                continue
+            # Group header: ## Group Name
+            if line.startswith("## "):
+                current_group = line[3:].strip()
+                continue
+            # Account line: - @handle — Display Name
+            if line.startswith("- @"):
+                rest = line[3:]  # strip "- @"
+                # Split on " — " (em dash) or " - " (hyphen)
+                for sep in (" — ", " – ", " - "):
+                    if sep in rest:
+                        handle, label = rest.split(sep, 1)
+                        accounts.append({
+                            "handle": handle.strip(),
+                            "label": label.strip(),
+                            "group": current_group,
+                        })
+                        break
+                else:
+                    # No separator — handle is the whole thing
+                    accounts.append({
+                        "handle": rest.strip(),
+                        "label": rest.strip(),
+                        "group": current_group,
+                    })
+    return accounts
+
+
 def run_must_follow_scan(
     config: dict,
     l30_config: dict,
     from_date: str,
     to_date: str,
+    tracker: TokenTracker | None = None,
 ) -> list:
     """Scan must-follow accounts on X. No filters — every tweet is captured.
 
+    Uses a strict prompt that only returns original posts authored BY the
+    account (no replies, no @-mentions from other users). A hard post-filter
+    verifies author_handle matches the expected handle.
+
     Returns a list of dicts: {handle, label, group, items: [x_item, ...]}
     """
-    from lib import xai_x, normalize
+    from vendor.last30days import xai_x, normalize
 
-    must_follow = config.get("must_follow", {})
-    accounts = must_follow.get("accounts", [])
+    # Load from must-follow.md first, fall back to config.json
+    accounts = _parse_must_follow_md(MUST_FOLLOW_MD)
+    if not accounts:
+        must_follow = config.get("must_follow", {})
+        accounts = must_follow.get("accounts", [])
     if not accounts or not l30_config.get("XAI_API_KEY"):
         return []
 
@@ -477,25 +713,53 @@ def run_must_follow_scan(
         label = acct.get("label", handle)
         group = acct.get("group", "Other")
 
-        # Search specifically for this person's tweets
-        query = f"from:@{handle}"
         try:
-            raw = xai_x.search_x(
+            # Use the dedicated must-follow search (strict prompt)
+            raw = xai_x.search_x_must_follow(
                 l30_config["XAI_API_KEY"],
                 model,
-                query,
+                handle,
                 from_date,
                 to_date,
                 depth="scan",
             )
+            if tracker:
+                tracker.record(f"MustFollow/@{handle}", model, _extract_usage(raw))
             items = xai_x.parse_x_response(raw)
             normalized = normalize.normalize_x_items(items, from_date, to_date)
-            # Keep ALL items — no scoring, no engagement filter, no dedup
+
+            # Hard post-filter: ONLY keep items actually authored by this handle.
+            # This is the belt-and-suspenders safety net — even if the LLM
+            # returns a post from someone else who @-mentioned this account,
+            # we drop it here.
+            clean_handle = handle.lower().lstrip("@")
+            before_count = len(normalized)
+            filtered = []
+            for item in normalized:
+                item_author = item.author_handle.lower().lstrip("@")
+                # Accept if author matches (exact or close enough for org handles)
+                if item_author == clean_handle:
+                    filtered.append(item)
+                else:
+                    print(f"  [must-follow] @{handle}: DROPPED post by @{item.author_handle} (not from @{handle})")
+            dropped = before_count - len(filtered)
+            if dropped:
+                print(f"  [must-follow] @{handle}: filtered out {dropped}/{before_count} posts from wrong authors")
+
+            # Also filter out replies (posts that start with "@someone")
+            final = []
+            for item in filtered:
+                text = item.text.strip()
+                if text.startswith("@") and not text.lower().startswith(f"@{clean_handle}"):
+                    print(f"  [must-follow] @{handle}: DROPPED reply: {text[:80]}...")
+                    continue
+                final.append(item)
+
             results.append({
                 "handle": handle,
                 "label": label,
                 "group": group,
-                "items": normalized,
+                "items": final,
             })
         except Exception as e:
             print(f"  [must-follow] @{handle}: error — {e}")
@@ -614,6 +878,150 @@ def _extract_date_from_path(filepath: str) -> str:
     return m.group(1) if m else ""
 
 
+# ---------------------------------------------------------------------------
+# Cost summary + efficiency recommendations (rendered in daily note)
+# ---------------------------------------------------------------------------
+
+def _render_cost_summary(tracker: TokenTracker) -> list[str]:
+    """Render a compact cost/token summary block for the top of the daily note."""
+    ts = tracker.summary_dict()
+    by_model = tracker.by_model()
+    total_cost = ts.get("cost_usd") or ts.get("estimated_cost_usd", 0)
+    cost_label = "Cost" if "cost_usd" in ts else "~Cost"
+
+    lines = [
+        f"> **Pipeline {cost_label}** | "
+        f"**{ts['api_calls']}** API calls | "
+        f"**{ts['total_tokens']:,}** tokens "
+        f"({ts['input_tokens']:,} in / {ts['output_tokens']:,} out) | "
+        f"**${total_cost:.4f}**",
+        ">",
+    ]
+    # Per-model breakdown on one line
+    model_parts = []
+    for model, data in sorted(by_model.items()):
+        tag = "" if data["has_exact"] else "~"
+        model_parts.append(
+            f"{model}: {data['calls']}× {data['total']:,}tok {tag}${data['cost']:.4f}"
+        )
+    lines.append(f"> {' · '.join(model_parts)}")
+    lines.append("")
+    return lines
+
+
+def _render_efficiency_recommendations(tracker: TokenTracker, config: dict,
+                                        topic_count: int,
+                                        mf_account_count: int) -> list[str]:
+    """Generate self-improvement recommendations based on this run's usage."""
+    lines = [
+        "## Efficiency Recommendations",
+        "",
+        "> Auto-generated analysis of this run's token/cost profile.",
+        "",
+    ]
+
+    ts = tracker.summary_dict()
+    by_model = tracker.by_model()
+    total_cost = ts.get("cost_usd") or ts.get("estimated_cost_usd", 0)
+    total_tokens = ts["total_tokens"]
+
+    recs: list[str] = []
+
+    # 1. Check if must-follow accounts dominate cost
+    mf_tokens = sum(
+        c["total"] for c in tracker.calls if c["label"].startswith("MustFollow/")
+    )
+    mf_cost = sum(
+        tracker._call_cost(c)
+        for c in tracker.calls if c["label"].startswith("MustFollow/")
+    )
+    if total_cost > 0 and mf_cost / total_cost > 0.5:
+        recs.append(
+            f"**Must-follow accounts consume {mf_cost/total_cost:.0%} of total cost** "
+            f"({mf_account_count} accounts, ${mf_cost:.4f}). "
+            f"Consider batching multiple handles into fewer API calls, or reducing "
+            f"the account list to high-signal accounts only."
+        )
+
+    # 2. Check output-heavy calls (model generating a lot of text)
+    for c in tracker.calls:
+        if c["output"] > 0 and c["input"] > 0:
+            ratio = c["output"] / c["input"]
+            if ratio > 3.0 and c["output"] > 2000:
+                recs.append(
+                    f"**{c['label']}** has a {ratio:.1f}× output/input ratio "
+                    f"({c['output']:,} output tokens). The prompt may be under-constraining "
+                    f"the response length. Adding a `max_tokens` cap could save cost."
+                )
+                break  # One example is enough
+
+    # 3. Per-topic cost outliers
+    topic_costs = {}
+    for c in tracker.calls:
+        if "/" in c["label"] and not c["label"].startswith("MustFollow/") and c["label"] != "Synthesis":
+            prefix = c["label"].split("/")[1] if "/" in c["label"] else c["label"]
+            topic_costs.setdefault(prefix, 0.0)
+            topic_costs[prefix] += tracker._call_cost(c)
+    if topic_costs:
+        avg_topic_cost = sum(topic_costs.values()) / len(topic_costs)
+        for slug, cost in topic_costs.items():
+            if avg_topic_cost > 0 and cost > avg_topic_cost * 2:
+                recs.append(
+                    f"**Topic '{slug}'** costs ${cost:.4f} — "
+                    f"{cost/avg_topic_cost:.1f}× the average topic. "
+                    f"Its search query may be too broad."
+                )
+
+    # 4. Model selection hints
+    for model, data in by_model.items():
+        if "grok" in model.lower() and data["cost"] > 0:
+            avg_per_call = data["cost"] / data["calls"] if data["calls"] > 0 else 0
+            if avg_per_call > 0.02:
+                recs.append(
+                    f"**{model}** averages ${avg_per_call:.4f}/call. "
+                    f"If xAI offers a cheaper model with x_search, switching could save "
+                    f"${data['cost'] * 0.4:.4f}/run (~40%)."
+                )
+                break
+
+    # 5. Overall daily budget check
+    monthly_est = total_cost * 30
+    if monthly_est > 10:
+        recs.append(
+            f"**Projected monthly cost: ${monthly_est:.2f}**. "
+            f"Target is $6/month. Consider reducing `items_per_topic`, "
+            f"switching to cheaper models for low-priority topics, "
+            f"or scanning fewer must-follow accounts."
+        )
+    elif monthly_est < 3:
+        recs.append(
+            f"Projected monthly cost: ${monthly_est:.2f} — well within budget. "
+            f"Room to add more topics or deeper scans if desired."
+        )
+
+    # 6. Zero-usage calls (API didn't return token counts)
+    zero_calls = [c for c in tracker.calls if c["total"] == 0]
+    if zero_calls:
+        labels = ", ".join(c["label"] for c in zero_calls[:3])
+        extra = f" (+{len(zero_calls)-3} more)" if len(zero_calls) > 3 else ""
+        recs.append(
+            f"**{len(zero_calls)} API calls returned no usage data** ({labels}{extra}). "
+            f"Cost estimates may be understated. Check if the API version reports usage."
+        )
+
+    if recs:
+        for i, rec in enumerate(recs, 1):
+            lines.append(f"{i}. {rec}")
+        lines.append("")
+    else:
+        lines.extend([
+            "No issues detected — pipeline is running efficiently.",
+            "",
+        ])
+
+    return lines
+
+
 def render_daily_note(
     date_str: str,
     topic_results: list,
@@ -621,6 +1029,7 @@ def render_daily_note(
     config: dict,
     must_follow_results: list = None,
     feedback_summary: dict = None,
+    tracker: TokenTracker | None = None,
 ) -> str:
     """Render the full daily note markdown."""
     topic_slugs = [tr["topic"].slug for tr in topic_results]
@@ -646,7 +1055,8 @@ def render_daily_note(
             if cat == 'deep-dive':
                 deep_dives.append((item, topic, 'reddit'))
 
-    lines = [
+    # Build frontmatter — include token stats if available
+    fm_lines = [
         "---",
         f"date: {date_str}",
         "type: daily-research",
@@ -657,11 +1067,28 @@ def render_daily_note(
         f"must_follow_tweets: {mf_count}",
         f"deep_dives: {len(deep_dives)}",
         f"lab_pulse: {len(lab_pulse_items)}",
-        "---",
-        "",
+    ]
+    if tracker and tracker.num_calls > 0:
+        ts = tracker.summary_dict()
+        cost_val = ts.get("cost_usd") or ts.get("estimated_cost_usd", 0)
+        cost_key = "cost_usd" if "cost_usd" in ts else "estimated_cost_usd"
+        fm_lines.extend([
+            f"api_calls: {ts['api_calls']}",
+            f"total_tokens: {ts['total_tokens']}",
+            f"input_tokens: {ts['input_tokens']}",
+            f"output_tokens: {ts['output_tokens']}",
+            f"{cost_key}: {cost_val}",
+        ])
+    fm_lines.extend(["---", ""])
+
+    lines = fm_lines + [
         f"# Daily Research — {_format_date(date_str)}",
         "",
     ]
+
+    # Token / cost summary — right after the title
+    if tracker and tracker.num_calls > 0:
+        lines.extend(_render_cost_summary(tracker))
 
     # Briefing — the POW moment
     briefing = synthesis.get("briefing", "")
@@ -703,7 +1130,7 @@ def render_daily_note(
                         date_str_item = ""
                         if hasattr(item, 'date') and item.date:
                             date_str_item = f" ({item.date})"
-                        text_display = text[:200] + "..." if len(text) > 200 else text
+                        text_display = _oneline(text, 200)
                         lines.append(
                             f"- @{acct['handle']}{date_str_item}: {text_display} "
                             f"[{likes}\u2764\ufe0f]({url})"
@@ -724,7 +1151,7 @@ def render_daily_note(
             lines.append("|--------|------|-------|------|")
             for item, topic, source in lab_pulse_items[:10]:
                 likes = item.engagement.likes if item.engagement and item.engagement.likes else 0
-                text_short = item.text[:80] + "..." if len(item.text) > 80 else item.text
+                text_short = _oneline(item.text, 80)
                 lines.append(
                     f"| @{item.author_handle} | {text_short} | {likes} | [→]({item.url}) |"
                 )
@@ -738,7 +1165,7 @@ def render_daily_note(
         ])
         for item, topic, source in deep_dives[:8]:
             if source == 'x':
-                title = item.text[:100] + "..." if len(item.text) > 100 else item.text
+                title = _oneline(item.text, 100)
                 lines.append(f"- [ ] [{title}]({item.url}) — @{item.author_handle} #{topic.slug}")
             else:
                 lines.append(f"- [ ] [{item.title}]({item.url}) — r/{item.subreddit} #{topic.slug}")
@@ -793,7 +1220,7 @@ def render_daily_note(
             ])
             for i, item in enumerate(tr["reddit_items"][:8], 1):
                 score_val = item.score if hasattr(item, "score") else 0
-                title_short = item.title[:60] + "..." if len(item.title) > 60 else item.title
+                title_short = _oneline(item.title, 60)
                 lines.append(
                     f"| {i} | {title_short} | r/{item.subreddit} | {score_val} | [→]({item.url}) |"
                 )
@@ -809,7 +1236,7 @@ def render_daily_note(
             ])
             for i, item in enumerate(tr["x_items"][:8], 1):
                 likes = item.engagement.likes if item.engagement and item.engagement.likes else 0
-                text_short = item.text[:60] + "..." if len(item.text) > 60 else item.text
+                text_short = _oneline(item.text, 60)
                 lines.append(
                     f"| {i} | {text_short} | @{item.author_handle} | {likes} | [→]({item.url}) |"
                 )
@@ -844,6 +1271,19 @@ def render_daily_note(
             "",
         ])
 
+    # Efficiency recommendations (at the very end)
+    if tracker and tracker.num_calls > 0:
+        topic_count = len(topic_results)
+        # Account count: prefer must-follow.md, fall back to config.json
+        mf_accts = _parse_must_follow_md(MUST_FOLLOW_MD)
+        if not mf_accts:
+            mf_accts = config.get("must_follow", {}).get("accounts", [])
+        mf_count_accts = len(mf_accts)
+        lines.extend(["---", ""])
+        lines.extend(_render_efficiency_recommendations(
+            tracker, config, topic_count, mf_count_accts,
+        ))
+
     return "\n".join(lines)
 
 
@@ -865,7 +1305,7 @@ def _build_reading_list(topic_results: list, config: dict) -> list:
             })
         for item in tr["x_items"]:
             all_items.append({
-                "title": item.text[:80] + "..." if len(item.text) > 80 else item.text,
+                "title": _oneline(item.text, 80),
                 "url": item.url,
                 "summary": item.why_relevant or f"@{item.author_handle}",
                 "topic_slug": topic.slug,
@@ -912,7 +1352,7 @@ def main():
     # --promote-only: just run promotion pass and exit
     if args.promote_only:
         # Load API key for LLM enrichment
-        from lib import env as l30_env
+        from vendor.last30days import env as l30_env
         l30_config = l30_env.get_config()
         openai_key = l30_config.get("OPENAI_API_KEY")
         if not openai_key:
@@ -936,7 +1376,7 @@ def main():
 
     # Run promote pass first (tag-to-library for previous dailies)
     # Load API key early so promote can do LLM enrichment
-    from lib import env as l30_env
+    from vendor.last30days import env as l30_env
     l30_config = l30_env.get_config()
     openai_key = l30_config.get("OPENAI_API_KEY")
 
@@ -972,13 +1412,16 @@ def main():
     print(f"[dedup] Found {len(seen_urls)} seen URLs, {len(seen_titles)} seen titles")
 
     # Date range: last 7 days for daily scan (not 30)
-    from lib import dates
+    from vendor.last30days import dates
     from_date, _ = dates.get_date_range(7)
     to_date = today
 
     # Select models (reuse last30days model selection with caching)
-    from lib import models as l30_models
+    from vendor.last30days import models as l30_models
     selected_models = l30_models.get_models(l30_config)
+
+    # Initialize token tracker (cost_rates can be overridden in config.json)
+    tracker = TokenTracker(config.get("cost_rates"))
 
     # Run topic scans sequentially (to stay within rate limits)
     print(f"\n[scan] Starting {len(all_topics)} topic scans (scan mode)...")
@@ -990,6 +1433,7 @@ def main():
         result = run_topic_scan(
             topic, config, l30_config, selected_models,
             from_date, to_date, seen_urls, seen_titles,
+            tracker=tracker,
         )
         r_count = len(result["reddit_items"])
         x_count = len(result["x_items"])
@@ -1016,6 +1460,7 @@ def main():
         print(f"\n[must-follow] Scanning {len(mf_accounts)} accounts...")
         must_follow_results = run_must_follow_scan(
             config, l30_config, from_date, to_date,
+            tracker=tracker,
         )
         mf_total = sum(len(r["items"]) for r in must_follow_results)
         print(f"[must-follow] Captured {mf_total} tweets from {len(mf_accounts)} accounts")
@@ -1034,6 +1479,7 @@ def main():
                 topic_results,
                 from_date,
                 to_date,
+                tracker=tracker,
             )
             if synthesis.get("briefing"):
                 print(f"[synth] Briefing: {synthesis['briefing'][:120]}...")
@@ -1046,6 +1492,7 @@ def main():
         today, topic_results, synthesis, config,
         must_follow_results=must_follow_results,
         feedback_summary=feedback_summary,
+        tracker=tracker,
     )
 
     if args.dry_run:
@@ -1059,16 +1506,14 @@ def main():
     filepath = vault.write_daily_note(config, today, note_content)
     print(f"\n[vault] Written → {filepath}")
 
-    # Cost summary
-    if args.costs:
-        n_topics = len(all_topics)
-        n_mf = len(mf_accounts)
-        est_cost = n_topics * 0.03 + n_mf * 0.01  # topic scans + must-follow scans
-        print(f"\n[costs] Estimated run cost: ~${est_cost:.2f}")
-        print(f"  {n_topics} Reddit scans (auto-selected model + web_search)")
-        print(f"  {n_topics} X scans (grok-4-1-fast + x_search)")
-        print(f"  {n_mf} must-follow X scans (grok-4-1-fast)")
-        print(f"  1 synthesis call (gpt-5.2)")
+    # Cost summary (always print — replaces old --costs heuristic)
+    ts = tracker.summary_dict()
+    total_cost = ts.get("cost_usd") or ts.get("estimated_cost_usd", 0)
+    cost_tag = "" if "cost_usd" in ts else "~"
+    print(f"\n[tokens] {ts['api_calls']} API calls | {ts['total_tokens']:,} tokens | {cost_tag}${total_cost:.4f}")
+    for model, data in tracker.by_model().items():
+        tag = "" if data["has_exact"] else "~"
+        print(f"  {model}: {data['calls']}× | {data['total']:,} tokens | {tag}${data['cost']:.4f}")
 
     # Final summary
     total_reddit = sum(len(tr["reddit_items"]) for tr in topic_results)
