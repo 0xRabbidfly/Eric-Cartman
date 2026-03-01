@@ -3,6 +3,7 @@ name: obsidian-daily-research
 description: Daily AI research pipeline → Obsidian vault. Scans Reddit + X for agents, skills, models, MCP, RAG topics. Deduplicates against vault history, writes structured daily notes with Lab Pulse, Deep Dives, and categorized reading lists. Tag #keep to promote to long-term library.
 argument-hint: daily research, run pipeline, what's new in AI
 user-invokable: true
+disable-model-invocation: true
 ---
 
 # Daily Research Pipeline

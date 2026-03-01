@@ -1,6 +1,8 @@
 ---
 name: project-infographic
 description: Generate a visually beautiful HTML infographic showing high-level project overview for sprint demos. Use when preparing presentations, stakeholder updates, or visual project summaries.
+user-invokable: true
+disable-model-invocation: true
 ---
 
 You are a visual documentation specialist. Your task is to scan the codebase and design docs, then generate a polished single-page HTML infographic suitable for sprint demos and stakeholder presentations.

@@ -1,6 +1,8 @@
 ---
 name: project-scaffold
 description: Interactive wizard that guides you through creating a comprehensive agentic development scaffold. Use when starting a new project or adding AI capabilities to an existing codebase. Asks about project goals, tech stack, team size, and workflows, then generates custom instructions, skills, agents, and MCP configurations.
+user-invokable: true
+disable-model-invocation: true
 ---
 
 # Project Scaffold Generator

@@ -3,7 +3,7 @@ name: skill-reflection
 description: Generic post-workflow self-reflection that any skill can invoke at the end of its run. Analyzes friction encountered during execution and produces advisory recommendations for improving the calling skill's SKILL.md. Use when a skill finishes (success or failure) and wants to capture improvement opportunities.
 argument-hint: skill name, step results, friction notes
 user-invokable: true
-disable-model-invocation: true
+disable-model-invocation: false
 ---
 
 # Skill Reflection (Composable)
@@ -23,6 +23,8 @@ output. The user decides what to apply.
 - After a skill encounters friction (errors, workarounds, retries)
 - After a successful run that still had rough edges
 - When a user says "reflect on that run" or "what could be improved"
+- **Mid-run (inline)**: When a skill step fails and the agent applies a workaround — trigger immediately, don't wait for end of session
+- **Self-healing loop**: When another skill's friction rule fires (see obsidian skill for the canonical pattern)
 
 ## Design Principles
 
@@ -30,6 +32,8 @@ output. The user decides what to apply.
 2. **Composable** — called inline by other skills, not standalone
 3. **Advisory** — produces recommendations, never edits SKILL.md directly
 4. **Cumulative** — tracks friction history to detect repeat issues
+5. **Inline-capable** — can run mid-workflow, not just at end of session
+6. **Memory-aware** — after producing recommendations, triggers Agent Memory capture via the obsidian skill
 
 ---
 
@@ -190,6 +194,50 @@ No SKILL.md changes made — recommendations are advisory.
 To apply: tell Copilot "apply the <skill-name> reflection recommendations and fix the SKILL.md".
 ---
 ```
+
+### 7. Capture Agent Memory
+
+After producing recommendations, save the friction + resolution to Obsidian
+for long-term recall. Use the `obsidian` skill's Agent Memory pattern:
+
+```powershell
+@'
+---
+tags: [agent-memory, lesson]
+source-skill: <calling-skill-name>
+captured: <YYYY-MM-DD>
+confidence: high
+---
+# Skill Reflection: <calling-skill-name> — <short friction summary>
+
+## Context
+<What skill was running, what step failed>
+
+## Insight
+<The key takeaway — what to do differently next time>
+
+## Recommendations Applied
+<List P0/P1 fixes that were applied to the SKILL.md>
+'@ | python .github/skills/obsidian/scripts/obsidian.py create --path "Agent Memories/reflection-<skill-name>-<date>.md"
+```
+
+Search first to avoid duplicates:
+```powershell
+python .github/skills/obsidian/scripts/obsidian.py search "<skill-name> <friction-keyword>" --path "Agent Memories" --format json
+```
+
+### 8. Self-Healing (Inline Mode)
+
+When triggered **mid-run** (not end-of-session), the agent should:
+
+1. Produce the reflection output as normal (steps 1–7)
+2. Evaluate the priority of each recommendation:
+   - **P0 (breaking)** → Apply the fix to the SKILL.md **immediately**, before continuing the parent workflow
+   - **P1 (quality)** → Apply if the fix is simple (< 5 lines), else note for later
+   - **P2 (nice)** → Skip for now, capture in Agent Memory
+3. Resume the parent skill's remaining steps
+
+This turns reflection from a post-mortem into a **live self-healing loop**.
 
 ## Priority Definitions
 

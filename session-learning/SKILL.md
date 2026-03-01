@@ -1,6 +1,8 @@
 ---
 name: session-learning
 description: Extract reusable patterns from a Copilot Chat session. Use at the end of long coding sessions to capture workarounds, error fixes, project-specific conventions, and debugging techniques as persistent instructions or skills.
+user-invokable: true
+disable-model-invocation: true
 ---
 
 # Session Learning Skill
