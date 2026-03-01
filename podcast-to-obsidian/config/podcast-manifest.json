@@ -1,0 +1,57 @@
+{
+  "version": 1,
+  "shows": {
+    "raoul-pal-the-journey-man": {
+      "name": "Raoul Pal: The Journey Man",
+      "rss_url": "https://feeds.megaphone.fm/realvisioncryptopodcast",
+      "spotify_id": "",
+      "episodes": {
+        "7f704b44-1195-11f1-9569-03f9af4f3a30": {
+          "title": "The AI Intelligence Tsunami Is Here",
+          "published": "2026-02-26",
+          "audio_url": "https://www.podtrac.com/pts/redirect.mp3/chrt.fm/track/1B146C/pscrb.fm/rss/p/traffic.megaphone.fm/ADV9704558798.mp3",
+          "transcript_path": "Podcasts/Raoul Pal: The Journey Man/transcripts/2026-02-26 - The AI Intelligence Tsunami Is Here.txt",
+          "note_path": "Podcasts/Raoul Pal The Journey Man/2026-02-26 - The AI Intelligence Tsunami Is Here.md",
+          "processed_at": "2026-03-01T03:40:36.392525+00:00",
+          "status": "completed"
+        }
+      }
+    },
+    "lex-fridman-podcast": {
+      "name": "Lex Fridman Podcast",
+      "rss_url": "https://lexfridman.com/feed/podcast/",
+      "spotify_id": "",
+      "episodes": {}
+    },
+    "bankless": {
+      "name": "Bankless",
+      "rss_url": "https://feeds.flightcast.com/p83fuj0y0u58o82l41xei7zo.xml",
+      "spotify_id": "",
+      "episodes": {}
+    },
+    "limitless": {
+      "name": "Limitless",
+      "rss_url": "https://feeds.transistor.fm/limitless",
+      "spotify_id": "",
+      "episodes": {}
+    },
+    "the-pomp-podcast": {
+      "name": "The Pomp Podcast",
+      "rss_url": "https://anchor.fm/s/b4841110/podcast/rss",
+      "spotify_id": "",
+      "episodes": {}
+    },
+    "moonshots-with-peter-diamandis": {
+      "name": "Moonshots with Peter Diamandis",
+      "rss_url": "https://feeds.megaphone.fm/DVVTS2890392624",
+      "spotify_id": "",
+      "episodes": {}
+    },
+    "dwarkesh-podcast": {
+      "name": "Dwarkesh Podcast",
+      "rss_url": "https://api.substack.com/feed/podcast/69345.rss",
+      "spotify_id": "",
+      "episodes": {}
+    }
+  }
+}

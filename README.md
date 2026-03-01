@@ -33,6 +33,7 @@ Portable, reusable skills for AI coding assistants. Each skill lives in its own 
 | `session-log` | Capture session insights into `.github/sessions/` |
 | `skill-reflection` | Composable after-action review (any skill can invoke) |
 | `testing` | Comprehensive testing workflow (Vitest + Playwright) |
+| `visual-explainer` | Generate self-contained HTML diagrams, diff reviews, plan audits, slide decks, and data tables — no ASCII art |
 
 ## Authoring a New Skill
 

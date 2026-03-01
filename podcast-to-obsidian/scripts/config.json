@@ -1,0 +1,62 @@
+{
+    "vault_path": "",
+    "podcasts_folder": "Podcasts",
+    "transcripts_folder": "transcripts",
+    "whisper_model": "base",
+    "whisper_device": "auto",
+    "whisper_language": null,
+    "max_episodes": 5,
+    "audio_format": "mp3",
+    "note_template": "default",
+    "work_dir": ".work",
+    "shows": {
+        "_comment": "Add shows here for RSS-only mode (no Spotify). Key is a slug, value has name + rss_url.",
+        "example-show": {
+            "name": "Example Show",
+            "rss_url": "https://example.com/feed.xml",
+            "enabled": false
+        },
+        "raoul-pal-the-journey-man": {
+            "name": "Raoul Pal: The Journey Man",
+            "rss_url": "https://feeds.megaphone.fm/realvisioncryptopodcast",
+            "enabled": true
+        },
+        "lex-fridman-podcast": {
+            "name": "Lex Fridman Podcast",
+            "rss_url": "https://lexfridman.com/feed/podcast/",
+            "enabled": true
+        },
+        "bankless": {
+            "name": "Bankless",
+            "rss_url": "https://feeds.flightcast.com/p83fuj0y0u58o82l41xei7zo.xml",
+            "enabled": true
+        },
+        "limitless": {
+            "name": "Limitless",
+            "rss_url": "https://feeds.transistor.fm/limitless",
+            "enabled": true
+        },
+        "the-pomp-podcast": {
+            "name": "The Pomp Podcast",
+            "rss_url": "https://anchor.fm/s/b4841110/podcast/rss",
+            "enabled": true
+        },
+        "moonshots-with-peter-diamandis": {
+            "name": "Moonshots with Peter Diamandis",
+            "rss_url": "https://feeds.megaphone.fm/DVVTS2890392624",
+            "enabled": true
+        },
+        "dwarkesh-podcast": {
+            "name": "Dwarkesh Podcast",
+            "rss_url": "https://api.substack.com/feed/podcast/69345.rss",
+            "enabled": true
+        }
+    },
+    "spotify": {
+        "enabled": true,
+        "client_id": "5f78aa6c013d47729b1208017a7aef67",
+        "client_secret": "",
+        "redirect_uri": "http://127.0.0.1:8080/callback",
+        "note": "Client secret goes in .env as SPOTIFY_CLIENT_SECRET (never commit it)"
+    }
+}

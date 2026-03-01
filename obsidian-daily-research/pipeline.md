@@ -38,7 +38,7 @@
 ## Anthropic
 
 - @bcherny — Boris (solo)
-- @alexalbert__ — Alex Albert (solo)
+- @trq212 - Thariq (solo)
 - @DarioAmodei — Dario Amodei (solo)
 - @AnthropicAI — Anthropic
 
@@ -46,7 +46,6 @@
 
 - @OpenAI — OpenAI
 - @sama — Sam Altman (solo)
-- @markchen90 — Mark Chen (solo)
 
 ## Google
 
