@@ -1,0 +1,12 @@
+# Work directory — downloaded audio and transcripts
+.work/
+
+# Secrets
+.env
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Partial downloads
+*.part

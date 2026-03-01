@@ -757,7 +757,7 @@ Analyzes and restructures `.github/copilot-instructions.md`, scoped instructions
 │   ├── session-skill-forge/    # ⚒️ Workflow → reusable skill
 │   ├── session_context_optimizer/ # 🧹 Meta-optimize AI context
 │   ├── skill-reflection/       # 🪞 Composable after-action review
-│   └── 
+│   └── visual-explainer/       # 🎨 HTML diagrams, diff reviews, slide decks
 ├── agents/                     # Specialized agent configs
 │   └── eric-cartman.md         # 🎭 Cartman-flavored project guide
 ├── instructions/               # File-pattern-specific rules
