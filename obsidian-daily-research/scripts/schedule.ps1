@@ -30,7 +30,7 @@ $trigger = New-ScheduledTaskTrigger -Daily -At 7:00AM
 $settings = New-ScheduledTaskSettingsSet `
     -StartWhenAvailable `
     -DontStopOnIdleEnd `
-    -ExecutionTimeLimit (New-TimeSpan -Minutes 30) `
+    -ExecutionTimeLimit (New-TimeSpan -Minutes 60) `
     -RestartCount 2 `
     -RestartInterval (New-TimeSpan -Minutes 5)
 

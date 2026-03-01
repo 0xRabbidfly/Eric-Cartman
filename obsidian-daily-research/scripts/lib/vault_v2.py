@@ -21,6 +21,9 @@ from obsidian import Obsidian
 # Module-level client (lazy init)
 _ob: Obsidian | None = None
 
+# Cache: vault folder → list of .md files (populated once per process)
+_folder_cache: dict[str, list[str]] = {}
+
 
 def _client() -> Obsidian:
     """Get or create the Obsidian client singleton."""
@@ -79,10 +82,14 @@ def title_is_seen(title: str, seen_titles: Set[str], threshold: float = 0.8) -> 
 # ---------------------------------------------------------------------------
 
 def _scan_folder_files(folder: str) -> list[str]:
-    """List .md files in a vault folder via CLI."""
+    """List .md files in a vault folder via CLI (cached per process)."""
+    if folder in _folder_cache:
+        return _folder_cache[folder]
     ob = _client()
     result = ob.files(folder=folder, ext="md")
-    return result.lines() if result.ok else []
+    files = result.lines() if result.ok else []
+    _folder_cache[folder] = files
+    return files
 
 
 def _read_vault_file(filepath: str) -> str:
@@ -102,10 +109,6 @@ def _scan_folder_recursive(folder: str) -> list[str]:
     all_files.extend(_scan_folder_files(folder))
 
     # Scan year sub-folders (e.g. Research/Dailies/2026/)
-    ob = _client()
-    year_result = ob.files(folder=folder, ext="md")
-    # Also try listing sub-directories by checking for YYYY patterns
-    # The CLI lists files; we probe likely year folders
     import datetime
     current_year = datetime.datetime.now().year
     for year in range(2024, current_year + 2):
@@ -121,45 +124,42 @@ def _scan_folder_recursive(folder: str) -> list[str]:
     return all_files
 
 
-def load_seen_urls(config: dict) -> Set[str]:
-    """Scan all dailies + library notes and return all previously seen URLs.
+def load_seen_dedup(config: dict) -> tuple[Set[str], Set[str]]:
+    """Scan all dailies + library notes in ONE pass, returning (seen_urls, seen_titles).
 
-    Uses Obsidian CLI to list and read files. Zero tokens.
-    Scans both flat (legacy) and year/month subfolder layouts.
+    Replaces separate load_seen_urls / load_seen_titles calls to halve the
+    number of Obsidian CLI file-read operations.
     """
     dailies_folder = config.get("dailies_folder", "Research/Dailies")
     library_folder = config.get("library_folder", "Research/Library")
-    seen: Set[str] = set()
+    seen_urls: Set[str] = set()
+    seen_titles: Set[str] = set()
 
-    # Dailies: recursive scan (year/month subfolders)
-    for filepath in _scan_folder_recursive(dailies_folder):
+    all_files = list(_scan_folder_recursive(dailies_folder)) + list(_scan_folder_files(library_folder))
+    for filepath in all_files:
         text = _read_vault_file(filepath)
-        seen.update(extract_urls_from_text(text))
+        if text:
+            seen_urls.update(extract_urls_from_text(text))
+            seen_titles.update(extract_titles_from_text(text))
 
-    # Library: flat scan
-    for filepath in _scan_folder_files(library_folder):
-        text = _read_vault_file(filepath)
-        seen.update(extract_urls_from_text(text))
+    return seen_urls, seen_titles
 
-    return seen
+
+def load_seen_urls(config: dict) -> Set[str]:
+    """Return all previously seen URLs from dailies + library.
+
+    Prefer load_seen_dedup() when you need both URLs and titles.
+    """
+    urls, _ = load_seen_dedup(config)
+    return urls
 
 
 def load_seen_titles(config: dict) -> Set[str]:
-    """Load previously seen article titles for fuzzy dedup."""
-    dailies_folder = config.get("dailies_folder", "Research/Dailies")
-    library_folder = config.get("library_folder", "Research/Library")
-    titles: Set[str] = set()
+    """Return all previously seen article titles for fuzzy dedup.
 
-    # Dailies: recursive scan (year/month subfolders)
-    for filepath in _scan_folder_recursive(dailies_folder):
-        text = _read_vault_file(filepath)
-        titles.update(extract_titles_from_text(text))
-
-    # Library: flat scan
-    for filepath in _scan_folder_files(library_folder):
-        text = _read_vault_file(filepath)
-        titles.update(extract_titles_from_text(text))
-
+    Prefer load_seen_dedup() when you need both URLs and titles.
+    """
+    _, titles = load_seen_dedup(config)
     return titles
 
 

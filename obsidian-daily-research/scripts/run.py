@@ -1669,10 +1669,9 @@ def main():
             sys.exit(1)
         all_topics = [topic]
 
-    # Load vault dedup set (zero tokens — pure filesystem)
-    print(f"[dedup] Scanning vault for seen URLs...")
-    seen_urls = vault.load_seen_urls(config)
-    seen_titles = vault.load_seen_titles(config)
+    # Load vault dedup set (zero tokens — pure filesystem, single pass)
+    print(f"[dedup] Scanning vault for seen URLs and titles...")
+    seen_urls, seen_titles = vault.load_seen_dedup(config)
     print(f"[dedup] Found {len(seen_urls)} seen URLs, {len(seen_titles)} seen titles")
 
     # Date range: last 7 days for daily scan (not 30)
