@@ -4,6 +4,7 @@ description: Scan the Obsidian vault for everything related to a topic and produ
 version: 1.0.0
 user-invokable: true
 argument-hint: "topic or question to synthesize from vault"
+disable-model-invocation: true
 ---
 
 # Obsidian Vault Digest

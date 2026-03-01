@@ -3,6 +3,7 @@ name: podcast-to-obsidian
 description: Podcast → transcript → Obsidian pipeline. Detects new episodes via Spotify MCP, downloads audio via RSS, transcribes locally with faster-whisper, generates structured Obsidian notes with summaries, key ideas, quotes, and backlinks. Manifest tracks processed episodes to avoid duplicates. Use when user says "podcast", "transcribe episode", "podcast-to-obsidian", or any podcast/transcript workflow.
 argument-hint: process podcasts, transcribe episode, check new episodes
 user-invokable: true
+disable-model-invocation: true
 ---
 
 # Podcast → Transcript → Obsidian

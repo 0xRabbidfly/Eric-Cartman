@@ -3,6 +3,7 @@ name: obsidian
 description: Composable Obsidian vault operations via CLI. Use when ANY task needs to read, write, search, tag, or query the Obsidian vault. This is the ONLY correct way to interact with the vault. Provides typed wrappers around the Obsidian CLI (v1.12+). Requires Obsidian to be running. Use when user says "save to vault", "obsidian", "research note", "daily note", "tag", "summarize and save", or any vault operation.
 argument-hint: search query, create note, daily append, tags
 user-invokable: true
+disable-model-invocation: false
 ---
 
 # Obsidian Skill (Composable)
@@ -180,6 +181,171 @@ ob.run("search", query="test", format="json")  # any CLI command
 ob.eval("app.vault.getFiles().length")          # run JS in Obsidian
 ```
 
+## Agent Memory (Composable)
+
+### Purpose
+
+Agents have long-term memory. When an agent discovers something worth persisting
+beyond the current session, it writes to the `Agent Memories/` folder in the
+Obsidian vault — **autonomously, without being asked**.
+
+This is the agent equivalent of "writing it down so you don't forget."
+
+### When to Trigger (Agent Self-Assessment)
+
+After completing any significant action, the agent evaluates:
+
+| Signal | Example | Save? |
+|--------|---------|-------|
+| **Non-obvious workaround discovered** | Zscaler blocks ACR push → `--insecure` flag | Yes |
+| **Project-specific convention learned** | "This repo uses barrel exports for all modules" | Yes |
+| **User preference observed** | User always wants vitest over jest | Yes |
+| **Decision with rationale** | Chose SQLite over Postgres for local dev because… | Yes |
+| **Recurring error pattern + fix** | TS2345 on this codebase always means missing generic | Yes |
+| **Research insight worth keeping** | "Obsidian CLI v1.12 broke --format=json on search" | Yes |
+| **Complex task completed — lessons learned** | Multi-file refactor; order mattered because… | Yes |
+| **Routine, well-documented action** | Ran `npm install` successfully | No |
+| **Trivial lookup** | Checked a file path | No |
+
+**Threshold**: If the agent thinks "I'd want to know this next time," save it.
+
+### Memory Note Format
+
+All memories go to `Agent Memories/` with this structure:
+
+```markdown
+---
+tags: [agent-memory, <category>]
+source-skill: <skill-name-or-session>
+captured: <YYYY-MM-DD>
+confidence: high | medium | low
+---
+# <Concise Title>
+
+## Context
+<What was happening when this was discovered>
+
+## Insight
+<The actual thing worth remembering — specific and actionable>
+
+## Evidence
+<Command output, error message, or reasoning that supports this>
+```
+
+Categories: `workaround`, `convention`, `preference`, `decision`, `pattern`, `insight`, `lesson`
+
+### How to Save a Memory (Inline)
+
+```powershell
+@'
+---
+tags: [agent-memory, workaround]
+source-skill: branch-wrapup
+captured: 2026-03-01
+confidence: high
+---
+# Zscaler Blocks ACR Push on First Attempt
+
+## Context
+During branch-wrapup step 2 (ACR push), the push failed with a TLS error.
+
+## Insight
+On this network, ACR pushes require `--insecure-registry` flag due to Zscaler MITM.
+Add the registry to Docker daemon.json insecure-registries list for a permanent fix.
+
+## Evidence
+`Error: x509: certificate signed by unknown authority`
+Workaround: `docker push --insecure myregistry.azurecr.io/app:latest`
+'@ | python .github/skills/obsidian/scripts/obsidian.py create --path "Agent Memories/zscaler-blocks-acr-push.md"
+```
+
+### Deduplication
+
+Before creating a memory, search for existing ones on the same topic:
+
+```powershell
+python .github/skills/obsidian/scripts/obsidian.py search "<keyword>" --path "Agent Memories" --format json
+```
+
+If a matching memory exists:
+- **Same insight** → skip (don't duplicate)
+- **New detail on same topic** → append to existing note
+- **Contradicts previous memory** → update with new evidence, bump `confidence`
+
+### Memory Recall
+
+At session start or when facing a tricky problem, agents should search memories:
+
+```powershell
+# Recall relevant memories before tackling a problem
+python .github/skills/obsidian/scripts/obsidian.py search "<problem keywords>" --path "Agent Memories" --format json
+```
+
+---
+
+## Friction Self-Healing (Composable)
+
+### Purpose
+
+When a skill hits significant friction **mid-run**, the agent doesn't just note it
+for later — it triggers `skill-reflection` immediately as part of the current
+ReACT loop, then applies the recommendations before continuing.
+
+This is **self-healing**: the agent fixes the skill that's failing *while it's failing*.
+
+### When to Trigger (Inline, Not End-of-Session)
+
+| Friction Signal | Action |
+|----------------|--------|
+| A skill step fails and needs a workaround | Trigger `skill-reflection` after the workaround succeeds |
+| 2+ retries on the same operation | Trigger `skill-reflection` with retry details |
+| Had to deviate from documented steps | Trigger `skill-reflection` with the deviation |
+| Encoding / environment / auth issue | Trigger `skill-reflection` + save Agent Memory |
+| A SKILL.md instruction was wrong or ambiguous | Trigger `skill-reflection`, apply fix immediately |
+
+### Self-Healing Workflow
+
+```
+1. Agent is running skill X, step N
+2. Step N fails or requires workaround
+3. Agent completes step N with workaround
+4. Agent IMMEDIATELY invokes skill-reflection:
+     "Run skill-reflection for <skill-X>.
+      Steps completed so far: ...
+      Friction: <what just happened>"
+5. skill-reflection produces recommendations
+6. Agent evaluates recommendations:
+   - P0 (breaking) → Apply fix to SKILL.md NOW, before continuing
+   - P1 (quality)  → Apply fix to SKILL.md NOW if simple, else note for later
+   - P2 (nice)     → Note for end of session
+7. Agent saves an Agent Memory about the friction + fix
+8. Agent continues with remaining steps of skill X
+```
+
+### Example: Self-Healing During branch-wrapup
+
+```
+Running branch-wrapup, step 3 (lint) fails:
+  "eslint found 2 errors in generated files that should be excluded"
+
+Agent workaround: added generated/ to .eslintignore
+
+Agent immediately runs:
+  "Run skill-reflection for branch-wrapup.
+   Steps: 1-build PASS, 2-typecheck PASS, 3-lint FAIL (workaround applied)
+   Friction: ESLint flagged generated files. SKILL.md doesn't mention
+   excluding generated directories from lint."
+
+skill-reflection returns:
+  R1. (P0) Add 'exclude generated/ from lint' to branch-wrapup step 3
+
+Agent applies R1 to branch-wrapup/SKILL.md immediately.
+Agent saves memory: "Generated files trigger lint errors — exclude them."
+Agent continues with step 4 (test).
+```
+
+---
+
 ## Composing with Other Skills
 
 ### From obsidian-daily-research
@@ -269,6 +435,11 @@ command inventory. It's checked into git so the diff works across sessions.
 ## Friction Rule
 
 > If you hit unexpected errors, encoding issues, missing CLI commands, or had to
-> retry/workaround anything while using this skill, run **`/skill-reflection`**
-> before ending the task. Capture what went wrong so the skill can be hardened.
+> retry/workaround anything while using this skill:
+> 1. **Immediately** invoke `skill-reflection` with the friction details (don't wait for end of session)
+> 2. Apply any P0/P1 recommendations to the relevant SKILL.md right now
+> 3. Save an Agent Memory about the friction and resolution
+> 4. Then continue with the current task
+>
+> This is the self-healing loop — skills get better every time they break.
 ````

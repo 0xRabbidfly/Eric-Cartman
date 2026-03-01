@@ -62,14 +62,37 @@ Eric Cartman is a **meta-prompt library** — a portable scaffold of agentic dev
 
 ## Friction Rule
 If you experienced friction completing a task — retries, workarounds, encoding issues,
-missing params, unclear docs, unexpected errors — run **`/skill-reflection`** before
-ending the session. This captures what went wrong so the skill (or instructions) can
-be hardened for next time.
+missing params, unclear docs, unexpected errors — run **`/skill-reflection`** **immediately**
+(not at end of session). Apply P0/P1 fixes to the SKILL.md right away, save an Agent Memory
+via the obsidian skill, then continue with the current task. This is the self-healing loop.
+
+## Autonomous Agent Behaviors
+
+These behaviors fire **automatically** during any session. No user prompt needed.
+
+### Agent Memory (via obsidian skill)
+After completing any significant action, evaluate: *"Would I want to know this next time?"*
+If yes, save to `Agent Memories/` in the Obsidian vault using the obsidian skill's
+Agent Memory pattern. Deduplicate before writing. See `obsidian/SKILL.md § Agent Memory`.
+
+**Triggers**: non-obvious workaround, project convention learned, user preference observed,
+decision with rationale, recurring error pattern + fix, research insight, complex task lessons.
+
+### Friction Self-Healing (via skill-reflection)
+When any skill step fails or needs a workaround **mid-run**:
+1. Complete the step with the workaround
+2. Immediately invoke `skill-reflection` with friction details
+3. Apply P0/P1 recommendations to the SKILL.md now
+4. Save an Agent Memory about the friction + resolution
+5. Continue the remaining steps
+
+Do NOT defer to end of session. Fix skills while they're breaking.
 
 ## Meta-Skills (Self-Improvement)
 The library includes skills that improve its own context:
 - `session_context_optimizer` — Audit and compress instruction files
 - `session-context-audit` — Lighter health check for context drift
 - `session-learning` — Extract patterns from sessions into persistent rules
-- `skill-reflection` — After-action review any skill can invoke
+- `skill-reflection` — After-action review any skill can invoke **mid-run or post-run**; triggers Agent Memory capture
 - `repo-state-sync` — Keep onboarding context fresh
+- `obsidian` (Agent Memory) — Long-term memory store; agents save insights autonomously to `Agent Memories/` in the vault
