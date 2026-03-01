@@ -475,9 +475,14 @@ def _fix_urls_from_citations(
 ) -> List[Dict[str, Any]]:
     """Cross-reference model-generated URLs with real citation URLs.
 
-    The model often fabricates plausible-looking status IDs. This function
-    matches each item to a real citation URL by author handle, and replaces
-    the fabricated URL with the real one.
+    The model sometimes fabricates status IDs but usually gets the author
+    handle correct. Strategy:
+    1. If model URL is already in the citation set → keep (verified real).
+    2. If model URL handle matches author_handle → keep (trust the model's
+       status ID; blindly swapping risks assigning the wrong tweet when an
+       author has multiple citations).
+    3. If handle is wrong/missing → replace with first citation URL for the
+       correct author, or fall back to anonymous x.com/i/status/* URLs.
 
     Args:
         items: Parsed model items (may have fabricated URLs)
@@ -489,46 +494,56 @@ def _fix_urls_from_citations(
     if not citation_urls:
         return items
 
-    # Build lookup: author_handle -> [real_urls]
+    # Build lookup: author_handle -> [real_urls] (citation order preserved)
     author_urls: Dict[str, List[str]] = {}
     for url in citation_urls:
-        # Extract handle from x.com/{handle}/status/... or x.com/i/status/...
         m = re.match(r'https://x\.com/(\w+)/status/\d+', url)
         if m:
             handle = m.group(1).lower()
             if handle != "i":  # x.com/i/status/* is handle-less
                 author_urls.setdefault(handle, []).append(url)
 
-    # Also collect all citation URLs as a flat set for validation
+    # Flat set for exact-match validation
     citation_set = set(citation_urls)
 
-    # Pool of unmatched x.com/i/status/* URLs (no handle in URL)
+    # Pool of handle-less x.com/i/status/* URLs as last resort
     anon_urls = [u for u in citation_urls if "/i/status/" in u]
     anon_idx = 0
 
     for item in items:
         model_url = item.get("url", "")
+        author = item.get("author_handle", "").lower().lstrip("@")
 
-        # If the model's URL is already in citations, it's real — keep it
+        # Case 1: model URL is a verified citation — keep and remove from pool
         if model_url in citation_set:
+            if author and author in author_urls and model_url in author_urls[author]:
+                author_urls[author].remove(model_url)
             continue
 
-        # Try to match by author handle
-        author = item.get("author_handle", "").lower().lstrip("@")
+        # Case 2: model URL already points to the correct author — keep it.
+        # Replacing it with a citation URL risks swapping the wrong tweet when
+        # an author has multiple posts (the original bug this fixes).
+        url_handle_match = re.match(r'https://x\.com/(\w+)/status/\d+', model_url)
+        if url_handle_match:
+            url_handle = url_handle_match.group(1).lower()
+            if url_handle == author and author:
+                if http.DEBUG:
+                    _log(f"URL kept (handle match): {model_url} (@{author})")
+                continue
+
+        # Case 3: handle mismatch or malformed — replace with real citation URL
         if author and author in author_urls and author_urls[author]:
             real_url = author_urls[author].pop(0)
             if http.DEBUG:
                 _log(f"URL fix: {model_url} → {real_url} (matched @{author})")
             item["url"] = real_url
         elif anon_urls and anon_idx < len(anon_urls):
-            # Fall back to anonymous x.com/i/status/* URLs
             real_url = anon_urls[anon_idx]
             anon_idx += 1
             if http.DEBUG:
                 _log(f"URL fix (anon): {model_url} → {real_url}")
             item["url"] = real_url
         else:
-            # No match found — flag it but keep the model's URL
             if http.DEBUG:
                 _log(f"URL unverified (no citation match): {model_url}")
 
