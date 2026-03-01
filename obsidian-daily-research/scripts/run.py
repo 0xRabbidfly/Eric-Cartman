@@ -24,7 +24,7 @@ import os
 import re
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 # Force UTF-8 on Windows
@@ -1680,6 +1680,9 @@ def main():
     from_date, _ = dates.get_date_range(7)
     to_date = today
 
+    # Must-follow: always last 24 hours only
+    mf_from_date = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+
     # Select models (reuse last30days model selection with caching)
     from vendor.last30days import models as l30_models
     selected_models = l30_models.get_models(l30_config)
@@ -1724,9 +1727,9 @@ def main():
         n_batch = sum(1 for a in mf_accounts if not a.get("solo"))
         n_solo = sum(1 for a in mf_accounts if a.get("solo"))
         n_calls = (1 if n_batch else 0) + n_solo
-        print(f"\n[must-follow] Scanning {len(mf_accounts)} accounts ({n_batch} batch + {n_solo} solo = {n_calls} calls)...")
+        print(f"\n[must-follow] Scanning {len(mf_accounts)} accounts ({n_batch} batch + {n_solo} solo = {n_calls} calls) | last 24h ({mf_from_date} → {to_date})...")
         must_follow_results = run_must_follow_scan(
-            config, l30_config, from_date, to_date,
+            config, l30_config, mf_from_date, to_date,
             tracker=tracker,
         )
         mf_total = sum(len(r["items"]) for r in must_follow_results)
