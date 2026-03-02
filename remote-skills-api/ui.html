@@ -458,7 +458,15 @@
         location.reload();
         throw new Error('Unauthorized');
       }
-      return res.json();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const err = new Error(data.error || `HTTP ${res.status}`);
+        err.code = data.code;
+        err.hint = data.hint;
+        err.status = res.status;
+        throw err;
+      }
+      return data;
     }
 
     // ── Skills ──
@@ -470,6 +478,9 @@
         renderQuickActions();
       } catch (e) {
         console.error('Failed to load skills:', e);
+        const msg = e?.message || 'Unknown error';
+        const hint = e?.hint ? `\n${e.hint}` : '';
+        addMessage('bot', `❌ Skills load failed: ${msg}${hint}`);
       }
     }
 
@@ -751,7 +762,11 @@
         throw new Error('Unauthorized');
       }
       if (!response.ok || !response.body) {
-        throw new Error(`HTTP ${response.status}`);
+        let payload = {};
+        try { payload = await response.json(); } catch {}
+        const code = payload?.code ? ` (${payload.code})` : '';
+        const hint = payload?.hint ? ` — ${payload.hint}` : '';
+        throw new Error(`${payload?.error || `HTTP ${response.status}`}${code}${hint}`);
       }
 
       const bot = addStreamingMessage(skillForMsg ? `skill: ${skillForMsg}` : null);
@@ -794,8 +809,11 @@
             sawDone = true;
             bot.done(evt.result, evt);
           } else if (evt.type === 'error') {
-            bot.fail(evt.error || 'Unknown error');
-            throw new Error(evt.error || 'Unknown error');
+            const code = evt.code ? ` (${evt.code})` : '';
+            const hint = evt.hint ? ` — ${evt.hint}` : '';
+            const message = `${evt.error || 'Unknown error'}${code}${hint}`;
+            bot.fail(message);
+            throw new Error(message);
           }
         }
       }
