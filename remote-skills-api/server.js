@@ -337,6 +337,9 @@ function buildChatPrompt(message, skill) {
       buildSystemPrompt(),
       '',
       `## Active Skill: ${skill}`,
+      'IMPORTANT: When this skill has workflow steps with shell commands, you MUST execute them',
+      'using the Bash tool. Do not just describe or explain the commands — actually run them.',
+      'Run each step, check output, and proceed to the next. The working directory is the project root.',
       '```',
       skillContent,
       '```',
@@ -356,7 +359,10 @@ function buildInvokePrompt(name, args) {
   const skill = skillRegistry.get(name);
   const skillContent = fs.readFileSync(skill.file, 'utf-8');
   return [
-    `Execute the following skill. Follow its instructions precisely.`,
+    `Execute the following skill by RUNNING the actual commands listed in the workflow steps.`,
+    `You MUST use the Bash tool to execute each shell command — do not just describe or explain them.`,
+    `Run each step in sequence, check the output, and proceed to the next step.`,
+    `The working directory is the project root. Python and node are available on PATH.`,
     '',
     '## SKILL.md',
     '```',
@@ -519,9 +525,16 @@ app.post('/api/chat', auth, async (req, res) => {
       'Connection': 'keep-alive',
       'X-Accel-Buffering': 'no',
     });
+    res.flushHeaders();  // Force headers out immediately
 
     // Send initial event
     res.write(`data: ${JSON.stringify({ type: 'start', skill: resolved.skill || null, mode: resolved.mode })}\n\n`);
+
+    // Keepalive heartbeat — real data events so they flush through any
+    // intermediate buffering and keep mobile Safari from killing the connection
+    const heartbeat = setInterval(() => {
+      try { res.write(`data: ${JSON.stringify({ type: 'heartbeat', ts: Date.now() })}\n\n`); } catch {}
+    }, 10000);
 
     try {
       currentGoal = resolved.currentGoal;
@@ -538,6 +551,8 @@ app.post('/api/chat', auth, async (req, res) => {
       console.error('[Chat:stream] Error:', e.error);
       res.write(`data: ${JSON.stringify({ type: 'error', ...e })}\n\n`);
       res.end();
+    } finally {
+      clearInterval(heartbeat);
     }
   } else {
     // Non-streaming JSON response (backwards compatible)
@@ -577,10 +592,17 @@ app.get('/api/chat/stream', auth, async (req, res) => {
     'Connection': 'keep-alive',
     'X-Accel-Buffering': 'no',
   });
+  res.flushHeaders();  // Force headers out immediately
 
   const prompt = resolved.prompt;
 
   res.write(`data: ${JSON.stringify({ type: 'start', skill: resolved.skill || null, mode: resolved.mode })}\n\n`);
+
+  // Keepalive heartbeat — real data events so they flush through any
+  // intermediate buffering and keep mobile Safari from killing the connection
+  const heartbeat = setInterval(() => {
+    try { res.write(`data: ${JSON.stringify({ type: 'heartbeat', ts: Date.now() })}\n\n`); } catch {}
+  }, 10000);
 
   try {
     currentGoal = resolved.currentGoal;
@@ -594,6 +616,8 @@ app.get('/api/chat/stream', auth, async (req, res) => {
     const e = classifyError(err, 'chat_stream_failed');
     res.write(`data: ${JSON.stringify({ type: 'error', ...e })}\n\n`);
     res.end();
+  } finally {
+    clearInterval(heartbeat);
   }
 });
 

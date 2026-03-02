@@ -19,6 +19,7 @@ Portable, reusable skills for AI coding assistants. Each skill lives in its own 
 | `session-context-audit` | Lighter health check for context drift |
 | `css-audit` | Audit components for CSS best-practice violations |
 | `obsidian-daily-research` | Daily AI research pipeline → Obsidian vault |
+| `obsidian-linked-research` | Fetch a URL → summarize → save to Obsidian Research/Library/ |
 | `doc-sync-all` | Propagate code changes to all design docs |
 | `health-audit` | Validate YAML frontmatter, cross-refs, token counts |
 | `i18n` | Bilingual EN/FR content validation (next-intl) |
