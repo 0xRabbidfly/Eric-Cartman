@@ -30,6 +30,7 @@ const PROJECT_DIR = path.resolve(__dirname, '../../..');
 const CLAUDE_PATH = process.env.CLAUDE_PATH || 'claude';
 const API_SECRET  = process.env.API_SECRET;
 const CLAUDE_MODEL = process.env.CLAUDE_MODEL || 'sonnet';
+const ALLOW_QUERY_TOKEN = (process.env.ALLOW_QUERY_TOKEN || '').toLowerCase() === 'true';
 
 if (!API_SECRET) {
   console.error('❌  API_SECRET not set in .env — aborting');
@@ -114,8 +115,11 @@ app.use(express.json());
 
 // Auth middleware
 function auth(req, res, next) {
-  const token = (req.headers.authorization || '').replace('Bearer ', '')
-             || req.query.token?.replace('Bearer ', '');
+  const headerToken = (req.headers.authorization || '').replace('Bearer ', '');
+  const queryToken = ALLOW_QUERY_TOKEN
+    ? req.query.token?.replace('Bearer ', '')
+    : '';
+  const token = headerToken || queryToken;
   if (token !== API_SECRET) return res.status(401).json({ error: 'Unauthorized' });
   next();
 }
@@ -335,6 +339,9 @@ app.get('/api/status', auth, (req, res) => {
     goal: currentGoal,
     queueLength: requestQueue.length,
     skillCount: skillRegistry.size,
+    auth: {
+      queryTokenEnabled: ALLOW_QUERY_TOKEN,
+    },
   });
 });
 
@@ -547,6 +554,7 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`📍  Local:     http://localhost:${PORT}`);
   console.log(`📱  Tailscale: http://<your-tailscale-ip>:${PORT}`);
   console.log(`🔐  Auth:      API_SECRET ${API_SECRET ? '✅' : '❌ MISSING'}`);
+  console.log(`🛡️  Query auth: ${ALLOW_QUERY_TOKEN ? 'ENABLED' : 'DISABLED (header-only)'}`);
   console.log(`🤖  Model:     ${CLAUDE_MODEL}`);
   console.log(`📦  Skills:    ${skillRegistry.size} discovered`);
   console.log(`💡  Claude:    ${CLAUDE_PATH}`);
