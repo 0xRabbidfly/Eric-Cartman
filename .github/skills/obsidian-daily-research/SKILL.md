@@ -4,6 +4,9 @@ description: Daily AI research pipeline → Obsidian vault. Scans Reddit + X for
 argument-hint: daily research, run pipeline, what's new in AI
 user-invokable: true
 disable-model-invocation: true
+metadata:
+  author: 0xrabbidfly
+  version: "1.0.0"
 ---
 
 # Daily Research Pipeline

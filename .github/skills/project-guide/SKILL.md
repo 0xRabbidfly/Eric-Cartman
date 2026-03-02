@@ -3,6 +3,9 @@ name: project-guide
 description: Simulates plan mode with a teaching-first approach. Use when onboarding to a new codebase, exploring architecture, or seeking guided understanding of any project area. Produces high-level overviews with diagrams, drills into details on request, and offers follow-up exploration questions.
 user-invokable: true
 disable-model-invocation: false
+metadata:
+  author: 0xrabbidfly
+  version: "1.0.0"
 ---
 
 # Project Guide Skill

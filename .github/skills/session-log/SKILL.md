@@ -2,7 +2,10 @@
 name: session-log
 description: Capture Copilot Chat session insights and end-of-session summaries into `.github/sessions/` for later analysis. Use at end of session, when asked to log progress, or when capturing decisions.
 user-invokable: true
-disable-model-invocation: true
+disable-model-invocation: false
+metadata:
+  author: 0xrabbidfly
+  version: "1.0.0"
 ---
 
 # Session Log Skill

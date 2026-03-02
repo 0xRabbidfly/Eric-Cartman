@@ -4,6 +4,9 @@ description: Research a topic from the last 30 days on Reddit + X + Web, become 
 argument-hint: topic, topic for tool
 user-invokable: true
 disable-model-invocation: true
+metadata:
+  author: 0xrabbidfly
+  version: "1.0.0"
 ---
 
 # last30days: Research Any Topic from the Last 30 Days

@@ -3,9 +3,10 @@ name: agentic-evaluator
 description: Evaluates any repository's agentic development maturity. Use when auditing a codebase for best practices in agents, skills, instructions, MCP config, and prompts. Produces a scored report with specific remediation steps.
 user-invokable: true
 disable-model-invocation: true
+metadata:
+  author: 0xrabbidfly
+  version: "1.0.0"
 ---
-
-# Agentic Evaluator Skill
 
 ## Purpose
 

@@ -4,6 +4,9 @@ description: Composable Obsidian vault operations via CLI. Use when ANY task nee
 argument-hint: search query, create note, daily append, tags
 user-invokable: true
 disable-model-invocation: false
+metadata:
+  author: 0xrabbidfly
+  version: "1.0.0"
 ---
 
 # Obsidian Skill (Composable)
