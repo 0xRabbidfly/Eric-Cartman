@@ -12,7 +12,7 @@ metadata:
 
 ## Purpose
 
-Run a comprehensive 8-phase verification and commit workflow before code is considered "ready" for pull request. Catches issues locally before they reach CI/CD, ensures constitutional compliance, and closes with a proper conventional commit summarizing all branch changes.
+Run a comprehensive 9-phase verification and commit workflow before code is considered "ready" for pull request. Catches issues locally before they reach CI/CD, ensures constitutional compliance, performs an obvious code-smell review, and closes with a proper conventional commit summarizing all branch changes.
 
 ## When to Use
 
@@ -107,16 +107,16 @@ npm run test 2>&1 | Select-Object -Last 50
 Project-specific security checks based on [copilot-instructions.md](../../copilot-instructions.md):
 
 ```powershell
-# 5a. Check for forbidden localStorage/sessionStorage
+# 1. Check for forbidden localStorage/sessionStorage
 Select-String -Path "app/**/*.ts","app/**/*.tsx","components/**/*.tsx","lib/**/*.ts" -Pattern "localStorage|sessionStorage" -Recurse | Select-Object -First 10
 
-# 5b. Check for exposed secrets
+# 2. Check for exposed secrets
 Select-String -Path "**/*.ts","**/*.tsx" -Pattern "sk-|api_key|password\s*=\s*['""]" -Recurse | Select-Object -First 10
 
-# 5c. Check for console.log in production code (should use structured logger)
+# 3. Check for console.log in production code (should use structured logger)
 Select-String -Path "app/**/*.ts","app/**/*.tsx","lib/**/*.ts" -Pattern "console\.(log|error|warn)" -Recurse | Select-Object -First 10
 
-# 5d. Check for hardcoded English strings (i18n violation)
+# 4. Check for hardcoded English strings (i18n violation)
 Select-String -Path "components/**/*.tsx","app/**/*.tsx" -Pattern "<(h[1-6]|p|span|button|label)>[A-Z][a-z]+" -Recurse | Select-Object -First 10
 ```
 
@@ -131,20 +131,20 @@ Select-String -Path "components/**/*.tsx","app/**/*.tsx" -Pattern "<(h[1-6]|p|sp
 ### Phase 6: Import & Style Hygiene
 
 ```powershell
-# 6a. Check for relative imports (should use @/ alias)
+# 1. Check for relative imports (should use @/ alias)
 Select-String -Path "app/**/*.ts","app/**/*.tsx","components/**/*.tsx" -Pattern 'from\s+[''"]\.\./' -Recurse | Select-Object -First 10
 
-# 6b. Check for inline styles with magic numbers
+# 2. Check for inline styles with magic numbers
 Select-String -Path "components/**/*.tsx" -Pattern 'style=\{\{.*\d+.*\}\}' -Recurse | Select-Object -First 10
 
-# 6c. Check for missing ARIA labels on interactive elements
+# 3. Check for missing ARIA labels on interactive elements
 Select-String -Path "components/**/*.tsx" -Pattern '<(button|a|input)[^>]*(?<!aria-label)[^>]*>' -Recurse | Select-Object -First 5
 
-# 6d. Stale .gitignore entries (paths that no longer exist)
+# 4. Check stale .gitignore entries (paths that no longer exist)
 Get-Content .gitignore | Where-Object { $_ -match '^[^#\s]' -and $_ -notmatch '[\*\?]' } |
   ForEach-Object { $p = $_.TrimEnd('/'); if (-not (Test-Path $p)) { "Stale: $_" } }
 
-# 6e. Orphan scripts (scripts/ files not referenced in package.json)
+# 5. Check orphan scripts (scripts/ files not referenced in package.json)
 $pkgJson = Get-Content package.json -Raw
 Get-ChildItem scripts/*.ts | Where-Object { $pkgJson -notmatch $_.Name } |
   ForEach-Object { "Orphan: scripts/$($_.Name)" }
@@ -174,7 +174,32 @@ git diff HEAD~1 --name-only 2>$null || git diff --cached --name-only
 
 ---
 
-### Phase 8: Commit
+### Phase 8: Code Smell Review (Obvious Smells)
+
+Perform a quick static review for obvious refactoring opportunities and track them.
+
+```powershell
+# 1. Scan for obvious P0 smells (blockers)
+Select-String -Path "app/**/*.ts","app/**/*.tsx","components/**/*.ts","components/**/*.tsx","lib/**/*.ts","lib/**/*.tsx" -Pattern "\beval\s*\(|\bnew\s+Function\s*\(" -Recurse
+
+# 2. Scan for obvious refactoring opportunities
+Select-String -Path "**/*.{ts,tsx,js,jsx}" -Pattern "TODO|FIXME|HACK|\?.*\?.*:" -Recurse | Select-Object -First 50
+
+# 3. Write or refresh code smell tracker
+# Output file: code-smells.md
+```
+
+**Gate behavior:**
+- If any `P0` smell is found, **stop immediately**.
+- If no `P0` smell is found, write refactoring opportunities to `code-smells.md`.
+
+**`code-smells.md` must include:**
+- Refactoring opportunities list (file + line)
+- 1–2 creative feature ideas to keep momentum
+
+---
+
+### Phase 9: Commit
 
 Only runs if all blocking phases passed. Stages all changes and creates a conventional commit summarizing the branch work.
 
@@ -218,6 +243,7 @@ After running all phases, produce this verification report:
 ║  Security:   [PASS/FAIL] (X constitutional violations)       ║
 ║  Hygiene:    [PASS/FAIL] (X issues)                          ║
 ║  Diff:       X files changed                                 ║
+║  Smells:     [PASS/FAIL] (X P0, Y refactor opportunities)    ║
 ║  Commit:     [DONE / SKIPPED]                                ║
 ║                                                               ║
 ╠══════════════════════════════════════════════════════════════╣
@@ -236,6 +262,10 @@ P1 - Type/Build Errors:
 P2 - Quality Issues:
 4. Relative import in components/Footer.tsx:3
 5. Missing ARIA label on button in components/SearchBar.tsx:28
+
+Refactoring Opportunities (written to code-smells.md):
+1. Nested ternary in components/Filters.tsx:44
+2. Long parameter list in lib/search/buildQuery.ts:18
 ```
 
 ---
@@ -251,6 +281,7 @@ P2 - Quality Issues:
 | Security | ✅ Yes | Constitutional violations block PR |
 | Hygiene | ⚠️ Soft | Report for cleanup |
 | Diff | 📋 Info | Human review checkpoint |
+| Code Smells | ✅ Yes (P0 only) | Stop on any P0 smell; otherwise track refactors in code-smells.md |
 | Commit | ✅ Yes | Only runs if no P0/P1 blockers. Stages + commits all changes. |
 
 ---
@@ -267,6 +298,8 @@ For long coding sessions, run verification at these checkpoints:
 ```
 Run a quick verification check (build + types + lint only).
 ```
+
+Near the end of a full run, add 1–2 implementable app ideas in `code-smells.md` under a `Creative Implementation Ideas` section.
 
 ---
 
