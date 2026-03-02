@@ -30,7 +30,17 @@
       "name": "Lex Fridman Podcast",
       "rss_url": "https://lexfridman.com/feed/podcast/",
       "spotify_id": "",
-      "episodes": {}
+      "episodes": {
+        "https://lexfridman.com/?p=6413": {
+          "title": "#491 - OpenClaw: The Viral AI Agent that Broke the Internet - Peter Steinberger",
+          "published": "2026-02-12",
+          "audio_url": "https://media.blubrry.com/takeituneasy/ins.blubrry.com/takeituneasy/lex_ai_peter_steinberger.mp3",
+          "transcript_path": ".work/transcripts/2026-02-12 - 491 - OpenClaw The Viral AI Agent that Broke the Internet - Peter Steinberger.txt",
+          "note_path": "Podcasts/Lex Fridman Podcast/2026-02-12 - 491 - OpenClaw The Viral AI Agent that Broke the Internet - Peter Steinberger.md",
+          "processed_at": "2026-03-02T02:07:05.576489+00:00",
+          "status": "completed"
+        }
+      }
     },
     "bankless": {
       "name": "Bankless",

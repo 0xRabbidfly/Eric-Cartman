@@ -101,7 +101,7 @@ Phone (Safari/Chrome)
 | GET | `/api/skills` | List all discovered skills |
 | POST | `/api/skills/reload` | Re-scan skill directories |
 | GET | `/api/skills/:name` | Read a skill's full SKILL.md |
-| POST | `/api/chat` | Send a chat message (JSON: `{message, skill?}`) |
+| POST | `/api/chat` | Send chat message. JSON response by default; SSE stream when `Accept: text/event-stream` |
 | GET | `/api/chat/stream` | SSE streaming chat (`?q=...&skill=...`) |
 | POST | `/api/invoke/:skill` | Direct skill invocation (`{args}`) |
 | POST | `/api/cancel` | Kill running Claude process |
@@ -135,6 +135,9 @@ Phone (Safari/Chrome)
 - **Skill chip**: Pin a skill to scope your messages
 - **Status indicator**: Green = ready, yellow = processing
 - **Cancel button**: Kill a long-running request
+- **Live streaming feedback**: Shows phases (starting, thinking, tool use, writing) while Claude runs
+- **Tool activity pills**: Displays active/completed tool calls in real time
+- **Completion metrics**: Shows duration/cost metadata when available
 - **Dark theme**: Easy on eyes, OLED-friendly
 
 ## Tips
