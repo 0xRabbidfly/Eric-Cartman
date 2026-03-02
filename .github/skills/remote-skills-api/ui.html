@@ -264,7 +264,7 @@
 
     /* ── Input bar ── */
     .input-bar {
-      display: flex; align-items: flex-end; gap: 8px;
+      display: flex; flex-direction: column; gap: 6px;
       padding: 10px 12px;
       padding-bottom: max(10px, env(safe-area-inset-bottom));
       background: var(--surface);
@@ -279,12 +279,20 @@
       border: 1px solid var(--accent);
       font-size: 12px; font-weight: 600;
       color: var(--accent);
-      cursor: pointer; flex-shrink: 0;
+      cursor: pointer;
+      align-self: flex-start;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
       white-space: nowrap;
     }
     .skill-chip.active { display: flex; }
-    .skill-chip .x { margin-left: 2px; opacity: .6; }
+    .skill-chip .x { margin-left: 2px; opacity: .6; flex-shrink: 0; }
 
+    .input-row {
+      display: flex; align-items: flex-end; gap: 8px;
+      width: 100%;
+    }
     .input-wrap {
       flex: 1; display: flex; align-items: flex-end;
       background: var(--surface2);
@@ -292,6 +300,7 @@
       border-radius: 24px;
       padding: 6px 6px 6px 16px;
       transition: border-color .2s;
+      min-width: 0;
     }
     .input-wrap:focus-within { border-color: var(--accent); }
 
@@ -383,14 +392,16 @@
     <div id="skillChip" class="skill-chip" onclick="clearSkill()">
       <span id="chipName"></span><span class="x">✕</span>
     </div>
-    <div class="input-wrap">
-      <textarea id="msgInput" rows="1" placeholder="Ask anything…" 
-                oninput="autoGrow(this)" onkeydown="handleKey(event)"></textarea>
-      <button class="send-btn" id="sendBtn" onclick="sendMessage()" disabled>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
-        </svg>
-      </button>
+    <div class="input-row">
+      <div class="input-wrap">
+        <textarea id="msgInput" rows="1" placeholder="Ask anything…" 
+                  oninput="autoGrow(this)" onkeydown="handleKey(event)"></textarea>
+        <button class="send-btn" id="sendBtn" onclick="sendMessage()" disabled>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
+          </svg>
+        </button>
+      </div>
     </div>
   </div>
 
@@ -492,7 +503,8 @@
         'repo-state-sync': '🔄', 'used-car-search': '🚗', 'rbc-banking': '🏦',
         'humanizer': '🧑', 'podcast-to-obsidian': '🎙️', 'project-scaffold': '🏗️',
         'obsidian-daily-research': '🔬', 'obsidian-vault-digest': '📚',
-        'obsidian-vault-linker': '🔗', 'agentic-evaluator': '🏆',
+        'obsidian-vault-linker': '🔗', 'obsidian-linked-research': '🔖',
+        'agentic-evaluator': '🏆',
         'session_context_optimizer': '⚙️', 'session-context-audit': '🔍',
         'session-learning': '🧠', 'session-skill-forge': '🔥',
         'branch-wrapup': '🎁', 'doc-sync-all': '📄', 'project-infographic': '📈',
@@ -772,54 +784,66 @@
       const bot = addStreamingMessage(skillForMsg ? `skill: ${skillForMsg}` : null);
       bot.setPhase('🧠', 'Thinking…');
 
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-      let sawDone = false;
+      try {
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let sawDone = false;
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
 
-        const idx = buffer.lastIndexOf('\n\n');
-        if (idx === -1) continue;
+          const idx = buffer.lastIndexOf('\n\n');
+          if (idx === -1) continue;
 
-        const chunk = buffer.slice(0, idx);
-        buffer = buffer.slice(idx + 2);
-        const events = parseSSE(chunk + '\n\n');
+          const chunk = buffer.slice(0, idx);
+          buffer = buffer.slice(idx + 2);
+          const events = parseSSE(chunk + '\n\n');
 
-        for (const evt of events) {
-          if (evt.type === 'start') {
-            bot.setPhase('🧠', 'Starting…');
-          } else if (evt.type === 'init') {
-            bot.setPhase('🧠', 'Session ready…');
-          } else if (evt.type === 'thinking_start') {
-            bot.setPhase('🧠', 'Thinking…');
-          } else if (evt.type === 'thinking') {
-            bot.setPhase('🧠', 'Reasoning…');
-          } else if (evt.type === 'tool_start') {
-            bot.toolStart(evt.tool, evt.id);
-          } else if (evt.type === 'tool_result') {
-            bot.toolDone(evt.id);
-          } else if (evt.type === 'text') {
-            bot.setPhase('✍️', 'Writing…');
-            bot.appendText(evt.text || '');
-          } else if (evt.type === 'done') {
-            sawDone = true;
-            bot.done(evt.result, evt);
-          } else if (evt.type === 'error') {
-            const code = evt.code ? ` (${evt.code})` : '';
-            const hint = evt.hint ? ` — ${evt.hint}` : '';
-            const message = `${evt.error || 'Unknown error'}${code}${hint}`;
-            bot.fail(message);
-            throw new Error(message);
+          for (const evt of events) {
+            if (evt.type === 'heartbeat') continue; // Server keepalive — ignore
+            if (evt.type === 'start') {
+              bot.setPhase('🧠', 'Starting…');
+            } else if (evt.type === 'init') {
+              bot.setPhase('🧠', 'Session ready…');
+            } else if (evt.type === 'thinking_start') {
+              bot.setPhase('🧠', 'Thinking…');
+            } else if (evt.type === 'thinking') {
+              bot.setPhase('🧠', 'Reasoning…');
+            } else if (evt.type === 'tool_start') {
+              bot.toolStart(evt.tool, evt.id);
+            } else if (evt.type === 'tool_result') {
+              bot.toolDone(evt.id);
+            } else if (evt.type === 'text') {
+              bot.setPhase('✍️', 'Writing…');
+              bot.appendText(evt.text || '');
+            } else if (evt.type === 'done') {
+              sawDone = true;
+              bot.done(evt.result, evt);
+            } else if (evt.type === 'error') {
+              const code = evt.code ? ` (${evt.code})` : '';
+              const hint = evt.hint ? ` — ${evt.hint}` : '';
+              const message = `${evt.error || 'Unknown error'}${code}${hint}`;
+              bot.fail(message);
+              throw new Error(message);
+            }
           }
         }
-      }
 
-      if (!sawDone) {
-        bot.done();
+        if (!sawDone) {
+          bot.done();
+        }
+      } catch (err) {
+        // Network-level error (e.g. Safari "Load failed" when SSE connection drops)
+        const isNetworkError = /load failed|failed to fetch|network|aborted/i.test(err.message);
+        if (isNetworkError) {
+          bot.fail('📡 Connection lost — skill may still be running in background. Check Obsidian or server logs.');
+        } else {
+          bot.fail(err.message);
+        }
+        return; // bot.fail() already displayed the error
       }
     }
 
@@ -842,7 +866,12 @@
       try {
         await streamChat(text, skillForMsg);
       } catch (err) {
-        addMessage('bot', `❌ Error: ${err.message}`);
+        // Initial connection failure (before streaming starts)
+        const isNetworkError = /load failed|failed to fetch|network|aborted/i.test(err.message);
+        const msg = isNetworkError
+          ? '📡 Connection lost — the skill may still be running in the background. Check back shortly.'
+          : `❌ Error: ${err.message}`;
+        addMessage('bot', msg);
       } finally {
         isBusy = false;
         setBusy(false);

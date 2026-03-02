@@ -775,6 +775,7 @@ npm start
 │   ├── branch-wrapup/          # ✅ Pre-PR quality gate
 │   ├── content-research-writer/ # ✍️ Writing partner
 │   ├── obsidian-daily-research/ # 📡 Daily AI research pipeline
+│   ├── obsidian-linked-research/ # 🔗 URL → research note in vault
 │   ├── doc-sync-all/           # 🔄 Documentation sync
 │   ├── health-audit/           # 🩺 Artifact health checks
 │   ├── insights-report/        # 📈 Cross-session analysis
