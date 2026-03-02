@@ -4,6 +4,9 @@ description: Generic post-workflow self-reflection that any skill can invoke at 
 argument-hint: skill name, step results, friction notes
 user-invokable: true
 disable-model-invocation: false
+metadata:
+  author: 0xrabbidfly
+  version: "1.0.0"
 ---
 
 # Skill Reflection (Composable)

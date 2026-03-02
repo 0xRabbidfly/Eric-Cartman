@@ -1,9 +1,11 @@
 ---
 name: obsidian-vault-linker
 description: Discover missing links, orphaned notes, thematic clusters, and connection opportunities across the Obsidian vault. Use when your knowledge base feels fragmented or you suspect hidden connections between notes.
-version: 1.0.0
 user-invokable: true
 disable-model-invocation: true
+metadata:
+  author: 0xrabbidfly
+  version: "1.0.0"
 ---
 
 # Obsidian Vault Linker

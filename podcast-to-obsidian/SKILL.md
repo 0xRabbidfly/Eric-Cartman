@@ -4,6 +4,9 @@ description: Podcast → transcript → Obsidian pipeline. Detects new episodes 
 argument-hint: process podcasts, transcribe episode, check new episodes
 user-invokable: true
 disable-model-invocation: true
+metadata:
+  author: 0xrabbidfly
+  version: "1.0.0"
 ---
 
 # Podcast → Transcript → Obsidian

@@ -1,9 +1,11 @@
 ---
 name: session_context_optimizer
 description: Audit and restructure the AI's own context files for efficiency. Use when copilot-instructions.md feels bloated, stale, or disorganized — or when you want the AI to propose how it would restructure its own operating context for maximum session efficiency.
-version: 1.1.0
 user-invokable: true
-disable-model-invocation: true
+disable-model-invocation: false
+metadata:
+  author: 0xrabbidfly
+  version: "1.1.0"
 ---
 
 # Session Context Optimizer
