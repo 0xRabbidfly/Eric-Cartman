@@ -355,6 +355,7 @@
     </div>
     <div class="header-actions">
       <button class="icon-btn" onclick="openDrawer()" title="Skills">⚡</button>
+      <button class="icon-btn" onclick="promptSetToken()" title="Set API Token">🔑</button>
       <button class="icon-btn" onclick="cancelRequest()" title="Cancel">✕</button>
     </div>
   </div>
@@ -413,6 +414,32 @@
     if (!API_TOKEN) {
       API_TOKEN = prompt('Enter API Secret:');
       if (API_TOKEN) localStorage.setItem('skills_api_token', API_TOKEN);
+    }
+
+    async function validateToken(token) {
+      const res = await fetch('/api/status', {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      return res.ok;
+    }
+
+    async function promptSetToken() {
+      const value = prompt('Paste API Secret:', API_TOKEN || '');
+      if (!value) return;
+      const candidate = value.trim();
+      if (!candidate) return;
+
+      const previous = API_TOKEN;
+      API_TOKEN = candidate;
+      try {
+        const ok = await validateToken(candidate);
+        if (!ok) throw new Error('Invalid token');
+        localStorage.setItem('skills_api_token', candidate);
+        alert('✅ API token updated on this device.');
+      } catch {
+        API_TOKEN = previous;
+        alert('❌ Token invalid. Existing token was kept.');
+      }
     }
 
     // ── API helpers ──

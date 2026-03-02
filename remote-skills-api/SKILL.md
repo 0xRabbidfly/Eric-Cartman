@@ -114,19 +114,22 @@ Phone (Safari/Chrome)
 | `SKILLS_PORT` | `3838` | Server port |
 | `CLAUDE_PATH` | `claude` | Path to Claude CLI binary |
 | `CLAUDE_MODEL` | `sonnet` | Model for Claude CLI |
+| `ALLOW_QUERY_TOKEN` | `false` | Allow `?token=` authentication on API routes (not recommended) |
 
 ## Security
 
-- **Token auth**: Every request requires `Authorization: Bearer <API_SECRET>`
+- **Token auth (default)**: Header-only `Authorization: Bearer <API_SECRET>`
 - **Tailscale**: Network-level encryption + identity. Not exposed to public internet.
-- **No secrets in URL**: Token passed via header; URL token only for initial setup (stripped after save)
+- **URL token bootstrap**: `?token=` in the UI is only for saving token to localStorage on that device; API query-token auth is disabled by default.
+- **Optional compatibility mode**: Set `ALLOW_QUERY_TOKEN=true` only if you intentionally need API query-token auth.
 
 ## Phone Setup (One-Time)
 
 1. Install Tailscale on your phone
-2. Open `http://<pc-tailscale-ip>:3838?token=YOUR_API_SECRET`
+2. Open `http://<pc-tailscale-ip>:3838?token=YOUR_API_SECRET` once on a new device (optional)
 3. Token is saved to localStorage — bookmark the page
-4. Add to Home Screen for app-like experience (iOS: Share → Add to Home Screen)
+4. Use 🔑 in the header anytime to update token on that device
+5. Add to Home Screen for app-like experience (iOS: Share → Add to Home Screen)
 
 ## UI Features
 
