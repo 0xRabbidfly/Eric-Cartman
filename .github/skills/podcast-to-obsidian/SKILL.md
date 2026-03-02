@@ -6,7 +6,7 @@ user-invokable: true
 disable-model-invocation: true
 metadata:
   author: 0xrabbidfly
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 # Podcast → Transcript → Obsidian
@@ -48,8 +48,11 @@ python .github/skills/podcast-to-obsidian/scripts/pipeline.py --check-only
 # Process a specific show
 python .github/skills/podcast-to-obsidian/scripts/pipeline.py --show "Show Name"
 
-# Dry run — show what would be processed
+# Dry run — downloads & transcribes but SKIPS vault write only
 python .github/skills/podcast-to-obsidian/scripts/pipeline.py --dry-run
+
+# Process a single episode by title substring
+python .github/skills/podcast-to-obsidian/scripts/pipeline.py --episode "Nasdaq"
 
 # Add a new show manually (without Spotify)
 python .github/skills/podcast-to-obsidian/scripts/pipeline.py --add-show --name "My Show" --rss "https://example.com/feed.xml"
@@ -67,15 +70,48 @@ python .github/skills/podcast-to-obsidian/scripts/pipeline.py --retry-failed
 ## Pipeline Flow
 
 ```
-1. DETECT    → Spotify MCP fetches followed shows + latest episodes
+1. DETECT    → Spotify MCP or fetch_webpage scrapes episode metadata
 2. DIFF      → Compare episode IDs against manifest (skip processed)
 3. CONFIRM   → Show user what's new, ask which to process
 4. DOWNLOAD  → Fetch audio via RSS <enclosure> URL → .work/audio/
 5. TRANSCRIBE → faster-whisper (local GPU/CPU) → .work/transcripts/
-6. GENERATE  → Copilot/LLM generates structured note from transcript
-7. WRITE     → Obsidian skill writes note to vault
+6. GENERATE  → Agent reads transcript + writes structured note (see below)
+7. WRITE     → Obsidian skill pipes note to vault
 8. MANIFEST  → Update manifest only after successful write
 ```
+
+### Step 1 — DETECT: Fallback Detection
+
+Spotify MCP (`SpotifyGetInfo`) **does not support episode URIs** — it returns
+"Unknown qtype episode". When given a Spotify episode URL:
+
+1. Try Spotify MCP first (may work for show-level queries)
+2. If it fails, use `fetch_webpage` on the Spotify episode URL to scrape:
+   - Episode title, show name, publish date, duration, description
+3. Match the episode to a tracked show in `config.json` via show name
+4. Use the show's RSS feed to find the audio enclosure URL
+
+### Step 6 — GENERATE: Structured Note from Transcript
+
+This step is **manual** — the agent reads the transcript and writes the note.
+
+1. Read the full transcript from `.work/transcripts/<YYYY-MM-DD> - <Title>.txt`
+2. Identify speakers, key themes, and structure
+3. Write the note following the **Obsidian Note Structure** template above:
+   - Frontmatter with tags, show, episode, dates, spotify_url
+   - TL;DR (2-3 sentences)
+   - Key Ideas (bulleted, bolded labels with explanations)
+   - Detailed Summary (paragraph-level, use ### subheadings for major topics)
+   - Actionable Takeaways (checkbox items)
+   - Memorable Quotes (blockquotes with speaker attribution)
+   - People & Topics (wiki-links: `[[People/Name]]`, `[[Topics/Topic]]`, `[[Companies/Org]]`)
+   - Transcript (condensed inside `<details><summary>` collapsible)
+4. Pipe the note to the obsidian skill:
+   ```powershell
+   $noteContent = @'
+   <generated note content>
+   '@ | python .github/skills/obsidian/scripts/obsidian.py create --path "Podcasts/<Show>/<YYYY-MM-DD> - <Title>.md"
+   ```
 
 ## Manifest
 
@@ -203,6 +239,37 @@ Add to `.vscode/settings.json` or user settings:
 ```
 
 Restart VS Code after configuration.
+
+## Known Issues
+
+| Issue | Severity | Workaround |
+|-------|----------|------------|
+| Spotify MCP `SpotifyGetInfo` does not support episode URIs | **P0** | Use `fetch_webpage` on the Spotify episode URL to scrape metadata |
+| `--dry-run` still downloads audio and runs transcription | **P1** | Use `--check-only` for true no-side-effects preview. `--dry-run` only skips vault write (Step 7). |
+| Pipeline downloads all new episodes per show, not just the target | **P1** | Use `--episode "title substring"` to filter, or `--max-episodes 1` |
+| Pipeline may exit with code 1 during large batch downloads | **P2** | Re-run with `--retry-failed` or `--transcribe-only` if audio already downloaded |
+
+## CLI Flag Reference
+
+| Flag | What it does | What it skips |
+|------|-------------|---------------|
+| `--check-only` | Lists new episodes | Download, transcribe, generate, write |
+| `--dry-run` | Downloads + transcribes | **Vault write only** (Step 7) |
+| `--transcribe-only` | Downloads + transcribes | Generate, write, manifest |
+| `--episode "text"` | Filters to episodes matching title substring | Other episodes |
+| `--show "Name"` | Filters to a single show | Other shows |
+| `--max-episodes N` | Limits episodes per show | Episodes beyond N |
+| `--model <size>` | Sets whisper model (base/large-v3) | — |
+| `--retry-failed` | Re-processes failed episodes | Already-completed episodes |
+
+## Troubleshooting
+
+| Error | Cause | Fix |
+|-------|-------|-----|
+| "Unknown qtype episode" from Spotify MCP | MCP doesn't support episode URIs | Use `fetch_webpage` fallback (see Step 1 above) |
+| Exit code 1 during download | Network timeout or RSS enclosure URL expired | Re-run with `--retry-failed` |
+| Transcript empty or garbled | Audio codec issue or whisper model too small | Try `--model large-v3` |
+| Obsidian write fails | Obsidian not running or CLI not enabled | Start Obsidian, enable CLI in Settings → General |
 
 ## Dependencies
 

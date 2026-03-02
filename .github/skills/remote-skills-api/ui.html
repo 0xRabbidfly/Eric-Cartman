@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Skills Remote</title>
+  <style>
+    :root {
+      --bg: #0f0f0f;
+      --surface: #1a1a1a;
+      --surface2: #242424;
+      --border: #333;
+      --text: #e8e8e8;
+      --text-dim: #888;
+      --accent: #6366f1;
+      --accent-soft: #6366f120;
+      --user-bubble: #6366f1;
+      --bot-bubble: #1e1e2e;
+      --success: #22c55e;
+      --danger: #ef4444;
+      --warn: #f59e0b;
+      --radius: 16px;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro', 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Header ── */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      z-index: 10;
+    }
+    .header-left { display: flex; align-items: center; gap: 10px; }
+    .header h1 { font-size: 18px; font-weight: 700; }
+    .status-dot {
+      width: 10px; height: 10px; border-radius: 50%;
+      background: var(--success);
+      box-shadow: 0 0 6px rgba(34,197,94,.5);
+      transition: all .3s;
+    }
+    .status-dot.busy {
+      background: var(--warn);
+      box-shadow: 0 0 6px rgba(245,158,11,.5);
+      animation: pulse 1.2s infinite;
+    }
+    @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.3)} }
+    .header-actions { display: flex; gap: 8px; }
+    .icon-btn {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      width: 36px; height: 36px;
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; font-size: 16px;
+      transition: background .15s;
+    }
+    .icon-btn:active { background: var(--accent-soft); }
+
+    /* ── Skills drawer ── */
+    .drawer-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.6);
+      z-index: 50;
+      opacity: 0; pointer-events: none;
+      transition: opacity .25s;
+    }
+    .drawer-overlay.open { opacity: 1; pointer-events: auto; }
+    .drawer {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      background: var(--surface);
+      border-radius: 20px 20px 0 0;
+      max-height: 70dvh;
+      z-index: 51;
+      transform: translateY(100%);
+      transition: transform .3s ease;
+      display: flex; flex-direction: column;
+    }
+    .drawer.open { transform: translateY(0); }
+    .drawer-handle {
+      width: 36px; height: 4px; border-radius: 2px;
+      background: var(--border);
+      margin: 10px auto 6px;
+    }
+    .drawer-title { padding: 8px 20px 12px; font-weight: 700; font-size: 16px; }
+    .skill-list {
+      overflow-y: auto; padding: 0 12px 20px;
+      -webkit-overflow-scrolling: touch;
+    }
+    .skill-item {
+      display: flex; align-items: flex-start; gap: 12px;
+      padding: 12px;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: background .15s;
+    }
+    .skill-item:active { background: var(--accent-soft); }
+    .skill-item.active { background: var(--accent-soft); border: 1px solid var(--accent); }
+    .skill-icon {
+      width: 36px; height: 36px; border-radius: 10px;
+      background: var(--surface2);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; flex-shrink: 0;
+    }
+    .skill-info { flex: 1; min-width: 0; }
+    .skill-name { font-weight: 600; font-size: 14px; }
+    .skill-desc {
+      font-size: 12px; color: var(--text-dim);
+      display: -webkit-box; -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical; overflow: hidden;
+      margin-top: 2px;
+    }
+    .skill-badge {
+      font-size: 10px; padding: 2px 6px;
+      border-radius: 6px; background: var(--surface2);
+      color: var(--text-dim); margin-top: 4px; display: inline-block;
+    }
+
+    /* ── Chat area ── */
+    .chat-area {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .msg { max-width: 85%; display: flex; flex-direction: column; }
+    .msg.user { align-self: flex-end; }
+    .msg.bot  { align-self: flex-start; }
+
+    .msg-bubble {
+      padding: 10px 14px;
+      border-radius: 18px;
+      font-size: 15px;
+      line-height: 1.45;
+      word-break: break-word;
+    }
+    .msg.user .msg-bubble {
+      background: var(--user-bubble);
+      color: white;
+      border-bottom-right-radius: 4px;
+    }
+    .msg.bot .msg-bubble {
+      background: var(--bot-bubble);
+      color: var(--text);
+      border-bottom-left-radius: 4px;
+    }
+    .msg-meta {
+      font-size: 11px; color: var(--text-dim);
+      margin-top: 4px; padding: 0 4px;
+    }
+    .msg.user .msg-meta { text-align: right; }
+
+    /* Markdown inside bot bubbles */
+    .msg-bubble h1,.msg-bubble h2,.msg-bubble h3 { font-size: 15px; font-weight: 700; margin: 8px 0 4px; }
+    .msg-bubble p { margin: 4px 0; }
+    .msg-bubble ul,.msg-bubble ol { padding-left: 18px; margin: 4px 0; }
+    .msg-bubble code {
+      background: rgba(255,255,255,.08); padding: 1px 5px;
+      border-radius: 4px; font-size: 13px;
+    }
+    .msg-bubble pre {
+      background: rgba(0,0,0,.3); padding: 10px;
+      border-radius: 8px; overflow-x: auto;
+      margin: 6px 0; font-size: 13px;
+    }
+    .msg-bubble pre code { background: none; padding: 0; }
+    .msg-bubble table { border-collapse: collapse; margin: 6px 0; font-size: 13px; }
+    .msg-bubble th, .msg-bubble td { border: 1px solid var(--border); padding: 4px 8px; }
+    .msg-bubble a { color: #818cf8; }
+
+    /* Typing indicator */
+    .typing { display: flex; gap: 4px; padding: 10px 14px; }
+    .typing span {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--text-dim);
+      animation: bounce .6s infinite alternate;
+    }
+    .typing span:nth-child(2) { animation-delay: .2s; }
+    .typing span:nth-child(3) { animation-delay: .4s; }
+    @keyframes bounce { to { opacity: .3; transform: translateY(-4px); } }
+
+    /* ── Input bar ── */
+    .input-bar {
+      display: flex; align-items: flex-end; gap: 8px;
+      padding: 10px 12px;
+      padding-bottom: max(10px, env(safe-area-inset-bottom));
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .skill-chip {
+      display: none; align-items: center; gap: 4px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      background: var(--accent-soft);
+      border: 1px solid var(--accent);
+      font-size: 12px; font-weight: 600;
+      color: var(--accent);
+      cursor: pointer; flex-shrink: 0;
+      white-space: nowrap;
+    }
+    .skill-chip.active { display: flex; }
+    .skill-chip .x { margin-left: 2px; opacity: .6; }
+
+    .input-wrap {
+      flex: 1; display: flex; align-items: flex-end;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 6px 6px 6px 16px;
+      transition: border-color .2s;
+    }
+    .input-wrap:focus-within { border-color: var(--accent); }
+
+    #msgInput {
+      flex: 1; background: none; border: none; outline: none;
+      color: var(--text); font-size: 16px;
+      resize: none; max-height: 120px;
+      line-height: 1.4; padding: 6px 0;
+      font-family: inherit;
+    }
+    #msgInput::placeholder { color: var(--text-dim); }
+
+    .send-btn {
+      width: 38px; height: 38px;
+      border-radius: 50%;
+      background: var(--accent);
+      border: none; color: white;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; flex-shrink: 0;
+      transition: opacity .15s;
+    }
+    .send-btn:disabled { opacity: .3; cursor: default; }
+    .send-btn svg { width: 20px; height: 20px; }
+
+    /* ── Welcome screen ── */
+    .welcome {
+      flex: 1; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 40px 20px; text-align: center;
+    }
+    .welcome-icon { font-size: 48px; margin-bottom: 16px; }
+    .welcome h2 { font-size: 22px; margin-bottom: 8px; }
+    .welcome p { color: var(--text-dim); font-size: 14px; max-width: 300px; line-height: 1.5; }
+    .quick-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; justify-content: center; }
+    .quick-btn {
+      padding: 8px 16px;
+      border-radius: 20px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-size: 13px;
+      cursor: pointer;
+      transition: all .15s;
+    }
+    .quick-btn:active { background: var(--accent-soft); border-color: var(--accent); }
+
+    /* ── Utility ── */
+    .hidden { display: none !important; }
+    @media (min-width: 600px) {
+      body { max-width: 500px; margin: 0 auto; border-left: 1px solid var(--border); border-right: 1px solid var(--border); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-left">
+      <div id="statusDot" class="status-dot"></div>
+      <h1>Skills</h1>
+    </div>
+    <div class="header-actions">
+      <button class="icon-btn" onclick="openDrawer()" title="Skills">⚡</button>
+      <button class="icon-btn" onclick="cancelRequest()" title="Cancel">✕</button>
+    </div>
+  </div>
+
+  <!-- Skills Drawer -->
+  <div id="drawerOverlay" class="drawer-overlay" onclick="closeDrawer()"></div>
+  <div id="drawer" class="drawer">
+    <div class="drawer-handle"></div>
+    <div class="drawer-title">Available Skills</div>
+    <div id="skillList" class="skill-list"></div>
+  </div>
+
+  <!-- Chat messages -->
+  <div id="chatArea" class="chat-area">
+    <div id="welcome" class="welcome">
+      <div class="welcome-icon">🧠</div>
+      <h2>Eric Cartman Skills</h2>
+      <p>Chat naturally or pick a skill. Running on your PC — accessible over Tailscale.</p>
+      <div id="quickActions" class="quick-actions"></div>
+    </div>
+  </div>
+
+  <!-- Input bar -->
+  <div class="input-bar">
+    <div id="skillChip" class="skill-chip" onclick="clearSkill()">
+      <span id="chipName"></span><span class="x">✕</span>
+    </div>
+    <div class="input-wrap">
+      <textarea id="msgInput" rows="1" placeholder="Ask anything…" 
+                oninput="autoGrow(this)" onkeydown="handleKey(event)"></textarea>
+      <button class="send-btn" id="sendBtn" onclick="sendMessage()" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Markdown renderer (loaded from CDN since marked is lightweight) -->
+  <script src="https://cdn.jsdelivr.net/npm/marked@15/marked.min.js"></script>
+  <script>
+    // ── State ──
+    let API_TOKEN = localStorage.getItem('skills_api_token');
+    let skills = [];
+    let activeSkill = null;
+    let isBusy = false;
+
+    // ── Auth ──
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlToken = urlParams.get('token');
+    if (urlToken) {
+      API_TOKEN = urlToken;
+      localStorage.setItem('skills_api_token', urlToken);
+      history.replaceState({}, '', location.pathname);
+    }
+    if (!API_TOKEN) {
+      API_TOKEN = prompt('Enter API Secret:');
+      if (API_TOKEN) localStorage.setItem('skills_api_token', API_TOKEN);
+    }
+
+    // ── API helpers ──
+    async function api(path, opts = {}) {
+      const res = await fetch(path, {
+        ...opts,
+        headers: {
+          'Authorization': `Bearer ${API_TOKEN}`,
+          'Content-Type': 'application/json',
+          ...(opts.headers || {}),
+        },
+      });
+      if (res.status === 401) {
+        localStorage.removeItem('skills_api_token');
+        alert('Invalid API secret. Refresh to try again.');
+        location.reload();
+        throw new Error('Unauthorized');
+      }
+      return res.json();
+    }
+
+    // ── Skills ──
+    async function loadSkills() {
+      try {
+        const data = await api('/api/skills');
+        skills = data.skills || [];
+        renderSkillList();
+        renderQuickActions();
+      } catch (e) {
+        console.error('Failed to load skills:', e);
+      }
+    }
+
+    function skillIcon(name) {
+      const icons = {
+        'obsidian': '💎', 'last30days': '📰', 'visual-explainer': '🎨',
+        'session-log': '📝', 'project-guide': '🗺️', 'content-research-writer': '✍️',
+        'skill-reflection': '🪞', 'insights-report': '📊', 'health-audit': '🩺',
+        'repo-state-sync': '🔄', 'used-car-search': '🚗', 'rbc-banking': '🏦',
+        'humanizer': '🧑', 'podcast-to-obsidian': '🎙️', 'project-scaffold': '🏗️',
+        'obsidian-daily-research': '🔬', 'obsidian-vault-digest': '📚',
+        'obsidian-vault-linker': '🔗', 'agentic-evaluator': '🏆',
+        'session_context_optimizer': '⚙️', 'session-context-audit': '🔍',
+        'session-learning': '🧠', 'session-skill-forge': '🔥',
+        'branch-wrapup': '🎁', 'doc-sync-all': '📄', 'project-infographic': '📈',
+        'teams-daily-digest': '💬', 'find-skills': '🔎', 'git-commit': '📦',
+      };
+      return icons[name] || '⚡';
+    }
+
+    function renderSkillList() {
+      const el = document.getElementById('skillList');
+      el.innerHTML = skills.map(s => `
+        <div class="skill-item ${activeSkill === s.name ? 'active' : ''}" onclick="selectSkill('${s.name}')">
+          <div class="skill-icon">${skillIcon(s.name)}</div>
+          <div class="skill-info">
+            <div class="skill-name">${s.name}</div>
+            <div class="skill-desc">${escHtml(s.description)}</div>
+            <div class="skill-badge">${s.source === 'personal' ? '🔒 personal' : '🌐 open-source'}</div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function renderQuickActions() {
+      const top = skills.filter(s => s.invocable).slice(0, 6);
+      const el = document.getElementById('quickActions');
+      el.innerHTML = top.map(s =>
+        `<button class="quick-btn" onclick="selectSkill('${s.name}'); closeDrawer();">${skillIcon(s.name)} ${s.name}</button>`
+      ).join('');
+    }
+
+    function selectSkill(name) {
+      activeSkill = activeSkill === name ? null : name;
+      document.getElementById('skillChip').classList.toggle('active', !!activeSkill);
+      document.getElementById('chipName').textContent = activeSkill ? `${skillIcon(activeSkill)} ${activeSkill}` : '';
+      renderSkillList();
+      closeDrawer();
+      document.getElementById('msgInput').focus();
+    }
+
+    function clearSkill() {
+      activeSkill = null;
+      document.getElementById('skillChip').classList.remove('active');
+      renderSkillList();
+    }
+
+    // ── Drawer ──
+    function openDrawer() {
+      document.getElementById('drawer').classList.add('open');
+      document.getElementById('drawerOverlay').classList.add('open');
+    }
+    function closeDrawer() {
+      document.getElementById('drawer').classList.remove('open');
+      document.getElementById('drawerOverlay').classList.remove('open');
+    }
+
+    // ── Chat ──
+    function escHtml(s) {
+      const d = document.createElement('div');
+      d.textContent = s || '';
+      return d.innerHTML;
+    }
+
+    function renderMarkdown(text) {
+      try {
+        if (typeof marked !== 'undefined' && marked.parse) {
+          return marked.parse(text, { breaks: true });
+        }
+      } catch {}
+      return `<pre style="white-space:pre-wrap;">${escHtml(text)}</pre>`;
+    }
+
+    function addMessage(role, content, meta) {
+      const welcome = document.getElementById('welcome');
+      if (welcome) welcome.classList.add('hidden');
+
+      const area = document.getElementById('chatArea');
+      const div = document.createElement('div');
+      div.className = `msg ${role}`;
+
+      const bubble = document.createElement('div');
+      bubble.className = 'msg-bubble';
+      if (role === 'bot') {
+        bubble.innerHTML = renderMarkdown(content);
+      } else {
+        bubble.textContent = content;
+      }
+      div.appendChild(bubble);
+
+      if (meta) {
+        const metaEl = document.createElement('div');
+        metaEl.className = 'msg-meta';
+        metaEl.textContent = meta;
+        div.appendChild(metaEl);
+      }
+
+      area.appendChild(div);
+      area.scrollTop = area.scrollHeight;
+      return div;
+    }
+
+    function addTyping() {
+      const area = document.getElementById('chatArea');
+      const div = document.createElement('div');
+      div.className = 'msg bot';
+      div.id = 'typingIndicator';
+      div.innerHTML = '<div class="msg-bubble"><div class="typing"><span></span><span></span><span></span></div></div>';
+      area.appendChild(div);
+      area.scrollTop = area.scrollHeight;
+    }
+
+    function removeTyping() {
+      const el = document.getElementById('typingIndicator');
+      if (el) el.remove();
+    }
+
+    async function sendMessage() {
+      const input = document.getElementById('msgInput');
+      const text = input.value.trim();
+      if (!text || isBusy) return;
+
+      const skillForMsg = activeSkill;
+      const meta = skillForMsg ? `via ${skillForMsg}` : null;
+      addMessage('user', text, meta);
+      input.value = '';
+      input.style.height = 'auto';
+      autoGrow(input);
+      updateSendBtn();
+
+      isBusy = true;
+      setBusy(true);
+      addTyping();
+
+      try {
+        const data = await api('/api/chat', {
+          method: 'POST',
+          body: JSON.stringify({ message: text, skill: skillForMsg }),
+        });
+        removeTyping();
+        const result = data.result || data.error || 'No response';
+        addMessage('bot', result, data.skill ? `skill: ${data.skill}` : null);
+      } catch (err) {
+        removeTyping();
+        addMessage('bot', `❌ Error: ${err.message}`);
+      } finally {
+        isBusy = false;
+        setBusy(false);
+      }
+    }
+
+    async function cancelRequest() {
+      try {
+        await api('/api/cancel', { method: 'POST' });
+      } catch {}
+    }
+
+    // ── Status polling ──
+    function setBusy(busy) {
+      document.getElementById('statusDot').classList.toggle('busy', busy);
+      document.getElementById('sendBtn').disabled = busy || !document.getElementById('msgInput').value.trim();
+    }
+
+    async function pollStatus() {
+      try {
+        const data = await api('/api/status');
+        if (!isBusy) {
+          setBusy(data.active);
+          if (data.active) isBusy = true;
+        }
+      } catch {}
+    }
+    setInterval(pollStatus, 3000);
+
+    // ── Input helpers ──
+    function autoGrow(el) {
+      el.style.height = 'auto';
+      el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+    }
+
+    function updateSendBtn() {
+      const btn = document.getElementById('sendBtn');
+      btn.disabled = isBusy || !document.getElementById('msgInput').value.trim();
+    }
+
+    document.getElementById('msgInput').addEventListener('input', updateSendBtn);
+
+    function handleKey(e) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    }
+
+    // ── Init ──
+    loadSkills();
+  </script>
+</body>
+</html>

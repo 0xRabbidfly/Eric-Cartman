@@ -729,6 +729,41 @@ Analyzes and restructures `.github/copilot-instructions.md`, scoped instructions
 
 ---
 
+### 23. 📱 Remote Skills API
+
+**Access all your skills from your phone over Tailscale.**
+
+Lightweight Express.js server that auto-discovers every skill from `.github/skills/` and `.claude/skills/`, exposes them via a chat API, and serves a mobile-first dark-themed web UI. Start it on your PC, access from anywhere over Tailscale.
+
+**Use When:**
+- You're away from your desk but want to invoke skills from your phone
+- Running research, vault operations, or any skill remotely
+- You want a chat interface to your skill library
+
+**Features:**
+| Feature | Description |
+|---------|-------------|
+| Skill Discovery | Auto-scans all SKILL.md files at startup |
+| Chat Interface | Natural language, Claude picks the right skill |
+| Skill Picker | Pin a specific skill to scope your messages |
+| Queue | Requests serialize — safe for concurrent use |
+| Auth | Bearer token via `API_SECRET` in `.env` |
+| Reboot Survival | Startup shortcut launches server at login |
+
+**Quick Start:**
+```powershell
+cd .github/skills/remote-skills-api
+npm install
+npm start
+# Open http://<tailscale-ip>:3838 on your phone
+```
+
+```
+📍 Location: .github/skills/remote-skills-api/
+```
+
+---
+
 ## 📁 Repository Structure
 
 ```
@@ -756,6 +791,7 @@ Analyzes and restructures `.github/copilot-instructions.md`, scoped instructions
 │   ├── session-context-audit/  # 🔬 Context file health check
 │   ├── session-skill-forge/    # ⚒️ Workflow → reusable skill
 │   ├── session_context_optimizer/ # 🧹 Meta-optimize AI context
+│   ├── remote-skills-api/      # 📱 Phone access over Tailscale
 │   ├── skill-reflection/       # 🪞 Composable after-action review
 │   └── visual-explainer/       # 🎨 HTML diagrams, diff reviews, slide decks
 ├── agents/                     # Specialized agent configs
