@@ -1,0 +1,16 @@
+{
+  "name": "remote-skills-api",
+  "version": "1.0.0",
+  "description": "Mobile-friendly API to chat with and invoke Eric Cartman skills remotely via Tailscale",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "marked": "^15.0.0"
+  }
+}
