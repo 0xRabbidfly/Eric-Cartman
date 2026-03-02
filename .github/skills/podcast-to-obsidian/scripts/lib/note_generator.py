@@ -60,9 +60,9 @@ created: {created}
 
 ---
 
-## 📝 Summary
+## � Deep Dives
 
-{detailed_summary}
+{deep_dives}
 
 ---
 
@@ -121,7 +121,10 @@ def generate_note(
     if ai_summary:
         tldr = _format_tldr_callout(ai_summary.get("tldr", ""))
         key_ideas = _format_key_ideas(ai_summary.get("key_ideas", []))
-        detailed_summary = ai_summary.get("detailed_summary", "_No detailed summary available._")
+        deep_dives = _format_deep_dives(ai_summary.get("deep_dives", []))
+        # Fallback: if AI returned old "detailed_summary" key, convert it
+        if not ai_summary.get("deep_dives") and ai_summary.get("detailed_summary"):
+            deep_dives = ai_summary["detailed_summary"]
         actionables = _format_actionables(ai_summary.get("actionables", []))
         quotes = _format_quotes(ai_summary.get("quotes", []))
         backlinks = _format_backlinks(ai_summary.get("backlinks", {}))
@@ -133,7 +136,7 @@ def generate_note(
         # Template-only mode
         tldr = _format_tldr_callout(_extract_basic_tldr(episode, transcript_text))
         key_ideas = "- _Add your OpenAI API key to `.env` as `OPENAI_API_KEY` to auto-generate key ideas._"
-        detailed_summary = "_Add your OpenAI API key to `.env` as `OPENAI_API_KEY` to auto-generate a summary._"
+        deep_dives = "_Add your OpenAI API key to `.env` as `OPENAI_API_KEY` to auto-generate deep dives._"
         actionables = "- [ ] Review transcript and extract action items"
         quotes = "> _Add your OpenAI API key to `.env` as `OPENAI_API_KEY` to auto-extract key quotes._"
         backlinks = f"[[Podcasts/{show_name}]]"
@@ -148,7 +151,7 @@ def generate_note(
         created=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         tldr=tldr,
         key_ideas=key_ideas,
-        detailed_summary=detailed_summary,
+        deep_dives=deep_dives,
         actionables=actionables,
         quotes=quotes,
         backlinks=backlinks,
@@ -192,7 +195,9 @@ Output JSON with these exact keys:
   "key_ideas": [
     {"idea": "Bold idea title", "explanation": "1-2 sentence explanation"}
   ],
-  "detailed_summary": "3-5 paragraph detailed summary",
+  "deep_dives": [
+    {"title": "Concept Title", "body": "2-4 paragraph mini-essay analyzing this concept in depth — implications, connections, what wasn't said, why it matters beyond the podcast"}
+  ],
   "actionables": ["Action item 1", "Action item 2"],
   "quotes": [
     {"text": "Exact quote from transcript", "speaker": "Speaker name if identifiable"}
@@ -205,9 +210,14 @@ Output JSON with these exact keys:
 }
 
 Rules:
-- Key ideas: 3-7 items, each with a bold-worthy title and concise explanation
+- Key ideas: 5-15 items, each with a bold-worthy title and concise 1-2 sentence explanation
+- Deep dives: 3-5 items. Pick the most important/surprising concepts and go DEEP.
+  Each deep dive is a mini-essay (2-4 paragraphs) that goes beyond summarizing — analyze
+  implications, draw connections between ideas, note what was left unsaid, explain why it
+  matters to the listener. Do NOT repeat the key ideas — add new depth and perspective.
+  For longer podcasts (>1h), use 4-5 deep dives.
 - Actionables: 2-5 concrete, actionable takeaways (not vague)
-- Quotes: 3-5 memorable/impactful quotes with speaker attribution if possible
+- Quotes: 3-10 memorable/impactful quotes with speaker attribution if possible
 - Backlinks: 5-15 total across people/topics/companies
 - Be specific, not generic. Reference actual content from the transcript.
 - If you can't identify speakers, use "Host" or "Guest"
@@ -295,6 +305,21 @@ def generate_ai_summary(
 # ---------------------------------------------------------------------------
 # Formatting helpers
 # ---------------------------------------------------------------------------
+
+def _format_deep_dives(dives: List[Dict[str, str]]) -> str:
+    """Format deep dives as mini-essay sections with headers."""
+    if not dives:
+        return "_No deep dives generated._"
+    sections = []
+    for dive in dives:
+        if isinstance(dive, dict):
+            title = dive.get("title", "Untitled")
+            body = dive.get("body", "")
+            sections.append(f"### {title}\n\n{body}")
+        elif isinstance(dive, str):
+            sections.append(dive)
+    return "\n\n---\n\n".join(sections)
+
 
 def _format_tldr_callout(text: str) -> str:
     """Wrap TL;DR text in an Obsidian callout block."""

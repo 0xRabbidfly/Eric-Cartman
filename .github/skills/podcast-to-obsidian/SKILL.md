@@ -57,6 +57,9 @@ python .github/skills/podcast-to-obsidian/scripts/pipeline.py --episode "Nasdaq"
 # Add a new show manually (without Spotify)
 python .github/skills/podcast-to-obsidian/scripts/pipeline.py --add-show --name "My Show" --rss "https://example.com/feed.xml"
 
+# Keep audio files after run (default: purge after success)
+python .github/skills/podcast-to-obsidian/scripts/pipeline.py --keep-audio
+
 # List all tracked shows
 python .github/skills/podcast-to-obsidian/scripts/pipeline.py --list-shows
 
@@ -78,6 +81,7 @@ python .github/skills/podcast-to-obsidian/scripts/pipeline.py --retry-failed
 6. GENERATE  → Agent reads transcript + writes structured note (see below)
 7. WRITE     → Obsidian skill pipes note to vault
 8. MANIFEST  → Update manifest only after successful write
+9. CLEANUP   → Purge .mp3 audio files + intermediate build artifacts
 ```
 
 ### Step 1 — DETECT: Fallback Detection
@@ -101,7 +105,7 @@ This step is **manual** — the agent reads the transcript and writes the note.
    - Frontmatter with tags, show, episode, dates, spotify_url
    - TL;DR (2-3 sentences)
    - Key Ideas (bulleted, bolded labels with explanations)
-   - Detailed Summary (paragraph-level, use ### subheadings for major topics)
+   - Deep Dives (3-5 mini-essays on the most important/surprising concepts — analysis, implications, connections, what wasn't said. NOT a summary rehash.)
    - Actionable Takeaways (checkbox items)
    - Memorable Quotes (blockquotes with speaker attribution)
    - People & Topics (wiki-links: `[[People/Name]]`, `[[Topics/Topic]]`, `[[Companies/Org]]`)
@@ -112,6 +116,15 @@ This step is **manual** — the agent reads the transcript and writes the note.
    <generated note content>
    '@ | python .github/skills/obsidian/scripts/obsidian.py create --path "Podcasts/<Show>/<YYYY-MM-DD> - <Title>.md"
    ```
+
+> **⚠️ Known bug:** `obsidian.com create` with stdin silently produces 0-byte files.
+> **Fallback:** Write directly to the vault filesystem path, then verify with `obsidian.com file`:
+> ```python
+> from pathlib import Path
+> vault = Path(r"C:\Users\<user>\Documents\Obsidian Vault")
+> (vault / "Podcasts" / show / filename).write_text(content, encoding="utf-8")
+> ```
+> Obsidian indexes the file immediately.
 
 ## Manifest
 
@@ -160,9 +173,15 @@ created: YYYY-MM-DDTHH:MM:SSZ
 - **Idea 2** — explanation
 - ...
 
-## Detailed Summary
+## Deep Dives
 
-<paragraph-level summary of the episode>
+### Concept Title
+
+2-4 paragraph mini-essay analyzing this concept in depth —
+implications, connections between ideas, what wasn't said,
+why it matters beyond the podcast. Pick 3-5 of the most
+important/surprising concepts. Do NOT repeat Key Ideas;
+add new depth and perspective.
 
 ## Actionable Takeaways
 
@@ -245,6 +264,7 @@ Restart VS Code after configuration.
 | Issue | Severity | Workaround |
 |-------|----------|------------|
 | Spotify MCP `SpotifyGetInfo` does not support episode URIs | **P0** | Use `fetch_webpage` on the Spotify episode URL to scrape metadata |
+| `obsidian.com create` with stdin-piped content silently produces 0-byte files (RC 0, says "Overwrote") | **P0** | Write directly to vault filesystem via `Path.write_text()`, then verify with `obsidian.com file`. The Python wrapper `obsidian.py` also fails because its `run()` uses `stdin=subprocess.DEVNULL`. |
 | `--dry-run` still downloads audio and runs transcription | **P1** | Use `--check-only` for true no-side-effects preview. `--dry-run` only skips vault write (Step 7). |
 | Pipeline downloads all new episodes per show, not just the target | **P1** | Use `--episode "title substring"` to filter, or `--max-episodes 1` |
 | Pipeline may exit with code 1 during large batch downloads | **P2** | Re-run with `--retry-failed` or `--transcribe-only` if audio already downloaded |
@@ -261,6 +281,7 @@ Restart VS Code after configuration.
 | `--max-episodes N` | Limits episodes per show | Episodes beyond N |
 | `--model <size>` | Sets whisper model (base/large-v3) | — |
 | `--retry-failed` | Re-processes failed episodes | Already-completed episodes |
+| `--keep-audio` | Keeps .mp3 files after successful run | Cleanup step |
 
 ## Troubleshooting
 
@@ -270,6 +291,7 @@ Restart VS Code after configuration.
 | Exit code 1 during download | Network timeout or RSS enclosure URL expired | Re-run with `--retry-failed` |
 | Transcript empty or garbled | Audio codec issue or whisper model too small | Try `--model large-v3` |
 | Obsidian write fails | Obsidian not running or CLI not enabled | Start Obsidian, enable CLI in Settings → General |
+| Obsidian write returns RC 0 but file is 0 bytes | stdin content-loss bug in `obsidian.com create` | Use direct filesystem write fallback (see Step 7 WRITE) |
 
 ## Dependencies
 

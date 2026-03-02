@@ -201,6 +201,67 @@
     .typing span:nth-child(3) { animation-delay: .4s; }
     @keyframes bounce { to { opacity: .3; transform: translateY(-4px); } }
 
+    /* ── Stream status bar ── */
+    .stream-status {
+      display: flex; align-items: center; gap: 8px;
+      padding: 6px 14px;
+      font-size: 12px;
+      color: var(--text-dim);
+      border-radius: 12px 12px 0 0;
+      background: var(--bot-bubble);
+    }
+    .stream-status .phase-icon {
+      display: inline-flex;
+      animation: pulse 1.2s infinite;
+    }
+    .stream-status .phase-text { flex: 1; }
+    .stream-status .elapsed {
+      font-variant-numeric: tabular-nums;
+      opacity: .6;
+    }
+
+    /* Tool use pill */
+    .tool-pill {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 3px 10px; margin: 4px 4px 4px 0;
+      border-radius: 12px;
+      background: rgba(99,102,241,.15);
+      border: 1px solid rgba(99,102,241,.3);
+      font-size: 11px; color: var(--accent);
+      white-space: nowrap;
+    }
+    .tool-pill .tool-spinner {
+      width: 10px; height: 10px;
+      border: 2px solid rgba(99,102,241,.3);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+    }
+    .tool-pill.done { opacity: .5; }
+    .tool-pill.done .tool-spinner { animation: none; border-color: var(--accent); }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Bot bubble streaming state */
+    .msg-bubble.streaming {
+      border-bottom-left-radius: 0;
+    }
+    .msg-bubble .cursor-blink::after {
+      content: '▊';
+      animation: blink 1s step-end infinite;
+      color: var(--accent);
+      font-weight: 300;
+    }
+    @keyframes blink { 50% { opacity: 0; } }
+
+    /* Done meta with cost */
+    .msg-done-meta {
+      display: flex; gap: 12px;
+      font-size: 11px; color: var(--text-dim);
+      margin-top: 4px; padding: 0 4px;
+      opacity: .7;
+    }
+    .msg-done-meta span { white-space: nowrap; }
+
     /* ── Input bar ── */
     .input-bar {
       display: flex; align-items: flex-end; gap: 8px;
@@ -509,6 +570,214 @@
       if (el) el.remove();
     }
 
+    function addStreamingMessage(meta) {
+      const area = document.getElementById('chatArea');
+      const div = document.createElement('div');
+      div.className = 'msg bot';
+
+      const status = document.createElement('div');
+      status.className = 'stream-status';
+      status.innerHTML = '<span class="phase-icon">🧠</span><span class="phase-text">Starting…</span><span class="elapsed">0.0s</span>';
+
+      const bubble = document.createElement('div');
+      bubble.className = 'msg-bubble streaming';
+      bubble.innerHTML = '<span class="cursor-blink"></span>';
+
+      const tools = document.createElement('div');
+      tools.style.marginTop = '6px';
+
+      div.appendChild(status);
+      div.appendChild(bubble);
+      div.appendChild(tools);
+
+      if (meta) {
+        const metaEl = document.createElement('div');
+        metaEl.className = 'msg-meta';
+        metaEl.textContent = meta;
+        div.appendChild(metaEl);
+      }
+
+      area.appendChild(div);
+      area.scrollTop = area.scrollHeight;
+
+      const phaseIcon = status.querySelector('.phase-icon');
+      const phaseText = status.querySelector('.phase-text');
+      const elapsedEl = status.querySelector('.elapsed');
+
+      let textBuffer = '';
+      const toolPills = new Map();
+
+      const startedAt = Date.now();
+      const timer = setInterval(() => {
+        const secs = ((Date.now() - startedAt) / 1000).toFixed(1);
+        elapsedEl.textContent = `${secs}s`;
+      }, 100);
+
+      function renderText() {
+        if (!textBuffer.trim()) {
+          bubble.innerHTML = '<span class="cursor-blink"></span>';
+          return;
+        }
+        bubble.innerHTML = renderMarkdown(textBuffer + '<span class="cursor-blink"></span>');
+      }
+
+      return {
+        setPhase(icon, text) {
+          phaseIcon.textContent = icon;
+          phaseText.textContent = text;
+          const area = document.getElementById('chatArea');
+          area.scrollTop = area.scrollHeight;
+        },
+        appendText(chunk) {
+          textBuffer += chunk;
+          renderText();
+          const area = document.getElementById('chatArea');
+          area.scrollTop = area.scrollHeight;
+        },
+        toolStart(name, id) {
+          const key = id || name || `${Date.now()}-${Math.random()}`;
+          const pill = document.createElement('span');
+          pill.className = 'tool-pill';
+          pill.innerHTML = `<span class="tool-spinner"></span>${escHtml(name || 'tool')}`;
+          toolPills.set(key, pill);
+          tools.appendChild(pill);
+          this.setPhase('🛠️', `Using ${name || 'tool'}…`);
+        },
+        toolDone(id) {
+          if (id && toolPills.has(id)) {
+            toolPills.get(id).classList.add('done');
+            this.setPhase('🧠', 'Thinking…');
+            return;
+          }
+          for (const pill of toolPills.values()) {
+            if (!pill.classList.contains('done')) {
+              pill.classList.add('done');
+              break;
+            }
+          }
+          this.setPhase('🧠', 'Thinking…');
+        },
+        done(finalText, metaData) {
+          clearInterval(timer);
+          if (finalText && finalText.trim()) {
+            textBuffer = finalText;
+          }
+          bubble.classList.remove('streaming');
+          bubble.innerHTML = renderMarkdown(textBuffer || 'Done (no output)');
+          status.remove();
+
+          if (metaData && (metaData.duration || metaData.cost || metaData.totalCost)) {
+            const doneMeta = document.createElement('div');
+            doneMeta.className = 'msg-done-meta';
+            const bits = [];
+            if (metaData.duration) bits.push(`<span>⏱ ${metaData.duration}s</span>`);
+            if (metaData.cost != null) bits.push(`<span>💲 ${Number(metaData.cost).toFixed(4)}</span>`);
+            if (metaData.totalCost != null) bits.push(`<span>Σ ${Number(metaData.totalCost).toFixed(4)}</span>`);
+            if (metaData.numTurns != null) bits.push(`<span>🔁 ${metaData.numTurns}</span>`);
+            doneMeta.innerHTML = bits.join('');
+            div.appendChild(doneMeta);
+          }
+
+          const area = document.getElementById('chatArea');
+          area.scrollTop = area.scrollHeight;
+        },
+        fail(error) {
+          clearInterval(timer);
+          status.remove();
+          bubble.classList.remove('streaming');
+          bubble.textContent = `❌ Error: ${error}`;
+          const area = document.getElementById('chatArea');
+          area.scrollTop = area.scrollHeight;
+        }
+      };
+    }
+
+    function parseSSE(raw) {
+      const events = [];
+      const blocks = raw.split('\n\n');
+      for (const block of blocks) {
+        if (!block.trim()) continue;
+        const lines = block.split('\n');
+        let data = '';
+        for (const line of lines) {
+          if (line.startsWith('data:')) data += line.slice(5).trim();
+        }
+        if (!data) continue;
+        try { events.push(JSON.parse(data)); } catch {}
+      }
+      return events;
+    }
+
+    async function streamChat(message, skillForMsg) {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${API_TOKEN}`,
+          'Content-Type': 'application/json',
+          'Accept': 'text/event-stream',
+        },
+        body: JSON.stringify({ message, skill: skillForMsg }),
+      });
+
+      if (response.status === 401) {
+        localStorage.removeItem('skills_api_token');
+        throw new Error('Unauthorized');
+      }
+      if (!response.ok || !response.body) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const bot = addStreamingMessage(skillForMsg ? `skill: ${skillForMsg}` : null);
+      bot.setPhase('🧠', 'Thinking…');
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let sawDone = false;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        const idx = buffer.lastIndexOf('\n\n');
+        if (idx === -1) continue;
+
+        const chunk = buffer.slice(0, idx);
+        buffer = buffer.slice(idx + 2);
+        const events = parseSSE(chunk + '\n\n');
+
+        for (const evt of events) {
+          if (evt.type === 'start') {
+            bot.setPhase('🧠', 'Starting…');
+          } else if (evt.type === 'init') {
+            bot.setPhase('🧠', 'Session ready…');
+          } else if (evt.type === 'thinking_start') {
+            bot.setPhase('🧠', 'Thinking…');
+          } else if (evt.type === 'thinking') {
+            bot.setPhase('🧠', 'Reasoning…');
+          } else if (evt.type === 'tool_start') {
+            bot.toolStart(evt.tool, evt.id);
+          } else if (evt.type === 'tool_result') {
+            bot.toolDone(evt.id);
+          } else if (evt.type === 'text') {
+            bot.setPhase('✍️', 'Writing…');
+            bot.appendText(evt.text || '');
+          } else if (evt.type === 'done') {
+            sawDone = true;
+            bot.done(evt.result, evt);
+          } else if (evt.type === 'error') {
+            bot.fail(evt.error || 'Unknown error');
+            throw new Error(evt.error || 'Unknown error');
+          }
+        }
+      }
+
+      if (!sawDone) {
+        bot.done();
+      }
+    }
+
     async function sendMessage() {
       const input = document.getElementById('msgInput');
       const text = input.value.trim();
@@ -524,18 +793,10 @@
 
       isBusy = true;
       setBusy(true);
-      addTyping();
 
       try {
-        const data = await api('/api/chat', {
-          method: 'POST',
-          body: JSON.stringify({ message: text, skill: skillForMsg }),
-        });
-        removeTyping();
-        const result = data.result || data.error || 'No response';
-        addMessage('bot', result, data.skill ? `skill: ${data.skill}` : null);
+        await streamChat(text, skillForMsg);
       } catch (err) {
-        removeTyping();
         addMessage('bot', `❌ Error: ${err.message}`);
       } finally {
         isBusy = false;

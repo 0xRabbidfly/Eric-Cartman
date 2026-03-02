@@ -458,6 +458,54 @@ def step_write_to_vault(
 
 
 # ---------------------------------------------------------------------------
+# Cleanup
+# ---------------------------------------------------------------------------
+
+def step_cleanup(
+    work_dir: Path,
+    written_episodes: List[Any],
+    keep_audio: bool = False,
+) -> None:
+    """Purge audio files and intermediate build artifacts after a successful run.
+
+    Audio files are large (100+ MB) and not needed once the transcript exists.
+    Intermediate .md files (pre-transcript) are superseded by .final.md.
+    """
+    print("\n=== Cleanup ===")
+    audio_dir = work_dir / "audio"
+    notes_dir = work_dir / "notes"
+    removed = 0
+    freed_mb = 0.0
+
+    if not keep_audio and audio_dir.exists():
+        for mp3 in audio_dir.glob("*.mp3"):
+            size_mb = mp3.stat().st_size / (1024 * 1024)
+            try:
+                mp3.unlink()
+                removed += 1
+                freed_mb += size_mb
+                print(f"  [purge] {mp3.name} ({size_mb:.1f} MB)")
+            except OSError as e:
+                print(f"  [warn] Could not remove {mp3.name}: {e}")
+
+    # Remove intermediate .md files (keep .final.md only)
+    if notes_dir.exists():
+        for md in notes_dir.glob("*.md"):
+            if not md.name.endswith(".final.md"):
+                try:
+                    md.unlink()
+                    removed += 1
+                    print(f"  [purge] intermediate {md.name}")
+                except OSError as e:
+                    print(f"  [warn] Could not remove {md.name}: {e}")
+
+    if removed:
+        print(f"  Cleaned {removed} files, freed {freed_mb:.1f} MB")
+    else:
+        print("  Nothing to clean")
+
+
+# ---------------------------------------------------------------------------
 # Main pipeline
 # ---------------------------------------------------------------------------
 
@@ -495,6 +543,22 @@ def run_pipeline(args: argparse.Namespace) -> None:
     if not new_episodes:
         print("\n✓ No new episodes to process. All caught up!")
         return
+
+    # --- Episode filter ---
+    if args.episode:
+        needle = args.episode.lower()
+        filtered = {}
+        for show_id, episodes in new_episodes.items():
+            matched = [ep for ep in episodes if needle in ep.title.lower()]
+            if matched:
+                filtered[show_id] = matched
+        if not filtered:
+            print(f"\n✗ No episodes matching '{args.episode}' found in new episodes.")
+            return
+        total_before = sum(len(eps) for eps in new_episodes.values())
+        total_after = sum(len(eps) for eps in filtered.values())
+        print(f"\n  --episode filter: {total_after}/{total_before} episodes match '{args.episode}'")
+        new_episodes = filtered
 
     # --- Check-only mode ---
     if args.check_only:
@@ -567,6 +631,14 @@ def run_pipeline(args: argparse.Namespace) -> None:
             dry_run=args.dry_run,
         )
         total_written += written
+
+    # --- Cleanup ---
+    if total_written > 0 and not args.dry_run:
+        step_cleanup(
+            work_dir=work_dir,
+            written_episodes=[],
+            keep_audio=args.keep_audio,
+        )
 
     # --- Summary ---
     print(f"\n{'='*60}")
@@ -693,6 +765,8 @@ def main() -> None:
                         help="Stop after transcription; print paths for orchestrator summarization")
     parser.add_argument("--max-episodes", type=int, default=None,
                         help="Max episodes to process per show (overrides config)")
+    parser.add_argument("--episode", type=str, default=None,
+                        help="Filter to episodes matching this title substring (case-insensitive)")
 
     # Subcommands
     parser.add_argument("--add-show", action="store_true",
@@ -705,6 +779,8 @@ def main() -> None:
                         help="List all tracked shows")
     parser.add_argument("--retry-failed", action="store_true",
                         help="Retry failed episodes")
+    parser.add_argument("--keep-audio", action="store_true",
+                        help="Don't purge .mp3 files after successful run")
 
     args = parser.parse_args()
 
