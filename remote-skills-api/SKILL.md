@@ -59,8 +59,8 @@ minimized when you log in. To set it up manually:
 # Creates a shortcut in your Windows Startup folder
 $s = [Environment]::GetFolderPath('Startup')
 $ws = (New-Object -ComObject WScript.Shell).CreateShortcut("$s\RemoteSkillsAPI.lnk")
-$ws.TargetPath = "Z:\Projects\Eric-Cartman\.github\skills\remote-skills-api\start-service.bat"
-$ws.WorkingDirectory = "Z:\Projects\Eric-Cartman"
+$ws.TargetPath = "$PWD\.github\skills\remote-skills-api\start-service.bat"
+$ws.WorkingDirectory = "$PWD"
 $ws.WindowStyle = 7  # minimized
 $ws.Save()
 ```
