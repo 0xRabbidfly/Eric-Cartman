@@ -3,12 +3,12 @@
     AI-HUB-Portal Branch Wrapup - Pre-PR Quality Gate + Commit
     
 .DESCRIPTION
-    Runs 8-phase verification against project constitution before PR creation,
+    Runs 9-phase verification against project constitution before PR creation,
     then commits all changes with a conventional commit message.
     
 .PARAMETER Phases
     Specific phases to run. Default: all phases.
-    Valid values: Build, Types, Lint, Tests, Security, Hygiene, Diff, Commit
+    Valid values: Build, Types, Lint, Tests, Security, Hygiene, Diff, CodeSmells, Commit
     
 .PARAMETER Quick
     Run only Build, Types, Lint (faster iteration, no commit)
@@ -37,8 +37,8 @@
 #>
 
 param(
-    [ValidateSet('Build', 'Types', 'Lint', 'Tests', 'Security', 'Hygiene', 'Diff', 'Commit')]
-    [string[]]$Phases = @('Build', 'Types', 'Lint', 'Tests', 'Security', 'Hygiene', 'Diff', 'Commit'),
+    [ValidateSet('Build', 'Types', 'Lint', 'Tests', 'Security', 'Hygiene', 'Diff', 'CodeSmells', 'Commit')]
+    [string[]]$Phases = @('Build', 'Types', 'Lint', 'Tests', 'Security', 'Hygiene', 'Diff', 'CodeSmells', 'Commit'),
     
     [switch]$Quick,
     
@@ -65,6 +65,7 @@ $results = @{
     Security = $null
     Hygiene = $null
     Diff = $null
+    CodeSmells = $null
     Commit = $null
 }
 
@@ -73,6 +74,8 @@ $issues = @{
     P1 = @()  # Type/Build errors
     P2 = @()  # Quality issues
 }
+
+$refactoringIdeas = @()
 
 # Quick mode overrides phases
 if ($Quick) {
@@ -351,8 +354,7 @@ try {
     # ═══════════════════════════════════════════════════════════
     if ($Phases -contains 'Diff') {
         Write-Host "`n📋 Phase 7: Git Diff Review" -ForegroundColor $colors.Header
-        
-        $diffStat = git diff --stat 2>&1
+
         $changedFiles = git diff --name-only 2>&1
         
         if ($changedFiles) {
@@ -369,10 +371,108 @@ try {
     }
 
     # ═══════════════════════════════════════════════════════════
-    # PHASE 8: COMMIT
+    # PHASE 8: CODE SMELLS REVIEW
+    # ═══════════════════════════════════════════════════════════
+    if ($Phases -contains 'CodeSmells') {
+        Write-Host "`n🧠 Phase 8: Code Smell Review" -ForegroundColor $colors.Header
+
+        $smellP0 = @()
+        $smellP2 = @()
+        $scanRoots = @('app', 'components', 'lib', 'scripts') | Where-Object { Test-Path $_ }
+
+        if ($scanRoots.Count -gt 0) {
+            $sourceFiles = Get-ChildItem -Path $scanRoots -Recurse -Include "*.ts", "*.tsx", "*.js", "*.jsx" -File -ErrorAction SilentlyContinue
+
+            # P0 smell: dynamic code execution in app code
+            $dangerousEval = $sourceFiles | Select-String -Pattern "\beval\s*\(|\bnew\s+Function\s*\(" -ErrorAction SilentlyContinue
+            if ($dangerousEval) {
+                foreach ($match in $dangerousEval | Select-Object -First 10) {
+                    $msg = "P0: dynamic code execution (`$eval/new Function) in $($match.Path):$($match.LineNumber)"
+                    $smellP0 += $msg
+                    $issues.P0 += $msg
+                }
+            }
+
+            # Refactoring opportunities
+            $nestedTernary = $sourceFiles | Select-String -Pattern "\?.*\?.*:" -ErrorAction SilentlyContinue
+            if ($nestedTernary) {
+                foreach ($match in $nestedTernary | Select-Object -First 10) {
+                    $msg = "Nested ternary; consider extracting conditionals in $($match.Path):$($match.LineNumber)"
+                    $smellP2 += $msg
+                }
+            }
+
+            $longParams = $sourceFiles | Select-String -Pattern "function\s+\w+\s*\(([^\)]*,){4,}[^\)]*\)|=>\s*\(([^\)]*,){4,}[^\)]*\)" -ErrorAction SilentlyContinue
+            if ($longParams) {
+                foreach ($match in $longParams | Select-Object -First 10) {
+                    $msg = "Long parameter list; consider object params in $($match.Path):$($match.LineNumber)"
+                    $smellP2 += $msg
+                }
+            }
+
+            $todoFixme = $sourceFiles | Select-String -Pattern "TODO|FIXME|HACK" -ErrorAction SilentlyContinue
+            if ($todoFixme) {
+                foreach ($match in $todoFixme | Select-Object -First 10) {
+                    $msg = "Pending technical debt marker (`$($match.Matches[0].Value)) in $($match.Path):$($match.LineNumber)"
+                    $smellP2 += $msg
+                }
+            }
+
+            foreach ($file in $sourceFiles | Select-Object -First 200) {
+                $lineCount = (Get-Content $file.FullName -ErrorAction SilentlyContinue | Measure-Object -Line).Lines
+                if ($lineCount -gt 500) {
+                    $smellP2 += "Large file ($lineCount lines); consider splitting module in $($file.FullName)"
+                }
+            }
+        }
+
+        if ($smellP0.Count -gt 0) {
+            $results.CodeSmells = 'FAIL'
+            Write-Phase "Code Smells" "FAIL" "($($smellP0.Count) P0 issues; stop and fix first)"
+            foreach ($item in $smellP0) {
+                Write-Host "  ❌ $item" -ForegroundColor Red
+            }
+        } else {
+            $results.CodeSmells = 'PASS'
+            Write-Phase "Code Smells" "PASS" "($($smellP2.Count) refactoring opportunities)"
+
+            if ($smellP2.Count -gt 0) {
+                $refactoringIdeas += $smellP2
+                $issues.P2 += $smellP2
+            }
+
+            $codeSmellsFile = Join-Path $projectRoot "code-smells.md"
+            $lines = @(
+                "# Code Smells Tracking",
+                "",
+                "Generated: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')",
+                "",
+                "## Refactoring Opportunities"
+            )
+
+            if ($smellP2.Count -eq 0) {
+                $lines += "- No obvious code smells detected in this run."
+            } else {
+                foreach ($item in $smellP2) {
+                    $lines += "- $item"
+                }
+            }
+
+            $lines += ""
+            $lines += "## Creative Implementation Ideas"
+            $lines += "- Add a lightweight architecture decision log generated from branch diffs to preserve intent."
+            $lines += "- Add a dev-only dashboard that trends verification failures and recurring smell categories over time."
+
+            Set-Content -Path $codeSmellsFile -Value $lines -Encoding UTF8
+            Write-Host "  📝 Wrote code smell tracking file: $codeSmellsFile" -ForegroundColor Gray
+        }
+    }
+
+    # ═══════════════════════════════════════════════════════════
+    # PHASE 9: COMMIT
     # ═══════════════════════════════════════════════════════════
     if (($Phases -contains 'Commit') -and -not $NoCommit -and -not $Quick) {
-        Write-Host "`n📝 Phase 8: Commit" -ForegroundColor $colors.Header
+        Write-Host "`n📝 Phase 9: Commit" -ForegroundColor $colors.Header
         
         # Only commit if no P0 or P1 blockers
         if ($issues.P0.Count -gt 0 -or $issues.P1.Count -gt 0) {
@@ -452,7 +552,7 @@ try {
     $hasP0 = $issues.P0.Count -gt 0
     $hasP1 = $issues.P1.Count -gt 0
     
-    foreach ($phase in @('Build', 'Types', 'Lint', 'Tests', 'Security', 'Hygiene', 'Commit')) {
+    foreach ($phase in @('Build', 'Types', 'Lint', 'Tests', 'Security', 'Hygiene', 'CodeSmells', 'Commit')) {
         if ($results[$phase]) {
             $status = $results[$phase]
             $color = switch ($status) {
