@@ -329,6 +329,119 @@ function buildSystemPrompt() {
   return lines.join('\n');
 }
 
+function buildChatPrompt(message, skill) {
+  if (skill && skillRegistry.has(skill)) {
+    const s = skillRegistry.get(skill);
+    const skillContent = fs.readFileSync(s.file, 'utf-8');
+    return [
+      buildSystemPrompt(),
+      '',
+      `## Active Skill: ${skill}`,
+      '```',
+      skillContent,
+      '```',
+      '',
+      `User request: ${message}`,
+    ].join('\n');
+  }
+
+  return [
+    buildSystemPrompt(),
+    '',
+    `User request: ${message}`,
+  ].join('\n');
+}
+
+function buildInvokePrompt(name, args) {
+  const skill = skillRegistry.get(name);
+  const skillContent = fs.readFileSync(skill.file, 'utf-8');
+  return [
+    `Execute the following skill. Follow its instructions precisely.`,
+    '',
+    '## SKILL.md',
+    '```',
+    skillContent,
+    '```',
+    '',
+    `User arguments: ${args || '(none — use defaults)'}`,
+  ].join('\n');
+}
+
+function parseSlashInvocation(message) {
+  const m = (message || '').trim().match(/^\/([a-zA-Z0-9][\w-]*)\s*(.*)$/);
+  if (!m) return null;
+  return {
+    skill: m[1],
+    args: (m[2] || '').trim(),
+  };
+}
+
+function classifyError(err, fallbackCode = 'request_failed') {
+  const msg = (err?.message || 'Unknown error').trim();
+  const low = msg.toLowerCase();
+
+  if (low.includes('spawn error')) {
+    return {
+      code: 'claude_spawn_failed',
+      error: msg,
+      hint: 'Check CLAUDE_PATH and that Claude CLI is installed and runnable.',
+    };
+  }
+
+  if (low.includes('exited')) {
+    return {
+      code: 'claude_exit_nonzero',
+      error: msg,
+      hint: 'Claude process failed. Check server logs for stderr details.',
+    };
+  }
+
+  if (low.includes('invalid choice') || low.includes('unrecognized arguments')) {
+    return {
+      code: 'invalid_skill_args',
+      error: msg,
+      hint: 'The invoked skill command arguments are unsupported by its script.',
+    };
+  }
+
+  return {
+    code: fallbackCode,
+    error: msg,
+  };
+}
+
+function resolveChatRequest(message, selectedSkill) {
+  const slash = parseSlashInvocation(message);
+  if (!slash) {
+    return {
+      mode: 'chat',
+      skill: selectedSkill && skillRegistry.has(selectedSkill) ? selectedSkill : null,
+      message,
+      prompt: buildChatPrompt(message, selectedSkill),
+      currentGoal: message.substring(0, 60),
+    };
+  }
+
+  if (!skillRegistry.has(slash.skill)) {
+    return {
+      error: {
+        status: 404,
+        code: 'skill_not_found',
+        error: `Skill "${slash.skill}" not found`,
+        hint: 'Use an existing skill name from /api/skills or the skill picker.',
+      },
+    };
+  }
+
+  return {
+    mode: 'invoke',
+    skill: slash.skill,
+    args: slash.args,
+    prompt: buildInvokePrompt(slash.skill, slash.args),
+    currentGoal: `/${slash.skill} ${slash.args.substring(0, 40)}`.trim(),
+  };
+}
+
 // ---------------------------------------------------------------------------
 // API Routes
 // ---------------------------------------------------------------------------
@@ -381,29 +494,22 @@ app.post('/api/chat', auth, async (req, res) => {
   if (!message) return res.status(400).json({ error: 'message required' });
 
   const wantsStream = (req.headers.accept || '').includes('text/event-stream');
-
-  // Build the prompt
-  let prompt;
-  if (skill && skillRegistry.has(skill)) {
-    const s = skillRegistry.get(skill);
-    const skillContent = fs.readFileSync(s.file, 'utf-8');
-    prompt = [
-      buildSystemPrompt(),
-      '',
-      `## Active Skill: ${skill}`,
-      '```',
-      skillContent,
-      '```',
-      '',
-      `User request: ${message}`,
-    ].join('\n');
-  } else {
-    prompt = [
-      buildSystemPrompt(),
-      '',
-      `User request: ${message}`,
-    ].join('\n');
+  const resolved = resolveChatRequest(message, skill);
+  if (resolved.error) {
+    if (wantsStream) {
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'X-Accel-Buffering': 'no',
+      });
+      res.write(`data: ${JSON.stringify({ type: 'error', ...resolved.error })}\n\n`);
+      return res.end();
+    }
+    return res.status(resolved.error.status).json(resolved.error);
   }
+
+  const prompt = resolved.prompt;
 
   if (wantsStream) {
     // SSE streaming response
@@ -415,10 +521,10 @@ app.post('/api/chat', auth, async (req, res) => {
     });
 
     // Send initial event
-    res.write(`data: ${JSON.stringify({ type: 'start', skill: skill || null })}\n\n`);
+    res.write(`data: ${JSON.stringify({ type: 'start', skill: resolved.skill || null, mode: resolved.mode })}\n\n`);
 
     try {
-      currentGoal = message.substring(0, 60);
+      currentGoal = resolved.currentGoal;
       const result = await enqueue(() => {
         return runClaudeStreaming(prompt, (evt) => {
           // Forward each streaming event to the client
@@ -428,28 +534,42 @@ app.post('/api/chat', auth, async (req, res) => {
       // Final done event (runClaudeStreaming already sends done, but ensure connection closes)
       res.end();
     } catch (err) {
-      console.error('[Chat:stream] Error:', err.message);
-      res.write(`data: ${JSON.stringify({ type: 'error', error: err.message })}\n\n`);
+      const e = classifyError(err, 'chat_stream_failed');
+      console.error('[Chat:stream] Error:', e.error);
+      res.write(`data: ${JSON.stringify({ type: 'error', ...e })}\n\n`);
       res.end();
     }
   } else {
     // Non-streaming JSON response (backwards compatible)
     try {
-      currentGoal = message.substring(0, 60);
+      currentGoal = resolved.currentGoal;
       const result = await enqueue(() => runClaude(prompt));
-      res.json({ result, skill: skill || null });
+      res.json({ result, skill: resolved.skill || null, mode: resolved.mode });
     } catch (err) {
-      console.error('[Chat] Error:', err.message);
-      res.status(500).json({ error: err.message });
+      const e = classifyError(err, 'chat_failed');
+      console.error('[Chat] Error:', e.error);
+      res.status(500).json(e);
     }
   }
 });
 
 // Chat with SSE streaming (GET — kept for direct URL/EventSource usage)
 app.get('/api/chat/stream', auth, async (req, res) => {
-  const message = req.query.q;
-  const skill   = req.query.skill;
+  const message = String(req.query.q || '');
+  const skill   = String(req.query.skill || '');
   if (!message) return res.status(400).json({ error: 'q param required' });
+
+  const resolved = resolveChatRequest(message, skill || null);
+  if (resolved.error) {
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+      'X-Accel-Buffering': 'no',
+    });
+    res.write(`data: ${JSON.stringify({ type: 'error', ...resolved.error })}\n\n`);
+    return res.end();
+  }
 
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
@@ -458,29 +578,12 @@ app.get('/api/chat/stream', auth, async (req, res) => {
     'X-Accel-Buffering': 'no',
   });
 
-  // Build prompt (same as /api/chat)
-  let prompt;
-  if (skill && skillRegistry.has(skill)) {
-    const s = skillRegistry.get(skill);
-    const skillContent = fs.readFileSync(s.file, 'utf-8');
-    prompt = [
-      buildSystemPrompt(),
-      '',
-      `## Active Skill: ${skill}`,
-      '```',
-      skillContent,
-      '```',
-      '',
-      `User request: ${message}`,
-    ].join('\n');
-  } else {
-    prompt = [buildSystemPrompt(), '', `User request: ${message}`].join('\n');
-  }
+  const prompt = resolved.prompt;
 
-  res.write(`data: ${JSON.stringify({ type: 'start', skill: skill || null })}\n\n`);
+  res.write(`data: ${JSON.stringify({ type: 'start', skill: resolved.skill || null, mode: resolved.mode })}\n\n`);
 
   try {
-    currentGoal = message.substring(0, 60);
+    currentGoal = resolved.currentGoal;
     const result = await enqueue(() => {
       return runClaudeStreaming(prompt, (evt) => {
         try { res.write(`data: ${JSON.stringify(evt)}\n\n`); } catch {}
@@ -488,7 +591,8 @@ app.get('/api/chat/stream', auth, async (req, res) => {
     });
     res.end();
   } catch (err) {
-    res.write(`data: ${JSON.stringify({ type: 'error', error: err.message })}\n\n`);
+    const e = classifyError(err, 'chat_stream_failed');
+    res.write(`data: ${JSON.stringify({ type: 'error', ...e })}\n\n`);
     res.end();
   }
 });
@@ -497,28 +601,24 @@ app.get('/api/chat/stream', auth, async (req, res) => {
 app.post('/api/invoke/:skill', auth, async (req, res) => {
   const name = req.params.skill;
   const skill = skillRegistry.get(name);
-  if (!skill) return res.status(404).json({ error: `Skill "${name}" not found` });
+  if (!skill) {
+    return res.status(404).json({
+      code: 'skill_not_found',
+      error: `Skill "${name}" not found`,
+      hint: 'Use /api/skills to list invocable skills.',
+    });
+  }
 
   const { args } = req.body;
-  const skillContent = fs.readFileSync(skill.file, 'utf-8');
-
-  const prompt = [
-    `Execute the following skill. Follow its instructions precisely.`,
-    '',
-    '## SKILL.md',
-    '```',
-    skillContent,
-    '```',
-    '',
-    `User arguments: ${args || '(none — use defaults)'}`,
-  ].join('\n');
+  const prompt = buildInvokePrompt(name, args);
 
   try {
     currentGoal = `/${name} ${(args || '').substring(0, 40)}`;
     const result = await enqueue(() => runClaude(prompt));
     res.json({ skill: name, result });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    const e = classifyError(err, 'invoke_failed');
+    res.status(500).json(e);
   }
 });
 

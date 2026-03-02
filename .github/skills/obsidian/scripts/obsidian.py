@@ -390,7 +390,9 @@ class Obsidian:
         *,
         file: Optional[str] = None,
         path: Optional[str] = None,
+        active: bool = False,
         counts: bool = True,
+        total: bool = False,
         sort: Optional[Literal["count", "name"]] = None,
         format: Literal["tsv", "json", "csv"] = "tsv",
     ) -> CLIResult:
@@ -399,18 +401,34 @@ class Obsidian:
             "tags",
             file=file,
             path=path,
+            active=active or None,
             counts=counts or None,
+            total=total or None,
             sort=sort,
             format=format if format != "tsv" else None,
         )
 
-    def tag_info(self, name: str, *, verbose: bool = True) -> CLIResult:
+    def tag_info(self, name: str, *, verbose: bool = True, total: bool = False) -> CLIResult:
         """Get info about a specific tag (count + file list)."""
-        return self.run("tag", name=name, verbose=verbose or None)
+        return self.run("tag", name=name, verbose=verbose or None, total=total or None)
 
-    def tags_for_file(self, file: Optional[str] = None, *, path: Optional[str] = None) -> CLIResult:
+    def tags_for_file(
+        self,
+        file: Optional[str] = None,
+        *,
+        path: Optional[str] = None,
+        counts: bool = False,
+        total: bool = False,
+    ) -> CLIResult:
         """Get tags for a specific file."""
-        return self.run("tags", file=file, path=path, active=True if not file and not path else None)
+        return self.run(
+            "tags",
+            file=file,
+            path=path,
+            counts=counts or None,
+            total=total or None,
+            active=True if not file and not path else None,
+        )
 
     # ------------------------------------------------------------------
     # Links / Graph
@@ -668,12 +686,16 @@ if __name__ == "__main__":
         description="Obsidian CLI wrapper — pipe-friendly vault operations.",
         epilog="Content is read from stdin when --content is omitted.",
     )
-    parser.add_argument("action", choices=["create", "append", "prepend", "read", "info"],
+    parser.add_argument("action", choices=["create", "append", "prepend", "read", "info", "search", "search-context"],
                         help="Vault operation to perform.")
     parser.add_argument("--path", required=False, help="Vault-relative path (e.g. Research/Library/note.md).")
     parser.add_argument("--file", required=False, help="File name (Obsidian title match).")
     parser.add_argument("--vault", required=False, help="Target vault name.")
     parser.add_argument("--content", required=False, help="Inline content (if omitted, reads stdin).")
+    parser.add_argument("--query", required=False, help="Search query (for search/search-context actions).")
+    parser.add_argument("--limit", required=False, type=int, help="Result limit for search actions.")
+    parser.add_argument("--format", required=False, choices=["text", "json"], default="text",
+                        help="Output format for search actions.")
     parser.add_argument("--overwrite", action="store_true", help="Overwrite existing file on create.")
     parser.add_argument("--template", required=False, help="Template name for create.")
 
@@ -687,6 +709,26 @@ if __name__ == "__main__":
     if args.action == "read":
         print(ob.read(file=args.file, path=args.path))
         sys.exit(0)
+
+    if args.action in {"search", "search-context"}:
+        query = args.query
+        if not query:
+            if not sys.stdin.isatty():
+                query = sys.stdin.read().strip()
+            else:
+                parser.error(f"'{args.action}' needs --query (or query via stdin).")
+
+        if args.action == "search":
+            r = ob.search(query, path=args.path, limit=args.limit, format=args.format)
+        else:
+            r = ob.search_context(query, path=args.path, limit=args.limit, format=args.format)
+
+        if r.ok:
+            print(r.text)
+            sys.exit(0)
+
+        print(f"FAIL: {r.stderr}", file=sys.stderr)
+        sys.exit(1)
 
     # For create/append/prepend — get content from --content or stdin
     content = args.content
