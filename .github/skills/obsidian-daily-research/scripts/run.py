@@ -224,6 +224,9 @@ DEFAULT_QUALITY_FILTERS = {
         "huggingface.co", "openai.com", "anthropic.com", "blog.",
         "notion.site", "dev.to", "towardsdatascience.com",
         "newsletter.", "mirror.xyz", "deepmind.google",
+        "latent.space", "mckinsey.com", "cursor.com/blog",
+        "manus.im/blog", "cognition.ai", "langchain.com",
+        "paddo.dev", "honra.io", "philschmid.de",
     ],
     "priority_accounts": {
         "x": [
@@ -233,6 +236,7 @@ DEFAULT_QUALITY_FILTERS = {
             "MetaAI", "ylecun",
             "MistralAI", "arthurmensch",
             "karpathy", "swyx", "hardmaru", "DrJimFan",
+            "mntruell", "simonw", "eugeneyan",
         ],
         "reddit_subreddits": [
             "Anthropic", "OpenAI", "LocalLLaMA", "MachineLearning",
@@ -290,6 +294,7 @@ def _parse_pipeline_md(path: Path) -> dict:
         "quality_filters": DEFAULT_QUALITY_FILTERS,
         "topics": [],
         "must_follow_accounts": [],
+        "discovery_accounts": [],
     }
 
     if not path.exists():
@@ -313,6 +318,8 @@ def _parse_pipeline_md(path: Path) -> dict:
                     section = "topics"
                 elif "must" in header or "follow" in header:
                     section = "must-follow"
+                elif "discovery" in header:
+                    section = "discovery"
                 elif "setting" in header:
                     section = "settings"
                 else:
@@ -378,6 +385,22 @@ def _parse_pipeline_md(path: Path) -> dict:
                     elif val.startswith("~/"):
                         val = str(Path.home() / val[2:])
                     config[key] = val
+
+            elif section == "discovery" and line.startswith("- @"):
+                rest = line[3:]  # strip "- @"
+                for sep in (" — ", " – ", " - "):
+                    if sep in rest:
+                        handle, label = rest.split(sep, 1)
+                        config["discovery_accounts"].append({
+                            "handle": handle.strip(),
+                            "label": label.strip(),
+                        })
+                        break
+                else:
+                    config["discovery_accounts"].append({
+                        "handle": rest.strip(),
+                        "label": rest.strip(),
+                    })
 
     return config
 
@@ -949,6 +972,88 @@ def run_must_follow_scan(
 
 
 # ---------------------------------------------------------------------------
+# Discovery Accounts Scan (single batch, topic-agnostic)
+# ---------------------------------------------------------------------------
+
+
+def run_discovery_scan(
+    config: dict,
+    l30_config: dict,
+    from_date: str,
+    to_date: str,
+    seen_urls: set,
+    tracker: TokenTracker | None = None,
+) -> list:
+    """Scan discovery accounts on X — broader builder/practitioner voices.
+
+    Unlike must-follow (which captures every tweet), discovery accounts are
+    scanned in a single batch API call and their results go through quality
+    filters + vault dedup. This is the "home feed approximation" — catching
+    viral practitioner content that keyword search misses.
+
+    Returns a list of XItem-like objects (scored, filtered, deduped).
+    """
+    from vendor.last30days import xai_x, normalize, score, dedupe
+
+    accounts = config.get("discovery_accounts", [])
+    if not accounts or not l30_config.get("XAI_API_KEY"):
+        return []
+
+    model = l30_config.get("xai_model", "grok-4-1-fast")
+    handles = [a["handle"].lstrip("@") for a in accounts[:10]]
+    handle_set = {h.lower() for h in handles}
+
+    print(f"  [discovery] {len(handles)} accounts in one batch...", end=" ", flush=True)
+
+    try:
+        raw = xai_x.search_x_must_follow_batch(
+            l30_config["XAI_API_KEY"],
+            model,
+            handles,
+            from_date,
+            to_date,
+            depth="scan",
+        )
+        if tracker:
+            tracker.record("Discovery/batch", model, _extract_usage(raw))
+
+        items = xai_x.parse_x_response(raw)
+        normalized = normalize.normalize_x_items(items, from_date, to_date)
+
+        # Hard post-filter: only keep items from handles in the discovery list
+        filtered = [
+            item for item in normalized
+            if item.author_handle.lower().lstrip("@") in handle_set
+        ]
+
+        # Filter out replies
+        final = []
+        for item in filtered:
+            text = item.text.strip()
+            author = item.author_handle.lower().lstrip("@")
+            if text.startswith("@") and not text.lower().startswith(f"@{author}"):
+                continue
+            final.append(item)
+
+        # Score items (gives them engagement-based scores)
+        scored = score.score_x_items(final)
+        sorted_items = score.sort_items(scored)
+
+        # Dedupe internally
+        deduped = dedupe.dedupe_x(sorted_items)
+
+        # Vault dedup — remove items already seen
+        vault_deduped = [item for item in deduped if item.url not in seen_urls]
+
+        print(f"→ {len(vault_deduped)} tweets (after dedup)")
+        return vault_deduped
+
+    except Exception as e:
+        print(f"error — {e}")
+        return []
+
+
+# ---------------------------------------------------------------------------
 # Feedback Processing (#good / #bad tags)
 # ---------------------------------------------------------------------------
 
@@ -1261,6 +1366,7 @@ def render_daily_note(
     synthesis: dict,
     config: dict,
     must_follow_results: list = None,
+    discovery_results: list = None,
     feedback_summary: dict = None,
     tracker: TokenTracker | None = None,
 ) -> str:
@@ -1271,6 +1377,9 @@ def render_daily_note(
 
     # Count must-follow tweets
     mf_count = sum(len(r["items"]) for r in (must_follow_results or []))
+
+    # Count discovery items
+    disc_count = len(discovery_results or [])
 
     # Find vault connections — wikilink to existing Library notes
     vault_connections = _find_vault_connections(topic_slugs, config)
@@ -1291,32 +1400,21 @@ def render_daily_note(
             if cat == 'deep-dive':
                 deep_dives.append((item, topic, 'reddit'))
 
-    # Build frontmatter — include token stats if available
+    # Build frontmatter
     fm_lines = [
         "---",
         f"date: {date_str}",
         "type: daily-research",
-        f"topics: [{', '.join(topic_slugs)}]",
-        f"tags: [{', '.join('#' + s for s in topic_slugs)}]",
+        f"tags: [{', '.join(topic_slugs)}]",
         "status: unread",
         f"up: \"[[🤖 MOC - AI Agent Development]]\"",
         f"reddit_items: {total_reddit}",
         f"x_items: {total_x}",
         f"must_follow_tweets: {mf_count}",
+        f"discovery_items: {disc_count}",
         f"deep_dives: {len(deep_dives)}",
         f"lab_pulse: {len(lab_pulse_items)}",
     ]
-    if tracker and tracker.num_calls > 0:
-        ts = tracker.summary_dict()
-        cost_val = ts.get("cost_usd") or ts.get("estimated_cost_usd", 0)
-        cost_key = "cost_usd" if "cost_usd" in ts else "estimated_cost_usd"
-        fm_lines.extend([
-            f"api_calls: {ts['api_calls']}",
-            f"total_tokens: {ts['total_tokens']}",
-            f"input_tokens: {ts['input_tokens']}",
-            f"output_tokens: {ts['output_tokens']}",
-            f"{cost_key}: {cost_val}",
-        ])
     fm_lines.extend(["---", ""])
 
     lines = fm_lines + [
@@ -1398,6 +1496,31 @@ def render_daily_note(
                             f"[{likes}\u2764\ufe0f]({url})"
                         )
                 lines.append("")
+
+    # Discovery Accounts — broader builder/practitioner voices (topic-agnostic)
+    if discovery_results:
+        lines.extend([
+            "## Discovery Feed \U0001f50d",
+            "",
+            "> Practitioner & builder accounts — topic-agnostic, engagement-ranked.",
+            "",
+        ])
+        for item in discovery_results[:12]:
+            text = item.text if hasattr(item, 'text') else str(item)
+            url = item.url if hasattr(item, 'url') else ""
+            likes = 0
+            if hasattr(item, 'engagement') and item.engagement and hasattr(item.engagement, 'likes'):
+                likes = item.engagement.likes or 0
+            date_str_item = ""
+            if hasattr(item, 'date') and item.date:
+                date_str_item = f" ({item.date})"
+            author = item.author_handle if hasattr(item, 'author_handle') else "?"
+            text_display = _oneline(text, 200)
+            lines.append(
+                f"- [ ] @{author}{date_str_item}: {text_display} "
+                f"[{likes}\u2764\ufe0f]({url})"
+            )
+        lines.append("")
 
     # Lab Pulse — what the model providers said/shipped today
     lab_pulse_summary = synthesis.get("lab_pulse_summary", "")
@@ -1734,6 +1857,21 @@ def main():
         mf_total = sum(len(r["items"]) for r in must_follow_results)
         print(f"[must-follow] Captured {mf_total} tweets from {len(mf_accounts)} accounts")
 
+    # Discovery accounts scan (single batch, topic-agnostic, quality-filtered)
+    discovery_results = []
+    disc_accounts = config.get("discovery_accounts", [])
+    if disc_accounts and l30_config.get("XAI_API_KEY"):
+        print(f"\n[discovery] Scanning {len(disc_accounts)} builder/practitioner accounts (1 API call) | last 24h ({mf_from_date} → {to_date})...")
+        discovery_results = run_discovery_scan(
+            config, l30_config, mf_from_date, to_date,
+            seen_urls=seen_urls,
+            tracker=tracker,
+        )
+        # Add discovery URLs to seen set
+        for item in discovery_results:
+            seen_urls.add(item.url)
+        print(f"[discovery] Captured {len(discovery_results)} tweets")
+
     # Synthesize (single batched call)
     synthesis = {}
     if l30_config.get("OPENAI_API_KEY"):
@@ -1760,6 +1898,7 @@ def main():
     note_content = render_daily_note(
         today, topic_results, synthesis, config,
         must_follow_results=must_follow_results,
+        discovery_results=discovery_results,
         feedback_summary=feedback_summary,
         tracker=tracker,
     )
@@ -1788,7 +1927,8 @@ def main():
     total_reddit = sum(len(tr["reddit_items"]) for tr in topic_results)
     total_x = sum(len(tr["x_items"]) for tr in topic_results)
     mf_total = sum(len(r["items"]) for r in must_follow_results)
-    print(f"\nDone! {total_reddit}R + {total_x}X + {mf_total}MF items across {len(all_topics)} topics.")
+    disc_total = len(discovery_results)
+    print(f"\nDone! {total_reddit}R + {total_x}X + {mf_total}MF + {disc_total}Disc items across {len(all_topics)} topics.")
 
 
 if __name__ == "__main__":

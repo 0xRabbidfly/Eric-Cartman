@@ -41,6 +41,18 @@
       "title": "> Tag any item with `#good` or `#bad` to give feedback.",
       "url": "",
       "source_file": "Research/Dailies/2026/03/2026-03-01.md"
+    },
+    {
+      "date": "2026-03-02",
+      "title": "> Tag any item with `#good` or `#bad` to give feedback.",
+      "url": "",
+      "source_file": "Research/Dailies/2026/03/2026-03-02.md"
+    },
+    {
+      "date": "2026-03-03",
+      "title": "> Tag any item with `#good` or `#bad` to give feedback.",
+      "url": "",
+      "source_file": "Research/Dailies/2026/03/2026-03-03.md"
     }
   ],
   "bad": [
@@ -91,10 +103,22 @@
       "title": "> Tag any item with `#good` or `#bad` to give feedback.",
       "url": "",
       "source_file": "Research/Dailies/2026/03/2026-03-01.md"
+    },
+    {
+      "date": "2026-03-02",
+      "title": "> Tag any item with `#good` or `#bad` to give feedback.",
+      "url": "",
+      "source_file": "Research/Dailies/2026/03/2026-03-02.md"
+    },
+    {
+      "date": "2026-03-03",
+      "title": "> Tag any item with `#good` or `#bad` to give feedback.",
+      "url": "",
+      "source_file": "Research/Dailies/2026/03/2026-03-03.md"
     }
   ],
   "stats": {
-    "total_good": 7,
-    "total_bad": 8
+    "total_good": 9,
+    "total_bad": 10
   }
 }
