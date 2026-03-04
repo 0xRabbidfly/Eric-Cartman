@@ -48,8 +48,9 @@ python .github/skills/obsidian-daily-research/scripts/run.py --promote-only
 7. **Content Classification** — Tags each item as `deep-dive`, `lab-pulse`, or `general`
 8. **Cross-Dedup** — Filters out any URLs/titles already in the vault
 9. **Must-Follow Scan** — Dedicated per-person X search for tracked accounts. **No filters** — every tweet is captured.
-10. **Batched Synthesis** — Single gpt-5.2 call to produce daily POW briefing + lab pulse summary + per-topic headlines
-11. **Write Daily Note** — Outputs structured markdown to `Research/Dailies/YYYY/MM/YYYY-MM-DD.md`
+10. **Discovery Scan** — Single batch API call for ~8-10 builder/practitioner accounts. Topic-agnostic, engagement-ranked, vault-deduped. Bridges the gap between must-follow and keyword search.
+11. **Batched Synthesis** — Single gpt-5.2 call to produce daily POW briefing + lab pulse summary + per-topic headlines
+12. **Write Daily Note** — Outputs structured markdown to `Research/Dailies/YYYY/MM/YYYY-MM-DD.md`
 
 ### Must-Follow Accounts
 
@@ -72,7 +73,24 @@ Dedicated scan for key people — every tweet is captured regardless of engageme
 | @MetaAI | Meta | Meta AI |
 | @Alibaba_Qwen | Alibaba | Alibaba Qwen team |
 
-To add/remove accounts, edit the `must_follow.accounts` array in `scripts/config.json`.
+To add/remove accounts, edit the `# Must-Follow Accounts` section in `pipeline.md`.
+
+### Discovery Accounts
+
+Broader builder/practitioner voices scanned in a **single batch API call** (1 API call for all). Topic-agnostic — captures any post, not just keyword matches. Results are engagement-ranked and vault-deduped. Think of these as "accounts whose tweets I'd stop scrolling to read."
+
+| Account | Why |
+|---------|-----|
+| @systematicls | sysls — agentic engineering practitioner |
+| @Hxlfed14 | Himanshu — agent harness deep dives |
+| @tanayj | Tanay Jaipuria — AI strategy / moats |
+| @ankitxg | Ankit Jain — Aviator / AI eng practices |
+| @hardmaru | David Ha — Sakana AI |
+| @DrJimFan | Jim Fan — NVIDIA |
+| @simonw | Simon Willison — AI tooling / pragmatist |
+| @eugeneyan | Eugene Yan — applied AI |
+
+To add/remove accounts, edit the `# Discovery Accounts` section in `pipeline.md`.
 
 ### Topics Tracked
 
@@ -125,6 +143,7 @@ Research/Dailies/2026/02/2026-02-26.md
 │   ├── Google (GoogleDeepMind, JeffDean)
 │   ├── Thought Leaders (karpathy)
 │   └── ...other groups
+├── Discovery Feed 🔍 (builder/practitioner accounts, engagement-ranked, checkboxes)
 ├── Lab Pulse 🧪 (model provider rollup + table of lab posts)
 ├── Deep Dives 📖 (long-form threads and articles, checkboxes)
 ├── Reading List (top 15, checkboxes, topic tags)
@@ -138,13 +157,14 @@ Research/Dailies/2026/02/2026-02-26.md
 
 ## Configuration
 
-Edit `scripts/config.json`:
+Edit `pipeline.md` (single source of truth):
 - `vault_path` — Path to your Obsidian vault
 - `dailies_folder` — Base subfolder for daily notes (default: `Research/Dailies`). Notes are auto-organized into `YYYY/MM/` subfolders.
 - `library_folder` — Subfolder for library notes (default: `Research/Library`)
 - `items_per_topic` — Max items per topic (default: 8)
 - `reading_list_max` — Max reading list items (default: 15)
-- `must_follow.accounts` — List of X accounts to track (every tweet captured, no filters)
+- `# Must-Follow Accounts` section — List of X accounts to track (every tweet captured, no filters)
+- `# Discovery Accounts` section — Builder/practitioner accounts (single batch, topic-agnostic)
 - `feedback_tags` — Tag names for feedback system (`#good`, `#bad`)
 
 Custom topics can be added via a `topics` array in config.json.

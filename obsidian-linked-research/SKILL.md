@@ -76,9 +76,14 @@ The script outputs JSON to stdout:
   "type": "web",
   "url": "https://...",
   "title": "Page Title",
-  "content": "Plain text content (up to 8000 chars)"
+  "content": "Plain text content (up to 8000 chars)",
+  "image_urls": ["https://example.com/hero.jpg", "https://example.com/diagram.png"]
 }
 ```
+
+The `image_urls` array includes OG images and meaningful `<img>` tags found in the
+page (tracking pixels, favicons, and tiny icons are filtered out). Use Step 3b to
+download them into the vault.
 
 If the result contains an `"error"` key, report it to the user and stop.
 

@@ -550,10 +550,67 @@ def _parse_xai_response(response: Dict[str, Any]) -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
-def fetch_web(url: str, timeout: int = 15) -> Dict[str, Any]:
-    """Fetch a web page and extract plain text content.
+def _extract_images(html: str, base_url: str) -> List[str]:
+    """Extract meaningful image URLs from HTML.
 
-    Returns dict with url, title (from <title>), and content (plain text, max 8000 chars).
+    Finds <img> src attributes and <meta property="og:image"> content.
+    Filters out tracking pixels, tiny icons, and data URIs.
+    Resolves relative URLs against base_url.
+    """
+    from urllib.parse import urljoin, urlparse
+
+    images: List[str] = []
+    seen: set = set()
+
+    def _add(src: str):
+        if not src or src in seen:
+            return
+        # Skip data URIs, SVG inline, tracking pixels, tiny icons
+        if src.startswith("data:"):
+            return
+        # Resolve relative URLs
+        if not src.startswith("http"):
+            src = urljoin(base_url, src)
+        # Skip common non-content images
+        _SKIP_PATTERNS = [
+            r'favicon', r'logo[\-_.]', r'icon[\-_.]', r'sprite',
+            r'tracking', r'pixel', r'1x1', r'badge', r'button',
+            r'avatar[\-_.]', r'emoji', r'\.svg$',
+        ]
+        src_lower = src.lower()
+        for pat in _SKIP_PATTERNS:
+            if re.search(pat, src_lower):
+                return
+        seen.add(src)
+        images.append(src)
+
+    # OG image (highest priority — usually the hero/share image)
+    og_match = re.search(
+        r'<meta\s+(?:[^>]*?)property=["\']og:image["\']\s+content=["\'](.*?)["\']',
+        html, re.IGNORECASE
+    )
+    if not og_match:
+        # Try reversed attribute order: content before property
+        og_match = re.search(
+            r'<meta\s+(?:[^>]*?)content=["\'](.*?)["\']\s+(?:[^>]*?)property=["\']og:image["\']',
+            html, re.IGNORECASE
+        )
+    if og_match:
+        _add(og_match.group(1).strip())
+
+    # <img> tags — extract src attributes
+    for img_match in re.finditer(r'<img\s[^>]*?src=["\']([^"\']+)["\']', html, re.IGNORECASE):
+        _add(img_match.group(1).strip())
+
+    _log(f"Extracted {len(images)} image(s) from HTML")
+    return images
+
+
+def fetch_web(url: str, timeout: int = 15) -> Dict[str, Any]:
+    """Fetch a web page and extract plain text content + image URLs.
+
+    Returns dict with url, title (from <title>), content (plain text, max 8000 chars),
+    and image_urls (list of meaningful image URLs found in the page).
     """
     try:
         req = urllib.request.Request(
@@ -567,11 +624,14 @@ def fetch_web(url: str, timeout: int = 15) -> Dict[str, Any]:
             raw = resp.read().decode("utf-8", errors="replace")
     except Exception as e:
         _log_error(f"Failed to fetch {url}: {e}")
-        return {"type": "web", "url": url, "title": "", "content": "", "error": str(e)}
+        return {"type": "web", "url": url, "title": "", "content": "", "image_urls": [], "error": str(e)}
 
     # Extract <title>
     title_match = re.search(r"<title[^>]*>(.*?)</title>", raw, re.IGNORECASE | re.DOTALL)
     title = html_mod.unescape(title_match.group(1).strip()) if title_match else ""
+
+    # Extract images BEFORE stripping HTML
+    image_urls = _extract_images(raw, url)
 
     # Strip scripts, styles, then all HTML tags
     text = re.sub(r"<script[^>]*>.*?</script>", "", raw, flags=re.DOTALL | re.IGNORECASE)
@@ -582,13 +642,14 @@ def fetch_web(url: str, timeout: int = 15) -> Dict[str, Any]:
 
     if len(text) < 100:
         _log_error(f"Extracted text too short ({len(text)} chars) for {url}")
-        return {"type": "web", "url": url, "title": title, "content": text, "error": "Content too short — may require JavaScript rendering"}
+        return {"type": "web", "url": url, "title": title, "content": text, "image_urls": image_urls, "error": "Content too short — may require JavaScript rendering"}
 
     return {
         "type": "web",
         "url": url,
         "title": title,
         "content": text[:8000],
+        "image_urls": image_urls,
     }
 
 

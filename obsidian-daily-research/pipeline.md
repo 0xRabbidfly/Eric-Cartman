@@ -34,6 +34,11 @@
 ## Thought Leaders
 
 - @karpathy — Andrej Karpathy (solo)
+- @swyx — Swyx / Latent Space (solo)
+
+## Cursor
+
+- @mntruell — Michael Truell (solo)
 
 ## Anthropic
 
@@ -63,6 +68,28 @@
 ## Meta
 
 - @MetaAI — Meta AI
+
+---
+
+# Discovery Accounts
+
+> Broader builder/practitioner accounts scanned in a SINGLE batch API call.
+> Topic-agnostic — captures any post, not just keyword matches.
+> This bridges the gap between must-follow (every tweet tracked) and
+> keyword search (misses emerging vocabulary and cross-topic content).
+> Think of these as "accounts whose tweets I'd stop scrolling to read."
+>
+> **Format:** `- @handle — Display Name`
+> These are always batched (max 10 per API call). No (solo) option.
+
+- @systematicls — sysls (agentic engineering)
+- @Hxlfed14 — Himanshu (agent harness deep dives)
+- @tanayj — Tanay Jaipuria (AI strategy / moats)
+- @ankitxg — Ankit Jain (Aviator / AI eng practices)
+- @hardmaru — David Ha (Sakana AI)
+- @DrJimFan — Jim Fan (NVIDIA)
+- @simonw — Simon Willison (AI tooling / pragmatist)
+- @eugeneyan — Eugene Yan (applied AI)
 
 ---
 
