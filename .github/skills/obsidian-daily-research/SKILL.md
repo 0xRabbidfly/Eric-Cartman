@@ -31,6 +31,9 @@ python .github/skills/obsidian-daily-research/scripts/run.py --topic agents
 # Preview without writing to vault
 python .github/skills/obsidian-daily-research/scripts/run.py --dry-run
 
+# Intentionally rerun for the same day
+python .github/skills/obsidian-daily-research/scripts/run.py --force-rerun
+
 # Just promote #keep items to Library
 python .github/skills/obsidian-daily-research/scripts/run.py --promote-only
 ```
@@ -52,6 +55,14 @@ python .github/skills/obsidian-daily-research/scripts/run.py --promote-only
 11. **Prominent AI Voices Scan** — Single broad X search for high-engagement (500+ likes) tweets from prominent AI researchers, engineers, and executives. One API call captures what the top minds are saying without hardcoding account names.
 12. **Batched Synthesis** — Single gpt-5.2 call to produce daily POW briefing + lab pulse summary + per-topic headlines
 13. **Write Daily Note** — Outputs structured markdown to `Research/Dailies/YYYY/MM/YYYY-MM-DD.md`
+
+### Same-Day Run Protection
+
+The pipeline is now single-write by default for each day.
+
+- If today's daily note already exists, the run exits before scanning.
+- It does not create `-2`, `-3`, or other suffixed duplicates anymore.
+- Use `--force-rerun` only when you intentionally want to regenerate the day.
 
 ### Must-Follow Accounts
 

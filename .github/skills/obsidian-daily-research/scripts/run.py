@@ -2132,6 +2132,7 @@ def main():
     parser.add_argument("--show-dedup", action="store_true", help="Show all seen URLs from vault")
     parser.add_argument("--costs", action="store_true", help="Show estimated token costs after run")
     parser.add_argument("--debug", action="store_true", help="Enable verbose debug logging")
+    parser.add_argument("--force-rerun", action="store_true", help="Ignore same-day note protection and rerun intentionally")
     args = parser.parse_args()
 
     # Load config
@@ -2170,6 +2171,10 @@ def main():
     # Enable debug
     if args.debug:
         os.environ["LAST30DAYS_DEBUG"] = "1"
+
+    if not args.dry_run and not args.force_rerun and vault.daily_exists(config, today):
+        print(f"[skip] Daily research note already exists for {today}. Use --force-rerun to run again intentionally.")
+        return
 
     # Run promote pass first (tag-to-library for previous dailies)
     # Load API key early so promote can do LLM enrichment
