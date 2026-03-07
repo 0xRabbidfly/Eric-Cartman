@@ -50,6 +50,11 @@
             "name": "Dwarkesh Podcast",
             "rss_url": "https://api.substack.com/feed/podcast/69345.rss",
             "enabled": true
+        },
+        "the-pragmatic-engineer": {
+            "name": "The Pragmatic Engineer",
+            "rss_url": "https://api.substack.com/feed/podcast/458709.rss",
+            "enabled": true
         }
     },
     "spotify": {

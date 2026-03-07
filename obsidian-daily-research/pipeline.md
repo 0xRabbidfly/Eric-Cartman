@@ -22,9 +22,8 @@
 
 # Must-Follow Accounts
 
-> Every tweet from these accounts is captured — no engagement filter, no quality
-> filter. Corp accounts are batched into one API call. Individual accounts get
-> dedicated solo calls for maximum reliability.
+> Every tweet from these accounts is captured — no engagement floor.
+> All original posts are included regardless of like count.
 >
 > **Format:** `- @handle — Display Name` or `- @handle — Display Name (solo)`
 > Append `(solo)` to give an account its own dedicated API call.
@@ -71,28 +70,6 @@
 
 ---
 
-# Discovery Accounts
-
-> Broader builder/practitioner accounts scanned in a SINGLE batch API call.
-> Topic-agnostic — captures any post, not just keyword matches.
-> This bridges the gap between must-follow (every tweet tracked) and
-> keyword search (misses emerging vocabulary and cross-topic content).
-> Think of these as "accounts whose tweets I'd stop scrolling to read."
->
-> **Format:** `- @handle — Display Name`
-> These are always batched (max 10 per API call). No (solo) option.
-
-- @systematicls — sysls (agentic engineering)
-- @Hxlfed14 — Himanshu (agent harness deep dives)
-- @tanayj — Tanay Jaipuria (AI strategy / moats)
-- @ankitxg — Ankit Jain (Aviator / AI eng practices)
-- @hardmaru — David Ha (Sakana AI)
-- @DrJimFan — Jim Fan (NVIDIA)
-- @simonw — Simon Willison (AI tooling / pragmatist)
-- @eugeneyan — Eugene Yan (applied AI)
-
----
-
 # Settings
 
 > Key-value pairs. Format: `- key: value`
@@ -104,3 +81,4 @@
 - items_per_topic: 8
 - reading_list_max: 15
 - depth: scan
+- prominent_ai_min_likes: 500

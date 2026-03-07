@@ -71,6 +71,22 @@
       "rss_url": "https://api.substack.com/feed/podcast/69345.rss",
       "spotify_id": "",
       "episodes": {}
+    },
+    "the-pragmatic-engineer": {
+      "name": "The Pragmatic Engineer",
+      "rss_url": "https://api.substack.com/feed/podcast/458709.rss",
+      "spotify_id": "",
+      "episodes": {
+        "3fuz0q5vlIQE1DB6JmKZ8B": {
+          "title": "Building Claude Code with Boris Cherny",
+          "published": "2026-03-04",
+          "audio_url": "https://api.substack.com/feed/podcast/189707865/2cbae30ec4559163310b34b9eb413105.mp3",
+          "transcript_path": ".work/transcripts/2026-03-04 - Building Claude Code with Boris Cherny.txt",
+          "note_path": "Podcasts/The Pragmatic Engineer/2026-03-04 - Building Claude Code with Boris Cherny.md",
+          "processed_at": "2026-03-05T04:07:03.501020+00:00",
+          "status": "completed"
+        }
+      }
     }
   }
 }

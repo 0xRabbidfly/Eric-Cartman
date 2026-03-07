@@ -1,124 +1,17 @@
 {
-  "good": [
-    {
-      "date": "2026-02-28",
-      "title": "> Tag any item with `#good` or `#bad` to give feedback.",
-      "url": "",
-      "source_file": "Research/Dailies/2026/02/2026-02-28.md"
-    },
-    {
-      "date": "2026-02-28",
-      "title": "> Tag any item with `#good` or `#bad` to give feedback.",
-      "url": "",
-      "source_file": "Research/Dailies/2026/02/2026-02-28.md"
-    },
-    {
-      "date": "2026-02-28",
-      "title": "> Tag any item with `#good` or `#bad` to give feedback.",
-      "url": "",
-      "source_file": "Research/Dailies/2026/02/2026-02-28.md"
-    },
-    {
-      "date": "2026-02-28",
-      "title": "> Tag any item with `#good` or `#bad` to give feedback.",
-      "url": "",
-      "source_file": "Research/Dailies/2026/02/2026-02-28.md"
-    },
-    {
-      "date": "2026-02-28",
-      "title": "> Tag any item with `#good` or `#bad` to give feedback.",
-      "url": "",
-      "source_file": "Research/Dailies/2026/02/2026-02-28.md"
-    },
-    {
-      "date": "2026-02-28",
-      "title": "> Tag any item with `#good` or `#bad` to give feedback.",
-      "url": "",
-      "source_file": "Research/Dailies/2026/02/2026-02-28.md"
-    },
-    {
-      "date": "2026-03-01",
-      "title": "> Tag any item with `#good` or `#bad` to give feedback.",
-      "url": "",
-      "source_file": "Research/Dailies/2026/03/2026-03-01.md"
-    },
-    {
-      "date": "2026-03-02",
-      "title": "> Tag any item with `#good` or `#bad` to give feedback.",
-      "url": "",
-      "source_file": "Research/Dailies/2026/03/2026-03-02.md"
-    },
-    {
-      "date": "2026-03-03",
-      "title": "> Tag any item with `#good` or `#bad` to give feedback.",
-      "url": "",
-      "source_file": "Research/Dailies/2026/03/2026-03-03.md"
-    }
-  ],
+  "good": [],
   "bad": [
     {
       "date": "2026-02-28",
-      "title": "> Tag any item with `#good` or `#bad` to give feedback.",
-      "url": "",
-      "source_file": "Research/Dailies/2026/02/2026-02-28.md"
-    },
-    {
-      "date": "2026-02-28",
-      "title": "> Tag any item with `#good` or `#bad` to give feedback.",
-      "url": "",
-      "source_file": "Research/Dailies/2026/02/2026-02-28.md"
-    },
-    {
-      "date": "2026-02-28",
-      "title": "> Tag any item with `#good` or `#bad` to give feedback.",
-      "url": "",
-      "source_file": "Research/Dailies/2026/02/2026-02-28.md"
-    },
-    {
-      "date": "2026-02-28",
-      "title": "> Tag any item with `#good` or `#bad` to give feedback.",
-      "url": "",
-      "source_file": "Research/Dailies/2026/02/2026-02-28.md"
-    },
-    {
-      "date": "2026-02-28",
-      "title": "> Tag any item with `#good` or `#bad` to give feedback.",
-      "url": "",
-      "source_file": "Research/Dailies/2026/02/2026-02-28.md"
-    },
-    {
-      "date": "2026-02-28",
-      "title": "🚨BREAKING: This new GitHub repo has a collection of 1,715+ production-ready AI a...",
+      "title": "\ud83d\udea8BREAKING: This new GitHub repo has a collection of 1,715+ production-ready AI a...",
       "url": "https://x.com/i/status/2027570052866756659",
+      "reason": "",
+      "topic": "",
       "source_file": "Research/Dailies/2026/02/2026-02-28.md"
-    },
-    {
-      "date": "2026-02-28",
-      "title": "> Tag any item with `#good` or `#bad` to give feedback.",
-      "url": "",
-      "source_file": "Research/Dailies/2026/02/2026-02-28.md"
-    },
-    {
-      "date": "2026-03-01",
-      "title": "> Tag any item with `#good` or `#bad` to give feedback.",
-      "url": "",
-      "source_file": "Research/Dailies/2026/03/2026-03-01.md"
-    },
-    {
-      "date": "2026-03-02",
-      "title": "> Tag any item with `#good` or `#bad` to give feedback.",
-      "url": "",
-      "source_file": "Research/Dailies/2026/03/2026-03-02.md"
-    },
-    {
-      "date": "2026-03-03",
-      "title": "> Tag any item with `#good` or `#bad` to give feedback.",
-      "url": "",
-      "source_file": "Research/Dailies/2026/03/2026-03-03.md"
     }
   ],
   "stats": {
-    "total_good": 9,
-    "total_bad": 10
+    "total_good": 0,
+    "total_bad": 1
   }
 }
