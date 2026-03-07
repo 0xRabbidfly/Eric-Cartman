@@ -193,13 +193,9 @@ def write_daily_note(config: dict, date_str: str, content: str) -> str:
 
     path = _daily_path(dailies_folder, date_str)
 
-    # Don't overwrite — find an available filename
+    # Fail closed for duplicate same-day runs.
     if ob.exists(path=path):
-        base = path.rsplit('.md', 1)[0]
-        i = 2
-        while ob.exists(path=f"{base}-{i}.md"):
-            i += 1
-        path = f"{base}-{i}.md"
+        raise FileExistsError(f"Daily note already exists: {path}")
 
     ob.create(path=path, content=content)
     return path
@@ -208,11 +204,23 @@ def write_daily_note(config: dict, date_str: str, content: str) -> str:
 def daily_exists(config: dict, date_str: str) -> bool:
     """Check if a daily note already exists for this date."""
     dailies_folder = config.get("dailies_folder", "Research/Dailies")
-    # Check both new (year/month) and legacy (flat) paths
     new_path = _daily_path(dailies_folder, date_str)
     legacy_path = f"{dailies_folder}/{date_str}.md"
     ob = _client()
-    return ob.exists(path=new_path) or ob.exists(path=legacy_path)
+    if ob.exists(path=new_path) or ob.exists(path=legacy_path):
+        return True
+
+    base = new_path.rsplit('.md', 1)[0]
+    suffix = 2
+    while ob.exists(path=f"{base}-{suffix}.md"):
+        return True
+
+    legacy_base = legacy_path.rsplit('.md', 1)[0]
+    suffix = 2
+    while ob.exists(path=f"{legacy_base}-{suffix}.md"):
+        return True
+
+    return False
 
 
 # ---------------------------------------------------------------------------
