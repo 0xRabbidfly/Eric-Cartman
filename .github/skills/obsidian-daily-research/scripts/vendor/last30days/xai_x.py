@@ -38,6 +38,8 @@ IMPORTANT RULES:
 1. For EACH post, include an inline citation link so I can trace the source.
 2. Return ONLY valid JSON in the exact format below, no other text.
 3. The url for each item MUST be the real X post URL from your search results. Do NOT fabricate or guess status IDs.
+4. ONLY return ORIGINAL posts — NO replies to other users, NO retweets/reposts.
+5. Prefer posts with high engagement (100+ likes) and substantive content.
 
 {{
   "items": [
@@ -46,6 +48,7 @@ IMPORTANT RULES:
       "url": "https://x.com/user/status/...",
       "author_handle": "username",
       "date": "YYYY-MM-DD or null if unknown",
+      "is_reply": false,
       "engagement": {{
         "likes": 100,
         "reposts": 25,
@@ -60,6 +63,7 @@ IMPORTANT RULES:
 
 Rules:
 - url MUST be the exact URL from the search results — never invent a status ID
+- is_reply MUST be false for all items — do not include replies
 - relevance is 0.0 to 1.0 (1.0 = highly relevant)
 - date must be YYYY-MM-DD format or null
 - engagement can be null if unknown
@@ -169,7 +173,7 @@ def search_x(
     }
 
     # Adjust timeout based on depth (generous for API response time)
-    timeout = 90 if depth == "quick" else 120 if depth == "default" else 180
+    timeout = 180 if depth == "quick" else 180 if depth == "default" else 300
 
     # Use Agent Tools API with x_search — pass date range as API params
     payload = {
@@ -231,7 +235,7 @@ def search_x_must_follow(
         "Content-Type": "application/json",
     }
 
-    timeout = 90 if depth == "quick" else 120 if depth == "default" else 180
+    timeout = 180 if depth == "quick" else 180 if depth == "default" else 300
 
     # Clean handle (remove @ if present)
     clean_handle = handle.lstrip("@")
@@ -305,6 +309,114 @@ IMPORTANT: Return ONLY valid JSON in this exact format, no other text:
 Remember: author_handle MUST match the ACTUAL author for every item. URLs MUST be real — never invent status IDs."""
 
 
+PROMINENT_AI_PROMPT = """You have access to real-time X (Twitter) data.
+
+Find {min_items}-{max_items} HIGH-ENGAGEMENT ORIGINAL tweets from prominent AI researchers,
+engineers, executives, and founders. These should be the most impactful posts in the AI space
+from {from_date} to {to_date}.
+
+I'm looking for tweets that would be newsworthy or insightful for AI industry professionals:
+- Frontier model releases, benchmarks, or technical deep-dives
+- AI research breakthroughs or paper highlights
+- Product launches or significant updates from AI companies
+- Technical insights from people building or shipping AI systems
+- Industry analysis or forward-looking commentary from recognized voices
+- Open-source AI releases, frameworks, or tooling announcements
+
+QUALITY BAR:
+- Each tweet MUST have 500+ likes — this is non-negotiable
+- ONLY original posts — NO replies, NO retweets/reposts
+- Prefer longer, substantive posts over short quips or hot takes
+- Diverse voices — don't over-index on any single person or company
+- Focus on posts that reveal genuine insight, not just announcements
+
+IMPORTANT: Return ONLY valid JSON in this exact format, no other text:
+{{
+  "items": [
+    {{
+      "text": "Post text content (full text, not truncated)",
+      "url": "https://x.com/username/status/...",
+      "author_handle": "username",
+      "date": "YYYY-MM-DD or null if unknown",
+      "is_reply": false,
+      "engagement": {{
+        "likes": 500,
+        "reposts": 100,
+        "replies": 50,
+        "quotes": 25
+      }},
+      "why_relevant": "Brief explanation of why this matters for AI practitioners",
+      "relevance": 0.90
+    }}
+  ]
+}}
+
+Rules:
+- url MUST be the exact URL from the search results — never invent a status ID
+- Every item MUST have 500+ likes
+- No replies (is_reply must be false for all items)
+- Include the author's full text, not a summary"""
+
+
+def search_x_prominent_ai(
+    api_key: str,
+    model: str,
+    from_date: str,
+    to_date: str,
+    depth: str = "scan",
+    mock_response: Optional[Dict] = None,
+) -> Dict[str, Any]:
+    """Search X for high-engagement AI tweets from prominent voices.
+
+    A single broad search that captures what the top AI minds are saying
+    without hardcoding specific account names. Relies on engagement
+    thresholds (500+ likes) to surface quality content.
+
+    Args:
+        api_key: xAI API key
+        model: Model to use
+        from_date: Start date (YYYY-MM-DD)
+        to_date: End date (YYYY-MM-DD)
+        depth: Research depth
+        mock_response: Mock response for testing
+
+    Returns:
+        Raw API response
+    """
+    if mock_response is not None:
+        return mock_response
+
+    min_items, max_items = DEPTH_CONFIG.get(depth, DEPTH_CONFIG["default"])
+    # Scale up slightly — we want a rich set from a broad search
+    min_items = max(min_items, 8)
+    max_items = max(max_items, 15)
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+
+    payload = {
+        "model": model,
+        "tools": [
+            _build_x_search_tool(from_date=from_date, to_date=to_date)
+        ],
+        "input": [
+            {
+                "role": "user",
+                "content": PROMINENT_AI_PROMPT.format(
+                    from_date=from_date,
+                    to_date=to_date,
+                    min_items=min_items,
+                    max_items=max_items,
+                ),
+            }
+        ],
+    }
+
+    return http.post(XAI_RESPONSES_URL, payload, headers=headers, timeout=300, retries=1)
+
+
 def search_x_must_follow_batch(
     api_key: str,
     model: str,
@@ -344,7 +456,7 @@ def search_x_must_follow_batch(
         "Content-Type": "application/json",
     }
 
-    timeout = 180  # batched calls need more time
+    timeout = 300  # batched calls need more time
 
     # Clean handles
     clean_handles = [h.lstrip("@") for h in handles[:10]]

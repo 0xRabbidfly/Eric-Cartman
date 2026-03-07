@@ -148,6 +148,7 @@ def normalize_x_items(
             date=date_str,
             date_confidence=date_confidence,
             engagement=engagement,
+            is_reply=bool(item.get("is_reply", False)),
             relevance=item.get("relevance", 0.5),
             why_relevant=item.get("why_relevant", ""),
         ))

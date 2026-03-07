@@ -257,38 +257,36 @@ Combines the teaching methodology of the Project Guide skill with Eric Cartman's
 
 ---
 
-### 9. ✅ Verification Loop
+### 9. 🛠️ Skill Creator
 
-**Pre-PR quality gate running comprehensive validation in 7 phases.**
+**Create new skills, improve existing ones, and measure whether they actually work.**
 
-Runs build, type-check, lint, tests, security scans, and hygiene checks before creating a pull request. Catches issues locally before they reach CI/CD.
+Provides an end-to-end workflow for skill authoring: capture intent, draft the `SKILL.md`, generate realistic test prompts, compare with-skill vs baseline runs, add assertions, and iterate until the skill is solid.
 
 **Use When:**
-- Before creating a pull request
-- After completing a feature or significant refactoring
-- After merging main into your branch
-- As a final check before deployment
-- Every 30 minutes during long coding sessions
+- You want to create a skill from scratch
+- You want to improve or refactor an existing skill
+- You need evals to verify a skill is actually helping
+- You want to benchmark a revised skill against the previous version
+- You want to tighten the skill description so it triggers more reliably
 
-**Verification Phases:**
-| Phase | Type | Checks |
-|-------|------|--------|
-| Build | ✅ Blocking | Syntax, imports, compilation |
-| Type Check | ⚠️ Soft | Type safety, `any` leaks |
-| Lint | ⚠️ Soft | Code style, unused vars |
-| Tests | ✅ Blocking | Unit tests, 80% coverage target |
-| Security | ✅ Blocking | Constitutional violations, secrets |
-| Hygiene | ⚠️ Soft | Import style, ARIA labels |
-| Git Diff | 📋 Info | Changed files review |
+**Core Workflow:**
+| Step | What it does |
+|------|--------------|
+| Capture Intent | Clarifies triggers, outputs, edge cases, and success criteria |
+| Draft the Skill | Writes the `SKILL.md` and any bundled resources |
+| Create Test Prompts | Builds realistic prompts for evaluation |
+| Run Comparisons | Compares with-skill behavior against a baseline |
+| Add Assertions | Defines objective checks where the output is measurable |
+| Iterate | Rewrites the skill based on results and feedback |
 
-**Constitutional Checks:**
-- No `localStorage`/`sessionStorage` usage
-- No hardcoded secrets or API keys
-- No `console.log` in production code
-- No hardcoded English text (i18n compliance)
+**Why It Matters:**
+- Prevents vibes-only skill authoring
+- Encourages measured improvement instead of prompt folklore
+- Makes skill quality reviewable by other contributors
 
 ```
-📍 Location: .github/skills/verification-loop/
+📍 Location: .github/skills/skill-creator/
 ```
 
 ---
@@ -516,15 +514,26 @@ Invoke the `skill-reflection` skill with:
 
 **Automated daily AI research pipeline that writes to your Obsidian vault.**
 
-Scans 5 topic tracks (agents, skills, models, MCP, RAG) across Reddit and X, deduplicates against vault history, and writes a structured daily note with reading list and per-topic breakdowns. Tag `#keep` to promote posts to your long-term Library.
+Scans 5 topic tracks (agents, skills, models, MCP, RAG) across Reddit and X, deduplicates against vault history, and writes a structured daily note with lab updates, prominent voices, deep dives, and per-topic breakdowns. It also supports a feedback loop with `#good` and `#bad` tags, plus `#keep` promotion into your long-term research library.
 
 **Use When:**
 - Daily research habit for staying current on AI developments
 - Scanning specific topics across Reddit and X
 - Building a curated research library over time
+- Catching up after missing a few days of research
 - User says "daily research", "what's new in AI", "run pipeline"
 
-**Cost:** ~$0.05-0.15/day (~$3/month) using scan mode with gpt-4o-mini.
+**Pipeline Highlights:**
+| Capability | Description |
+|------------|-------------|
+| Must-Follow Scan | Tracks key accounts from Anthropic, OpenAI, Google, Meta, Mistral, and notable individuals |
+| Prominent Voices | Pulls high-engagement posts from prominent AI researchers and operators |
+| Deep Dives | Surfaces long-form threads and article-style content separately from general chatter |
+| Vault Dedup | Avoids resurfacing links and titles already captured in the vault |
+| Feedback Loop | Learns from `#good` / `#bad` tags and proposes pipeline improvements |
+| Library Promotion | Promotes `#keep` items into `Research/Library/` on the next run |
+
+**Cost:** ~$0.10-0.30/day (~$6/month) using scan mode with gpt-5.2 synthesis.
 
 **Invocation:**
 ```bash
@@ -536,6 +545,9 @@ python .github/skills/obsidian-daily-research/scripts/run.py --topic agents
 
 # Preview without writing to vault
 python .github/skills/obsidian-daily-research/scripts/run.py --dry-run
+
+# Promote kept items into the long-term library only
+python .github/skills/obsidian-daily-research/scripts/run.py --promote-only
 ```
 
 ```
@@ -776,6 +788,7 @@ npm start
 │   ├── content-research-writer/ # ✍️ Writing partner
 │   ├── obsidian-daily-research/ # 📡 Daily AI research pipeline
 │   ├── obsidian-linked-research/ # 🔗 URL → research note in vault
+│   ├── podcast-to-obsidian/    # 🎙️ Podcast → transcript → Obsidian
 │   ├── doc-sync-all/           # 🔄 Documentation sync
 │   ├── health-audit/           # 🩺 Artifact health checks
 │   ├── insights-report/        # 📈 Cross-session analysis
@@ -793,6 +806,7 @@ npm start
 │   ├── session-skill-forge/    # ⚒️ Workflow → reusable skill
 │   ├── session_context_optimizer/ # 🧹 Meta-optimize AI context
 │   ├── remote-skills-api/      # 📱 Phone access over Tailscale
+│   ├── skill-creator/          # 🛠️ Create, test, and refine skills
 │   ├── skill-reflection/       # 🪞 Composable after-action review
 │   └── visual-explainer/       # 🎨 HTML diagrams, diff reviews, slide decks
 ├── agents/                     # Specialized agent configs

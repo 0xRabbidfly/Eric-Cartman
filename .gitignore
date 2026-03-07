@@ -38,6 +38,7 @@ temp/
 dist/
 build/
 out/
+/reports/
 
 # Cache
 .cache/

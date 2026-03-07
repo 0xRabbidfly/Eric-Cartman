@@ -1,6 +1,6 @@
 ---
 name: obsidian-daily-research
-description: Daily AI research pipeline → Obsidian vault. Scans Reddit + X for agents, skills, models, MCP, RAG topics. Deduplicates against vault history, writes structured daily notes with Lab Pulse, Deep Dives, and categorized reading lists. Tag #keep to promote to long-term library.
+description: Use this skill when the user wants to run the daily AI research pipeline, scan Reddit or X for AI news, or write today's research into their Obsidian vault. Triggers for 'run the daily research', 'what's new in AI today', 'pull today's research', 'catch me up on agents/MCP/models', 'run the pipeline', 'daily scan'. Also use when the user wants to scan only specific sources (Reddit or X only), specify a vault path, or catch up after missing days.
 argument-hint: daily research, run pipeline, what's new in AI
 user-invokable: true
 disable-model-invocation: true
@@ -44,17 +44,18 @@ python .github/skills/obsidian-daily-research/scripts/run.py --promote-only
 3. **Vault Dedup** — Scans all dailies + library files (including year/month subfolders), extracts every URL and title seen before (zero tokens — filesystem only)
 4. **Multi-Topic Scan** — For each of 5 topics, runs Reddit + X search in scan mode (auto-selected model, no enrichment, 5-12 items each)
 5. **Spam Detection** — Filters out misleading content (claim/link mismatches like fake "official guides", engagement bait)
-6. **Quality Filters** — Engagement floor (100+ likes on X, 50+ on Reddit), long-form bonus, priority account boost
-7. **Content Classification** — Tags each item as `deep-dive`, `lab-pulse`, or `general`
-8. **Cross-Dedup** — Filters out any URLs/titles already in the vault
-9. **Must-Follow Scan** — Dedicated per-person X search for tracked accounts. **No filters** — every tweet is captured.
-10. **Discovery Scan** — Single batch API call for ~8-10 builder/practitioner accounts. Topic-agnostic, engagement-ranked, vault-deduped. Bridges the gap between must-follow and keyword search.
-11. **Batched Synthesis** — Single gpt-5.2 call to produce daily POW briefing + lab pulse summary + per-topic headlines
-12. **Write Daily Note** — Outputs structured markdown to `Research/Dailies/YYYY/MM/YYYY-MM-DD.md`
+6. **Reply Filtering** — Drops replies from topic scans using both `is_reply` API field and text-pattern detection
+7. **Quality Filters** — Strict engagement floor (100+ likes on X, 50+ on Reddit — items with unknown engagement are dropped, not bypassed), long-form bonus, priority account boost
+8. **Content Classification** — Tags each item as `deep-dive`, `lab-pulse`, or `general`
+9. **Cross-Dedup** — Filters out any URLs/titles already in the vault
+10. **Must-Follow Scan** — Dedicated per-person X search for tracked accounts. No engagement floor — catches everything they post.
+11. **Prominent AI Voices Scan** — Single broad X search for high-engagement (500+ likes) tweets from prominent AI researchers, engineers, and executives. One API call captures what the top minds are saying without hardcoding account names.
+12. **Batched Synthesis** — Single gpt-5.2 call to produce daily POW briefing + lab pulse summary + per-topic headlines
+13. **Write Daily Note** — Outputs structured markdown to `Research/Dailies/YYYY/MM/YYYY-MM-DD.md`
 
 ### Must-Follow Accounts
 
-Dedicated scan for key people — every tweet is captured regardless of engagement or quality filters. Configured in `config.json → must_follow.accounts`:
+Dedicated scan for key people — catches everything they post (no engagement floor). Configured in `config.json → must_follow.accounts`:
 
 | Account | Group | Why |
 |---------|-------|-----|
@@ -75,23 +76,6 @@ Dedicated scan for key people — every tweet is captured regardless of engageme
 
 To add/remove accounts, edit the `# Must-Follow Accounts` section in `pipeline.md`.
 
-### Discovery Accounts
-
-Broader builder/practitioner voices scanned in a **single batch API call** (1 API call for all). Topic-agnostic — captures any post, not just keyword matches. Results are engagement-ranked and vault-deduped. Think of these as "accounts whose tweets I'd stop scrolling to read."
-
-| Account | Why |
-|---------|-----|
-| @systematicls | sysls — agentic engineering practitioner |
-| @Hxlfed14 | Himanshu — agent harness deep dives |
-| @tanayj | Tanay Jaipuria — AI strategy / moats |
-| @ankitxg | Ankit Jain — Aviator / AI eng practices |
-| @hardmaru | David Ha — Sakana AI |
-| @DrJimFan | Jim Fan — NVIDIA |
-| @simonw | Simon Willison — AI tooling / pragmatist |
-| @eugeneyan | Eugene Yan — applied AI |
-
-To add/remove accounts, edit the `# Discovery Accounts` section in `pipeline.md`.
-
 ### Topics Tracked
 
 | Topic | Slug | Weight |
@@ -109,7 +93,8 @@ Each item gets classified into one of three categories:
 | Category | What it catches | Where it appears |
 |----------|----------------|------------------|
 | **Lab Pulse** | Posts from Anthropic, OpenAI, Google, Meta, Mistral and their lead devs | Dedicated Lab Pulse section at the top |
-| **Deep Dives** | Long-form threads (≥400 chars), articles from known domains (substack, arxiv, medium, etc.) | Deep Dives section with checkboxes |
+| **Prominent Voices** | High-engagement tweets (500+ likes) from any prominent AI figure, found via broad search | Prominent Voices section with engagement stats |
+| **Deep Dives** | Long-form threads (≥800 chars), articles from known domains (substack, arxiv, medium, etc.) | Deep Dives section with checkboxes |
 | **General** | Everything else that passes quality filters | Per-topic sections + Reading List |
 
 ### Tagging System
@@ -119,10 +104,27 @@ Three tags you can add to any item in a daily note:
 | Tag | What it does | Processed as |
 |-----|-------------|--------------|
 | `#keep` | Promote item to `Research/Library/` with LLM-enriched summary | → `#kept` |
-| `#good` | Log as positive feedback (good result, want more like this) | → `#good-noted` |
-| `#bad` | Log as negative feedback (noisy, irrelevant, low quality) | → `#bad-noted` |
+| `#good <reason>` | Log as positive feedback. Add a reason for better analysis: `#good deep practical tutorial` | → `#good-noted` |
+| `#bad <reason>` | Log as negative feedback. Add a reason: `#bad it was a reply`, `#bad bot-generated`, `#bad self-promo fake official guide` | → `#bad-noted` |
 
-Feedback is accumulated in `scripts/feedback.json` with timestamps, titles, and URLs. Stats are shown in the daily note footer.
+Feedback is accumulated in `scripts/feedback.json` with timestamps, titles, URLs, reasons, and topic context.
+
+### Feedback Learning Loop
+
+The pipeline learns from your `#good` and `#bad` tags across a 14-day rolling window:
+
+1. **Collection** — Each run scans previous dailies for unprocessed `#good`/`#bad` tags (skips blockquote template lines). Captures the reason text after the tag and which topic section the item was in.
+2. **Classification** — Reasons are auto-classified into buckets:
+   - **Bad buckets**: `reply`, `low-engagement`, `bot`, `self-promo`, `misleading`, `off-topic`, `duplicate`, `stale`
+   - **Good buckets**: `long-form`, `original-research`, `practical`, `insider`, `high-signal`
+3. **Analysis** — Patterns are extracted: which buckets dominate, which topics produce the most bad results, what good items have in common.
+4. **Proposals** — Concrete improvement suggestions are generated and rendered in the daily note's **Feedback Insights** section. Examples:
+   - "3/5 bad items were replies → reply filter may need strengthening"
+   - "All 4 good items were long-form → consider boosting `long_form_bonus`"
+   - "Topic X produces 60% of bad items → search queries may be too broad"
+5. **Advisory only** — Proposals appear in the daily note for you to review. No auto-applied config changes.
+
+The more reasons you add to your tags, the more precise the proposals become. Tags without reasons still count but get classified as `unclassified`.
 
 ### Long-Term Memory
 
@@ -135,24 +137,26 @@ Feedback is accumulated in `scripts/feedback.json` with timestamps, titles, and 
 
 ```
 Research/Dailies/2026/02/2026-02-26.md
-├── YAML frontmatter (date, type, topics, stats, must_follow_tweets, deep_dives, lab_pulse)
+├── YAML frontmatter (date, type, topics, stats, must_follow_tweets, prominent_voices, deep_dives, lab_pulse)
 ├── Today's POW (vivid daily summary — the one thing that matters most)
-├── Must Follow 📌 (every tweet from tracked accounts, grouped by org)
+├── Must Follow 📌 (tweets from tracked accounts, no engagement floor, grouped by org)
 │   ├── Anthropic (AnthropicAI, alexalbert__, daboris)
 │   ├── OpenAI (OpenAI, sama, markchen90)
 │   ├── Google (GoogleDeepMind, JeffDean)
 │   ├── Thought Leaders (karpathy)
 │   └── ...other groups
-├── Discovery Feed 🔍 (builder/practitioner accounts, engagement-ranked, checkboxes)
+├── Prominent Voices 🎙️ (high-engagement 500+ likes tweets from top AI minds, sorted by likes)
 ├── Lab Pulse 🧪 (model provider rollup + table of lab posts)
-├── Deep Dives 📖 (long-form threads and articles, checkboxes)
+├── Deep Dives 📖 (long-form threads ≥800 chars and articles, checkboxes)
 ├── Reading List (top 15, checkboxes, topic tags)
 ├── Per-topic sections
 │   ├── Headline + key points
 │   ├── Reddit sources table
 │   └── X sources table
 ├── Promote to Library instructions
-└── Rate Results (feedback tag instructions + stats)
+├── Rate Results (feedback tag instructions with examples + stats)
+├── Feedback Insights 🔍 (pattern analysis + improvement proposals from last 14 days)
+└── Efficiency Recommendations
 ```
 
 ## Configuration
@@ -163,8 +167,7 @@ Edit `pipeline.md` (single source of truth):
 - `library_folder` — Subfolder for library notes (default: `Research/Library`)
 - `items_per_topic` — Max items per topic (default: 8)
 - `reading_list_max` — Max reading list items (default: 15)
-- `# Must-Follow Accounts` section — List of X accounts to track (every tweet captured, no filters)
-- `# Discovery Accounts` section — Builder/practitioner accounts (single batch, topic-agnostic)
+- `# Must-Follow Accounts` section — List of X accounts to track (no engagement floor — catches everything)
 - `feedback_tags` — Tag names for feedback system (`#good`, `#bad`)
 
 Custom topics can be added via a `topics` array in config.json.
@@ -176,8 +179,9 @@ Post-scoring filters applied inside `run_topic_scan()` via `config.json → qual
 | Filter | What it does | Config key |
 |--------|-------------|------------|
 | **Spam detection** | Drops fake "official guide" link bait, engagement farming posts. Catches claim/link mismatches and low-effort patterns. | `spam_detection.enabled`, `claim_link_mismatch_patterns`, `low_effort_patterns` |
-| **Engagement floor** | Drops Reddit items with `score < 50` and X items with `likes < 100`. Lab/priority accounts bypass the floor. | `min_engagement.reddit_score`, `min_engagement.x_likes` |
-| **Long-form bonus** | +15 pts for X posts with ≥400 chars (threads) and Reddit links to article domains (medium, substack, arxiv, etc.) | `long_form_bonus`, `long_form_min_chars`, `article_domains` |
+| **Reply filtering** | Drops replies from topic scans using `is_reply` API field and text-pattern detection (`@someone` prefix). Applied to all topic scans. | N/A (always on) |
+| **Engagement floor** | Drops Reddit items with `score < 50` and X items with `likes < 100`. Items with unknown engagement are dropped (not bypassed). Lab/priority accounts bypass the floor. Must-follow accounts have no floor. | `min_engagement.reddit_score`, `min_engagement.x_likes` |
+| **Long-form bonus** | +15 pts for X posts with ≥800 chars (threads) and Reddit links to article domains (medium, substack, arxiv, etc.) | `long_form_bonus`, `long_form_min_chars`, `article_domains` |
 | **Priority accounts** | +20 pts for posts from tracked accounts. Frontier lab releases always surface. | `priority_accounts.x`, `priority_account_bonus` |
 | **Lab accounts** | Accounts from the 5 major labs, used for Lab Pulse rollup. Bypass engagement floor. | `lab_accounts.anthropic`, `lab_accounts.openai`, etc. |
 

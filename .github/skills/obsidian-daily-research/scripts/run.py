@@ -218,7 +218,7 @@ def _extract_usage(response: dict) -> dict | None:
 DEFAULT_QUALITY_FILTERS = {
     "min_engagement": {"reddit_score": 50, "x_likes": 100},
     "long_form_bonus": 15,
-    "long_form_min_chars": 400,
+    "long_form_min_chars": 800,
     "article_domains": [
         "medium.com", "substack.com", "arxiv.org", "github.com",
         "huggingface.co", "openai.com", "anthropic.com", "blog.",
@@ -526,6 +526,21 @@ def apply_quality_filters(result: dict, config: dict) -> dict:
         if not _is_spam(item, config, "reddit")
     ]
 
+    # --- 0b. Reply filtering (drop replies from topic scans) ---
+    # Replies leak through when the API returns them despite prompt instructions.
+    # Two checks: is_reply field from API, and text starting with @someone.
+    filtered_x = []
+    for item in result["x_items"]:
+        # Check is_reply flag (carried through from xAI response)
+        if getattr(item, 'is_reply', False):
+            continue
+        # Check text pattern: starts with @someone (but not self-mention)
+        text = item.text.strip()
+        if text.startswith("@") and not text.lower().startswith(f"@{item.author_handle.lower()}"):
+            continue
+        filtered_x.append(item)
+    result["x_items"] = filtered_x
+
     min_eng = qf.get("min_engagement", {})
     reddit_floor = min_eng.get("reddit_score", 0)
     x_likes_floor = min_eng.get("x_likes", 0)
@@ -548,18 +563,18 @@ def apply_quality_filters(result: dict, config: dict) -> dict:
     if reddit_floor > 0:
         result["reddit_items"] = [
             item for item in result["reddit_items"]
-            if item.engagement is None  # keep items with unknown engagement
-            or item.engagement.score is None
-            or item.engagement.score >= reddit_floor
+            if (item.engagement is not None
+                and item.engagement.score is not None
+                and item.engagement.score >= reddit_floor)
         ]
     if x_likes_floor > 0:
         result["x_items"] = [
             item for item in result["x_items"]
             if item.author_handle.lower() in lab_handles  # lab accounts bypass floor
             or item.author_handle.lower() in priority_x   # priority accounts bypass floor
-            or item.engagement is None
-            or item.engagement.likes is None
-            or item.engagement.likes >= x_likes_floor
+            or (item.engagement is not None
+                and item.engagement.likes is not None
+                and item.engagement.likes >= x_likes_floor)
         ]
 
     # --- 2. Long-form content bonus ---
@@ -884,7 +899,12 @@ def run_must_follow_scan(
                 author = item.author_handle.lower().lstrip("@")
                 if text.startswith("@") and not text.lower().startswith(f"@{author}"):
                     continue
+                if getattr(item, 'is_reply', False):
+                    continue
                 final.append(item)
+
+            # Must-follow: NO engagement floor — catch everything
+            # (engagement floor is for topic scans only)
 
             # Distribute items back to per-account results
             per_handle: dict[str, list] = {h.lower(): [] for h in handles}
@@ -947,7 +967,12 @@ def run_must_follow_scan(
                 text = item.text.strip()
                 if text.startswith("@") and not text.lower().startswith(f"@{handle.lower()}"):
                     continue
+                if getattr(item, 'is_reply', False):
+                    continue
                 final.append(item)
+
+            # Must-follow: NO engagement floor — catch everything
+            # (engagement floor is for topic scans only)
 
             results.append({
                 "handle": acct["handle"],
@@ -971,12 +996,15 @@ def run_must_follow_scan(
     return results
 
 
+# (Discovery feed removed — use must-follow for tracked accounts)
+
+
 # ---------------------------------------------------------------------------
-# Discovery Accounts Scan (single batch, topic-agnostic)
+# Prominent AI Voices Scan (single broad search, engagement-gated)
 # ---------------------------------------------------------------------------
 
 
-def run_discovery_scan(
+def run_prominent_ai_scan(
     config: dict,
     l30_config: dict,
     from_date: str,
@@ -984,69 +1012,64 @@ def run_discovery_scan(
     seen_urls: set,
     tracker: TokenTracker | None = None,
 ) -> list:
-    """Scan discovery accounts on X — broader builder/practitioner voices.
+    """Run a single broad X search for high-engagement AI tweets.
 
-    Unlike must-follow (which captures every tweet), discovery accounts are
-    scanned in a single batch API call and their results go through quality
-    filters + vault dedup. This is the "home feed approximation" — catching
-    viral practitioner content that keyword search misses.
+    Instead of spending tokens on per-account searches, this does ONE API
+    call asking for high-engagement (500+ likes) original tweets from
+    prominent AI voices. The xAI model naturally surfaces the most impactful
+    posts without needing hardcoded account names.
 
-    Returns a list of XItem-like objects (scored, filtered, deduped).
+    Returns a list of XItem objects (already filtered for quality).
     """
     from vendor.last30days import xai_x, normalize, score, dedupe
 
-    accounts = config.get("discovery_accounts", [])
-    if not accounts or not l30_config.get("XAI_API_KEY"):
+    if not l30_config.get("XAI_API_KEY"):
         return []
 
     model = l30_config.get("xai_model", "grok-4-1-fast")
-    handles = [a["handle"].lstrip("@") for a in accounts[:10]]
-    handle_set = {h.lower() for h in handles}
 
-    print(f"  [discovery] {len(handles)} accounts in one batch...", end=" ", flush=True)
+    print(f"  [prominent-ai] Searching for high-engagement AI tweets...", end=" ", flush=True)
 
     try:
-        raw = xai_x.search_x_must_follow_batch(
+        raw = xai_x.search_x_prominent_ai(
             l30_config["XAI_API_KEY"],
             model,
-            handles,
             from_date,
             to_date,
             depth="scan",
         )
         if tracker:
-            tracker.record("Discovery/batch", model, _extract_usage(raw))
+            tracker.record("ProminentAI", model, _extract_usage(raw))
 
         items = xai_x.parse_x_response(raw)
         normalized = normalize.normalize_x_items(items, from_date, to_date)
+        scored = score.score_x_items(normalized)
 
-        # Hard post-filter: only keep items from handles in the discovery list
-        filtered = [
-            item for item in normalized
-            if item.author_handle.lower().lstrip("@") in handle_set
+        # Filter: must have 500+ likes (the whole point of this scan)
+        high_signal = [
+            item for item in scored
+            if not getattr(item, 'is_reply', False)
+            and item.engagement is not None
+            and item.engagement.likes is not None
+            and item.engagement.likes >= 500
         ]
 
-        # Filter out replies
+        # Also filter reply patterns from text
         final = []
-        for item in filtered:
+        for item in high_signal:
             text = item.text.strip()
-            author = item.author_handle.lower().lstrip("@")
-            if text.startswith("@") and not text.lower().startswith(f"@{author}"):
+            if text.startswith("@") and not text.lower().startswith(f"@{item.author_handle.lower()}"):
                 continue
             final.append(item)
 
-        # Score items (gives them engagement-based scores)
-        scored = score.score_x_items(final)
-        sorted_items = score.sort_items(scored)
+        # Dedup against vault
+        final = [
+            item for item in final
+            if item.url not in seen_urls
+        ]
 
-        # Dedupe internally
-        deduped = dedupe.dedupe_x(sorted_items)
-
-        # Vault dedup — remove items already seen
-        vault_deduped = [item for item in deduped if item.url not in seen_urls]
-
-        print(f"→ {len(vault_deduped)} tweets (after dedup)")
-        return vault_deduped
+        print(f"→ {len(final)} high-signal tweets")
+        return final
 
     except Exception as e:
         print(f"error — {e}")
@@ -1074,9 +1097,54 @@ def save_feedback(data: dict):
         json.dump(data, f, indent=2, ensure_ascii=False)
 
 
+def _extract_reason(line: str, tag: str) -> str:
+    """Extract the reason text after a #good/#bad tag.
+
+    Examples:
+        '#good great long-form analysis'  →  'great long-form analysis'
+        '#bad it was a reply'             →  'it was a reply'
+        '#good'                           →  ''
+    """
+    # Find tag position, grab everything after it on the same line
+    idx = line.find(tag)
+    if idx < 0:
+        return ""
+    after = line[idx + len(tag):].strip()
+    # Stop at next tag or end of line
+    after = re.split(r'#\w', after, maxsplit=1)[0].strip()
+    # Strip trailing markdown artifacts
+    after = after.rstrip('|').strip()
+    return after
+
+
+def _extract_current_topic(lines: list[str], line_idx: int) -> str:
+    """Walk backwards from line_idx to find the nearest ## section header.
+
+    Returns the topic slug if the header matches a known topic section,
+    or the raw header text otherwise.
+    """
+    for j in range(line_idx, -1, -1):
+        m = re.match(r'^##\s+(.+)', lines[j])
+        if m:
+            header = m.group(1).strip()
+            # Known sections that aren't topics
+            if header.lower() in (
+                "rate results", "promote to library", "reading list",
+                "today's pow", "vault connections", "efficiency recommendations",
+            ):
+                return ""
+            # Strip emoji suffixes like "Lab Pulse 🧪"
+            clean = re.sub(r'[\U0001f300-\U0001faff\u2600-\u27bf]+', '', header).strip()
+            return clean
+    return ""
+
+
 def process_feedback_tags(config: dict) -> dict:
     """Scan dailies for #good / #bad tags and accumulate feedback.
 
+    Skips blockquote/instruction lines (starting with >).
+    Captures the reason text after the tag (e.g. '#bad it was a reply').
+    Identifies which topic section the tagged item belongs to.
     Replaces #good → #good-noted, #bad → #bad-noted so items
     aren't reprocessed. Returns summary of what was found.
     """
@@ -1091,8 +1159,8 @@ def process_feedback_tags(config: dict) -> dict:
     new_good = []
     new_bad = []
 
-    # Scan dailies for feedback tags
-    md_files = sorted(vault.list_md_files(dailies_folder))
+    # Scan dailies for feedback tags (including year/month subfolders)
+    md_files = sorted(vault._scan_folder_recursive(dailies_folder))
     for filepath in md_files:
         text = vault.read_file(filepath)
         if not text:
@@ -1108,18 +1176,33 @@ def process_feedback_tags(config: dict) -> dict:
         modified = False
 
         for i, line in enumerate(lines):
+            stripped = line.strip()
+
             # Skip already-processed lines
             if f"{good_tag}{suffix}" in line or f"{bad_tag}{suffix}" in line:
+                continue
+
+            # Skip blockquote / instruction lines — these contain template
+            # text like '> Tag any item with #good or #bad to give feedback.'
+            if stripped.startswith(">"):
+                continue
+
+            # Skip YAML frontmatter lines
+            if stripped.startswith("---"):
                 continue
 
             # Extract link info from the line
             link_match = re.search(r'\[([^\]]+)\]\((https?://[^\)]+)\)', line)
 
             if good_tag in line and f"{good_tag}{suffix}" not in line:
+                reason = _extract_reason(line, good_tag)
+                topic = _extract_current_topic(lines, i)
                 entry = {
                     "date": _extract_date_from_path(filepath),
-                    "title": link_match.group(1) if link_match else line[:80],
+                    "title": link_match.group(1) if link_match else _clean_title(line),
                     "url": link_match.group(2) if link_match else "",
+                    "reason": reason,
+                    "topic": topic,
                     "source_file": filepath,
                 }
                 new_good.append(entry)
@@ -1127,10 +1210,14 @@ def process_feedback_tags(config: dict) -> dict:
                 modified = True
 
             if bad_tag in line and f"{bad_tag}{suffix}" not in line:
+                reason = _extract_reason(line, bad_tag)
+                topic = _extract_current_topic(lines, i)
                 entry = {
                     "date": _extract_date_from_path(filepath),
-                    "title": link_match.group(1) if link_match else line[:80],
+                    "title": link_match.group(1) if link_match else _clean_title(line),
                     "url": link_match.group(2) if link_match else "",
+                    "reason": reason,
+                    "topic": topic,
                     "source_file": filepath,
                 }
                 new_bad.append(entry)
@@ -1151,10 +1238,325 @@ def process_feedback_tags(config: dict) -> dict:
     return {"new_good": len(new_good), "new_bad": len(new_bad), "data": feedback_data}
 
 
+def _clean_title(line: str) -> str:
+    """Extract a clean display title from a markdown line."""
+    # Strip list markers, checkboxes, tags
+    cleaned = re.sub(r'^[-*]\s*(?:\[[ x]\]\s*)?', '', line.strip())
+    # Strip #good/#bad and reason text
+    cleaned = re.sub(r'#(?:good|bad)\S*\s*.*$', '', cleaned).strip()
+    return cleaned[:80] if cleaned else line[:80]
+
+
 def _extract_date_from_path(filepath: str) -> str:
     """Extract YYYY-MM-DD from a daily note path."""
     m = re.search(r'(\d{4}-\d{2}-\d{2})', filepath)
     return m.group(1) if m else ""
+
+
+# ---------------------------------------------------------------------------
+# Feedback Analysis & Proposals
+# ---------------------------------------------------------------------------
+
+# Canonical bad-reason buckets with regex patterns for classification
+_BAD_REASON_BUCKETS = [
+    ("reply",       [r"reply", r"not\s+an?\s+OP", r"not\s+original", r"response\s+to"]),
+    ("low-engagement", [r"low\s+(?:like|engagement)", r"\d+\s+likes?", r"no\s+likes", r"low\s+quality"]),
+    ("bot",         [r"bot", r"generated", r"obviously\s+(?:written\s+)?by\s+(?:a\s+)?(?:bot|AI|LLM)", r"spam"]),
+    ("self-promo",  [r"promo", r"promoting\s+(?:their|his|her)", r"shill", r"github\s+repo", r"plug"]),
+    ("misleading",  [r"mislead", r"fake", r"clickbait", r"bait", r"claim.*mismatch"]),
+    ("off-topic",   [r"off.?topic", r"irrelevant", r"not\s+related", r"wrong\s+topic"]),
+    ("duplicate",   [r"duplicate", r"already\s+seen", r"repeat", r"dupe"]),
+    ("stale",       [r"old", r"stale", r"outdated", r"not\s+new"]),
+]
+
+# Good-reason buckets for positive signal classification
+_GOOD_REASON_BUCKETS = [
+    ("long-form",     [r"long.?form", r"deep\s+dive", r"thread", r"detailed", r"comprehensive"]),
+    ("original-research", [r"original", r"research", r"paper", r"arxiv", r"novel"]),
+    ("practical",     [r"practical", r"tutorial", r"how.?to", r"example", r"code", r"implementation"]),
+    ("insider",       [r"insider", r"first.?hand", r"from\s+(?:the\s+)?team", r"official", r"announcement"]),
+    ("high-signal",   [r"signal", r"insight", r"important", r"breaking", r"major"]),
+]
+
+
+def _classify_reason(reason: str, buckets: list[tuple[str, list[str]]]) -> str:
+    """Match a reason string against bucket patterns. Returns bucket name or 'unclassified'."""
+    if not reason:
+        return "unclassified"
+    reason_lower = reason.lower()
+    for bucket_name, patterns in buckets:
+        for pattern in patterns:
+            if re.search(pattern, reason_lower):
+                return bucket_name
+    return "unclassified"
+
+
+def analyze_feedback(feedback_data: dict, lookback_days: int = 14) -> dict:
+    """Analyze accumulated feedback and extract actionable patterns.
+
+    Looks at the last `lookback_days` of feedback entries. Returns a dict with:
+      - bad_buckets: {bucket_name: [entries...]}   — classified bad reasons
+      - good_buckets: {bucket_name: [entries...]}  — classified good reasons
+      - bad_topics: {topic: count}                 — which topics produce bad results
+      - good_topics: {topic: count}                — which topics produce good results
+      - top_bad_reasons: [(reason, count)]         — most common raw bad reasons
+      - top_good_reasons: [(reason, count)]        — most common raw good reasons
+      - total_good / total_bad in window
+    """
+    cutoff = (datetime.now() - timedelta(days=lookback_days)).strftime("%Y-%m-%d")
+
+    good_entries = [e for e in feedback_data.get("good", [])
+                    if e.get("date", "") >= cutoff and e.get("url")]
+    bad_entries = [e for e in feedback_data.get("bad", [])
+                   if e.get("date", "") >= cutoff and e.get("url")]
+
+    # Classify bad reasons into buckets
+    bad_buckets: dict[str, list] = {}
+    for entry in bad_entries:
+        bucket = _classify_reason(entry.get("reason", ""), _BAD_REASON_BUCKETS)
+        bad_buckets.setdefault(bucket, []).append(entry)
+
+    # Classify good reasons into buckets
+    good_buckets: dict[str, list] = {}
+    for entry in good_entries:
+        bucket = _classify_reason(entry.get("reason", ""), _GOOD_REASON_BUCKETS)
+        good_buckets.setdefault(bucket, []).append(entry)
+
+    # Topic distribution
+    bad_topics: dict[str, int] = {}
+    for entry in bad_entries:
+        topic = entry.get("topic", "unknown")
+        bad_topics[topic] = bad_topics.get(topic, 0) + 1
+
+    good_topics: dict[str, int] = {}
+    for entry in good_entries:
+        topic = entry.get("topic", "unknown")
+        good_topics[topic] = good_topics.get(topic, 0) + 1
+
+    # Most common raw reasons
+    bad_reason_counts: dict[str, int] = {}
+    for entry in bad_entries:
+        r = entry.get("reason", "").strip()
+        if r:
+            bad_reason_counts[r] = bad_reason_counts.get(r, 0) + 1
+    top_bad = sorted(bad_reason_counts.items(), key=lambda x: -x[1])[:5]
+
+    good_reason_counts: dict[str, int] = {}
+    for entry in good_entries:
+        r = entry.get("reason", "").strip()
+        if r:
+            good_reason_counts[r] = good_reason_counts.get(r, 0) + 1
+    top_good = sorted(good_reason_counts.items(), key=lambda x: -x[1])[:5]
+
+    return {
+        "bad_buckets": bad_buckets,
+        "good_buckets": good_buckets,
+        "bad_topics": bad_topics,
+        "good_topics": good_topics,
+        "top_bad_reasons": top_bad,
+        "top_good_reasons": top_good,
+        "total_good": len(good_entries),
+        "total_bad": len(bad_entries),
+        "lookback_days": lookback_days,
+    }
+
+
+def generate_proposals(analysis: dict, config: dict) -> list[str]:
+    """Turn feedback patterns into concrete improvement proposals.
+
+    Each proposal is a markdown string with:
+      - What pattern was detected
+      - What action could improve results
+      - Confidence (based on sample size)
+
+    Returns a list of proposal strings (empty if insufficient data).
+    """
+    proposals: list[str] = []
+    total_bad = analysis["total_bad"]
+    total_good = analysis["total_good"]
+    bad_buckets = analysis["bad_buckets"]
+    good_buckets = analysis["good_buckets"]
+
+    if total_bad + total_good < 3:
+        return []  # Not enough data to make meaningful proposals
+
+    # --- Bad-signal proposals ---
+
+    # Reply detection
+    reply_count = len(bad_buckets.get("reply", []))
+    if reply_count >= 2:
+        pct = reply_count / max(total_bad, 1) * 100
+        proposals.append(
+            f"**Reply leak** — {reply_count}/{total_bad} bad items ({pct:.0f}%) were replies, "
+            f"not original posts. The `is_reply` filter + text-pattern detection may need "
+            f"strengthening. Consider also filtering posts that start with `@username` "
+            f"where the username isn't the author."
+        )
+
+    # Bot / spam
+    bot_count = len(bad_buckets.get("bot", []))
+    if bot_count >= 2:
+        pct = bot_count / max(total_bad, 1) * 100
+        proposals.append(
+            f"**Bot/spam leak** — {bot_count}/{total_bad} bad items ({pct:.0f}%) were bot-generated. "
+            f"Consider adding heuristics: very formulaic text patterns, accounts with "
+            f"high post frequency, or emoji-heavy engagement-bait openers."
+        )
+
+    # Self-promotion
+    promo_count = len(bad_buckets.get("self-promo", []))
+    if promo_count >= 2:
+        pct = promo_count / max(total_bad, 1) * 100
+        proposals.append(
+            f"**Self-promo leak** — {promo_count}/{total_bad} bad items ({pct:.0f}%) were "
+            f"self-promotion (e.g. 'check out my repo', fake official guides). "
+            f"The `claim_link_mismatch` spam detector could be extended with new patterns "
+            f"from these examples."
+        )
+
+    # Low engagement sneaking through
+    low_eng = len(bad_buckets.get("low-engagement", []))
+    if low_eng >= 2:
+        pct = low_eng / max(total_bad, 1) * 100
+        proposals.append(
+            f"**Low-engagement leak** — {low_eng}/{total_bad} bad items ({pct:.0f}%) had "
+            f"suspiciously low engagement. Check if unknown-engagement items are being "
+            f"let through instead of dropped. Current floors: "
+            f"X={config.get('quality_filters', {}).get('min_engagement', {}).get('x_likes', '?')} likes, "
+            f"Reddit={config.get('quality_filters', {}).get('min_engagement', {}).get('reddit_score', '?')} score."
+        )
+
+    # Misleading content
+    mislead_count = len(bad_buckets.get("misleading", []))
+    if mislead_count >= 2:
+        proposals.append(
+            f"**Misleading content** — {mislead_count} items flagged as misleading/clickbait. "
+            f"Add the specific claim patterns from these examples to "
+            f"`spam_detection.claim_link_mismatch_patterns` in the quality filters."
+        )
+
+    # Topic-specific problems
+    if total_bad >= 5:
+        for topic, count in sorted(analysis["bad_topics"].items(), key=lambda x: -x[1]):
+            topic_pct = count / total_bad * 100
+            if topic_pct >= 40 and count >= 3:
+                proposals.append(
+                    f"**Topic hotspot: {topic}** — {count}/{total_bad} bad items ({topic_pct:.0f}%) "
+                    f"come from this topic. Its search queries may be too broad, or "
+                    f"the topic attracts more noise. Consider narrowing the query or "
+                    f"raising the engagement floor for this topic specifically."
+                )
+                break  # One topic callout is enough
+
+    # --- Good-signal proposals ---
+
+    # Long-form preference
+    longform_count = len(good_buckets.get("long-form", []))
+    if longform_count >= 2:
+        current_bonus = config.get("quality_filters", {}).get("long_form_bonus", 15)
+        proposals.append(
+            f"**Long-form wins** — {longform_count}/{total_good} good items were long-form content. "
+            f"Current `long_form_bonus` is {current_bonus}. "
+            f"Consider increasing it to {current_bonus + 10} to surface more of these."
+        )
+
+    # Practical content preference
+    practical_count = len(good_buckets.get("practical", []))
+    if practical_count >= 2:
+        proposals.append(
+            f"**Practical content valued** — {practical_count}/{total_good} good items were "
+            f"tutorials, how-tos, or code examples. Consider adding bonus scoring for "
+            f"posts containing code blocks, 'tutorial', or linking to GitHub repos "
+            f"(non-self-promo)."
+        )
+
+    # Insider / announcement preference
+    insider_count = len(good_buckets.get("insider", []))
+    if insider_count >= 2:
+        proposals.append(
+            f"**Insider content valued** — {insider_count}/{total_good} good items were "
+            f"from team members or official accounts. The `priority_accounts` list "
+            f"and `lab_accounts` detection are working. Consider expanding the "
+            f"must-follow list if specific people keep surfacing as #good."
+        )
+
+    # Unclassified feedback (user provides tags but no reasons)
+    unclassified_bad = len(bad_buckets.get("unclassified", []))
+    unclassified_good = len(good_buckets.get("unclassified", []))
+    total_unclassified = unclassified_bad + unclassified_good
+    if total_unclassified >= 5 and total_unclassified / max(total_bad + total_good, 1) > 0.5:
+        proposals.append(
+            f"**Add reasons to feedback** — {total_unclassified}/{total_bad + total_good} "
+            f"tagged items have no reason text. Adding a short reason after the tag "
+            f"(e.g. `#bad it was a reply`) enables much better pattern detection."
+        )
+
+    return proposals
+
+
+def _render_feedback_insights(analysis: dict, proposals: list[str]) -> list[str]:
+    """Render the Feedback Insights section for the daily note."""
+    lines = [
+        "## Feedback Insights \U0001f50d",
+        "",
+    ]
+
+    total = analysis["total_good"] + analysis["total_bad"]
+    if total == 0:
+        lines.extend([
+            "> No feedback data yet. Tag items with `#good <reason>` or `#bad <reason>` to start the learning loop.",
+            "",
+        ])
+        return lines
+
+    # Summary line
+    lines.append(
+        f"> Analyzing **{total}** feedback entries from the last "
+        f"**{analysis['lookback_days']}** days "
+        f"({analysis['total_good']} good, {analysis['total_bad']} bad)."
+    )
+    lines.append("")
+
+    # Bad-signal breakdown
+    if analysis["total_bad"] > 0 and analysis["bad_buckets"]:
+        lines.append("**Why you tagged items #bad:**")
+        lines.append("")
+        for bucket_name, entries in sorted(
+            analysis["bad_buckets"].items(),
+            key=lambda x: -len(x[1])
+        ):
+            count = len(entries)
+            pct = count / analysis["total_bad"] * 100
+            lines.append(f"- **{bucket_name}**: {count} ({pct:.0f}%)")
+        lines.append("")
+
+    # Good-signal breakdown
+    if analysis["total_good"] > 0 and analysis["good_buckets"]:
+        lines.append("**Why you tagged items #good:**")
+        lines.append("")
+        for bucket_name, entries in sorted(
+            analysis["good_buckets"].items(),
+            key=lambda x: -len(x[1])
+        ):
+            count = len(entries)
+            pct = count / analysis["total_good"] * 100
+            lines.append(f"- **{bucket_name}**: {count} ({pct:.0f}%)")
+        lines.append("")
+
+    # Proposals
+    if proposals:
+        lines.append("### Proposals")
+        lines.append("")
+        for i, p in enumerate(proposals, 1):
+            lines.append(f"{i}. {p}")
+        lines.append("")
+    elif total >= 3:
+        lines.extend([
+            "> Patterns are forming but no strong signals yet. Keep tagging!",
+            "",
+        ])
+
+    return lines
 
 
 # ---------------------------------------------------------------------------
@@ -1366,8 +1768,10 @@ def render_daily_note(
     synthesis: dict,
     config: dict,
     must_follow_results: list = None,
-    discovery_results: list = None,
+    prominent_results: list = None,
     feedback_summary: dict = None,
+    feedback_analysis: dict = None,
+    feedback_proposals: list[str] = None,
     tracker: TokenTracker | None = None,
 ) -> str:
     """Render the full daily note markdown."""
@@ -1377,9 +1781,9 @@ def render_daily_note(
 
     # Count must-follow tweets
     mf_count = sum(len(r["items"]) for r in (must_follow_results or []))
+    prom_count = len(prominent_results or [])
 
-    # Count discovery items
-    disc_count = len(discovery_results or [])
+
 
     # Find vault connections — wikilink to existing Library notes
     vault_connections = _find_vault_connections(topic_slugs, config)
@@ -1411,7 +1815,7 @@ def render_daily_note(
         f"reddit_items: {total_reddit}",
         f"x_items: {total_x}",
         f"must_follow_tweets: {mf_count}",
-        f"discovery_items: {disc_count}",
+        f"prominent_voices: {prom_count}",
         f"deep_dives: {len(deep_dives)}",
         f"lab_pulse: {len(lab_pulse_items)}",
     ]
@@ -1497,28 +1901,28 @@ def render_daily_note(
                         )
                 lines.append("")
 
-    # Discovery Accounts — broader builder/practitioner voices (topic-agnostic)
-    if discovery_results:
+
+    # Prominent AI Voices — high-engagement tweets from top AI minds (broad search)
+    if prominent_results:
         lines.extend([
-            "## Discovery Feed \U0001f50d",
+            "## Prominent Voices \U0001f399\ufe0f",
             "",
-            "> Practitioner & builder accounts — topic-agnostic, engagement-ranked.",
+            "> High-engagement tweets (500+ likes) from prominent AI researchers, engineers, and executives.",
             "",
+            "| Author | Post | Likes | Link |",
+            "|--------|------|-------|------|",
         ])
-        for item in discovery_results[:12]:
-            text = item.text if hasattr(item, 'text') else str(item)
-            url = item.url if hasattr(item, 'url') else ""
-            likes = 0
-            if hasattr(item, 'engagement') and item.engagement and hasattr(item.engagement, 'likes'):
-                likes = item.engagement.likes or 0
-            date_str_item = ""
-            if hasattr(item, 'date') and item.date:
-                date_str_item = f" ({item.date})"
-            author = item.author_handle if hasattr(item, 'author_handle') else "?"
-            text_display = _oneline(text, 200)
+        # Sort by likes descending for impact
+        sorted_prom = sorted(
+            prominent_results,
+            key=lambda item: (item.engagement.likes if item.engagement and item.engagement.likes else 0),
+            reverse=True,
+        )
+        for item in sorted_prom[:15]:
+            likes = item.engagement.likes if item.engagement and item.engagement.likes else 0
+            text_short = _oneline(item.text, 100)
             lines.append(
-                f"- [ ] @{author}{date_str_item}: {text_display} "
-                f"[{likes}\u2764\ufe0f]({url})"
+                f"| @{item.author_handle} | {text_short} | {likes}\u2764\ufe0f | [→]({item.url}) |"
             )
         lines.append("")
 
@@ -1647,8 +2051,10 @@ def render_daily_note(
         "",
         "## Rate Results",
         "",
-        "> Tag any item with `#good` or `#bad` to give feedback.",
-        "> Next run picks it up and logs it — helps tune future results.",
+        "> Tag any item with `#good <reason>` or `#bad <reason>` to give feedback.",
+        "> Add a short reason after the tag — it powers the learning loop below.",
+        "> Examples: `#bad it was a reply` · `#good deep practical tutorial` · `#bad bot-generated spam`",
+        "> Next run picks it up, classifies it, and generates improvement proposals.",
         "",
     ])
 
@@ -1661,6 +2067,10 @@ def render_daily_note(
             f"(lifetime: {stats.get('total_good', 0)} good, {stats.get('total_bad', 0)} bad)",
             "",
         ])
+
+    # Feedback Insights — pattern analysis + proposals from accumulated feedback
+    if feedback_analysis:
+        lines.extend(_render_feedback_insights(feedback_analysis, feedback_proposals or []))
 
     # Efficiency recommendations (at the very end)
     if tracker and tracker.num_calls > 0:
@@ -1779,6 +2189,12 @@ def main():
     else:
         print("[feedback] No new feedback tags found")
 
+    # Analyze accumulated feedback and generate proposals
+    feedback_analysis = analyze_feedback(feedback_summary["data"], lookback_days=14)
+    feedback_proposals = generate_proposals(feedback_analysis, config)
+    if feedback_proposals:
+        print(f"[feedback] Generated {len(feedback_proposals)} improvement proposals")
+
     if not l30_config.get("OPENAI_API_KEY") and not l30_config.get("XAI_API_KEY"):
         print("Error: No API keys found. Set them in ~/.config/last30days/.env", file=sys.stderr)
         sys.exit(1)
@@ -1857,20 +2273,18 @@ def main():
         mf_total = sum(len(r["items"]) for r in must_follow_results)
         print(f"[must-follow] Captured {mf_total} tweets from {len(mf_accounts)} accounts")
 
-    # Discovery accounts scan (single batch, topic-agnostic, quality-filtered)
-    discovery_results = []
-    disc_accounts = config.get("discovery_accounts", [])
-    if disc_accounts and l30_config.get("XAI_API_KEY"):
-        print(f"\n[discovery] Scanning {len(disc_accounts)} builder/practitioner accounts (1 API call) | last 24h ({mf_from_date} → {to_date})...")
-        discovery_results = run_discovery_scan(
+    # Prominent AI voices scan (single broad search, 500+ likes)
+    prominent_results = []
+    if l30_config.get("XAI_API_KEY"):
+        print(f"\n[prominent-ai] Scanning for high-engagement AI voices | last 24h ({mf_from_date} → {to_date})...")
+        prominent_results = run_prominent_ai_scan(
             config, l30_config, mf_from_date, to_date,
-            seen_urls=seen_urls,
+            seen_urls,
             tracker=tracker,
         )
-        # Add discovery URLs to seen set
-        for item in discovery_results:
+        # Add to seen_urls so synthesis doesn't double-count
+        for item in prominent_results:
             seen_urls.add(item.url)
-        print(f"[discovery] Captured {len(discovery_results)} tweets")
 
     # Synthesize (single batched call)
     synthesis = {}
@@ -1898,8 +2312,10 @@ def main():
     note_content = render_daily_note(
         today, topic_results, synthesis, config,
         must_follow_results=must_follow_results,
-        discovery_results=discovery_results,
+        prominent_results=prominent_results,
         feedback_summary=feedback_summary,
+        feedback_analysis=feedback_analysis,
+        feedback_proposals=feedback_proposals,
         tracker=tracker,
     )
 
@@ -1927,8 +2343,8 @@ def main():
     total_reddit = sum(len(tr["reddit_items"]) for tr in topic_results)
     total_x = sum(len(tr["x_items"]) for tr in topic_results)
     mf_total = sum(len(r["items"]) for r in must_follow_results)
-    disc_total = len(discovery_results)
-    print(f"\nDone! {total_reddit}R + {total_x}X + {mf_total}MF + {disc_total}Disc items across {len(all_topics)} topics.")
+    prom_total = len(prominent_results)
+    print(f"\nDone! {total_reddit}R + {total_x}X + {mf_total}MF + {prom_total}PA items across {len(all_topics)} topics.")
 
 
 if __name__ == "__main__":

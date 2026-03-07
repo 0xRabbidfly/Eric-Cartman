@@ -117,6 +117,7 @@ class XItem:
     date: Optional[str] = None
     date_confidence: str = "low"
     engagement: Optional[Engagement] = None
+    is_reply: bool = False
     relevance: float = 0.5
     why_relevant: str = ""
     subs: SubScores = field(default_factory=SubScores)
