@@ -102,29 +102,25 @@ This step is **manual** — the agent reads the transcript and writes the note.
 1. Read the full transcript from `.work/transcripts/<YYYY-MM-DD> - <Title>.txt`
 2. Identify speakers, key themes, and structure
 3. Write the note following the **Obsidian Note Structure** template above:
-   - Frontmatter with tags, show, episode, dates, spotify_url
-   - TL;DR (2-3 sentences)
-   - Key Ideas (bulleted, bolded labels with explanations)
+  - Frontmatter with tags, show, episode, dates, `source: podcast-to-obsidian`, and `spotify_url` when available
+  - Keep the episode title unsanitized inside the note; sanitize only the filename/path
+  - TL;DR as an Obsidian abstract callout
+  - Key Ideas as a numbered list with bolded labels and explanations
    - Deep Dives (3-5 mini-essays on the most important/surprising concepts — analysis, implications, connections, what wasn't said. NOT a summary rehash.)
    - Actionable Takeaways (checkbox items)
-   - Memorable Quotes (blockquotes with speaker attribution)
+  - Memorable Quotes as quote callouts with speaker attribution
    - People & Topics (wiki-links: `[[People/Name]]`, `[[Topics/Topic]]`, `[[Companies/Org]]`)
-   - Transcript (condensed inside `<details><summary>` collapsible)
+  - Use the same section separators and layout as the generated final notes in `.work/notes/`
 4. Pipe the note to the obsidian skill:
    ```powershell
    $noteContent = @'
    <generated note content>
    '@ | python .github/skills/obsidian/scripts/obsidian.py create --path "Podcasts/<Show>/<YYYY-MM-DD> - <Title>.md"
    ```
-
-> **⚠️ Known bug:** `obsidian.com create` with stdin silently produces 0-byte files.
-> **Fallback:** Write directly to the vault filesystem path, then verify with `obsidian.com file`:
-> ```python
-> from pathlib import Path
-> vault = Path(r"C:\Users\<user>\Documents\Obsidian Vault")
-> (vault / "Podcasts" / show / filename).write_text(content, encoding="utf-8")
-> ```
-> Obsidian indexes the file immediately.
+5. Verify the write through the Obsidian wrapper instead of writing directly to the vault filesystem:
+  ```powershell
+  python .github/skills/obsidian/scripts/obsidian.py read --path "Podcasts/<Show>/<YYYY-MM-DD> - <Title>.md"
+  ```
 
 ## Manifest
 
@@ -144,9 +140,16 @@ Persistent JSON file tracking all processed episodes.
 Each episode produces a note at:
 `Podcasts/<Show Name>/<YYYY-MM-DD> - <Episode Title>.md`
 
+Filename rule:
+- Use the episode's published date plus title
+- Strip only invalid filename characters: `< > : " / \ | ? *`
+- Trim trailing `.` and space after stripping
+- Truncate the title portion to about 120 chars if needed
+- Do not slugify the filename
+
 ```markdown
 ---
-tags: [podcast, <show-slug>, transcript]
+tags: [podcast, <show-slug>, <topic-tag-1>, <topic-tag-2>]
 type: podcast-note
 show: "<Show Name>"
 episode: "<Episode Title>"
@@ -159,21 +162,24 @@ created: YYYY-MM-DDTHH:MM:SSZ
 
 # <Episode Title>
 
-**Show:** [[Podcasts/<Show Name>]]
-**Published:** YYYY-MM-DD
-**Duration:** HH:MM:SS
+**Show:** [[Podcasts/<Show Name>]] · 📅 YYYY-MM-DD · ⏱ HH:MM:SS
 
-## TL;DR
+---
 
-<2-3 sentence summary>
+> [!abstract]+ TL;DR
+> <2-3 sentence summary>
 
-## Key Ideas
+---
 
-- **Idea 1** — explanation
-- **Idea 2** — explanation
-- ...
+## 💡 Key Ideas
 
-## Deep Dives
+1. **Idea 1** — explanation
+2. **Idea 2** — explanation
+3. ...
+
+---
+
+## 🧠 Deep Dives
 
 ### Concept Title
 
@@ -183,18 +189,31 @@ why it matters beyond the podcast. Pick 3-5 of the most
 important/surprising concepts. Do NOT repeat Key Ideas;
 add new depth and perspective.
 
-## Actionable Takeaways
+---
+
+## ✅ Actionable Takeaways
 
 - [ ] Action item 1
 - [ ] Action item 2
 
-## Memorable Quotes
+---
 
-> "Quote text" — Speaker Name
+## 💬 Key Quotes
 
-## People & Topics
+> [!quote] "Quote text"
+> — **Speaker Name**
 
-[[People/<Name>]] · [[Topics/<Topic>]] · [[Companies/<Org>]]
+---
+
+## 🔗 People & Topics
+
+**People:** [[People/<Name>]] · [[People/<Name 2>]]
+
+**Topics:** [[Topics/<Topic>]] · [[Topics/<Topic 2>]]
+
+**Companies:** [[Companies/<Org>]] · [[Companies/<Org 2>]]
+
+---
 
 ## Transcript
 

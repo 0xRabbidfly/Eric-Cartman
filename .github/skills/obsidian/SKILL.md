@@ -76,6 +76,11 @@ python .github/skills/obsidian/scripts/obsidian.py info
 python -c "import sys; sys.path.insert(0,'.github/skills/obsidian/scripts'); from obsidian import Obsidian; ob=Obsidian(); print(ob.create(path='Research/Library/my-note.md', content='# Title\n\nBody text').text)"
 ```
 
+### Verification Notes
+
+- In inline Python usage, `ob.read(path="...")` returns the note content as a plain string. Print the value directly; do not assume a `.text` property.
+- When the CLI output for `create` is terse, verify success with a follow-up `read --path ...` or an inline `print(ob.read(path="..."))`.
+
 > **IMPORTANT**: Always use `@'...'@` (single-quoted heredoc), never `@"..."@`
 > (double-quoted). Double-quoted heredocs still interpret backticks and `$`.
 
@@ -119,7 +124,7 @@ ob = Obsidian(vault="My Vault")              # explicit vault
 
 # --- Files ---
 ob.read("Recipe")                            # read by name
-ob.read(path="Notes/Recipe.md")              # read by path
+ob.read(path="Notes/Recipe.md")              # read by path; returns plain string content
 ob.create("Trip to Paris", content="# Paris", template="Travel")
 ob.append("Recipe", "## New Section")
 ob.prepend("Recipe", "**Updated 2026-02-23**")
