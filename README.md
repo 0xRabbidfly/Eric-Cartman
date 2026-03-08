@@ -32,6 +32,7 @@ Portable, reusable skills for AI coding assistants. Each skill lives in its own 
 | `repo-state-sync` | Keep onboarding context in copilot-instructions.md fresh |
 | `session-learning` | Extract reusable patterns from coding sessions |
 | `session-log` | Capture session insights into `.github/sessions/` |
+| `skill-autoresearch` | Apply a bounded keep-or-revert experiment loop to creating or improving one skill |
 | `skill-reflection` | Composable after-action review (any skill can invoke) |
 | `testing` | Comprehensive testing workflow (Vitest + Playwright) |
 | `visual-explainer` | Generate self-contained HTML diagrams, diff reviews, plan audits, slide decks, and data tables — no ASCII art |

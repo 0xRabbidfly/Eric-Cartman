@@ -2,7 +2,7 @@
 name: skill-reflection
 description: Generic post-workflow self-reflection that any skill can invoke at the end of its run. Analyzes friction encountered during execution and produces advisory recommendations for improving the calling skill's SKILL.md. Use when a skill finishes (success or failure) and wants to capture improvement opportunities.
 argument-hint: skill name, step results, friction notes
-user-invokable: true
+user-invocable: true
 disable-model-invocation: false
 metadata:
   author: 0xrabbidfly
@@ -20,6 +20,10 @@ prioritized recommendations for improving the calling skill's SKILL.md.
 **This skill does not modify SKILL.md files automatically** — it produces advisory
 output. The user decides what to apply.
 
+The primary output is a structured reflection report. If memory capture, immediate
+fixes, or workflow resumption are needed, treat those as explicit caller-side
+follow-up actions after the report is produced.
+
 ## When to Use
 
 - At the end of any multi-step skill workflow
@@ -36,7 +40,7 @@ output. The user decides what to apply.
 3. **Advisory** — produces recommendations, never edits SKILL.md directly
 4. **Cumulative** — tracks friction history to detect repeat issues
 5. **Inline-capable** — can run mid-workflow, not just at end of session
-6. **Memory-aware** — after producing recommendations, triggers Agent Memory capture via the obsidian skill
+6. **Follow-up aware** — may recommend memory capture or immediate fixes, but those actions remain outside the core reflection output contract
 
 ---
 
@@ -58,6 +62,24 @@ Invoke the `skill-reflection` skill with the following context:
 
 The reflection skill will analyze the run and produce improvement recommendations.
 ```
+
+Preferred invocation shape:
+
+```
+Run skill-reflection for <skill-name>.
+SKILL.md path: .github/skills/<skill-name>/SKILL.md
+Steps completed:
+  1. <step name> - PASS
+  2. <step name> - FAIL
+  3. <step name> - SKIPPED
+Friction:
+  - <issue 1>
+  - <issue 2>
+Run duration: <optional>
+```
+
+This exact shape is not required, but it is the preferred caller format because
+it reduces follow-up questions and makes repeat-friction detection easier.
 
 ### Example: calling from a deployment skill
 
@@ -112,8 +134,22 @@ Extract from the caller's input:
 | Friction notes | No | Free-text description of issues encountered |
 | Run duration | No | Total wall time if available |
 
+Normalize status variants such as "passed", "failed", "ok", or "done" to
+`PASS`, `FAIL`, or `SKIPPED` before analyzing the run.
+
 If the caller didn't provide structured input, ask:
 > What skill just ran, and what friction did you encounter?
+
+Use this minimum-context rule:
+
+- If the caller provides the calling skill name and a usable step list, proceed even
+  if `SKILL.md path`, friction notes, or run duration are missing.
+- If the caller provides the skill name but no step list, ask only for the missing
+  steps and statuses.
+- If the caller provides friction notes but not the calling skill name, ask first
+  which skill just ran.
+- Never ask for optional fields when the required fields are already sufficient to
+  produce a recommendation report.
 
 ### 2. Reflect On the Run
 
@@ -150,6 +186,10 @@ Read the SKILL.md to understand:
 - What estimates or assumptions are stated
 - Whether the friction point is already addressed (but poorly)
 
+If `SKILL.md path` is missing but the calling skill name is present, say that the
+path was not provided and continue with the rest of the reflection instead of
+blocking the run.
+
 ### 5. Check Friction History
 
 Look for previous reflection output in the vault or in `.github/sessions/`:
@@ -157,6 +197,9 @@ Look for previous reflection output in the vault or in `.github/sessions/`:
 ```
 Search for: "SKILL REFLECTION — <skill-name>"
 ```
+
+If those history sources are unavailable, say so explicitly instead of assuming
+there is no repeat friction.
 
 If the **same friction category + same step** appears in a previous reflection:
 - **Escalate to P0** (repeat friction = must fix)
@@ -175,17 +218,24 @@ Friction points: <count>
 Friction encountered:
   1. [Step X] <category>
      What happened: <description>
+    Evidence: <error text, command output, timing, or observed symptom if available>
+    Confidence: <high | medium | low>
      Workaround used: <what the user/agent actually did>
      → Recommendation: <specific change to SKILL.md>
 
   2. [Step Y] <category>
      What happened: <description>
+    Evidence: <supporting signal if available>
+    Confidence: <high | medium | low>
      → Recommendation: <specific change to SKILL.md>
 
 Prioritized recommendations for <skill-name>/SKILL.md:
   R1. (P0 - breaking)  <change needed to prevent failure next time>
+    Why this priority: <one sentence>
   R2. (P1 - quality)   <improvement to reduce manual steps or retries>
+    Why this priority: <one sentence>
   R3. (P2 - nice)      <minor doc, timing, or clarity improvement>
+    Why this priority: <one sentence>
 
 Repeat friction: [none | list of issues seen before with dates]
 
@@ -198,10 +248,37 @@ To apply: tell Copilot "apply the <skill-name> reflection recommendations and fi
 ---
 ```
 
-### 7. Capture Agent Memory
+Recommendation writing rules:
 
-After producing recommendations, save the friction + resolution to Obsidian
-for long-term recall. Use the `obsidian` skill's Agent Memory pattern:
+- Point to the affected step, section, or table in the calling skill whenever you
+  can, not just the skill as a whole.
+- Name the type of change needed: reorder a step, add a prerequisite check,
+  document an error, clarify wording, or add a fallback.
+- Tie each recommendation to the observed friction, not to a hypothetical future
+  issue that did not occur in the run.
+- Prefer concrete edits over generic advice such as "improve docs" or "make it clearer."
+- Include evidence only when the run actually provides it; do not invent quotes,
+  timings, or error strings.
+- When context is missing, say `unknown`, `not provided`, or `not checked`
+  explicitly instead of implying that nothing was found.
+
+Optionally append a short follow-up block after the advisory report when useful:
+
+```
+Caller follow-up:
+  - Memory capture: [required | optional | not needed]
+  - Immediate fix before next run: [none | P0 item]
+  - Resume parent workflow: [yes | no]
+```
+
+Skip this follow-up block on clean runs unless the parent workflow explicitly
+requires memory capture or a resume signal.
+
+### 7. Optional Caller Follow-Up: Capture Agent Memory
+
+If the invoking workflow's rules require durable memory capture and the Obsidian
+path is available, the caller can save the friction + resolution after the
+reflection report is produced. Use the `obsidian` skill's Agent Memory pattern:
 
 ```powershell
 @'
@@ -229,16 +306,19 @@ Search first to avoid duplicates:
 python .github/skills/obsidian/scripts/obsidian.py search "<skill-name> <friction-keyword>" --path "Agent Memories" --format json
 ```
 
-### 8. Self-Healing (Inline Mode)
+### 8. Optional Caller Follow-Up: Self-Healing (Inline Mode)
 
-When triggered **mid-run** (not end-of-session), the agent should:
+When reflection is triggered **mid-run** (not end-of-session), the invoking
+agent may use the advisory output to decide whether to self-heal before
+continuing the parent workflow:
 
-1. Produce the reflection output as normal (steps 1–7)
+1. Produce the reflection output as normal (steps 1–6)
 2. Evaluate the priority of each recommendation:
-   - **P0 (breaking)** → Apply the fix to the SKILL.md **immediately**, before continuing the parent workflow
-   - **P1 (quality)** → Apply if the fix is simple (< 5 lines), else note for later
-   - **P2 (nice)** → Skip for now, capture in Agent Memory
-3. Resume the parent skill's remaining steps
+  - **P0 (breaking)** → Caller should apply the fix to the SKILL.md before continuing the parent workflow
+  - **P1 (quality)** → Caller may apply if the fix is simple, else note it for later
+  - **P2 (nice)** → Caller can defer it
+3. Optionally capture Agent Memory if the parent workflow requires it
+4. Resume the parent skill's remaining steps
 
 This turns reflection from a post-mortem into a **live self-healing loop**.
 
@@ -268,6 +348,7 @@ If a run completed cleanly with no friction:
 
 Run summary: Steps 1-N completed | all passed
 Friction points: 0
+Repeat friction: none
 
 ✅ Clean run — no recommendations.
 Skill is working as documented.
@@ -286,4 +367,5 @@ Still log it if persisting to vault — clean runs are useful signal too.
 ❌ Generic advice ("add more docs")               — recommendations must be specific and actionable
 ❌ Skipping the history check                     — repeat detection is the core value
 ❌ Running without knowing which skill called     — always require the caller identity
+❌ Treating follow-up actions as core output      — memory capture and fixes belong to the caller workflow
 ```
