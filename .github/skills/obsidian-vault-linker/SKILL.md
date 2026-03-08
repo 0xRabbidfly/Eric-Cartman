@@ -1,11 +1,11 @@
 ---
 name: obsidian-vault-linker
 description: Discover missing links, orphaned notes, thematic clusters, and connection opportunities across the Obsidian vault. Use when your knowledge base feels fragmented or you suspect hidden connections between notes.
-user-invokable: true
+user-invocable: true
 disable-model-invocation: true
 metadata:
-  author: 0xrabbidfly
-  version: "1.0.0"
+   author: 0xrabbidfly
+   version: "1.2.0"
 ---
 
 # Obsidian Vault Linker
@@ -31,6 +31,8 @@ This is the **knowledge gardening** skill — it doesn't create new content, it 
 
 - Obsidian must be running with CLI enabled
 - Uses the `obsidian.py` wrapper (`.github/skills/obsidian/scripts/obsidian.py`)
+- Master research-library MOC: `Research/Library/00 MOC/🗺️ MOC - Research Library.md`
+- Topic MOCs are subordinate maps, for example `Research/Library/00 MOC/🤖 MOC - AI Agent Development.md`
 
 ---
 
@@ -58,6 +60,15 @@ python .github/skills/obsidian/scripts/obsidian.py run deadends --format json
 
 # Get all tags with counts
 python .github/skills/obsidian/scripts/obsidian.py run tags --format json
+
+# Read the master research-library MOC
+python .github/skills/obsidian/scripts/obsidian.py read --path "Research/Library/00 MOC/🗺️ MOC - Research Library.md"
+
+# List all library MOCs
+python -c "import sys; sys.path.insert(0,'.github/skills/obsidian/scripts'); from obsidian import Obsidian; print(Obsidian().files(folder='Research/Library/00 MOC', ext='md').text)"
+
+# List the current structured research library
+python -c "import sys; sys.path.insert(0,'.github/skills/obsidian/scripts'); from obsidian import Obsidian; print(Obsidian().files(folder='Research/Library', ext='md').text)"
 ```
 
 Record:
@@ -66,6 +77,8 @@ Record:
 - Unresolved link count
 - Dead-end count
 - Tag distribution
+- Master MOC coverage for current research notes
+- Topic MOC coverage summaries for scoped domains
 
 ### Phase 2: Thematic Cluster Detection
 
@@ -188,6 +201,8 @@ Run a full vault link audit. Use obsidian-vault-linker.
 - **Read-only by default.** Never modify notes without explicit user approval.
 - **Confidence thresholds.** Only suggest High/Medium confidence links. Skip speculative ones.
 - **Respect vault structure.** Don't suggest flattening folders or reorganizing — just linking.
+- **Read the master MOC first.** Use `Research/Library/00 MOC/🗺️ MOC - Research Library.md` as the canonical library-wide index.
+- **Treat topic MOCs as scoped.** Topic MOCs are subordinate maps and should not be evaluated as if they must cover the whole library.
 - **Use Obsidian link syntax.** Always `[[Note Name]]` or `[[path/to/note|Display Text]]`.
 - **Limit output.** Cap at 20 link suggestions per run. User can ask for more.
 

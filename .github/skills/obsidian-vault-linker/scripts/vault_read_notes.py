@@ -1,23 +1,44 @@
-"""Read Research/Library notes to understand content for linking."""
+"""Read current Research/Library notes to understand content for linking."""
 import sys
+from pathlib import PurePosixPath
+
 sys.path.insert(0, ".github/skills/obsidian/scripts")
 from obsidian import Obsidian
 
+MOC_PATH = "Research/Library/00 MOC/🤖 MOC - AI Agent Development.md"
+TARGET_SLUGS = {
+    "ai-second-brain-obsidian-claude-code",
+    "skillsbench-benchmarking-agent-skills",
+    "complete-guide-building-skills-for-claude",
+    "agent-skills-vscode-docs",
+    "rag-pipeline-explained",
+    "vscode-agent-hooks",
+    "vscode-custom-agents",
+    "custom-instructions-vscode-docs",
+    "best-practices-claude-code",
+    "every-saas-is-now-an-api",
+    "delete-your-agents-md-vs-add-evals",
+}
+
 ob = Obsidian()
 
-notes = [
-    "Research/Library/ai-second-brain-obsidian-claude-code.md",
-    "Research/Library/skillsbench-benchmarking-agent-skills.md",
-    "Research/Library/complete-guide-building-skills-for-claude.md",
-    "Research/Library/agent-skills-vscode-docs.md",
-    "Research/Library/rag-pipeline-explained.md",
-    "Research/Library/vscode-agent-hooks.md",
-    "Research/Library/vscode-custom-agents.md",
-    "Research/Library/custom-instructions-vscode-docs.md",
-    "Research/Library/best-practices-claude-code.md",
-    "Research/Library/every-saas-is-now-an-api.md",
-    "Research/Library/delete-your-agents-md-vs-add-evals.md",
+library_paths = [
+    line for line in ob.files(folder="Research/Library", ext="md").lines()
+    if not line.startswith("Research/Library/00 MOC/")
 ]
+
+notes = []
+slug_to_path = {
+    PurePosixPath(path).stem: path
+    for path in library_paths
+}
+
+for slug in sorted(TARGET_SLUGS):
+    path = slug_to_path.get(slug)
+    if path:
+        notes.append(path)
+
+notes.insert(0, MOC_PATH)
 
 for note in notes:
     content = ob.read(path=note)

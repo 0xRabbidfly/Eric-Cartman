@@ -1,12 +1,12 @@
 ---
 name: obsidian-linked-research
-description: Fetch a URL, summarize it, and save as a structured research note in Obsidian Research/Library/. Use when user shares a link and says "research this", "save this article", "save this to obsidian", or "/obsidian-linked-research".
+description: Fetch a URL, summarize it, and save as a structured research note in the current Obsidian Research/Library taxonomy. Use the master Research Library MOC as the source of truth for tags, folder routing, and freshness updates.
 argument-hint: URL to research and save
-user-invokable: true
+user-invocable: true
 disable-model-invocation: false
 metadata:
   author: 0xrabbidfly
-  version: "1.0.0"
+  version: "1.2.0"
 ---
 
 # Obsidian Linked Research
@@ -14,7 +14,12 @@ metadata:
 ## Purpose
 
 Take a URL → fetch its content → generate a structured summary → write a
-standalone research note to `Research/Library/` in the Obsidian vault.
+standalone research note into the active `Research/Library/` taxonomy in the
+Obsidian vault.
+
+The library is no longer flat. Notes should be routed into the existing numbered
+subfolders and tagged using the vocabulary established by the **master Research
+Library MOC** and the vault tag index.
 
 **Tweet/X URLs** get rich content via xAI's `x_search` tool (engagement stats,
 thread context, media descriptions). **All other URLs** get plain-text extraction
@@ -40,6 +45,50 @@ Vault writes go through the **obsidian** skill (composable CLI wrapper).
 - Web URLs work without any API key
 
 ## Workflow
+
+### Step 0 — Inspect Taxonomy First
+
+Before fetching or summarizing, inspect the live research taxonomy so you do not
+invent a second folder or tag scheme.
+
+Read the master library MOC first:
+
+```powershell
+python .github/skills/obsidian/scripts/obsidian.py read --path "Research/Library/00 MOC/🗺️ MOC - Research Library.md"
+```
+
+Read any relevant topic MOC only after the master MOC, and only for extra domain
+context. Topic MOCs are secondary maps, not the source of truth for canonical tags.
+
+Read the current vault tag index:
+
+```powershell
+python -c "import sys; sys.path.insert(0,'.github/skills/obsidian/scripts'); from obsidian import Obsidian; print(Obsidian().tags().text)"
+```
+
+List the live research-library note paths so you can see the active buckets:
+
+```powershell
+python -c "import sys; sys.path.insert(0,'.github/skills/obsidian/scripts'); from obsidian import Obsidian; print(Obsidian().files(folder='Research/Library', ext='md').text)"
+```
+
+Use this routing table unless the live vault has changed again:
+
+| Folder | Use for |
+|-------|---------|
+| `Research/Library/01 Agent Harnesses & Architecture/` | harnesses, orchestration, control planes, architecture, model/runtime design |
+| `Research/Library/02 Skills, IDEs & Agent Tooling/` | skills, Copilot, Claude Code, IDEs, hooks, MCP, tooling |
+| `Research/Library/03 Evals, Reliability & Control/` | evals, reliability, governance, testing, review, controls |
+| `Research/Library/04 SDLC, Workflow & Strategy/` | SDLC, workflow redesign, consulting POV, product/API strategy |
+| `Research/Library/05 Knowledge, RAG & Memory/` | RAG, retrieval, knowledge systems, Obsidian, memory, second brain |
+
+Tagging rules before you write anything:
+
+- Reuse tags already present in the master MOC's `Canonical Tag Guidance` first: `agents`, `ai-agents`, `agent-harnesses`, `skills`, `claude-code`, `copilot`, `mcp`, `evals`, `rag`, `sdlc`, `workflow-design`, `research`
+- Prefer an existing vault tag over a new synonym if the meaning is the same
+- Normalize to lowercase kebab-case; do not create variants like `AIagents`, `MachineLearning`, or mixed singular/plural duplicates if a canonical form already exists
+- Only mint a new canonical tag if both the master MOC and the vault tag index are missing a genuinely useful concept
+- Choose one primary library folder per note; do not duplicate the same note across folders
 
 ### Step 1 — Fetch Content
 
@@ -127,7 +176,8 @@ Close the browser when done: `browser_close()`
 Using the fetched content, generate a **deep, structured analysis** — not a shallow
 summary. Do NOT call an external API — use your own reasoning.
 
-**Quality bar**: Study the existing notes in `Research/Library/` for reference.
+**Quality bar**: Study the existing notes in the target `Research/Library/`
+subfolder for reference.
 Good notes are section-by-section breakdowns with tables, code examples, specific
 details, and "Relevance to This Repo" sections. They read like comprehensive
 technical references, not tweet-length summaries.
@@ -138,6 +188,8 @@ Think through the content and produce this structure internally:
 {
   "title": "Clear, descriptive title for the note",
   "slug": "kebab-case-filename-slug (3-6 words, no special chars)",
+  "library_bucket": "01 Agent Harnesses & Architecture | 02 Skills, IDEs & Agent Tooling | 03 Evals, Reliability & Control | 04 SDLC, Workflow & Strategy | 05 Knowledge, RAG & Memory",
+  "library_path": "Research/Library/<bucket>/<slug>.md",
   "author": "@handle or Author Name",
   "source": "x|reddit|blog|article|github",
   "core_thesis": "1-2 sentences capturing the central argument or claim",
@@ -152,13 +204,18 @@ Think through the content and produce this structure internally:
   ],
   "relevance_to_repo": "2-4 sentences on how this connects to Eric Cartman / the user's workflow",
   "related_notes": ["[[Note Title 1]]", "[[Note Title 2]]"],
+  "master_moc_section": "The existing section in the master Research Library MOC this note belongs under",
+  "topic_moc": "Optional topic MOC to update secondarily, if one clearly applies",
+  "tag_rationale": "Short note on which tags were reused from the master MOC/tag index and whether any new canonical tag is truly needed",
   "tags": ["tag1", "tag2", "tag3"]
 }
 ```
 
 **Summarization rules:**
 - `slug`: lowercase, hyphens only, 3-6 words, no special chars
-- `tags`: lowercase, 4-6 tags, topically relevant, hyphens in multi-word
+- `library_bucket`: choose exactly one existing library folder based on the dominant theme
+- `library_path`: always point at `Research/Library/<bucket>/<slug>.md`
+- `tags`: lowercase, 4-7 tags, topically relevant, hyphens in multi-word, with existing vault tags preferred over new inventions
 - `sections`: Preserve the article's own structure. Include code blocks, tables,
   numbered lists, and blockquotes from the original. DO NOT flatten rich content
   into bullet points.
@@ -167,6 +224,9 @@ Think through the content and produce this structure internally:
 - `relevance_to_repo`: Connect the content to this repo's architecture, skills,
   or workflow patterns. Be specific.
 - `related_notes`: Use `[[wiki-link]]` format to connect to other Library notes.
+- `master_moc_section`: prefer an existing folder section in `🗺️ MOC - Research Library`; also use `Recently Added`
+- `topic_moc`: optional; only set this if the note clearly belongs to a subordinate topic MOC such as `🤖 MOC - AI Agent Development`
+- `tag_rationale`: explicitly check the master MOC and `Obsidian().tags().text` output before deciding to introduce any new canonical tag
 - `source`: detect from URL (`x.com`→x, `reddit.com`→reddit, `github.com`→github, else→article)
 - `author`: extract from content or URL. "Unknown" if not identifiable
 - For tweets: incorporate engagement stats and thread context
@@ -192,7 +252,7 @@ status: unread
 
 # {title}
 
-**Author**: {author} ([profile link](url))
+**Author**: {author}
 **Published**: {date}
 **Views**: {views if known}
 **Source**: {url}
@@ -236,7 +296,7 @@ the user's workflow. Be specific about what to keep, change, or investigate.}
 ## Related
 
 - [[Note Title 1]] · [[Note Title 2]]
-- [External link description](url)
+- External source: {url}
 
 ## Images
 
@@ -254,6 +314,7 @@ the user's workflow. Be specific about what to keep, change, or investigate.}
 - Use blockquotes (`>`) for direct quotes from the source
 - Include `**bold**` for key terms and emphasis as in the original
 - `## Related` should use `[[wiki-links]]` to connect to other Library notes
+- Keep the frontmatter compatible with existing research notes in the chosen folder
 
 And if it's a thread, add a Thread Context section before Summary:
 
@@ -310,13 +371,13 @@ Pipe the composed note to the obsidian skill:
 ```powershell
 @'
 {full markdown content}
-'@ | python .github/skills/obsidian/scripts/obsidian.py create --path "Research/Library/{slug}.md"
+'@ | python .github/skills/obsidian/scripts/obsidian.py create --path "Research/Library/{library_bucket}/{slug}.md"
 ```
 
 **Note**: `obsidian.py create` produces no stdout on success. Verify the write:
 
 ```powershell
-python .github/skills/obsidian/scripts/obsidian.py read --path "Research/Library/{slug}.md" 2>&1 | Select-Object -First 3
+python .github/skills/obsidian/scripts/obsidian.py read --path "Research/Library/{library_bucket}/{slug}.md" 2>&1 | Select-Object -First 6
 ```
 
 If the first few lines match your frontmatter, the write succeeded.
@@ -325,26 +386,62 @@ If the path already exists, append `-2`, `-3`, etc. to the slug.
 Check first:
 
 ```powershell
-python .github/skills/obsidian/scripts/obsidian.py read --path "Research/Library/{slug}.md" 2>$null
+python .github/skills/obsidian/scripts/obsidian.py read --path "Research/Library/{library_bucket}/{slug}.md" 2>$null
 ```
 
 If that returns content, increment the suffix.
 
-### Step 5 — Open in Obsidian
+### Step 5 — Update the Master MOC
+
+After the note exists, refresh the **master Research Library MOC** as part of the
+same run unless doing so would require a major restructure.
+
+At minimum:
+
+- add the note to the relevant folder section if it is useful for navigation
+- append or refresh an entry under `Recently Added`
+- keep the one-line description current and specific
+
+If the master MOC would need a larger restructure, stop after creating the note and
+suggest a separate `obsidian-vault-linker` refresh.
+
+If the incoming report justifies a new canonical tag:
+
+- add the new tag to `Canonical Tag Guidance`
+- normalize away obvious duplicates instead of adding a synonym
+- only promote the tag if it is durable and likely to organize multiple future notes
+
+For lightweight sync, append a short block to the master MOC:
 
 ```powershell
-python -c "import sys; sys.path.insert(0,'.github/skills/obsidian/scripts'); from obsidian import Obsidian; ob=Obsidian(); ob.open('Research/Library/{slug}')"
+@'
+
+## Recently Added
+
+- [[{slug}|{title}]] — {one-line why this note matters}
+- Tags: #{tag1} #{tag2} #{tag3}
+'@ | python .github/skills/obsidian/scripts/obsidian.py append --path "Research/Library/00 MOC/🗺️ MOC - Research Library.md"
 ```
 
-### Step 6 — Confirm
+If a topic MOC clearly applies, update it secondarily after the master MOC is
+current. The master MOC remains authoritative for canonical tags and library-wide freshness.
+
+### Step 6 — Open in Obsidian
+
+```powershell
+python -c "import sys; sys.path.insert(0,'.github/skills/obsidian/scripts'); from obsidian import Obsidian; ob=Obsidian(); ob.open('Research/Library/{library_bucket}/{slug}')"
+```
+
+### Step 7 — Confirm
 
 Report to the user:
 - Note title and path
 - Brief summary (1-2 sentences)
 - Tag list
-- Obsidian link: `obsidian://open?vault=Obsidian%20Vault&file=Research%2FLibrary%2F{slug}`
+- Whether the master MOC was updated, and whether any topic MOC was also updated
+- Obsidian link: `obsidian://open?vault=Obsidian%20Vault&file=Research%2FLibrary%2F{library_bucket_urlencoded}%2F{slug}`
 
-### Step 7 — Reflection (composable)
+### Step 8 — Reflection (composable)
 
 Invoke the `skill-reflection` skill with the following context:
 
@@ -357,9 +454,9 @@ The reflection skill will analyze the run and produce improvement recommendation
 
 ## Output Format
 
-The output is a `Research/Library/{slug}.md` file in the Obsidian vault, following
-the enriched note template above. The format matches the existing Library pages
-created by `obsidian-daily-research`'s promote pass.
+The output is a `Research/Library/<bucket>/{slug}.md` file in the Obsidian vault,
+following the enriched note template above. The format matches the existing
+library pages and respects the live MOC/tag taxonomy already in the vault.
 
 ## Rules
 
@@ -371,6 +468,10 @@ created by `obsidian-daily-research`'s promote pass.
 6. **Deduplicate** — check if a note with a similar slug already exists before creating
 7. **UTF-8** — the fetch script handles Windows UTF-8 automatically; for the pipe, ensure `$OutputEncoding = [System.Text.Encoding]::UTF8` if needed
 8. **Zero pip deps** — `fetch.py` uses only Python stdlib
+9. **Read the master MOC first** — tag and folder decisions must be based on the live `Research/Library/00 MOC/🗺️ MOC - Research Library.md`
+10. **Prefer existing tags** — reuse the master MOC's canonical lowercase kebab-case tags before introducing a new one
+11. **Keep the master MOC fresh** — update it with every successful research-note addition unless the change truly requires larger curation work
+12. **Use topic MOCs secondarily** — they are optional supporting maps, not the authoritative taxonomy source
 
 ## Related Skills
 
@@ -387,6 +488,12 @@ created by `obsidian-daily-research`'s promote pass.
 User: "research this: <url>"
           │
           ▼
+┌─────────────────────────┐
+│  Read master MOC        │  ← Determine folder + canonical tags
+│  + tag index + library  │
+└──────────┬──────────────┘
+           │
+           ▼
 ┌─────────────────────────┐
 │  fetch.py <url>         │  ← Python stdlib only
 │  ├─ Tweet? → xAI API   │     (x_search tool, grok-4-1-fast)
@@ -405,5 +512,12 @@ User: "research this: <url>"
 ┌─────────────────────────┐
 │  obsidian.py create     │  ← CLI wrapper (composable)
 │  └─ Research/Library/   │
+│     <bucket>/{slug}.md  │
+└──────────┬──────────────┘
+           │
+           ▼
+┌─────────────────────────┐
+│  Update master MOC      │  ← Keep library map and tags current
+│  (+ topic MOC if needed)│
 └─────────────────────────┘
 ```

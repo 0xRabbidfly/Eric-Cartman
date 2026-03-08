@@ -821,7 +821,7 @@ It is for measured skill iteration, not one-shot drafting.
 │   ├── branch-wrapup/          # ✅ Pre-PR quality gate
 │   ├── content-research-writer/ # ✍️ Writing partner
 │   ├── obsidian-daily-research/ # 📡 Daily AI research pipeline
-│   ├── obsidian-linked-research/ # 🔗 URL → research note in vault
+│   ├── obsidian-linked-research/ # 🔗 URL → research note using the master Library MOC
 │   ├── podcast-to-obsidian/    # 🎙️ Podcast → transcript → Obsidian
 │   ├── doc-sync-all/           # 🔄 Documentation sync
 │   ├── health-audit/           # 🩺 Artifact health checks
@@ -829,7 +829,7 @@ It is for measured skill iteration, not one-shot drafting.
 │   ├── last30days/             # 🔍 Research (Copilot version)
 │   ├── obsidian/               # 📓 Vault operations (composable)
 │   ├── obsidian-vault-digest/  # 🔍 Vault topic synthesis
-│   ├── obsidian-vault-linker/  # 🔗 Missing links & graph health
+│   ├── obsidian-vault-linker/  # 🔗 Missing links, MOC gaps, and graph health
 │   ├── project-guide/          # 🧭 Codebase exploration
 │   ├── project-infographic/    # 🎨 Sprint demo visuals
 │   ├── project-scaffold/       # 🏗️ Agentic scaffold wizard

@@ -13,13 +13,13 @@ Portable, reusable skills for AI coding assistants. Each skill lives in its own 
 | `session_context_optimizer` | Audit and compress the AI's own context files |
 | `session-skill-forge` | Turn a productive workflow into a reusable SKILL.md |
 | `obsidian-vault-digest` | Synthesize Obsidian vault content into a briefing |
-| `obsidian-vault-linker` | Discover missing links and clusters in Obsidian vault |
+| `obsidian-vault-linker` | Discover missing links, MOC gaps, and cluster opportunities in the structured Obsidian vault |
 | `code-review` | Constitutional code review against project standards |
 | `content-research-writer` | Token-efficient writing partner with citations |
 | `session-context-audit` | Lighter health check for context drift |
 | `css-audit` | Audit components for CSS best-practice violations |
 | `obsidian-daily-research` | Daily AI research pipeline → Obsidian vault |
-| `obsidian-linked-research` | Fetch a URL → summarize → save to Obsidian Research/Library/ |
+| `obsidian-linked-research` | Fetch a URL → summarize → save into the structured Obsidian research taxonomy using the master Library MOC for tags and freshness |
 | `doc-sync-all` | Propagate code changes to all design docs |
 | `health-audit` | Validate YAML frontmatter, cross-refs, token counts |
 | `i18n` | Bilingual EN/FR content validation (next-intl) |

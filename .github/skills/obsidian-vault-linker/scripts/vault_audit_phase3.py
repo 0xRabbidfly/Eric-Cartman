@@ -1,10 +1,19 @@
 """Phase 3: Deep link opportunity analysis across clusters."""
 import json
+import re
 import sys
 sys.path.insert(0, ".github/skills/obsidian/scripts")
 from obsidian import Obsidian
 
 ob = Obsidian()
+MASTER_MOC_PATH = "Research/Library/00 MOC/🗺️ MOC - Research Library.md"
+TOPIC_MOC_PATHS = {
+    "AI Agent Development": "Research/Library/00 MOC/🤖 MOC - AI Agent Development.md",
+}
+
+
+def extract_wikilink_targets(content: str):
+    return set(match.split("|", 1)[0].strip() for match in re.findall(r"\[\[([^\]]+)\]\]", content))
 
 # --- Check Dailies for references to Library notes ---
 print("=" * 60)
@@ -18,7 +27,6 @@ for daily in dailies:
     content = ob.read(path=daily)
     if "[[" in content:
         # Extract wikilinks
-        import re
         links = re.findall(r'\[\[([^\]|]+)', content)
         lib_links = [l for l in links if "Library" in l or "Research" in l]
         if lib_links:
@@ -33,7 +41,7 @@ print("\n" + "=" * 60)
 print("IDEAS/Raven CLUSTER")
 print("=" * 60)
 
-raven_notes = ob.files(folder="Personal - Nuno/IDEAS/Raven", ext="md").lines()
+raven_notes = ob.files(folder="Project Domains/IDEAS/Raven", ext="md").lines()
 print(f"Total Raven notes: {len(raven_notes)}")
 
 # Check orphan status
@@ -72,6 +80,38 @@ for i, (t1, c1) in enumerate(tag_names):
             seen_pairs.add((t1, t2))
             print(f"  Similar: {t1} ({c1}) ↔ {t2} ({c2}) — similarity: {ratio:.0%}")
 
+# --- Research MOC audit ---
+print("\n" + "=" * 60)
+print("MASTER AND TOPIC MOC AUDIT")
+print("=" * 60)
+
+library_notes = [
+    line for line in ob.files(folder="Research/Library", ext="md").lines()
+    if not line.startswith("Research/Library/00 MOC/")
+]
+library_slug_map = {path.rsplit("/", 1)[-1].replace(".md", ""): path for path in library_notes}
+
+master_moc_content = ob.read(path=MASTER_MOC_PATH)
+master_moc_targets = extract_wikilink_targets(master_moc_content)
+missing_from_master_moc = [
+    path for path in library_notes
+    if path.rsplit("/", 1)[-1].replace(".md", "") not in master_moc_targets
+]
+
+print(f"Master MOC path: {MASTER_MOC_PATH}")
+print(f"Research notes not referenced by master MOC: {len(missing_from_master_moc)}")
+for path in missing_from_master_moc[:15]:
+    print(f"  ➕ {path}")
+if len(missing_from_master_moc) > 15:
+    print(f"  ... +{len(missing_from_master_moc) - 15} more")
+
+print("\nTopic MOC summaries:")
+for moc_name, moc_path in TOPIC_MOC_PATHS.items():
+    topic_targets = extract_wikilink_targets(ob.read(path=moc_path))
+    topic_linked_notes = [path for slug, path in library_slug_map.items() if slug in topic_targets]
+    print(f"  {moc_name}: {len(topic_linked_notes)} referenced library notes")
+    print("    Scoped topic MOCs are not expected to cover the entire library.")
+
 # --- Complexity cluster — MOC candidates ---
 print("\n" + "=" * 60)
 print("SUGGESTED MOCs — Complexity/Systems Thinking")
@@ -85,7 +125,9 @@ try:
     for m in moc_results:
         if isinstance(m, str):
             print(f"  📋 {m}")
-except:
+        elif isinstance(m, dict):
+            print(f"  📋 {m.get('path', m)}")
+except Exception:
     print("  No MOC notes found")
 
 # Count orphans in key subject areas
