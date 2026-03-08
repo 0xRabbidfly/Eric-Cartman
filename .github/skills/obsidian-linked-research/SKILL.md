@@ -6,7 +6,7 @@ user-invocable: true
 disable-model-invocation: false
 metadata:
   author: 0xrabbidfly
-  version: "1.2.0"
+  version: "1.2.1"
 ---
 
 # Obsidian Linked Research
@@ -135,6 +135,17 @@ page (tracking pixels, favicons, and tiny icons are filtered out). Use Step 3b t
 download them into the vault.
 
 If the result contains an `"error"` key, report it to the user and stop.
+
+**If a non-X web page is truncated or loses useful structure**: `fetch.py` is
+still the required first pass, but long articles may come back clipped (for
+example around the first ~8000 chars) or flattened enough that headings, quotes,
+or diagram captions are hard to reconstruct. In that case, supplement the fetch
+result with `fetch_webpage` on the same URL to recover richer article structure.
+
+- Do **not** skip `fetch.py`; it remains the canonical fetch step
+- Use `fetch_webpage` only as a secondary enrichment pass for standard web URLs
+- Keep the original `fetch.py` metadata (`title`, `image_urls`, `url`) as the
+  source of truth unless the webpage fetch clearly corrects it
 
 **If `"needs_browser": true`**: The tweet contains an X Article that requires
 JavaScript rendering. **Do NOT use `fetch_webpage`** — it cannot render X Article
@@ -404,6 +415,25 @@ At minimum:
 
 If the master MOC would need a larger restructure, stop after creating the note and
 suggest a separate `obsidian-vault-linker` refresh.
+
+If you need to insert the note into an existing section (for example the correct
+library bucket list plus `Recently Added`), prefer a clean overwrite instead of
+stacking append-only blocks at the end of the file:
+
+1. Read the current MOC
+2. Update the markdown in memory so the new note lands in the right section
+3. Rewrite the full note through the obsidian wrapper using `create --overwrite`
+
+Example pattern:
+
+```powershell
+@'
+{full updated MOC markdown}
+'@ | python .github/skills/obsidian/scripts/obsidian.py create --path "Research/Library/00 MOC/🗺️ MOC - Research Library.md" --overwrite
+```
+
+Use the lighter `append` example below only when a small footer-style refresh is
+good enough and the file does not need an in-place insertion.
 
 If the incoming report justifies a new canonical tag:
 
