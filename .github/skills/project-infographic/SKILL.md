@@ -1,7 +1,7 @@
 ---
 name: project-infographic
 description: Generate a visually beautiful HTML infographic showing high-level project overview for sprint demos. Use when preparing presentations, stakeholder updates, or visual project summaries.
-user-invokable: true
+user-invocable: true
 disable-model-invocation: true
 metadata:
   author: 0xrabbidfly

@@ -1,7 +1,7 @@
 ---
 name: repo-state-sync
 description: Scan codebase and design docs to update the Session Onboarding section in copilot-instructions.md. Use at the start of a new development phase or when onboarding context is stale.
-user-invokable: true
+user-invocable: true
 disable-model-invocation: true
 metadata:
   author: 0xrabbidfly

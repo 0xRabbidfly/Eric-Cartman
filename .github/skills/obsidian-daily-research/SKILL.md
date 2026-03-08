@@ -2,7 +2,7 @@
 name: obsidian-daily-research
 description: Use this skill when the user wants to run the daily AI research pipeline, scan Reddit or X for AI news, or write today's research into their Obsidian vault. Triggers for 'run the daily research', 'what's new in AI today', 'pull today's research', 'catch me up on agents/MCP/models', 'run the pipeline', 'daily scan'. Also use when the user wants to scan only specific sources (Reddit or X only), specify a vault path, or catch up after missing days.
 argument-hint: daily research, run pipeline, what's new in AI
-user-invokable: true
+user-invocable: true
 disable-model-invocation: true
 metadata:
   author: 0xrabbidfly

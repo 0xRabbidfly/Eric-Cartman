@@ -1,7 +1,7 @@
 ---
 name: insights-report
 description: Generate a comprehensive cross-session insights report by analyzing all captured session logs in `.github/sessions/`. Use when reviewing patterns across sessions or preparing retrospectives.
-user-invokable: true
+user-invocable: true
 disable-model-invocation: false
 metadata:
   author: 0xrabbidfly

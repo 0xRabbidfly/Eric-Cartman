@@ -1,7 +1,7 @@
 ---
 name: doc-sync-all
 description: Comprehensive documentation synchronization - scan local git changes and propagate updates to ALL design docs, task lists, specs, diagrams, and planning artifacts. Use when finishing a feature, after merging, or when design docs are out of date.
-user-invokable: true
+user-invocable: true
 disable-model-invocation: true
 metadata:
   author: 0xrabbidfly

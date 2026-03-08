@@ -1,7 +1,7 @@
 ---
 name: session-skill-forge
 description: Turn any productive workflow into a reusable skill. Use at the end of a session when you've built something worth repeating — this skill writes the SOP, creates the SKILL.md, and wires it into the project.
-user-invokable: true
+user-invocable: true
 disable-model-invocation: true
 metadata:
   author: 0xrabbidfly

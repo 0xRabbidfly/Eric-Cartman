@@ -1,7 +1,7 @@
 ---
 name: content-research-writer
 description: A token-efficient writing partner that uses bounded research, numbered citations, evidence packets, and parallel sub-agents to outline, draft, and refine high-quality content with minimal context growth.
-user-invokable: true
+user-invocable: true
 disable-model-invocation: true
 metadata:
   author: 0xrabbidfly

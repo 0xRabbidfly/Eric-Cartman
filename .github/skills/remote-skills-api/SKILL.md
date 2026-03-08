@@ -3,7 +3,7 @@
 name: remote-skills-api
 description: Mobile-friendly web server to chat with and invoke Eric Cartman skills remotely via Tailscale. Generalised from rbc-banking/simple-api.js. Start once on your PC, access from your phone anywhere.
 argument-hint: start, stop
-user-invokable: true
+user-invocable: true
 disable-model-invocation: false
 metadata:
   author: 0xrabbidfly

@@ -1,7 +1,7 @@
 ---
 name: obsidian-vault-digest
 description: Scan the Obsidian vault for everything related to a topic and produce a synthesized briefing with citations. Use before writing, researching, or making decisions — to leverage everything you've already captured.
-user-invokable: true
+user-invocable: true
 argument-hint: "topic or question to synthesize from vault"
 disable-model-invocation: true
 metadata:

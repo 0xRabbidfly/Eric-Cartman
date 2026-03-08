@@ -2,7 +2,7 @@
 name: obsidian
 description: Composable Obsidian vault operations via CLI. Use when ANY task needs to read, write, search, tag, or query the Obsidian vault. This is the ONLY correct way to interact with the vault. Provides typed wrappers around the Obsidian CLI (v1.12+). Requires Obsidian to be running. Use when user says "save to vault", "obsidian", "research note", "daily note", "tag", "summarize and save", or any vault operation.
 argument-hint: search query, create note, daily append, tags
-user-invokable: true
+user-invocable: true
 disable-model-invocation: false
 metadata:
   author: 0xrabbidfly

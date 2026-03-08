@@ -1,7 +1,7 @@
 ---
 name: session-context-audit
 description: Audit the health and coherence of all AI context files. Use when the AI behaves inconsistently, misapplies rules, or you suspect context drift after many sessions of incremental changes.
-user-invokable: true
+user-invocable: true
 disable-model-invocation: true
 metadata:
   author: 0xrabbidfly
