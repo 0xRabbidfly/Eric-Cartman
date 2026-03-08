@@ -776,6 +776,40 @@ npm start
 
 ---
 
+### 24. 🧪 Skill Autoresearch
+
+**Apply Karpathy-style autoresearch to skill creation and improvement.**
+
+This skill wraps skill authoring in a bounded keep-or-revert loop: one target
+`SKILL.md`, one stable eval batch, one results ledger, and one promotion rule.
+It is for measured skill iteration, not one-shot drafting.
+
+**Use When:**
+- You want to improve a skill empirically instead of by vibes
+- You want fixed prompts and a ledger before changing instructions
+- You want to compare candidate revisions against a baseline and only keep winners
+- You want a safe way to create a new skill without letting scope sprawl
+
+**Core Pattern:**
+| Autoresearch | Skill Workflow |
+|---|---|
+| `program.md` | experiment brief + control rules |
+| `train.py` | one mutable `SKILL.md` |
+| fixed 5-minute harness | fixed eval batch |
+| `results.tsv` | skill results ledger |
+| keep / discard | promote / revert |
+
+**How It Fits:**
+- `session-skill-forge` creates the first draft from a workflow
+- `skill-creator` helps with prompts, assertions, and benchmark runs
+- `skill-autoresearch` controls the bounded hill-climbing loop around one target skill
+
+```
+📍 Location: .github/skills/skill-autoresearch/
+```
+
+---
+
 ## 📁 Repository Structure
 
 ```
@@ -806,6 +840,7 @@ npm start
 │   ├── session-skill-forge/    # ⚒️ Workflow → reusable skill
 │   ├── session_context_optimizer/ # 🧹 Meta-optimize AI context
 │   ├── remote-skills-api/      # 📱 Phone access over Tailscale
+│   ├── skill-autoresearch/     # 🧪 Keep-or-revert skill improvement loops
 │   ├── skill-creator/          # 🛠️ Create, test, and refine skills
 │   ├── skill-reflection/       # 🪞 Composable after-action review
 │   └── visual-explainer/       # 🎨 HTML diagrams, diff reviews, slide decks

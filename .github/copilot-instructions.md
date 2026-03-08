@@ -44,6 +44,7 @@ Eric Cartman is a **meta-prompt library** — a portable scaffold of agentic dev
 - **Structure**: Purpose → When to Use → Workflow (numbered steps) → Output Format → Rules
 - **Naming**: Folder names are `kebab-case`. Skill titles are human-readable.
 - **Composability**: Skills can invoke other skills (e.g., `skill-reflection` as a final step).
+- **Reflection step**: Every new skill should end its workflow with a composable call to `skill-reflection` so friction is captured and the skill can improve over time.
 - **Scripts**: Place helper scripts in `<skill>/scripts/`. Python preferred for cross-platform.
 - **No duplication**: If a rule exists in `copilot-instructions.md`, skills reference it — don't repeat it.
 
@@ -57,7 +58,8 @@ Eric Cartman is a **meta-prompt library** — a portable scaffold of agentic dev
 ## Change Hygiene
 - Keep changes focused on the requested task.
 - Do not reformat unrelated files.
-- Update README.md when adding/removing/renaming skills.
+- Whenever a skill is added, deleted, or modified, update README.md to keep the public skill catalog and descriptions in sync.
+- When a skill is added, deleted, or modified, also review `.github/skills/remote-skills-api/` and update it if the change affects remote discovery, invocation, examples, or user-facing behavior.
 - Test skills by invoking them before marking complete.
 
 ## Friction Rule

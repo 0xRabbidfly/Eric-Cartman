@@ -70,6 +70,9 @@ mcp-servers/
 # Content research writer workspace (generated briefs, evidence packets, drafts)
 .github/skills/content-research-writer/research/
 
+# Skill autoresearch workspaces (generated experiment artifacts)
+.github/skills/skill-reflection-workspace/
+
 # Backup files
 *.bak
 *.backup
