@@ -97,3 +97,6 @@ scratch/
 
 # Portugal Lawyer
 .github/agents/portuguese-lawyer.md
+
+# Daily research feedback log (personal vault data)
+.github/skills/obsidian-daily-research/scripts/feedback.json
