@@ -1148,6 +1148,7 @@ def process_feedback_tags(config: dict) -> dict:
     Replaces #good → #good-noted, #bad → #bad-noted so items
     aren't reprocessed. Returns summary of what was found.
     """
+    vault._init_fs(config)  # ensure FS-direct I/O is enabled before bulk reads
     fb_config = config.get("feedback_tags", {})
     good_tag = fb_config.get("good_tag", "#good")
     bad_tag = fb_config.get("bad_tag", "#bad")

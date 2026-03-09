@@ -355,6 +355,7 @@ def promote_items(
     dailies_folder = config.get("dailies_folder", "Research/Dailies")
     library_folder = config.get("library_folder", "Research/Library")
 
+    vault._init_fs(config)  # enable FS-direct I/O before bulk reads/writes
     all_promoted = []
     keeps = scan_for_keeps(dailies_folder)
 
