@@ -24,6 +24,12 @@ _ob: Obsidian | None = None
 # Cache: vault folder → list of .md files (populated once per process)
 _folder_cache: dict[str, list[str]] = {}
 
+# Cache: vault file path → content (populated once per process, invalidated on write)
+_file_content_cache: dict[str, str] = {}
+
+# Vault filesystem root (set from config on first use; enables direct FS I/O)
+_vault_fs_root: str | None = None
+
 
 def _client() -> Obsidian:
     """Get or create the Obsidian client singleton."""
@@ -31,6 +37,22 @@ def _client() -> Obsidian:
     if _ob is None:
         _ob = Obsidian()
     return _ob
+
+
+def _init_fs(config: dict) -> None:
+    """Populate _vault_fs_root from config (idempotent, call at start of any config-aware function).
+
+    When the vault root is a real directory on disk, subsequent _scan_folder_files()
+    and _read_vault_file() calls go directly to the filesystem — zero CLI spawns.
+    This eliminates the 300+ Obsidian.com subprocess invocations that previously
+    caused IPC overload and spurious new-window openings.
+    """
+    global _vault_fs_root
+    if _vault_fs_root:
+        return  # already set
+    root = config.get("vault_path", "")
+    if root and Path(root).is_dir():
+        _vault_fs_root = root
 
 
 # ---------------------------------------------------------------------------
@@ -82,33 +104,82 @@ def title_is_seen(title: str, seen_titles: Set[str], threshold: float = 0.8) -> 
 # ---------------------------------------------------------------------------
 
 def _scan_folder_files(folder: str) -> list[str]:
-    """List .md files in a vault folder via CLI (cached per process)."""
+    """List .md files in a vault folder (cached per process).
+
+    Uses filesystem I/O when _vault_fs_root is set (fast, no CLI spawns).
+    Falls back to Obsidian CLI when vault root is not known.
+    """
     if folder in _folder_cache:
         return _folder_cache[folder]
-    ob = _client()
-    result = ob.files(folder=folder, ext="md")
-    files = result.lines() if result.ok else []
+
+    vault_root = _vault_fs_root
+    if vault_root:
+        base = Path(vault_root) / folder
+        if base.is_dir():
+            files = sorted(
+                f"{folder}/{f.name}"
+                for f in base.iterdir()
+                if f.is_file() and f.suffix == ".md"
+            )
+        else:
+            files = []
+    else:
+        ob = _client()
+        result = ob.files(folder=folder, ext="md")
+        files = result.lines() if result.ok else []
+
     _folder_cache[folder] = files
     return files
 
 
 def _read_vault_file(filepath: str) -> str:
-    """Read a file from the vault via CLI."""
-    ob = _client()
-    return ob.read(path=filepath)
+    """Read a file from the vault (cached per process).
+
+    Uses filesystem I/O when _vault_fs_root is set (fast, no CLI spawns).
+    Falls back to Obsidian CLI when vault root is not known.
+    """
+    if filepath in _file_content_cache:
+        return _file_content_cache[filepath]
+
+    vault_root = _vault_fs_root
+    if vault_root:
+        full = Path(vault_root) / filepath
+        try:
+            text = full.read_text(encoding="utf-8", errors="replace") if full.exists() else ""
+        except Exception:
+            text = ""
+    else:
+        ob = _client()
+        text = ob.read(path=filepath)
+
+    _file_content_cache[filepath] = text
+    return text
 
 
 def _scan_folder_recursive(folder: str) -> list[str]:
     """List .md files recursively in a vault folder.
 
-    Handles both flat (legacy) and year/month subfolder layouts.
-    Scans the root folder, then any YYYY/ and YYYY/MM/ sub-dirs.
+    Uses os.walk on the filesystem when _vault_fs_root is set — one syscall
+    traversal instead of 50+ individual folder-listing CLI calls.
+    Falls back to the sub-folder loop (CLI) when vault root is not known.
     """
+    vault_root = _vault_fs_root
+    if vault_root:
+        base = Path(vault_root) / folder
+        if not base.is_dir():
+            return []
+        all_files = []
+        for dirpath, _dirs, filenames in base.walk() if hasattr(base, "walk") else _os_walk(base):
+            rel_dir = str(Path(dirpath).relative_to(Path(vault_root))).replace("\\", "/")
+            for fname in sorted(filenames):
+                if fname.endswith(".md"):
+                    all_files.append(f"{rel_dir}/{fname}")
+        return all_files
+
+    # --- Fallback: CLI-based enumeration (used when vault_path is not configured) ---
     all_files: list[str] = []
-    # Root-level files
     all_files.extend(_scan_folder_files(folder))
 
-    # Scan year sub-folders (e.g. Research/Dailies/2026/)
     import datetime
     current_year = datetime.datetime.now().year
     for year in range(2024, current_year + 2):
@@ -117,11 +188,18 @@ def _scan_folder_recursive(folder: str) -> list[str]:
             month_folder = f"{year_folder}/{month:02d}"
             month_files = _scan_folder_files(month_folder)
             all_files.extend(month_files)
-        # Also check files directly in the year folder
         year_files = _scan_folder_files(year_folder)
         all_files.extend(year_files)
 
     return all_files
+
+
+def _os_walk(base: Path):
+    """Compatibility shim: use os.walk when Path.walk() is not available (Python <3.12)."""
+    import os
+    for dirpath, dirnames, filenames in os.walk(str(base)):
+        dirnames.sort()
+        yield dirpath, dirnames, filenames
 
 
 def load_seen_dedup(config: dict) -> tuple[Set[str], Set[str]]:
@@ -130,6 +208,7 @@ def load_seen_dedup(config: dict) -> tuple[Set[str], Set[str]]:
     Replaces separate load_seen_urls / load_seen_titles calls to halve the
     number of Obsidian CLI file-read operations.
     """
+    _init_fs(config)  # enable FS-direct reads if vault_path is valid
     dailies_folder = config.get("dailies_folder", "Research/Dailies")
     library_folder = config.get("library_folder", "Research/Library")
     seen_urls: Set[str] = set()
@@ -181,31 +260,54 @@ def _daily_path(dailies_folder: str, date_str: str) -> str:
 
 
 def write_daily_note(config: dict, date_str: str, content: str) -> str:
-    """Write a daily research note to the vault via CLI.
+    """Write a daily research note to the vault.
 
     Organizes into year/month subfolders:
       Research/Dailies/2026/02/2026-02-26.md
 
-    Returns the path of the written file.
-    """
-    dailies_folder = config.get("dailies_folder", "Research/Dailies")
-    ob = _client()
+    Writes directly to the vault filesystem when vault_path is configured
+    (avoids the named-pipe size limit that causes Pipe errors on large notes).
+    Falls back to Obsidian CLI when vault root is not available.
 
+    Returns the vault-relative path of the written file.
+    """
+    _init_fs(config)
+    dailies_folder = config.get("dailies_folder", "Research/Dailies")
     path = _daily_path(dailies_folder, date_str)
 
-    # Fail closed for duplicate same-day runs.
-    if ob.exists(path=path):
-        raise FileExistsError(f"Daily note already exists: {path}")
+    vault_root = _vault_fs_root
+    if vault_root:
+        full_path = Path(vault_root) / path
+        if full_path.exists():
+            raise FileExistsError(f"Daily note already exists: {path}")
+        full_path.parent.mkdir(parents=True, exist_ok=True)
+        full_path.write_text(content, encoding="utf-8")
+        # Populate cache so subsequent reads in same run don't re-read disk
+        _file_content_cache[path] = content
+    else:
+        ob = _client()
+        if ob.exists(path=path):
+            raise FileExistsError(f"Daily note already exists: {path}")
+        ob.create(path=path, content=content)
 
-    ob.create(path=path, content=content)
     return path
 
 
 def daily_exists(config: dict, date_str: str) -> bool:
     """Check if a daily note already exists for this date."""
+    _init_fs(config)
     dailies_folder = config.get("dailies_folder", "Research/Dailies")
     new_path = _daily_path(dailies_folder, date_str)
     legacy_path = f"{dailies_folder}/{date_str}.md"
+
+    vault_root = _vault_fs_root
+    if vault_root:
+        if (Path(vault_root) / new_path).exists():
+            return True
+        if (Path(vault_root) / legacy_path).exists():
+            return True
+        return False
+
     ob = _client()
     if ob.exists(path=new_path) or ob.exists(path=legacy_path):
         return True
@@ -228,13 +330,25 @@ def daily_exists(config: dict, date_str: str) -> bool:
 # ---------------------------------------------------------------------------
 
 def read_file(path: str) -> str:
-    """Read a vault file by path."""
-    return _client().read(path=path)
+    """Read a vault file by path (uses FS cache when available)."""
+    return _read_vault_file(path)
 
 
 def write_file(path: str, content: str) -> None:
-    """Write (create/overwrite) a vault file by path."""
-    _client().create(path=path, content=content, overwrite=True)
+    """Write (create/overwrite) a vault file by path.
+
+    Writes directly to the vault filesystem when vault_path is configured
+    (avoids the named-pipe size limit on large content).
+    """
+    vault_root = _vault_fs_root
+    if vault_root:
+        full_path = Path(vault_root) / path
+        full_path.parent.mkdir(parents=True, exist_ok=True)
+        full_path.write_text(content, encoding="utf-8")
+        # Invalidate the in-process cache so the next read sees new content
+        _file_content_cache[path] = content
+    else:
+        _client().create(path=path, content=content, overwrite=True)
 
 
 def append_to_file(path: str, content: str) -> None:
@@ -244,6 +358,9 @@ def append_to_file(path: str, content: str) -> None:
 
 def file_exists(path: str) -> bool:
     """Check if a file exists in the vault."""
+    vault_root = _vault_fs_root
+    if vault_root:
+        return (Path(vault_root) / path).exists()
     return _client().exists(path=path)
 
 
