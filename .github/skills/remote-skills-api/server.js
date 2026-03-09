@@ -119,6 +119,11 @@ function appendHistory(sess, role, content, maxTurns = 10) {
   saveSessions();
 }
 
+function formatInvokeHistoryEntry(skillName, args) {
+  const trimmedArgs = typeof args === 'string' ? args.trim() : '';
+  return trimmedArgs ? `/${skillName} ${trimmedArgs}` : `/${skillName}`;
+}
+
 function touchSession(sessionId, skillName) {
   const sess = getOrCreateSession(sessionId);
   sess.lastActivity = Date.now();
@@ -816,10 +821,13 @@ app.post('/api/invoke/:skill', auth, async (req, res) => {
 
   try {
     currentGoal = `/${name} ${(args || '').substring(0, 40)}`;
+    appendHistory(sess, 'user', formatInvokeHistoryEntry(name, args));
     const result = await enqueue(() => runClaude(prompt));
+    appendHistory(sess, 'assistant', result);
     res.json({ skill: name, result, sessionId: sess.id });
   } catch (err) {
     const e = classifyError(err, 'invoke_failed');
+    appendHistory(sess, 'assistant', `Error: ${e.error}${e.hint ? `\n\n${e.hint}` : ''}`);
     res.status(500).json(e);
   }
 });

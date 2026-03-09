@@ -73,6 +73,10 @@ mcp-servers/
 # Skill autoresearch workspaces (generated experiment artifacts)
 .github/skills/skill-reflection-workspace/
 
+# Remote Skills API generated runtime state
+.github/skills/remote-skills-api/sessions.json
+.github/skills/remote-skills-api/usage-stats.json
+
 # Backup files
 *.bak
 *.backup
