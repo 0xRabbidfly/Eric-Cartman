@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="icon" type="image/png" href="https://upload.wikimedia.org/wikipedia/en/7/77/EricCartman.png">
+  <link rel="apple-touch-icon" href="https://upload.wikimedia.org/wikipedia/en/7/77/EricCartman.png">
   <title>Skills Remote</title>
   <style>
     :root {
@@ -72,6 +74,8 @@
       display: flex; align-items: center; justify-content: center;
       cursor: pointer; font-size: 16px;
       transition: background .15s;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
     }
     .icon-btn:active { background: var(--accent-soft); }
 
@@ -111,6 +115,7 @@
       border-radius: 12px;
       cursor: pointer;
       transition: background .15s;
+      touch-action: manipulation;
     }
     .skill-item:active { background: var(--accent-soft); }
     .skill-item.active { background: var(--accent-soft); border: 1px solid var(--accent); }
@@ -285,6 +290,7 @@
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+      touch-action: manipulation;
     }
     .skill-chip.active { display: flex; }
     .skill-chip .x { margin-left: 2px; opacity: .6; flex-shrink: 0; }
@@ -321,6 +327,8 @@
       display: flex; align-items: center; justify-content: center;
       cursor: pointer; flex-shrink: 0;
       transition: opacity .15s;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
     }
     .send-btn:disabled { opacity: .3; cursor: default; }
     .send-btn svg { width: 20px; height: 20px; }
@@ -331,7 +339,25 @@
       align-items: center; justify-content: center;
       padding: 40px 20px; text-align: center;
     }
-    .welcome-icon { font-size: 48px; margin-bottom: 16px; }
+    .welcome-icon {
+      width: 96px;
+      height: 96px;
+      margin-bottom: 16px;
+      border-radius: 50%;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      box-shadow: 0 14px 32px rgba(0,0,0,.32);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .welcome-icon img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
     .welcome h2 { font-size: 22px; margin-bottom: 8px; }
     .welcome p { color: var(--text-dim); font-size: 14px; max-width: 300px; line-height: 1.5; }
     .quick-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; justify-content: center; }
@@ -344,8 +370,100 @@
       font-size: 13px;
       cursor: pointer;
       transition: all .15s;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
     }
     .quick-btn:active { background: var(--accent-soft); border-color: var(--accent); }
+
+    /* ── Modal + toast ── */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.72);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      z-index: 80;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal-card {
+      width: min(100%, 380px);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 18px;
+      box-shadow: 0 24px 60px rgba(0,0,0,.45);
+    }
+    .modal-title {
+      font-size: 17px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .modal-text {
+      font-size: 14px;
+      color: var(--text-dim);
+      line-height: 1.45;
+      margin-bottom: 14px;
+      white-space: pre-wrap;
+    }
+    .modal-input {
+      width: 100%;
+      background: var(--surface2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 14px;
+      font-size: 15px;
+      outline: none;
+      margin-bottom: 14px;
+    }
+    .modal-input:focus { border-color: var(--accent); }
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+    .modal-btn {
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--text);
+      border-radius: 12px;
+      padding: 10px 14px;
+      font-size: 14px;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .modal-btn.primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: white;
+    }
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: calc(max(18px, env(safe-area-inset-bottom)) + 74px);
+      transform: translateX(-50%) translateY(16px);
+      opacity: 0;
+      pointer-events: none;
+      background: rgba(20,20,24,.96);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 12px 14px;
+      width: min(calc(100vw - 24px), 420px);
+      font-size: 14px;
+      line-height: 1.4;
+      transition: opacity .2s ease, transform .2s ease;
+      z-index: 90;
+      box-shadow: 0 18px 40px rgba(0,0,0,.35);
+    }
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+    .toast.error { border-color: rgba(239,68,68,.55); }
+    .toast.success { border-color: rgba(34,197,94,.55); }
 
     /* ── Utility ── */
     .hidden { display: none !important; }
@@ -365,6 +483,7 @@
     <div class="header-actions">
       <button class="icon-btn" onclick="openDrawer()" title="Skills">⚡</button>
       <button class="icon-btn" onclick="promptSetToken()" title="Set API Token">🔑</button>
+      <button class="icon-btn" onclick="restartServer()" title="Restart Server">🔁</button>
       <button class="icon-btn" onclick="cancelRequest()" title="Cancel">✕</button>
     </div>
   </div>
@@ -377,10 +496,26 @@
     <div id="skillList" class="skill-list"></div>
   </div>
 
+  <div id="modalOverlay" class="modal-overlay">
+    <div class="modal-card">
+      <div id="modalTitle" class="modal-title"></div>
+      <div id="modalText" class="modal-text"></div>
+      <input id="modalInput" class="modal-input hidden" autocomplete="off">
+      <div class="modal-actions">
+        <button id="modalCancel" class="modal-btn" type="button">Cancel</button>
+        <button id="modalConfirm" class="modal-btn primary" type="button">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
   <!-- Chat messages -->
   <div id="chatArea" class="chat-area">
     <div id="welcome" class="welcome">
-      <div class="welcome-icon">🧠</div>
+      <div class="welcome-icon">
+        <img src="https://upload.wikimedia.org/wikipedia/en/7/77/EricCartman.png" alt="Eric Cartman">
+      </div>
       <h2>Eric Cartman Skills</h2>
       <p>Chat naturally or pick a skill. Running on your PC — accessible over Tailscale.</p>
       <div id="quickActions" class="quick-actions"></div>
@@ -409,10 +544,21 @@
   <script src="https://cdn.jsdelivr.net/npm/marked@15/marked.min.js"></script>
   <script>
     // ── State ──
-    let API_TOKEN = localStorage.getItem('skills_api_token');
-    let skills = [];
+    let API_TOKEN  = localStorage.getItem('skills_api_token');
+    let sessionId  = localStorage.getItem('skills_session_id') || null;
+    let skills     = [];
     let activeSkill = null;
-    let isBusy = false;
+    let isBusy      = false;
+    let promptForTokenOnLoad = false;
+    let modalResolver = null;
+    let toastTimer = null;
+
+    function updateSessionId(id) {
+      if (id && id !== sessionId) {
+        sessionId = id;
+        localStorage.setItem('skills_session_id', id);
+      }
+    }
 
     // ── Auth ──
     const urlParams = new URLSearchParams(window.location.search);
@@ -423,8 +569,77 @@
       history.replaceState({}, '', location.pathname);
     }
     if (!API_TOKEN) {
-      API_TOKEN = prompt('Enter API Secret:');
-      if (API_TOKEN) localStorage.setItem('skills_api_token', API_TOKEN);
+      promptForTokenOnLoad = true;
+    }
+
+    function showToast(message, kind = 'info', timeoutMs = 3200) {
+      const el = document.getElementById('toast');
+      clearTimeout(toastTimer);
+      el.textContent = message;
+      el.className = `toast ${kind} show`;
+      toastTimer = setTimeout(() => {
+        el.className = 'toast';
+      }, timeoutMs);
+    }
+
+    function showModal(options = {}) {
+      const overlay = document.getElementById('modalOverlay');
+      const title = document.getElementById('modalTitle');
+      const text = document.getElementById('modalText');
+      const input = document.getElementById('modalInput');
+      const cancel = document.getElementById('modalCancel');
+      const confirm = document.getElementById('modalConfirm');
+
+      title.textContent = options.title || 'Confirm';
+      text.textContent = options.message || '';
+      confirm.textContent = options.confirmLabel || 'OK';
+      cancel.textContent = options.cancelLabel || 'Cancel';
+      cancel.classList.toggle('hidden', options.showCancel === false);
+
+      if (options.input) {
+        input.classList.remove('hidden');
+        input.type = options.inputType || 'text';
+        input.value = options.inputValue || '';
+        input.placeholder = options.inputPlaceholder || '';
+      } else {
+        input.classList.add('hidden');
+        input.value = '';
+      }
+
+      overlay.classList.add('open');
+
+      return new Promise(resolve => {
+        modalResolver = resolve;
+        setTimeout(() => {
+          if (!input.classList.contains('hidden')) input.focus();
+          else confirm.focus();
+        }, 0);
+      });
+    }
+
+    function closeModal(result) {
+      const overlay = document.getElementById('modalOverlay');
+      const input = document.getElementById('modalInput');
+      overlay.classList.remove('open');
+      input.blur();
+      if (modalResolver) {
+        const resolve = modalResolver;
+        modalResolver = null;
+        resolve(result);
+      }
+    }
+
+    function wireModal() {
+      const overlay = document.getElementById('modalOverlay');
+      const input = document.getElementById('modalInput');
+      document.getElementById('modalCancel').addEventListener('click', () => closeModal({ confirmed: false, value: '' }));
+      document.getElementById('modalConfirm').addEventListener('click', () => closeModal({ confirmed: true, value: input.value }));
+      overlay.addEventListener('click', (event) => {
+        if (event.target === overlay) closeModal({ confirmed: false, value: '' });
+      });
+      input.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') closeModal({ confirmed: true, value: input.value });
+      });
     }
 
     async function validateToken(token) {
@@ -435,9 +650,19 @@
     }
 
     async function promptSetToken() {
-      const value = prompt('Paste API Secret:', API_TOKEN || '');
-      if (!value) return;
-      const candidate = value.trim();
+      const result = await showModal({
+        title: 'API Token',
+        message: 'Paste API Secret for this device.',
+        confirmLabel: 'Save',
+        cancelLabel: 'Not now',
+        showCancel: true,
+        input: true,
+        inputValue: API_TOKEN || '',
+        inputPlaceholder: 'API secret',
+      });
+      if (!result?.confirmed) return;
+
+      const candidate = (result.value || '').trim();
       if (!candidate) return;
 
       const previous = API_TOKEN;
@@ -446,10 +671,10 @@
         const ok = await validateToken(candidate);
         if (!ok) throw new Error('Invalid token');
         localStorage.setItem('skills_api_token', candidate);
-        alert('✅ API token updated on this device.');
+        showToast('API token updated on this device.', 'success');
       } catch {
         API_TOKEN = previous;
-        alert('❌ Token invalid. Existing token was kept.');
+        showToast('Token invalid. Existing token was kept.', 'error', 4200);
       }
     }
 
@@ -460,13 +685,15 @@
         headers: {
           'Authorization': `Bearer ${API_TOKEN}`,
           'Content-Type': 'application/json',
+          ...(sessionId ? { 'X-Session-ID': sessionId } : {}),
           ...(opts.headers || {}),
         },
       });
+      updateSessionId(res.headers.get('X-Session-ID'));
       if (res.status === 401) {
         localStorage.removeItem('skills_api_token');
-        alert('Invalid API secret. Refresh to try again.');
-        location.reload();
+        showToast('Invalid API secret. Reloading...', 'error', 1200);
+        setTimeout(() => location.reload(), 1200);
         throw new Error('Unauthorized');
       }
       const data = await res.json().catch(() => ({}));
@@ -528,11 +755,19 @@
     }
 
     function renderQuickActions() {
-      const top = skills.filter(s => s.invocable).slice(0, 6);
+      const invocable = skills.filter(s => s.invocable);
+      // Sort by usage count descending; ties keep discovery order
+      const top = invocable
+        .slice()
+        .sort((a, b) => (b.usageCount || 0) - (a.usageCount || 0))
+        .slice(0, 6);
       const el = document.getElementById('quickActions');
-      el.innerHTML = top.map(s =>
-        `<button class="quick-btn" onclick="selectSkill('${s.name}'); closeDrawer();">${skillIcon(s.name)} ${s.name}</button>`
-      ).join('');
+      el.innerHTML = top.map(s => {
+        const badge = s.usageCount > 0
+          ? `<span style="opacity:.45;font-size:11px;margin-left:3px">${s.usageCount}×</span>`
+          : '';
+        return `<button class="quick-btn" onclick="selectSkill('${s.name}'); closeDrawer();">${skillIcon(s.name)} ${s.name}${badge}</button>`;
+      }).join('');
     }
 
     function selectSkill(name) {
@@ -765,9 +1000,11 @@
           'Authorization': `Bearer ${API_TOKEN}`,
           'Content-Type': 'application/json',
           'Accept': 'text/event-stream',
+          ...(sessionId ? { 'X-Session-ID': sessionId } : {}),
         },
         body: JSON.stringify({ message, skill: skillForMsg }),
       });
+      updateSessionId(response.headers.get('X-Session-ID'));
 
       if (response.status === 401) {
         localStorage.removeItem('skills_api_token');
@@ -805,6 +1042,7 @@
           for (const evt of events) {
             if (evt.type === 'heartbeat') continue; // Server keepalive — ignore
             if (evt.type === 'start') {
+              if (evt.sessionId) updateSessionId(evt.sessionId);
               bot.setPhase('🧠', 'Starting…');
             } else if (evt.type === 'init') {
               bot.setPhase('🧠', 'Session ready…');
@@ -878,10 +1116,75 @@
       }
     }
 
+    function sleep(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    async function waitForServer(timeoutMs = 15000, intervalMs = 750) {
+      const deadline = Date.now() + timeoutMs;
+      while (Date.now() < deadline) {
+        try {
+          await api('/api/status');
+          return true;
+        } catch {}
+        await sleep(intervalMs);
+      }
+      return false;
+    }
+
+    async function restartServer() {
+      const result = await showModal({
+        title: 'Restart Server',
+        message: 'Restart the server? You will need to reconnect after a few seconds.',
+        confirmLabel: 'Restart',
+        cancelLabel: 'Cancel',
+        showCancel: true,
+      });
+      if (!result?.confirmed) return;
+
+      if (isBusy) {
+        showToast('Server is busy. Wait for the current request to finish or use Cancel first.', 'error', 4200);
+        return;
+      }
+
+      addMessage('bot', '🔁 Restart requested. Waiting for the server to come back...');
+      showToast('Restarting server...', 'info', 2000);
+      isBusy = true;
+      setBusy(true);
+
+      try {
+        await api('/api/admin/restart', { method: 'POST', body: JSON.stringify({ force: true }) });
+      } catch (err) {
+        const isNetworkError = /load failed|failed to fetch|network|aborted/i.test(err.message);
+        if (!isNetworkError) {
+          const hint = err?.hint ? `\n${err.hint}` : '';
+          showToast(`Restart failed: ${err.message}${hint}`, 'error', 5200);
+          isBusy = false;
+          setBusy(false);
+          return;
+        }
+      }
+
+      const restored = await waitForServer();
+      isBusy = false;
+      setBusy(false);
+
+      if (restored) {
+        showToast('Server restarted. Reloading now.', 'success', 900);
+        setTimeout(() => location.reload(), 900);
+        return;
+      }
+
+      showToast('Restart was requested, but the server did not come back in time. Refresh in a few seconds and check server.log if needed.', 'error', 5200);
+    }
+
     async function cancelRequest() {
       try {
-        await api('/api/cancel', { method: 'POST' });
-      } catch {}
+        const result = await api('/api/cancel', { method: 'POST' });
+        showToast(result.cancelled ? 'Cancelled active request.' : (result.message || 'Nothing running.'), result.cancelled ? 'success' : 'info');
+      } catch (err) {
+        showToast(`Cancel failed: ${err.message}`, 'error', 4200);
+      }
     }
 
     // ── Status polling ──
@@ -922,7 +1225,13 @@
     }
 
     // ── Init ──
+    wireModal();
     loadSkills();
+    if (promptForTokenOnLoad) {
+      setTimeout(() => {
+        promptSetToken();
+      }, 150);
+    }
   </script>
 </body>
 </html>

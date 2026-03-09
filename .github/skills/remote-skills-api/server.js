@@ -31,11 +31,116 @@ const CLAUDE_PATH = process.env.CLAUDE_PATH || 'claude';
 const API_SECRET  = process.env.API_SECRET;
 const CLAUDE_MODEL = process.env.CLAUDE_MODEL || 'sonnet';
 const ALLOW_QUERY_TOKEN = (process.env.ALLOW_QUERY_TOKEN || '').toLowerCase() === 'true';
+const RESTART_EXIT_CODE = process.env.RESTART_EXIT_CODE
+  ? parseInt(process.env.RESTART_EXIT_CODE, 10)
+  : 75;
+
+// LLM caps: token budget and tool-call limit
+// MAX_BUDGET_USD  — max dollars per request (passed as --max-budget-usd to Claude CLI)
+// MAX_TOOL_CALLS  — max tool invocations before the request is killed (0 = unlimited)
+const MAX_BUDGET_USD  = process.env.MAX_BUDGET_USD  ? parseFloat(process.env.MAX_BUDGET_USD)  : null;
+const MAX_TOOL_CALLS  = process.env.MAX_TOOL_CALLS  ? parseInt(process.env.MAX_TOOL_CALLS, 10) : 0;
 
 if (!API_SECRET) {
   console.error('❌  API_SECRET not set in .env — aborting');
   process.exit(1);
 }
+
+// ---------------------------------------------------------------------------
+// Usage Stats (persisted to disk)
+// ---------------------------------------------------------------------------
+const USAGE_FILE = path.join(__dirname, 'usage-stats.json');
+let usageStats = { skills: {} };
+try {
+  if (fs.existsSync(USAGE_FILE)) {
+    const raw = JSON.parse(fs.readFileSync(USAGE_FILE, 'utf-8'));
+    usageStats = { skills: {}, ...raw };
+  }
+} catch {}
+
+function trackSkillUsage(skillName) {
+  if (!skillName) return;
+  usageStats.skills[skillName] = (usageStats.skills[skillName] || 0) + 1;
+  try { fs.writeFileSync(USAGE_FILE, JSON.stringify(usageStats, null, 2)); } catch {}
+}
+
+// ---------------------------------------------------------------------------
+// Session Management (in-memory + persisted JSON, configurable TTL)
+// ---------------------------------------------------------------------------
+// Set SESSION_TTL_HOURS=0 to disable expiry. Default: 24 hours.
+const SESSION_TTL_HOURS = parseFloat(process.env.SESSION_TTL_HOURS ?? '24');
+const SESSION_TTL_MS = SESSION_TTL_HOURS > 0 ? SESSION_TTL_HOURS * 60 * 60 * 1000 : Infinity;
+const SESSIONS_FILE  = path.join(__dirname, 'sessions.json');
+const activeSessions = new Map();
+
+function makeSessionId() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+
+function loadSessions() {
+  try {
+    if (!fs.existsSync(SESSIONS_FILE)) return;
+    const data = JSON.parse(fs.readFileSync(SESSIONS_FILE, 'utf-8'));
+    const now  = Date.now();
+    for (const [id, sess] of Object.entries(data || {})) {
+      if (now - sess.lastActivity <= SESSION_TTL_MS) activeSessions.set(id, sess);
+    }
+    console.log(`[Sessions] Loaded ${activeSessions.size} active session(s) from disk`);
+  } catch {}
+}
+
+function saveSessions() {
+  try {
+    const obj = {};
+    for (const [id, sess] of activeSessions) obj[id] = sess;
+    fs.writeFileSync(SESSIONS_FILE, JSON.stringify(obj, null, 2));
+  } catch {}
+}
+
+function getOrCreateSession(id) {
+  const now = Date.now();
+  if (id && activeSessions.has(id)) {
+    const sess = activeSessions.get(id);
+    if (now - sess.lastActivity <= SESSION_TTL_MS) return sess;
+    activeSessions.delete(id);
+  }
+  const sess = { id: makeSessionId(), createdAt: now, lastActivity: now, messageCount: 0, skills: [], history: [] };
+  activeSessions.set(sess.id, sess);
+  saveSessions();
+  return sess;
+}
+
+function appendHistory(sess, role, content, maxTurns = 10) {
+  if (!sess.history) sess.history = [];
+  sess.history.push({ role, content: content.substring(0, 4000) });
+  if (sess.history.length > maxTurns * 2) {
+    sess.history = sess.history.slice(-(maxTurns * 2));
+  }
+  saveSessions();
+}
+
+function touchSession(sessionId, skillName) {
+  const sess = getOrCreateSession(sessionId);
+  sess.lastActivity = Date.now();
+  sess.messageCount++;
+  if (skillName && !sess.skills.includes(skillName)) sess.skills.push(skillName);
+  saveSessions();
+  return sess;
+}
+
+// Purge expired sessions every 10 minutes (skipped if TTL is infinite)
+if (isFinite(SESSION_TTL_MS)) {
+  setInterval(() => {
+    const now = Date.now();
+    let purged = 0;
+    for (const [id, sess] of activeSessions) {
+      if (now - sess.lastActivity > SESSION_TTL_MS) { activeSessions.delete(id); purged++; }
+    }
+    if (purged) { console.log(`[Sessions] Purged ${purged} expired session(s)`); saveSessions(); }
+  }, 10 * 60_000);
+}
+
+loadSessions();
 
 // ---------------------------------------------------------------------------
 // Skill Discovery
@@ -132,6 +237,8 @@ let requestQueue = [];
 let isProcessing = false;
 let currentGoal   = '';
 let activeProcess  = null;
+let serverHandle   = null;
+let restartScheduled = false;
 
 async function enqueue(handler) {
   return new Promise((resolve, reject) => {
@@ -157,6 +264,27 @@ async function processQueue() {
   }
 }
 
+function scheduleRestart(reason) {
+  if (restartScheduled) return;
+  restartScheduled = true;
+  console.log(`[Admin] Restart requested: ${reason}`);
+
+  const exitWithRestartCode = () => {
+    console.log(`[Admin] Exiting with restart code ${RESTART_EXIT_CODE}`);
+    process.exit(RESTART_EXIT_CODE);
+  };
+
+  setTimeout(exitWithRestartCode, 1500);
+
+  if (serverHandle) {
+    try {
+      serverHandle.close(() => exitWithRestartCode());
+    } catch {
+      // Fallback timer above will still terminate the process.
+    }
+  }
+}
+
 /**
  * Run Claude CLI once and return the full result text.
  */
@@ -169,6 +297,8 @@ function runClaude(prompt, opts = {}) {
       '--permission-mode', 'bypassPermissions',
       '-p', prompt,
     ];
+
+    if (MAX_BUDGET_USD != null) args.push('--max-budget-usd', String(MAX_BUDGET_USD));
 
     // If there's an MCP config, reference it
     const mcpConfig = path.join(PROJECT_DIR, '.mcp.json');
@@ -228,6 +358,8 @@ function runClaudeStreaming(prompt, onEvent, opts = {}) {
       '-p', prompt,
     ];
 
+    if (MAX_BUDGET_USD != null) args.push('--max-budget-usd', String(MAX_BUDGET_USD));
+
     const mcpConfig = path.join(PROJECT_DIR, '.mcp.json');
     if (fs.existsSync(mcpConfig)) {
       args.push('--mcp-config', mcpConfig.replace(/\\/g, '/'));
@@ -248,6 +380,7 @@ function runClaudeStreaming(prompt, onEvent, opts = {}) {
     let stderr = '';
     let buffer = '';
     let resultText = '';
+    let toolCallCount = 0;
 
     proc.stdout.on('data', chunk => {
       buffer += chunk.toString();
@@ -263,6 +396,13 @@ function runClaudeStreaming(prompt, onEvent, opts = {}) {
           if (evt.type === 'content_block_delta' && evt.delta?.type === 'text_delta') {
             onEvent({ type: 'text', text: evt.delta.text });
           } else if (evt.type === 'content_block_start' && evt.content_block?.type === 'tool_use') {
+            toolCallCount++;
+            if (MAX_TOOL_CALLS > 0 && toolCallCount > MAX_TOOL_CALLS) {
+              console.warn(`[Claude:stream] Tool call limit (${MAX_TOOL_CALLS}) reached — killing process`);
+              try { proc.kill('SIGTERM'); } catch {}
+              onEvent({ type: 'error', code: 'tool_limit_exceeded', error: `Tool call limit of ${MAX_TOOL_CALLS} reached` });
+              return;
+            }
             onEvent({ type: 'tool_start', tool: evt.content_block.name, id: evt.content_block.id });
           } else if (evt.type === 'content_block_start' && evt.content_block?.type === 'tool_result') {
             onEvent({ type: 'tool_result', id: evt.content_block.tool_use_id });
@@ -329,7 +469,19 @@ function buildSystemPrompt() {
   return lines.join('\n');
 }
 
-function buildChatPrompt(message, skill) {
+function buildHistoryBlock(history) {
+  if (!history || history.length === 0) return '';
+  const lines = ['', '## Conversation History'];
+  for (const msg of history) {
+    const label = msg.role === 'user' ? 'User' : 'Assistant';
+    lines.push(`**${label}**: ${msg.content}`);
+  }
+  return lines.join('\n');
+}
+
+function buildChatPrompt(message, skill, history = []) {
+  const historyBlock = buildHistoryBlock(history);
+
   if (skill && skillRegistry.has(skill)) {
     const s = skillRegistry.get(skill);
     const skillContent = fs.readFileSync(s.file, 'utf-8');
@@ -343,6 +495,7 @@ function buildChatPrompt(message, skill) {
       '```',
       skillContent,
       '```',
+      historyBlock,
       '',
       `User request: ${message}`,
     ].join('\n');
@@ -350,6 +503,7 @@ function buildChatPrompt(message, skill) {
 
   return [
     buildSystemPrompt(),
+    historyBlock,
     '',
     `User request: ${message}`,
   ].join('\n');
@@ -416,14 +570,15 @@ function classifyError(err, fallbackCode = 'request_failed') {
   };
 }
 
-function resolveChatRequest(message, selectedSkill) {
+function resolveChatRequest(message, selectedSkill, history = []) {
   const slash = parseSlashInvocation(message);
   if (!slash) {
+    const skill = selectedSkill && skillRegistry.has(selectedSkill) ? selectedSkill : null;
     return {
       mode: 'chat',
-      skill: selectedSkill && skillRegistry.has(selectedSkill) ? selectedSkill : null,
+      skill,
       message,
-      prompt: buildChatPrompt(message, selectedSkill),
+      prompt: buildChatPrompt(message, skill, history),
       currentGoal: message.substring(0, 60),
     };
   }
@@ -474,6 +629,7 @@ app.get('/api/skills', auth, (req, res) => {
       description: s.meta.description || s.snippet || '',
       source: s.source,
       invocable: s.meta['user-invokable'] !== 'false',
+      usageCount: usageStats.skills[name] || 0,
     });
   }
   res.json({ skills: list });
@@ -500,7 +656,16 @@ app.post('/api/chat', auth, async (req, res) => {
   if (!message) return res.status(400).json({ error: 'message required' });
 
   const wantsStream = (req.headers.accept || '').includes('text/event-stream');
-  const resolved = resolveChatRequest(message, skill);
+
+  // Session + usage tracking (load session first so we have history for the prompt)
+  const sess = touchSession(req.headers['x-session-id'], null);
+  const resolved = resolveChatRequest(message, skill, sess.history || []);
+  if (resolved.skill) {
+    if (!sess.skills.includes(resolved.skill)) sess.skills.push(resolved.skill);
+    trackSkillUsage(resolved.skill);
+    saveSessions();
+  }
+
   if (resolved.error) {
     if (wantsStream) {
       res.writeHead(200, {
@@ -524,11 +689,13 @@ app.post('/api/chat', auth, async (req, res) => {
       'Cache-Control': 'no-cache',
       'Connection': 'keep-alive',
       'X-Accel-Buffering': 'no',
+      'X-Session-ID': sess.id,
+      'Access-Control-Expose-Headers': 'X-Session-ID',
     });
     res.flushHeaders();  // Force headers out immediately
 
-    // Send initial event
-    res.write(`data: ${JSON.stringify({ type: 'start', skill: resolved.skill || null, mode: resolved.mode })}\n\n`);
+    // Send initial event (includes session ID for client)
+    res.write(`data: ${JSON.stringify({ type: 'start', skill: resolved.skill || null, mode: resolved.mode, sessionId: sess.id })}\n\n`);
 
     // Keepalive heartbeat — real data events so they flush through any
     // intermediate buffering and keep mobile Safari from killing the connection
@@ -538,12 +705,14 @@ app.post('/api/chat', auth, async (req, res) => {
 
     try {
       currentGoal = resolved.currentGoal;
+      appendHistory(sess, 'user', message);
       const result = await enqueue(() => {
         return runClaudeStreaming(prompt, (evt) => {
           // Forward each streaming event to the client
           try { res.write(`data: ${JSON.stringify(evt)}\n\n`); } catch {}
         });
       });
+      appendHistory(sess, 'assistant', result);
       // Final done event (runClaudeStreaming already sends done, but ensure connection closes)
       res.end();
     } catch (err) {
@@ -556,10 +725,14 @@ app.post('/api/chat', auth, async (req, res) => {
     }
   } else {
     // Non-streaming JSON response (backwards compatible)
+    res.setHeader('X-Session-ID', sess.id);
+    res.setHeader('Access-Control-Expose-Headers', 'X-Session-ID');
     try {
       currentGoal = resolved.currentGoal;
+      appendHistory(sess, 'user', message);
       const result = await enqueue(() => runClaude(prompt));
-      res.json({ result, skill: resolved.skill || null, mode: resolved.mode });
+      appendHistory(sess, 'assistant', result);
+      res.json({ result, skill: resolved.skill || null, mode: resolved.mode, sessionId: sess.id });
     } catch (err) {
       const e = classifyError(err, 'chat_failed');
       console.error('[Chat] Error:', e.error);
@@ -636,14 +809,72 @@ app.post('/api/invoke/:skill', auth, async (req, res) => {
   const { args } = req.body;
   const prompt = buildInvokePrompt(name, args);
 
+  const sess = touchSession(req.headers['x-session-id'], name);
+  trackSkillUsage(name);
+  res.setHeader('X-Session-ID', sess.id);
+  res.setHeader('Access-Control-Expose-Headers', 'X-Session-ID');
+
   try {
     currentGoal = `/${name} ${(args || '').substring(0, 40)}`;
     const result = await enqueue(() => runClaude(prompt));
-    res.json({ skill: name, result });
+    res.json({ skill: name, result, sessionId: sess.id });
   } catch (err) {
     const e = classifyError(err, 'invoke_failed');
     res.status(500).json(e);
   }
+});
+
+// Session info
+app.get('/api/session', auth, (req, res) => {
+  const sess = getOrCreateSession(req.headers['x-session-id']);
+  const now  = Date.now();
+  res.setHeader('X-Session-ID', sess.id);
+  res.setHeader('Access-Control-Expose-Headers', 'X-Session-ID');
+  res.json({
+    id:             sess.id,
+    createdAt:      sess.createdAt,
+    lastActivity:   sess.lastActivity,
+    messageCount:   sess.messageCount,
+    skills:         sess.skills,
+    history:        sess.history || [],
+    expiresIn:      isFinite(SESSION_TTL_MS) ? Math.max(0, SESSION_TTL_MS - (now - sess.lastActivity)) : null,
+    activeSessions: activeSessions.size,
+  });
+});
+
+// Skill usage stats
+app.get('/api/usage', auth, (req, res) => {
+  const sorted = Object.entries(usageStats.skills)
+    .sort(([, a], [, b]) => b - a)
+    .map(([name, count]) => ({ name, count }));
+  res.json({ skills: sorted, total: sorted.reduce((s, x) => s + x.count, 0) });
+});
+
+// Restart the API process so the launcher can relaunch it.
+app.post('/api/admin/restart', auth, (req, res) => {
+  const force = req.body?.force === true;
+  const busy = isProcessing || requestQueue.length > 0 || activeProcess;
+
+  if (busy && !force) {
+    return res.status(409).json({
+      restarting: false,
+      error: 'Server is busy',
+      hint: 'Retry when the queue is empty, or send {"force":true} to cancel the active Claude process and restart anyway.',
+      active: isProcessing,
+      queueLength: requestQueue.length,
+    });
+  }
+
+  if (force) {
+    requestQueue = [];
+    if (activeProcess) {
+      try { activeProcess.kill('SIGTERM'); } catch {}
+      activeProcess = null;
+    }
+  }
+
+  res.json({ restarting: true, exitCode: RESTART_EXIT_CODE, forced: force });
+  setTimeout(() => scheduleRestart(`remote API request from ${req.ip}${force ? ' (forced)' : ''}`), 100);
 });
 
 // Cancel current request (kills the Claude process)
@@ -673,7 +904,7 @@ app.get('/', (req, res) => {
 // ---------------------------------------------------------------------------
 // Start
 // ---------------------------------------------------------------------------
-app.listen(PORT, '0.0.0.0', () => {
+serverHandle = app.listen(PORT, '0.0.0.0', () => {
   console.log('');
   console.log(`🚀  Remote Skills API running on port ${PORT}`);
   console.log(`📍  Local:     http://localhost:${PORT}`);
@@ -683,5 +914,9 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`🤖  Model:     ${CLAUDE_MODEL}`);
   console.log(`📦  Skills:    ${skillRegistry.size} discovered`);
   console.log(`💡  Claude:    ${CLAUDE_PATH}`);
+  console.log(`🔁  Restart code: ${RESTART_EXIT_CODE}`);
+  console.log(`⏱️  Session TTL: ${isFinite(SESSION_TTL_MS) ? `${SESSION_TTL_HOURS}h` : 'unlimited'}`);
+  console.log(`💰  Budget cap: ${MAX_BUDGET_USD != null ? `$${MAX_BUDGET_USD}` : 'none'}`);
+  console.log(`🔧  Tool cap:   ${MAX_TOOL_CALLS > 0 ? `${MAX_TOOL_CALLS} calls` : 'none'}`);
   console.log('');
 });

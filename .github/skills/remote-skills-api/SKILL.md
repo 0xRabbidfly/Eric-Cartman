@@ -1,4 +1,3 @@
-````skill
 ---
 name: remote-skills-api
 description: Mobile-friendly web server to chat with and invoke Eric Cartman skills remotely via Tailscale. Generalised from rbc-banking/simple-api.js. Start once on your PC, access from your phone anywhere.
@@ -7,7 +6,7 @@ user-invocable: true
 disable-model-invocation: false
 metadata:
   author: 0xrabbidfly
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 # Remote Skills API
@@ -66,7 +65,9 @@ $ws.Save()
 ```
 
 The included `start-service.bat` sets the correct working directory and
-launches node. A minimized cmd window stays in your taskbar.
+supervises the Node process. A minimized cmd window stays in your taskbar.
+If the API exits with the configured restart code, the batch file relaunches it
+automatically.
 
 ## Architecture
 
@@ -104,6 +105,7 @@ Phone (Safari/Chrome)
 | POST | `/api/chat` | Send chat message. JSON response by default; SSE stream when `Accept: text/event-stream` |
 | GET | `/api/chat/stream` | SSE streaming chat (`?q=...&skill=...`) |
 | POST | `/api/invoke/:skill` | Direct skill invocation (`{args}`) |
+| POST | `/api/admin/restart` | Restart the Node service so `start-service.bat` relaunches it |
 | POST | `/api/cancel` | Kill running Claude process |
 
 ## Environment Variables
@@ -115,6 +117,7 @@ Phone (Safari/Chrome)
 | `CLAUDE_PATH` | `claude` | Path to Claude CLI binary |
 | `CLAUDE_MODEL` | `sonnet` | Model for Claude CLI |
 | `ALLOW_QUERY_TOKEN` | `false` | Allow `?token=` authentication on API routes (not recommended) |
+| `RESTART_EXIT_CODE` | `75` | Exit code that tells `start-service.bat` to relaunch the service |
 
 ## Security
 
@@ -149,6 +152,24 @@ Phone (Safari/Chrome)
 - Pin a skill via the ⚡ button for repeated use (e.g., pin `obsidian` for vault ops)
 - Use `/api/invoke/last30days` with `{args: "AI agents"}` for direct invocation
 - The server auto-discovers new skills — add a SKILL.md and hit "reload"
+- After editing `server.js` or `.env`, call `POST /api/admin/restart` so the launcher restarts the process cleanly
+
+## Remote Restart
+
+Use this when you changed server code or environment settings and need a full
+process restart instead of a skill registry reload.
+
+```powershell
+$headers = @{ Authorization = "Bearer $env:API_SECRET" }
+Invoke-RestMethod -Method Post -Uri "http://<tailscale-ip>:3838/api/admin/restart" -Headers $headers
+```
+
+If a Claude request is still running, the endpoint returns `409` unless you force it:
+
+```powershell
+$headers = @{ Authorization = "Bearer $env:API_SECRET"; 'Content-Type' = 'application/json' }
+Invoke-RestMethod -Method Post -Uri "http://<tailscale-ip>:3838/api/admin/restart" -Headers $headers -Body '{"force":true}'
+```
 
 ## Related Skills
 

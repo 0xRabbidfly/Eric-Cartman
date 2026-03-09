@@ -6,6 +6,7 @@ setlocal
 set "SCRIPT_DIR=%~dp0"
 set "ROOT=%SCRIPT_DIR%..\..\.."
 set "LOG=%SCRIPT_DIR%server.log"
+set "RESTART_EXIT_CODE=75"
 
 echo.>> "%LOG%"
 echo [%date% %time%] Launcher invoked from "%SCRIPT_DIR%" >> "%LOG%"
@@ -31,8 +32,14 @@ echo.>> "%LOG%"
 echo [%date% %time%] Starting Remote Skills API from "%ROOT%" >> "%LOG%"
 if defined CLAUDE_PATH echo [%date% %time%] CLAUDE_PATH="%CLAUDE_PATH%" >> "%LOG%"
 
+:launch
 node ".github\skills\remote-skills-api\server.js" >> "%LOG%" 2>&1
 set "EXITCODE=%ERRORLEVEL%"
 echo [%date% %time%] Remote Skills API exited with code %EXITCODE% >> "%LOG%"
+if "%EXITCODE%"=="%RESTART_EXIT_CODE%" (
+	echo [%date% %time%] Restart requested; relaunching in 2 seconds >> "%LOG%"
+	timeout /t 2 /nobreak >nul
+	goto launch
+)
 popd
 exit /b %EXITCODE%

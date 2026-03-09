@@ -6,7 +6,7 @@ user-invocable: true
 disable-model-invocation: false
 metadata:
   author: 0xrabbidfly
-  version: "1.2.1"
+  version: "1.3.0"
 ---
 
 # Obsidian Linked Research
@@ -69,8 +69,10 @@ python -c "import sys; sys.path.insert(0,'.github/skills/obsidian/scripts'); fro
 List the live research-library note paths so you can see the active buckets:
 
 ```powershell
-python -c "import sys; sys.path.insert(0,'.github/skills/obsidian/scripts'); from obsidian import Obsidian; print(Obsidian().files(folder='Research/Library', ext='md').text)"
+python -c "import sys; sys.stdout.reconfigure(encoding='utf-8'); sys.path.insert(0,'.github/skills/obsidian/scripts'); from obsidian import Obsidian; print(Obsidian().files(folder='Research/Library', ext='md').text)"
 ```
+
+> **Windows UTF-8 note**: On Windows, subprocess pipes default to the system code page (cp1252), which cannot encode emoji or non-ASCII vault paths. Always add `sys.stdout.reconfigure(encoding='utf-8')` before any `print()` call in one-liner subprocess commands, or prefer calling the Obsidian Python API directly.
 
 Use this routing table unless the live vault has changed again:
 
@@ -140,12 +142,12 @@ If the result contains an `"error"` key, report it to the user and stop.
 still the required first pass, but long articles may come back clipped (for
 example around the first ~8000 chars) or flattened enough that headings, quotes,
 or diagram captions are hard to reconstruct. In that case, supplement the fetch
-result with `fetch_webpage` on the same URL to recover richer article structure.
+result with a secondary enrichment pass:
 
-- Do **not** skip `fetch.py`; it remains the canonical fetch step
-- Use `fetch_webpage` only as a secondary enrichment pass for standard web URLs
-- Keep the original `fetch.py` metadata (`title`, `image_urls`, `url`) as the
-  source of truth unless the webpage fetch clearly corrects it
+- Use `WebFetch` (Claude Code tool) or `fetch_webpage` (if available) on the same URL to recover richer article structure
+- If neither tool is sufficient for a long structured document (e.g., an academic paper with many sections), delegate to a general-purpose sub-agent with `WebFetch` and ask it to extract all major sections in full
+- Do **not** skip `fetch.py`; it remains the canonical fetch step and the source of `image_urls` and metadata
+- Keep the original `fetch.py` metadata (`title`, `image_urls`, `url`) as the source of truth unless the secondary fetch clearly corrects it
 
 **If `"needs_browser": true`**: The tweet contains an X Article that requires
 JavaScript rendering. **Do NOT use `fetch_webpage`** — it cannot render X Article
@@ -377,30 +379,64 @@ Use `![[{slug}-1.jpg]]` in the note to embed them.
 
 ### Step 4 — Write to Vault
 
-Pipe the composed note to the obsidian skill:
+**Primary pattern (works in all environments, including Claude Code on Windows):**
 
-```powershell
-@'
-{full markdown content}
-'@ | python .github/skills/obsidian/scripts/obsidian.py create --path "Research/Library/{library_bucket}/{slug}.md"
+Use the `Write` tool to write the note content to a temp file, then call the Obsidian Python API directly:
+
+```python
+# 1. Write content to temp file using the Write tool:
+#    file_path: Z:\Projects\Eric-Cartman\_tmp_note.md
+#    content: {full markdown content}
+
+# 2. Call the Obsidian Python API (in a Bash tool):
+python -c "
+import sys
+sys.path.insert(0, '.github/skills/obsidian/scripts')
+from obsidian import Obsidian
+
+with open('_tmp_note.md', 'r', encoding='utf-8') as f:
+    content = f.read()
+
+ob = Obsidian()
+result = ob.create(path='Research/Library/{library_bucket}/{slug}.md', content=content)
+print(result)
+"
+
+# 3. Delete the temp file:
+rm _tmp_note.md
 ```
 
-**Note**: `obsidian.py create` produces no stdout on success. Verify the write:
+> **IMPORTANT — keyword arguments required**: `ob.create()` does not accept positional arguments.
+> Always use `path=` and `content=` as keyword arguments. `ob.create(path, content)` will fail.
+
+> **WARNING — do not use heredoc pipes from bash**: The `@'...'@` heredoc pipe pattern only
+> works in a native PowerShell shell. When Claude Code runs bash on Windows, attempting
+> `bash -c "powershell -Command \"@'...'@\""` fails due to irreparably lossy quote escaping.
+> Any note containing apostrophes, contractions, or code will break the heredoc approach.
+> Use the Write-tool + Python API pattern above instead.
+
+**Verify the write:**
 
 ```powershell
-python .github/skills/obsidian/scripts/obsidian.py read --path "Research/Library/{library_bucket}/{slug}.md" 2>&1 | Select-Object -First 6
+python .github/skills/obsidian/scripts/obsidian.py read --path "Research/Library/{library_bucket}/{slug}.md" 2>&1 | head -6
 ```
 
 If the first few lines match your frontmatter, the write succeeded.
 
-If the path already exists, append `-2`, `-3`, etc. to the slug.
-Check first:
+**Check for existing notes before creating** (deduplicate):
 
-```powershell
-python .github/skills/obsidian/scripts/obsidian.py read --path "Research/Library/{library_bucket}/{slug}.md" 2>$null
+```python
+python -c "
+import sys
+sys.path.insert(0, '.github/skills/obsidian/scripts')
+from obsidian import Obsidian
+ob = Obsidian()
+result = ob.read(path='Research/Library/{library_bucket}/{slug}.md')
+print('EXISTS' if result and not result.startswith('Error') else 'NOT_FOUND')
+"
 ```
 
-If that returns content, increment the suffix.
+If the note already exists, append `-2`, `-3`, etc. to the slug before calling `ob.create()`.
 
 ### Step 5 — Update the Master MOC
 
@@ -424,33 +460,50 @@ stacking append-only blocks at the end of the file:
 2. Update the markdown in memory so the new note lands in the right section
 3. Rewrite the full note through the obsidian wrapper using `create --overwrite`
 
-Example pattern:
+Example pattern (use the Python API directly — do not use heredoc pipes from bash):
 
-```powershell
-@'
-{full updated MOC markdown}
-'@ | python .github/skills/obsidian/scripts/obsidian.py create --path "Research/Library/00 MOC/🗺️ MOC - Research Library.md" --overwrite
+```python
+python -c "
+import sys
+sys.path.insert(0, '.github/skills/obsidian/scripts')
+from obsidian import Obsidian
+
+ob = Obsidian()
+
+# Read current MOC
+content = ob.read(path='Research/Library/00 MOC/🗺️ MOC - Research Library.md')
+
+# Make in-memory edits (string replacement)
+updated = content.replace(old_text, new_text)
+
+# Overwrite — always use keyword args
+ob.create(path='Research/Library/00 MOC/🗺️ MOC - Research Library.md', content=updated, overwrite=True)
+print('MOC updated')
+"
 ```
 
-Use the lighter `append` example below only when a small footer-style refresh is
-good enough and the file does not need an in-place insertion.
+> **Windows UTF-8**: `ob.read()` and `ob.create()` handle encoding correctly. Do not go
+> through subprocess pipes for MOC reads/writes — encoding errors will occur with emoji paths.
 
-If the incoming report justifies a new canonical tag:
+Use the lighter `append` approach only when a small footer-style refresh is
+good enough and the file does not need an in-place insertion:
 
-- add the new tag to `Canonical Tag Guidance`
-- normalize away obvious duplicates instead of adding a synonym
-- only promote the tag if it is durable and likely to organize multiple future notes
+```python
+python -c "
+import sys
+sys.path.insert(0, '.github/skills/obsidian/scripts')
+from obsidian import Obsidian
 
-For lightweight sync, append a short block to the master MOC:
-
-```powershell
-@'
+ob = Obsidian()
+append_text = '''
 
 ## Recently Added
 
 - [[{slug}|{title}]] — {one-line why this note matters}
 - Tags: #{tag1} #{tag2} #{tag3}
-'@ | python .github/skills/obsidian/scripts/obsidian.py append --path "Research/Library/00 MOC/🗺️ MOC - Research Library.md"
+'''
+ob.append(path='Research/Library/00 MOC/🗺️ MOC - Research Library.md', content=append_text)
+"
 ```
 
 If a topic MOC clearly applies, update it secondarily after the master MOC is
@@ -492,16 +545,17 @@ library pages and respects the live MOC/tag taxonomy already in the vault.
 
 1. **Never skip the fetch step** — always run `fetch.py` even if you think you know the content
 2. **Never call an external LLM API** for summarization — use your own model (VS Code)
-3. **Always pipe through the obsidian skill** for vault writes — never write files directly
-4. **Always use `@'...'@`** (single-quoted heredoc) when piping to obsidian.py
-5. **Handle fetch errors gracefully** — if fetch returns an error, tell the user and suggest alternatives
-6. **Deduplicate** — check if a note with a similar slug already exists before creating
-7. **UTF-8** — the fetch script handles Windows UTF-8 automatically; for the pipe, ensure `$OutputEncoding = [System.Text.Encoding]::UTF8` if needed
-8. **Zero pip deps** — `fetch.py` uses only Python stdlib
-9. **Read the master MOC first** — tag and folder decisions must be based on the live `Research/Library/00 MOC/🗺️ MOC - Research Library.md`
-10. **Prefer existing tags** — reuse the master MOC's canonical lowercase kebab-case tags before introducing a new one
-11. **Keep the master MOC fresh** — update it with every successful research-note addition unless the change truly requires larger curation work
-12. **Use topic MOCs secondarily** — they are optional supporting maps, not the authoritative taxonomy source
+3. **Always use the Obsidian Python API** for vault writes — use `ob.create(path=, content=)` with keyword args; never use positional arguments and never write vault files directly via filesystem tools
+4. **Write-tool + Python API is the primary write pattern** — write content to a temp file with the Write tool, read it in Python, call `ob.create(path=..., content=...)`, then delete the temp file; do not use `@'...'@` heredocs from bash on Windows (they break on apostrophes and single quotes in note content)
+5. **Never use `bash -c "powershell -Command \"...\""` for heredocs** — quote escaping through that shell boundary is irreparably lossy; the Write-tool + Python API pattern avoids this entirely
+6. **Windows UTF-8** — on Windows, subprocess pipes default to cp1252 and cannot encode emoji or non-ASCII vault paths; add `sys.stdout.reconfigure(encoding='utf-8')` to one-liner subprocess commands, or call the Obsidian Python API directly (preferred)
+7. **Handle fetch errors gracefully** — if fetch returns an error, tell the user and suggest alternatives
+8. **Deduplicate** — check if a note with a similar slug already exists before creating
+9. **Zero pip deps** — `fetch.py` uses only Python stdlib
+10. **Read the master MOC first** — tag and folder decisions must be based on the live `Research/Library/00 MOC/🗺️ MOC - Research Library.md`
+11. **Prefer existing tags** — reuse the master MOC's canonical lowercase kebab-case tags before introducing a new one
+12. **Keep the master MOC fresh** — update it with every successful research-note addition unless the change truly requires larger curation work
+13. **Use topic MOCs secondarily** — they are optional supporting maps, not the authoritative taxonomy source
 
 ## Related Skills
 
@@ -535,9 +589,9 @@ User: "research this: <url>"
 │  Agent (VS Code model)  │  ← Summarize, structure, compose
 │  ├─ Generate summary    │
 │  ├─ Compose markdown    │
-│  └─ Pipe to obsidian.py │
+│  └─ Write → Python API  │
 └──────────┬──────────────┘
-           │ heredoc pipe
+           │ Write tool → _tmp_note.md → ob.create(path=, content=)
            ▼
 ┌─────────────────────────┐
 │  obsidian.py create     │  ← CLI wrapper (composable)

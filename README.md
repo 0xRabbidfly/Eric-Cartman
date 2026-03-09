@@ -761,6 +761,7 @@ Lightweight Express.js server that auto-discovers every skill from `.github/skil
 | Queue | Requests serialize — safe for concurrent use |
 | Auth | Bearer token via `API_SECRET` in `.env` |
 | Reboot Survival | Startup shortcut launches server at login |
+| Remote Restart | Authenticated endpoint can restart the Node service via the launcher |
 
 **Quick Start:**
 ```powershell
