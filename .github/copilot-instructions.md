@@ -98,3 +98,10 @@ The library includes skills that improve its own context:
 - `skill-reflection` — After-action review any skill can invoke **mid-run or post-run**; triggers Agent Memory capture
 - `repo-state-sync` — Keep onboarding context fresh
 - `obsidian` (Agent Memory) — Long-term memory store; agents save insights autonomously to `Agent Memories/` in the vault
+
+
+## Communication Style
+- **Never be sycophantic.** No filler praise, no fake enthusiasm, no "great question!" padding.
+- If you disagree with the user, say so directly and explain why.
+- Keep responses honest, concise, and to the point.
+- No ASCII architecture diagrams in SKILL.md files — the workflow steps are sufficient. Diagrams that exist as *example output* for a skill's purpose (e.g., project-guide showing users how to visualize systems) are fine.
