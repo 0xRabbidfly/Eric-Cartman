@@ -1085,7 +1085,11 @@ def load_feedback(config: dict) -> dict:
     if FEEDBACK_FILE.exists():
         try:
             with open(FEEDBACK_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
+                data = json.load(f)
+                for bucket in ("good", "bad"):
+                    for entry in data.get(bucket, []):
+                        entry["topic"] = _normalize_feedback_topic(entry.get("topic", ""))
+                return data
         except (json.JSONDecodeError, OSError):
             pass
     return {"good": [], "bad": [], "stats": {"total_good": 0, "total_bad": 0}}
@@ -1117,6 +1121,12 @@ def _extract_reason(line: str, tag: str) -> str:
     return after
 
 
+def _normalize_feedback_topic(topic: str) -> str:
+    """Normalize topic labels stored in feedback data."""
+    normalized = re.sub(r'\s+', ' ', (topic or '').strip())
+    return normalized or "unknown"
+
+
 def _extract_current_topic(lines: list[str], line_idx: int) -> str:
     """Walk backwards from line_idx to find the nearest ## section header.
 
@@ -1131,6 +1141,7 @@ def _extract_current_topic(lines: list[str], line_idx: int) -> str:
             if header.lower() in (
                 "rate results", "promote to library", "reading list",
                 "today's pow", "vault connections", "efficiency recommendations",
+                "feedback insights",
             ):
                 return ""
             # Strip emoji suffixes like "Lab Pulse 🧪"
@@ -1192,12 +1203,16 @@ def process_feedback_tags(config: dict) -> dict:
             if stripped.startswith("---"):
                 continue
 
+            # Skip feedback helper text rendered by the report itself.
+            if re.search(r'why you tagged items\s+#(?:good|bad)', stripped, re.IGNORECASE):
+                continue
+
             # Extract link info from the line
             link_match = re.search(r'\[([^\]]+)\]\((https?://[^\)]+)\)', line)
 
             if good_tag in line and f"{good_tag}{suffix}" not in line:
                 reason = _extract_reason(line, good_tag)
-                topic = _extract_current_topic(lines, i)
+                topic = _normalize_feedback_topic(_extract_current_topic(lines, i))
                 entry = {
                     "date": _extract_date_from_path(filepath),
                     "title": link_match.group(1) if link_match else _clean_title(line),
@@ -1212,7 +1227,7 @@ def process_feedback_tags(config: dict) -> dict:
 
             if bad_tag in line and f"{bad_tag}{suffix}" not in line:
                 reason = _extract_reason(line, bad_tag)
-                topic = _extract_current_topic(lines, i)
+                topic = _normalize_feedback_topic(_extract_current_topic(lines, i))
                 entry = {
                     "date": _extract_date_from_path(filepath),
                     "title": link_match.group(1) if link_match else _clean_title(line),
@@ -1326,12 +1341,12 @@ def analyze_feedback(feedback_data: dict, lookback_days: int = 14) -> dict:
     # Topic distribution
     bad_topics: dict[str, int] = {}
     for entry in bad_entries:
-        topic = entry.get("topic", "unknown")
+        topic = _normalize_feedback_topic(entry.get("topic", "unknown"))
         bad_topics[topic] = bad_topics.get(topic, 0) + 1
 
     good_topics: dict[str, int] = {}
     for entry in good_entries:
-        topic = entry.get("topic", "unknown")
+        topic = _normalize_feedback_topic(entry.get("topic", "unknown"))
         good_topics[topic] = good_topics.get(topic, 0) + 1
 
     # Most common raw reasons
@@ -1439,6 +1454,8 @@ def generate_proposals(analysis: dict, config: dict) -> list[str]:
     # Topic-specific problems
     if total_bad >= 5:
         for topic, count in sorted(analysis["bad_topics"].items(), key=lambda x: -x[1]):
+            if topic == "unknown":
+                continue
             topic_pct = count / total_bad * 100
             if topic_pct >= 40 and count >= 3:
                 proposals.append(
