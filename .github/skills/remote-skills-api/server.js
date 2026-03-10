@@ -70,8 +70,15 @@ function trackSkillUsage(skillName) {
 // Set SESSION_TTL_HOURS=0 to disable expiry. Default: 24 hours.
 const SESSION_TTL_HOURS = parseFloat(process.env.SESSION_TTL_HOURS ?? '24');
 const SESSION_TTL_MS = SESSION_TTL_HOURS > 0 ? SESSION_TTL_HOURS * 60 * 60 * 1000 : Infinity;
+// Context reuse window is intentionally much shorter than session persistence.
+// Only same-scope conversations within this freshness window can reuse history.
+const SESSION_CONTEXT_TTL_HOURS = parseFloat(process.env.SESSION_CONTEXT_TTL_HOURS ?? '2');
+const SESSION_CONTEXT_TTL_MS = SESSION_CONTEXT_TTL_HOURS > 0
+  ? SESSION_CONTEXT_TTL_HOURS * 60 * 60 * 1000
+  : Infinity;
 const SESSIONS_FILE  = path.join(__dirname, 'sessions.json');
 const activeSessions = new Map();
+const GENERAL_SCOPE = '__general__';
 
 function makeSessionId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -104,7 +111,17 @@ function getOrCreateSession(id) {
     if (now - sess.lastActivity <= SESSION_TTL_MS) return sess;
     activeSessions.delete(id);
   }
-  const sess = { id: makeSessionId(), createdAt: now, lastActivity: now, messageCount: 0, skills: [], history: [] };
+  const sess = {
+    id: makeSessionId(),
+    createdAt: now,
+    lastActivity: now,
+    messageCount: 0,
+    skills: [],
+    history: [],
+    contextScope: GENERAL_SCOPE,
+    contextStartedAt: now,
+    contextLastActivity: now,
+  };
   activeSessions.set(sess.id, sess);
   saveSessions();
   return sess;
@@ -122,6 +139,66 @@ function appendHistory(sess, role, content, maxTurns = 10) {
 function formatInvokeHistoryEntry(skillName, args) {
   const trimmedArgs = typeof args === 'string' ? args.trim() : '';
   return trimmedArgs ? `/${skillName} ${trimmedArgs}` : `/${skillName}`;
+}
+
+function getConversationScope(skillName) {
+  return skillName || GENERAL_SCOPE;
+}
+
+function isContextExpired(sess, now = Date.now()) {
+  if (!isFinite(SESSION_CONTEXT_TTL_MS)) return false;
+  const lastContextActivity = sess.contextLastActivity || sess.lastActivity || 0;
+  return (now - lastContextActivity) > SESSION_CONTEXT_TTL_MS;
+}
+
+function rewriteSessionsFile(reason, keepSession = null) {
+  try {
+    if (fs.existsSync(SESSIONS_FILE)) fs.unlinkSync(SESSIONS_FILE);
+  } catch (err) {
+    console.warn(`[Sessions] Failed to delete sessions file during reset (${reason}): ${err.message}`);
+  }
+
+  activeSessions.clear();
+  if (keepSession) activeSessions.set(keepSession.id, keepSession);
+  saveSessions();
+  console.log(`[Sessions] Reset persisted history (${reason})`);
+}
+
+function resetSessionContext(sess, scope, reason) {
+  const now = Date.now();
+  sess.history = [];
+  sess.skills = scope === GENERAL_SCOPE ? [] : [scope];
+  sess.contextScope = scope;
+  sess.contextStartedAt = now;
+  sess.contextLastActivity = now;
+  sess.lastActivity = now;
+  rewriteSessionsFile(reason, sess);
+  return sess;
+}
+
+function getScopedHistory(sess, scope) {
+  if (!sess.history || sess.history.length === 0) return [];
+  if ((sess.contextScope || GENERAL_SCOPE) !== scope) return [];
+  if (isContextExpired(sess)) return [];
+  return sess.history;
+}
+
+function prepareSessionContext(sess, scope) {
+  const previousScope = sess.contextScope || GENERAL_SCOPE;
+  if (previousScope !== scope) {
+    return resetSessionContext(sess, scope, `scope changed: ${previousScope} -> ${scope}`);
+  }
+  if (isContextExpired(sess)) {
+    return resetSessionContext(sess, scope, `context expired for scope ${scope}`);
+  }
+
+  const now = Date.now();
+  sess.contextScope = scope;
+  sess.contextLastActivity = now;
+  sess.lastActivity = now;
+  if (scope !== GENERAL_SCOPE && !sess.skills.includes(scope)) sess.skills = [scope];
+  saveSessions();
+  return sess;
 }
 
 function touchSession(sessionId, skillName) {
@@ -297,10 +374,11 @@ function runClaude(prompt, opts = {}) {
   return new Promise((resolve, reject) => {
     const model = opts.model || CLAUDE_MODEL;
     const args = [
+      '--print',
       '--output-format', 'json',
+      '--input-format', 'text',
       '--model', model,
       '--permission-mode', 'bypassPermissions',
-      '-p', prompt,
     ];
 
     if (MAX_BUDGET_USD != null) args.push('--max-budget-usd', String(MAX_BUDGET_USD));
@@ -321,7 +399,7 @@ function runClaude(prompt, opts = {}) {
       shell: false,
     });
     activeProcess = proc;
-    proc.stdin.end();
+    proc.stdin.end(prompt);
 
     let stdout = '', stderr = '';
     proc.stdout.on('data', d => stdout += d);
@@ -356,11 +434,12 @@ function runClaudeStreaming(prompt, onEvent, opts = {}) {
   return new Promise((resolve, reject) => {
     const model = opts.model || CLAUDE_MODEL;
     const args = [
+      '--print',
       '--output-format', 'stream-json',
+      '--input-format', 'text',
       '--verbose',
       '--model', model,
       '--permission-mode', 'bypassPermissions',
-      '-p', prompt,
     ];
 
     if (MAX_BUDGET_USD != null) args.push('--max-budget-usd', String(MAX_BUDGET_USD));
@@ -380,7 +459,7 @@ function runClaudeStreaming(prompt, onEvent, opts = {}) {
       shell: false,
     });
     activeProcess = proc;
-    proc.stdin.end();
+    proc.stdin.end(prompt);
 
     let stderr = '';
     let buffer = '';
@@ -662,9 +741,27 @@ app.post('/api/chat', auth, async (req, res) => {
 
   const wantsStream = (req.headers.accept || '').includes('text/event-stream');
 
-  // Session + usage tracking (load session first so we have history for the prompt)
+  // Session + usage tracking with strict scope guards
   const sess = touchSession(req.headers['x-session-id'], null);
-  const resolved = resolveChatRequest(message, skill, sess.history || []);
+  const seedResolved = resolveChatRequest(message, skill, []);
+  if (seedResolved.error) {
+    if (wantsStream) {
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'X-Accel-Buffering': 'no',
+      });
+      res.write(`data: ${JSON.stringify({ type: 'error', ...seedResolved.error })}\n\n`);
+      return res.end();
+    }
+    return res.status(seedResolved.error.status).json(seedResolved.error);
+  }
+
+  const conversationScope = getConversationScope(seedResolved.skill);
+  prepareSessionContext(sess, conversationScope);
+  const scopedHistory = getScopedHistory(sess, conversationScope);
+  const resolved = resolveChatRequest(message, skill, scopedHistory);
   if (resolved.skill) {
     if (!sess.skills.includes(resolved.skill)) sess.skills.push(resolved.skill);
     trackSkillUsage(resolved.skill);
@@ -711,6 +808,8 @@ app.post('/api/chat', auth, async (req, res) => {
     try {
       currentGoal = resolved.currentGoal;
       appendHistory(sess, 'user', message);
+      sess.contextLastActivity = Date.now();
+      saveSessions();
       const result = await enqueue(() => {
         return runClaudeStreaming(prompt, (evt) => {
           // Forward each streaming event to the client
@@ -718,6 +817,8 @@ app.post('/api/chat', auth, async (req, res) => {
         });
       });
       appendHistory(sess, 'assistant', result);
+      sess.contextLastActivity = Date.now();
+      saveSessions();
       // Final done event (runClaudeStreaming already sends done, but ensure connection closes)
       res.end();
     } catch (err) {
@@ -735,8 +836,12 @@ app.post('/api/chat', auth, async (req, res) => {
     try {
       currentGoal = resolved.currentGoal;
       appendHistory(sess, 'user', message);
+      sess.contextLastActivity = Date.now();
+      saveSessions();
       const result = await enqueue(() => runClaude(prompt));
       appendHistory(sess, 'assistant', result);
+      sess.contextLastActivity = Date.now();
+      saveSessions();
       res.json({ result, skill: resolved.skill || null, mode: resolved.mode, sessionId: sess.id });
     } catch (err) {
       const e = classifyError(err, 'chat_failed');
@@ -752,7 +857,15 @@ app.get('/api/chat/stream', auth, async (req, res) => {
   const skill   = String(req.query.skill || '');
   if (!message) return res.status(400).json({ error: 'q param required' });
 
-  const resolved = resolveChatRequest(message, skill || null);
+  const sess = touchSession(req.headers['x-session-id'] || req.query.sessionId, null);
+  const seedResolved = resolveChatRequest(message, skill || null, []);
+  if (!seedResolved.error) {
+    const conversationScope = getConversationScope(seedResolved.skill);
+    prepareSessionContext(sess, conversationScope);
+  }
+  const resolved = seedResolved.error
+    ? seedResolved
+    : resolveChatRequest(message, skill || null, getScopedHistory(sess, getConversationScope(seedResolved.skill)));
   if (resolved.error) {
     res.writeHead(200, {
       'Content-Type': 'text/event-stream',
@@ -784,11 +897,17 @@ app.get('/api/chat/stream', auth, async (req, res) => {
 
   try {
     currentGoal = resolved.currentGoal;
+    appendHistory(sess, 'user', message);
+    sess.contextLastActivity = Date.now();
+    saveSessions();
     const result = await enqueue(() => {
       return runClaudeStreaming(prompt, (evt) => {
         try { res.write(`data: ${JSON.stringify(evt)}\n\n`); } catch {}
       });
     });
+    appendHistory(sess, 'assistant', result);
+    sess.contextLastActivity = Date.now();
+    saveSessions();
     res.end();
   } catch (err) {
     const e = classifyError(err, 'chat_stream_failed');
@@ -815,6 +934,7 @@ app.post('/api/invoke/:skill', auth, async (req, res) => {
   const prompt = buildInvokePrompt(name, args);
 
   const sess = touchSession(req.headers['x-session-id'], name);
+  prepareSessionContext(sess, getConversationScope(name));
   trackSkillUsage(name);
   res.setHeader('X-Session-ID', sess.id);
   res.setHeader('Access-Control-Expose-Headers', 'X-Session-ID');

@@ -116,8 +116,17 @@ Phone (Safari/Chrome)
 | `SKILLS_PORT` | `3838` | Server port |
 | `CLAUDE_PATH` | `claude` | Path to Claude CLI binary |
 | `CLAUDE_MODEL` | `sonnet` | Model for Claude CLI |
+| `SESSION_CONTEXT_TTL_HOURS` | `2` | Max age for reusable chat history within the same skill scope |
 | `ALLOW_QUERY_TOKEN` | `false` | Allow `?token=` authentication on API routes (not recommended) |
 | `RESTART_EXIT_CODE` | `75` | Exit code that tells `start-service.bat` to relaunch the service |
+
+## Conversation Context Guards
+
+- Chat history is now **scope-isolated**: only messages from the same skill can be reused in follow-up prompts.
+- Switching from one skill to another immediately clears persisted history instead of carrying context across scopes.
+- Old history is also discarded after `SESSION_CONTEXT_TTL_HOURS`, even if you return to the same skill later.
+- General chat (no pinned skill / no slash-skill) is treated as its own separate scope and does not inherit skill-specific history.
+- Prompt transport should use Claude stdin mode for large prompts so long SKILL.md content does not trigger Windows `spawn ENAMETOOLONG` errors.
 
 ## Security
 
