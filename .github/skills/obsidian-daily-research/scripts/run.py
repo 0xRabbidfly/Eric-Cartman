@@ -18,6 +18,7 @@ Scheduled via Windows Task Scheduler (see schedule.ps1).
 """
 
 import argparse
+import copy
 import io
 import json
 import os
@@ -74,6 +75,7 @@ DEFAULT_COST_RATES = {
     "gpt-4o":        {"input": 2.50, "output": 10.00},
     "gpt-4o-mini":   {"input": 0.15, "output": 0.60},
     # OpenAI Chat Completions
+    "gpt-5.4":       {"input": 2.50, "output": 15.00},
     "gpt-5.2":       {"input": 2.00, "output": 8.00},
     "gpt-4.1":       {"input": 2.00, "output": 8.00},
     # xAI — fallback only; prefer cost_in_usd_ticks from API response
@@ -214,7 +216,8 @@ def _extract_usage(response: dict) -> dict | None:
 # Pipeline config — parsed from pipeline.md (single source of truth)
 # ---------------------------------------------------------------------------
 
-# Hardcoded quality filter defaults (were in config.json, now inlined)
+# Quality filter defaults. X account membership is derived from pipeline.md,
+# not hardcoded here.
 DEFAULT_QUALITY_FILTERS = {
     "min_engagement": {"reddit_score": 50, "x_likes": 100},
     "long_form_bonus": 15,
@@ -229,15 +232,7 @@ DEFAULT_QUALITY_FILTERS = {
         "paddo.dev", "honra.io", "philschmid.de",
     ],
     "priority_accounts": {
-        "x": [
-            "AnthropicAI", "alexalbert__", "amandaaskell", "bcherny",
-            "OpenAI", "sama", "markchen90",
-            "GoogleDeepMind", "JeffDean",
-            "MetaAI", "ylecun",
-            "MistralAI", "arthurmensch",
-            "karpathy", "swyx", "hardmaru", "DrJimFan",
-            "mntruell", "simonw", "eugeneyan",
-        ],
+        "x": [],
         "reddit_subreddits": [
             "Anthropic", "OpenAI", "LocalLLaMA", "MachineLearning",
         ],
@@ -261,14 +256,39 @@ DEFAULT_QUALITY_FILTERS = {
             "DM me for", "link in bio", r"drop a .* if you",
         ],
     },
-    "lab_accounts": {
-        "anthropic": ["AnthropicAI", "alexalbert__", "amandaaskell", "bcherny", "jack_clark", "DarioAmodei"],
-        "openai": ["OpenAI", "sama", "markchen90"],
-        "google": ["GoogleDeepMind", "JeffDean", "googleai"],
-        "meta": ["MetaAI", "ylecun"],
-        "mistral": ["MistralAI", "arthurmensch"],
-    },
+    "lab_accounts": {},
 }
+
+LAB_GROUP_MAP = {
+    "anthropic": "anthropic",
+    "openai": "openai",
+    "google": "google",
+    "meta": "meta",
+    "mistral": "mistral",
+}
+
+
+def _apply_derived_quality_filters(config: dict) -> dict:
+    """Populate quality filter account lists from pipeline-defined accounts."""
+    qf = copy.deepcopy(config.get("quality_filters") or DEFAULT_QUALITY_FILTERS)
+
+    priority = qf.setdefault("priority_accounts", {})
+    priority["x"] = [
+        acct["handle"].lstrip("@").lower()
+        for acct in config.get("must_follow_accounts", [])
+    ]
+
+    lab_accounts: dict[str, list[str]] = {}
+    for acct in config.get("must_follow_accounts", []):
+        group = (acct.get("group") or "").strip().lower()
+        lab_key = LAB_GROUP_MAP.get(group)
+        if not lab_key:
+            continue
+        lab_accounts.setdefault(lab_key, []).append(acct["handle"].lstrip("@").lower())
+    qf["lab_accounts"] = lab_accounts
+
+    config["quality_filters"] = qf
+    return config
 
 
 def _parse_pipeline_md(path: Path) -> dict:
@@ -407,7 +427,7 @@ def _parse_pipeline_md(path: Path) -> dict:
 
 def load_config() -> dict:
     """Load pipeline config from pipeline.md."""
-    return _parse_pipeline_md(PIPELINE_MD)
+    return _apply_derived_quality_filters(_parse_pipeline_md(PIPELINE_MD))
 
 
 # ---------------------------------------------------------------------------
@@ -2350,7 +2370,7 @@ def main():
         return
 
     # Write to vault via Obsidian CLI
-    filepath = vault.write_daily_note(config, today, note_content)
+    filepath = vault.write_daily_note(config, today, note_content, overwrite=args.force_rerun)
     print(f"\n[vault] Written → {filepath}")
 
     # Cost summary (always print — replaces old --costs heuristic)

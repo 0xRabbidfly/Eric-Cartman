@@ -5,8 +5,8 @@ argument-hint: daily research, run pipeline, what's new in AI
 user-invocable: true
 disable-model-invocation: true
 metadata:
-  author: 0xrabbidfly
-  version: "1.0.0"
+   author: 0xrabbidfly
+   version: "1.0.1"
 ---
 
 # Daily Research Pipeline
@@ -66,36 +66,17 @@ The pipeline is now single-write by default for each day.
 
 ### Must-Follow Accounts
 
-Dedicated scan for key people — catches everything they post (no engagement floor). Configured in `config.json → must_follow.accounts`:
+Dedicated scan for key people — catches everything they post with no engagement floor.
 
-| Account | Group | Why |
-|---------|-------|-----|
-| @karpathy | Thought Leaders | Andrej Karpathy — frontier model insights |
-| @daboris | Anthropic | Boris — Claude Code team |
-| @alexalbert__ | Anthropic | Alex Albert — Anthropic prompt eng |
-| @AnthropicAI | Anthropic | Official Anthropic account |
-| @OpenAI | OpenAI | Official OpenAI account |
-| @sama | OpenAI | Sam Altman |
-| @markchen90 | OpenAI | Mark Chen — OpenAI eng lead |
-| @GoogleDeepMind | Google | Google DeepMind |
-| @JeffDean | Google | Jeff Dean |
-| @xaborai | xAI | xAI official |
-| @MistralAI | Mistral | Mistral AI |
-| @ylecun | Meta | Yann LeCun |
-| @MetaAI | Meta | Meta AI |
-| @Alibaba_Qwen | Alibaba | Alibaba Qwen team |
+`pipeline.md` is the source of truth for:
 
-To add/remove accounts, edit the `# Must-Follow Accounts` section in `pipeline.md`.
+- must-follow accounts and org groups
+- topic slugs, names, and weights
+- vault paths and item limits
+- daily pipeline settings
 
-### Topics Tracked
-
-| Topic | Slug | Weight |
-|-------|------|--------|
-| Agent Development | `agents` | 1.2x |
-| Agent Skills & Tools | `skills` | 1.1x |
-| Frontier Model Releases | `models` | 1.0x |
-| MCP & Tool Use | `mcp` | 1.0x |
-| RAG & AI Search | `rag` | 0.9x |
+Edit `pipeline.md` when you want to add or remove followed accounts, adjust topics,
+or tune runtime settings.
 
 ### Content Categories
 
@@ -172,16 +153,8 @@ Research/Dailies/2026/02/2026-02-26.md
 
 ## Configuration
 
-Edit `pipeline.md` (single source of truth):
-- `vault_path` — Path to your Obsidian vault
-- `dailies_folder` — Base subfolder for daily notes (default: `Research/Dailies`). Notes are auto-organized into `YYYY/MM/` subfolders.
-- `library_folder` — Subfolder for library notes (default: `Research/Library`)
-- `items_per_topic` — Max items per topic (default: 8)
-- `reading_list_max` — Max reading list items (default: 15)
-- `# Must-Follow Accounts` section — List of X accounts to track (no engagement floor — catches everything)
-- `feedback_tags` — Tag names for feedback system (`#good`, `#bad`)
-
-Custom topics can be added via a `topics` array in config.json.
+Edit `pipeline.md` for runtime configuration. It is the single source of truth for
+topics, must-follow accounts, and pipeline settings.
 
 ### Quality Filters
 
@@ -196,11 +169,8 @@ Post-scoring filters applied inside `run_topic_scan()` via `config.json → qual
 | **Priority accounts** | +20 pts for posts from tracked accounts. Frontier lab releases always surface. | `priority_accounts.x`, `priority_account_bonus` |
 | **Lab accounts** | Accounts from the 5 major labs, used for Lab Pulse rollup. Bypass engagement floor. | `lab_accounts.anthropic`, `lab_accounts.openai`, etc. |
 
-### Followed Accounts
-
-The `followed_accounts.x` list in config.json tracks accounts you follow. These get priority scoring. Since the Grok API doesn't expose your X follow graph, maintain this list manually.
-
-To customize, edit the `quality_filters` block in `scripts/config.json`.
+To customize scoring behavior beyond what `pipeline.md` exposes, edit the quality
+filter defaults in `scripts/run.py`.
 
 ## Scheduling
 

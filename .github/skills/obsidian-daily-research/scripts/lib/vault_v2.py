@@ -259,7 +259,7 @@ def _daily_path(dailies_folder: str, date_str: str) -> str:
         return f"{dailies_folder}/{date_str}.md"
 
 
-def write_daily_note(config: dict, date_str: str, content: str) -> str:
+def write_daily_note(config: dict, date_str: str, content: str, overwrite: bool = False) -> str:
     """Write a daily research note to the vault.
 
     Organizes into year/month subfolders:
@@ -270,6 +270,8 @@ def write_daily_note(config: dict, date_str: str, content: str) -> str:
     Falls back to Obsidian CLI when vault root is not available.
 
     Returns the vault-relative path of the written file.
+
+    When overwrite is True, an existing note for the same day is replaced.
     """
     _init_fs(config)
     dailies_folder = config.get("dailies_folder", "Research/Dailies")
@@ -278,7 +280,7 @@ def write_daily_note(config: dict, date_str: str, content: str) -> str:
     vault_root = _vault_fs_root
     if vault_root:
         full_path = Path(vault_root) / path
-        if full_path.exists():
+        if full_path.exists() and not overwrite:
             raise FileExistsError(f"Daily note already exists: {path}")
         full_path.parent.mkdir(parents=True, exist_ok=True)
         full_path.write_text(content, encoding="utf-8")
@@ -286,9 +288,9 @@ def write_daily_note(config: dict, date_str: str, content: str) -> str:
         _file_content_cache[path] = content
     else:
         ob = _client()
-        if ob.exists(path=path):
+        if ob.exists(path=path) and not overwrite:
             raise FileExistsError(f"Daily note already exists: {path}")
-        ob.create(path=path, content=content)
+        ob.create(path=path, content=content, overwrite=overwrite)
 
     return path
 
