@@ -25,7 +25,7 @@ $action = New-ScheduledTaskAction `
     -Argument "`"$scriptPath`"" `
     -WorkingDirectory $workingDir
 
-$trigger = New-ScheduledTaskTrigger -Daily -At 7:00AM
+$trigger = New-ScheduledTaskTrigger -Daily -At 1:00AM
 
 $settings = New-ScheduledTaskSettingsSet `
     -StartWhenAvailable `
@@ -52,7 +52,7 @@ if ($existing) {
 }
 
 Write-Host ""
-Write-Host "Done! Task '$taskName' is registered to run daily at 7:00 AM."
+Write-Host "Done! Task '$taskName' is registered to run daily at 1:00 AM."
 Write-Host ""
 Write-Host "Verify: Get-ScheduledTask -TaskName '$taskName' | Format-List"
 Write-Host "Test:   Start-ScheduledTask -TaskName '$taskName'"

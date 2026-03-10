@@ -40,7 +40,7 @@ python .github/skills/obsidian-daily-research/scripts/run.py --costs
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│  Windows Task Scheduler (7:00 AM daily)             │
+│  Windows Task Scheduler (1:00 AM daily)             │
 │  python .github/skills/obsidian-daily-research/scripts/run.py│
 └──────────┬──────────────────────────────────────────┘
            │
@@ -89,7 +89,7 @@ Research/Dailies/2026-02-23.md
 
 ## Scheduled Task
 
-Registered via Windows Task Scheduler at **7:00 AM daily**.
+Registered via Windows Task Scheduler at **1:00 AM daily**.
 
 ```powershell
 # Register (run as Admin)

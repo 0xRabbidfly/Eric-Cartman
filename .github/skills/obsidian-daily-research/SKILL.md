@@ -204,7 +204,7 @@ To customize, edit the `quality_filters` block in `scripts/config.json`.
 
 ## Scheduling
 
-Run `scripts/schedule.ps1` to register a Windows Task Scheduler task at 7:00 AM daily.
+Run `scripts/schedule.ps1` to register a Windows Task Scheduler task at 1:00 AM daily.
 
 ### Step N: Reflection (composable)
 
