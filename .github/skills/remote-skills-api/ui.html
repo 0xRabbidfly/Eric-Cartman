@@ -549,6 +549,7 @@
     let skills     = [];
     let activeSkill = null;
     let isBusy      = false;
+    let localSending = false;
     let promptForTokenOnLoad = false;
     let modalResolver = null;
     let toastTimer = null;
@@ -1099,6 +1100,7 @@
       updateSendBtn();
 
       isBusy = true;
+      localSending = true;
       setBusy(true);
 
       try {
@@ -1111,6 +1113,7 @@
           : `❌ Error: ${err.message}`;
         addMessage('bot', msg);
       } finally {
+        localSending = false;
         isBusy = false;
         setBusy(false);
       }
@@ -1141,11 +1144,6 @@
         showCancel: true,
       });
       if (!result?.confirmed) return;
-
-      if (isBusy) {
-        showToast('Server is busy. Wait for the current request to finish or use Cancel first.', 'error', 4200);
-        return;
-      }
 
       addMessage('bot', '🔁 Restart requested. Waiting for the server to come back...');
       showToast('Restarting server...', 'info', 2000);
@@ -1196,9 +1194,9 @@
     async function pollStatus() {
       try {
         const data = await api('/api/status');
-        if (!isBusy) {
+        if (!localSending) {
+          isBusy = data.active;
           setBusy(data.active);
-          if (data.active) isBusy = true;
         }
       } catch {}
     }
