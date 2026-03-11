@@ -41,6 +41,11 @@ const RESTART_EXIT_CODE = process.env.RESTART_EXIT_CODE
 const MAX_BUDGET_USD  = process.env.MAX_BUDGET_USD  ? parseFloat(process.env.MAX_BUDGET_USD)  : null;
 const MAX_TOOL_CALLS  = process.env.MAX_TOOL_CALLS  ? parseInt(process.env.MAX_TOOL_CALLS, 10) : 0;
 
+// Request timeout — kill Claude if it hangs (default 5 min, 0 = no timeout)
+const CLAUDE_TIMEOUT_MS = process.env.CLAUDE_TIMEOUT_MS
+  ? parseInt(process.env.CLAUDE_TIMEOUT_MS, 10)
+  : 5 * 60 * 1000;
+
 if (!API_SECRET) {
   console.error('❌  API_SECRET not set in .env — aborting');
   process.exit(1);
@@ -401,11 +406,20 @@ function runClaude(prompt, opts = {}) {
     activeProcess = proc;
     proc.stdin.end(prompt);
 
+    let killTimeout;
+    if (CLAUDE_TIMEOUT_MS > 0) {
+      killTimeout = setTimeout(() => {
+        console.warn(`[Claude] Timeout (${CLAUDE_TIMEOUT_MS / 1000}s) — killing hung process`);
+        try { proc.kill('SIGTERM'); } catch {}
+      }, CLAUDE_TIMEOUT_MS);
+    }
+
     let stdout = '', stderr = '';
     proc.stdout.on('data', d => stdout += d);
     proc.stderr.on('data', d => stderr += d);
 
     proc.on('close', code => {
+      if (killTimeout) clearTimeout(killTimeout);
       const elapsed = ((Date.now() - start) / 1000).toFixed(1);
       console.log(`[Claude] Done in ${elapsed}s (exit ${code})`);
       if (code === 0) {
@@ -460,6 +474,15 @@ function runClaudeStreaming(prompt, onEvent, opts = {}) {
     });
     activeProcess = proc;
     proc.stdin.end(prompt);
+
+    let killTimeout;
+    if (CLAUDE_TIMEOUT_MS > 0) {
+      killTimeout = setTimeout(() => {
+        console.warn(`[Claude:stream] Timeout (${CLAUDE_TIMEOUT_MS / 1000}s) — killing hung process`);
+        try { proc.kill('SIGTERM'); } catch {}
+        onEvent({ type: 'error', code: 'timeout', error: `Request timed out after ${CLAUDE_TIMEOUT_MS / 1000}s` });
+      }, CLAUDE_TIMEOUT_MS);
+    }
 
     let stderr = '';
     let buffer = '';
@@ -519,6 +542,7 @@ function runClaudeStreaming(prompt, onEvent, opts = {}) {
     proc.stderr.on('data', d => stderr += d);
 
     proc.on('close', code => {
+      if (killTimeout) clearTimeout(killTimeout);
       const elapsed = ((Date.now() - start) / 1000).toFixed(1);
       console.log(`[Claude:stream] Done in ${elapsed}s (exit ${code})`);
       if (code === 0) {
@@ -1046,5 +1070,6 @@ serverHandle = app.listen(PORT, '0.0.0.0', () => {
   console.log(`⏱️  Session TTL: ${isFinite(SESSION_TTL_MS) ? `${SESSION_TTL_HOURS}h` : 'unlimited'}`);
   console.log(`💰  Budget cap: ${MAX_BUDGET_USD != null ? `$${MAX_BUDGET_USD}` : 'none'}`);
   console.log(`🔧  Tool cap:   ${MAX_TOOL_CALLS > 0 ? `${MAX_TOOL_CALLS} calls` : 'none'}`);
+  console.log(`⏱️  Claude timeout: ${CLAUDE_TIMEOUT_MS > 0 ? `${CLAUDE_TIMEOUT_MS / 1000}s` : 'none'}`);
   console.log('');
 });

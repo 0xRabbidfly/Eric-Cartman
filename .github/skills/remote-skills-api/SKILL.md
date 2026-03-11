@@ -119,6 +119,7 @@ Phone (Safari/Chrome)
 | `SESSION_CONTEXT_TTL_HOURS` | `2` | Max age for reusable chat history within the same skill scope |
 | `ALLOW_QUERY_TOKEN` | `false` | Allow `?token=` authentication on API routes (not recommended) |
 | `RESTART_EXIT_CODE` | `75` | Exit code that tells `start-service.bat` to relaunch the service |
+| `CLAUDE_TIMEOUT_MS` | `300000` | Kill Claude process after this many ms (0 = no timeout) |
 
 ## Conversation Context Guards
 
