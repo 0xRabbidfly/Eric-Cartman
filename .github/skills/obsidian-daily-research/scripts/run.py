@@ -438,15 +438,16 @@ def _oneline(text: str, max_len: int = 120) -> str:
     """Collapse text to a single line safe for markdown list items and links.
 
     Strips newlines, tabs, pipe chars (break tables), and square brackets
-    (break markdown links).  Collapses whitespace, then truncates.
+    (break markdown links). Collapses whitespace, then truncates only when
+    max_len is a positive integer.
     """
     # Replace newlines/tabs with a space
     t = re.sub(r'[\n\r\t]+', ' ', text)
     # Remove characters that break markdown link syntax or tables
-    t = t.replace('[', '').replace(']', '').replace('|', '—')
+    t = t.replace('[', '').replace(']', '').replace('|', '-')
     # Collapse multiple spaces
     t = re.sub(r' {2,}', ' ', t).strip()
-    if len(t) > max_len:
+    if max_len and max_len > 0 and len(t) > max_len:
         return t[:max_len] + "..."
     return t
 
@@ -942,10 +943,10 @@ def run_must_follow_scan(
                     "items": per_handle.get(clean, []),
                 })
 
-            print(f"→ {len(final)} tweets")
+            print(f"-> {len(final)} tweets")
 
         except Exception as e:
-            print(f"error — {e}")
+            print(f"error - {e}")
             for acct in batch_accounts:
                 results.append({
                     "handle": acct["handle"],
@@ -1001,10 +1002,10 @@ def run_must_follow_scan(
                 "items": final,
             })
 
-            print(f"→ {len(final)} tweets")
+            print(f"-> {len(final)} tweets")
 
         except Exception as e:
-            print(f"error — {e}")
+            print(f"error - {e}")
             results.append({
                 "handle": acct["handle"],
                 "label": acct.get("label", acct["handle"]),
@@ -1088,11 +1089,11 @@ def run_prominent_ai_scan(
             if item.url not in seen_urls
         ]
 
-        print(f"→ {len(final)} high-signal tweets")
+        print(f"-> {len(final)} high-signal tweets")
         return final
 
     except Exception as e:
-        print(f"error — {e}")
+        print(f"error - {e}")
         return []
 
 
@@ -1823,9 +1824,6 @@ def render_daily_note(
 
 
 
-    # Find vault connections — wikilink to existing Library notes
-    vault_connections = _find_vault_connections(topic_slugs, config)
-
     # Collect categorized items across all topics
     deep_dives = []
     lab_pulse_items = []
@@ -1878,30 +1876,6 @@ def render_daily_note(
             "",
         ])
 
-    # Vault Connections — wikilink to existing Library notes
-    if vault_connections:
-        lines.extend([
-            "## Vault Connections \U0001f517",
-            "",
-            "> Today's topics link to these existing notes in your vault.",
-            "",
-        ])
-        # Collect all unique stems across all topics for later use
-        all_linked = set()
-        for slug in topic_slugs:
-            stems = vault_connections.get(slug, [])
-            if stems:
-                # Use the topic's display name from topic_results
-                display = slug
-                for tr in topic_results:
-                    if tr["topic"].slug == slug:
-                        display = tr["topic"].display_name
-                        break
-                links = ", ".join(f"[[{s}]]" for s in stems)
-                lines.append(f"- **{display}**: {links}")
-                all_linked.update(stems)
-        lines.append("")
-
     # Must Follow — every tweet from tracked accounts, grouped
     if must_follow_results:
         has_tweets = any(r["items"] for r in must_follow_results)
@@ -1932,7 +1906,7 @@ def render_daily_note(
                         date_str_item = ""
                         if hasattr(item, 'date') and item.date:
                             date_str_item = f" ({item.date})"
-                        text_display = _oneline(text, 200)
+                        text_display = _oneline(text, 0)
                         lines.append(
                             f"- @{acct['handle']}{date_str_item}: {text_display} "
                             f"[{likes}\u2764\ufe0f]({url})"
@@ -1958,7 +1932,7 @@ def render_daily_note(
         )
         for item in sorted_prom[:15]:
             likes = item.engagement.likes if item.engagement and item.engagement.likes else 0
-            text_short = _oneline(item.text, 100)
+            text_short = _oneline(item.text, 0)
             lines.append(
                 f"| @{item.author_handle} | {text_short} | {likes}\u2764\ufe0f | [→]({item.url}) |"
             )
@@ -1978,7 +1952,7 @@ def render_daily_note(
             lines.append("|--------|------|-------|------|")
             for item, topic, source in lab_pulse_items[:10]:
                 likes = item.engagement.likes if item.engagement and item.engagement.likes else 0
-                text_short = _oneline(item.text, 80)
+                text_short = _oneline(item.text, 0)
                 lines.append(
                     f"| @{item.author_handle} | {text_short} | {likes} | [→]({item.url}) |"
                 )
@@ -1992,7 +1966,7 @@ def render_daily_note(
         ])
         for item, topic, source in deep_dives[:8]:
             if source == 'x':
-                title = _oneline(item.text, 100)
+                title = _oneline(item.text, 0)
                 lines.append(f"- [ ] [{title}]({item.url}) — @{item.author_handle} #{topic.slug}")
             else:
                 lines.append(f"- [ ] [{item.title}]({item.url}) — r/{item.subreddit} #{topic.slug}")
@@ -2024,12 +1998,6 @@ def render_daily_note(
             f"## {topic.display_name}",
             "",
         ])
-
-        # Vault see-also — wikilinks to related Library notes
-        related_stems = vault_connections.get(topic.slug, [])
-        if related_stems:
-            see_also = " · ".join(f"[[{s}]]" for s in related_stems[:5])
-            lines.extend([f"> See also: {see_also}", ""])
 
         # Topic headline
         headline = synth.get("headline", "")
@@ -2069,7 +2037,7 @@ def render_daily_note(
             ])
             for i, item in enumerate(tr["x_items"][:8], 1):
                 likes = item.engagement.likes if item.engagement and item.engagement.likes else 0
-                text_short = _oneline(item.text, 60)
+                text_short = _oneline(item.text, 0)
                 lines.append(
                     f"| {i} | {text_short} | @{item.author_handle} | {likes} | [→]({item.url}) |"
                 )
@@ -2192,7 +2160,7 @@ def main():
         l30_config = l30_env.get_config()
         openai_key = l30_config.get("OPENAI_API_KEY")
         if not openai_key:
-            print("[warn] No OPENAI_API_KEY — will create basic notes without summaries")
+            print("[warn] No OPENAI_API_KEY - will create basic notes without summaries")
 
         promoted = promote.promote_items(
             config, api_key=openai_key, dry_run=args.dry_run,
@@ -2201,7 +2169,7 @@ def main():
             print(f"Promoted {len(promoted)} items to Library:")
             for item in promoted:
                 path = item.get('library_path', item['topic_slug'])
-                print(f"  [{item['topic_slug']}] {item['title']} → {path}")
+                print(f"  [{item['topic_slug']}] {item['title']} -> {path}")
         else:
             print("No #keep items found to promote.")
         return
@@ -2285,7 +2253,7 @@ def main():
         )
         r_count = len(result["reddit_items"])
         x_count = len(result["x_items"])
-        print(f"→ {r_count}R + {x_count}X items (new)")
+        print(f"-> {r_count}R + {x_count}X items (new)")
         topic_results.append(result)
         total_errors.extend(result["errors"])
 
@@ -2308,7 +2276,7 @@ def main():
         n_batch = sum(1 for a in mf_accounts if not a.get("solo"))
         n_solo = sum(1 for a in mf_accounts if a.get("solo"))
         n_calls = (1 if n_batch else 0) + n_solo
-        print(f"\n[must-follow] Scanning {len(mf_accounts)} accounts ({n_batch} batch + {n_solo} solo = {n_calls} calls) | last 24h ({mf_from_date} → {to_date})...")
+        print(f"\n[must-follow] Scanning {len(mf_accounts)} accounts ({n_batch} batch + {n_solo} solo = {n_calls} calls) | last 24h ({mf_from_date} -> {to_date})...")
         must_follow_results = run_must_follow_scan(
             config, l30_config, mf_from_date, to_date,
             tracker=tracker,
@@ -2319,7 +2287,7 @@ def main():
     # Prominent AI voices scan (single broad search, 500+ likes)
     prominent_results = []
     if l30_config.get("XAI_API_KEY"):
-        print(f"\n[prominent-ai] Scanning for high-engagement AI voices | last 24h ({mf_from_date} → {to_date})...")
+        print(f"\n[prominent-ai] Scanning for high-engagement AI voices | last 24h ({mf_from_date} -> {to_date})...")
         prominent_results = run_prominent_ai_scan(
             config, l30_config, mf_from_date, to_date,
             seen_urls,
@@ -2364,14 +2332,14 @@ def main():
 
     if args.dry_run:
         print("\n" + "=" * 60)
-        print("DRY RUN — would write this to vault:")
+        print("DRY RUN - would write this to vault:")
         print("=" * 60)
         print(note_content)
         return
 
     # Write to vault via Obsidian CLI
     filepath = vault.write_daily_note(config, today, note_content, overwrite=args.force_rerun)
-    print(f"\n[vault] Written → {filepath}")
+    print(f"\n[vault] Written -> {filepath}")
 
     # Cost summary (always print — replaces old --costs heuristic)
     ts = tracker.summary_dict()
