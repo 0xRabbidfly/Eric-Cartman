@@ -15,8 +15,9 @@
 - agents | Agent Development | 1.2
 - skills | Agent Skills & Tools | 1.1
 - models | Frontier Model Releases | 1.0
-- mcp | MCP & Tool Use | 1.0
-- rag | RAG & AI Search | 0.9
+- sdd | Spec Driven Development & AI frameworks | 1.0
+- sdlc | Software development lifecycle & AI | 0.9
+
 
 ---
 

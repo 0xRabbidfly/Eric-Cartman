@@ -90,6 +90,8 @@ Research/Dailies/2026-02-23.md
 ## Scheduled Task
 
 Registered via Windows Task Scheduler at **1:00 AM daily**.
+The scheduled action runs through `scripts/run-scheduled.ps1`, which writes a timestamped log file to `logs/` for every attempt.
+The task is configured to wake the PC, tolerate battery state changes, and run without an active VS Code session or interactive desktop login.
 
 ```powershell
 # Register (run as Admin)
@@ -101,6 +103,12 @@ Get-ScheduledTask -TaskName "DailyResearchPipeline" | Get-ScheduledTaskInfo
 
 # Test now
 Start-ScheduledTask -TaskName "DailyResearchPipeline"
+
+# Tail the latest scheduled-run log
+Get-ChildItem .github/skills/obsidian-daily-research/logs |
+  Sort-Object LastWriteTime -Descending |
+  Select-Object -First 1 |
+  Get-Content -Tail 100
 
 # Remove
 Unregister-ScheduledTask -TaskName "DailyResearchPipeline"
