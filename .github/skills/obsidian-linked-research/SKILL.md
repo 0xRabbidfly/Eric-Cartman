@@ -6,7 +6,7 @@ user-invocable: true
 disable-model-invocation: false
 metadata:
   author: 0xrabbidfly
-  version: "1.3.0"
+  version: "1.4.0"
 ---
 
 # Obsidian Linked Research
@@ -73,6 +73,18 @@ python -c "import sys; sys.stdout.reconfigure(encoding='utf-8'); sys.path.insert
 ```
 
 > **Windows UTF-8 note**: On Windows, subprocess pipes default to the system code page (cp1252), which cannot encode emoji or non-ASCII vault paths. Always add `sys.stdout.reconfigure(encoding='utf-8')` before any `print()` call in one-liner subprocess commands, or prefer calling the Obsidian Python API directly.
+
+**URL-based dedup (mandatory before fetching)**: Search for an existing note
+whose `url:` frontmatter matches the input URL. This catches duplicates even
+when the slug or folder differ. Use the Obsidian search API:
+
+```powershell
+python -c "import sys; sys.stdout.reconfigure(encoding='utf-8'); sys.path.insert(0,'.github/skills/obsidian/scripts'); from obsidian import Obsidian; r=Obsidian().search(query='url: <INPUT_URL>', context_length=120); print(r.text if hasattr(r,'text') else r)"
+```
+
+If a match is found, **stop** — tell the user the note already exists, give them
+the path and an Obsidian link, and ask whether they want to update the existing
+note instead. Do NOT proceed to fetch or create a new note.
 
 Use this routing table unless the live vault has changed again:
 
@@ -425,6 +437,9 @@ If the first few lines match your frontmatter, the write succeeded.
 
 **Check for existing notes before creating** (deduplicate):
 
+The primary dedup gate is the URL-based search in Step 0. This slug check is a
+secondary guard for the rare case where two different URLs produce the same slug:
+
 ```python
 python -c "
 import sys
@@ -550,7 +565,7 @@ library pages and respects the live MOC/tag taxonomy already in the vault.
 5. **Never use `bash -c "powershell -Command \"...\""` for heredocs** — quote escaping through that shell boundary is irreparably lossy; the Write-tool + Python API pattern avoids this entirely
 6. **Windows UTF-8** — on Windows, subprocess pipes default to cp1252 and cannot encode emoji or non-ASCII vault paths; add `sys.stdout.reconfigure(encoding='utf-8')` to one-liner subprocess commands, or call the Obsidian Python API directly (preferred)
 7. **Handle fetch errors gracefully** — if fetch returns an error, tell the user and suggest alternatives
-8. **Deduplicate** — check if a note with a similar slug already exists before creating
+8. **Deduplicate by URL first, slug second** — search all `Research/Library/` frontmatter for the input URL in Step 0 before fetching; check slug in Step 4 as a secondary guard
 9. **Zero pip deps** — `fetch.py` uses only Python stdlib
 10. **Read the master MOC first** — tag and folder decisions must be based on the live `Research/Library/00 MOC/🗺️ MOC - Research Library.md`
 11. **Prefer existing tags** — reuse the master MOC's canonical lowercase kebab-case tags before introducing a new one

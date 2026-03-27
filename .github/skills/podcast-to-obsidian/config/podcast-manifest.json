@@ -6,6 +6,15 @@
       "rss_url": "https://feeds.megaphone.fm/realvisioncryptopodcast",
       "spotify_id": "",
       "episodes": {
+        "7mvJhxgfrJpXL7VWOqWWn4": {
+          "title": "This Time IS Different for Crypto",
+          "published": "2026-03-19",
+          "audio_url": "https://www.podtrac.com/pts/redirect.mp3/chrt.fm/track/1B146C/pscrb.fm/rss/p/traffic.megaphone.fm/ADV3293170802.mp3",
+          "transcript_path": ".work/transcripts/2026-03-19 - This Time IS Different for Crypto.txt",
+          "note_path": "Podcasts/Raoul Pal The Journey Man/2026-03-19 - This Time IS Different for Crypto.md",
+          "processed_at": "2026-03-21T00:00:00Z",
+          "status": "completed"
+        },
         "7f704b44-1195-11f1-9569-03f9af4f3a30": {
           "title": "The AI Intelligence Tsunami Is Here",
           "published": "2026-02-26",
@@ -64,13 +73,34 @@
       "name": "Moonshots with Peter Diamandis",
       "rss_url": "https://feeds.megaphone.fm/DVVTS2890392624",
       "spotify_id": "",
-      "episodes": {}
+      "episodes": {
+        "0DVaxQhCkAFnVTAnQ1cXkq": {
+          "title": "NVIDIA's $1 Trillion Prediction, Anthropic Beats OpenAI, Tesla vs. TSMC & The CS Job Collapse | 240",
+          "published": "2026-03-21",
+          "audio_url": "https://traffic.megaphone.fm/DVVTS6372073266.mp3?updated=1774091947",
+          "transcript_path": ".work/transcripts/2026-03-21 - NVIDIA's $1 Trillion Prediction, Anthropic Beats OpenAI, Tesla vs. TSMC & The CS Job Collapse  240.txt",
+          "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-03-21 - NVIDIA's $1 Trillion Prediction, Anthropic Beats OpenAI, Tesla vs. TSMC & The CS Job Collapse  240.md",
+          "processed_at": "2026-03-22T20:00:00Z",
+          "status": "completed"
+        }
+      }
     },
     "dwarkesh-podcast": {
       "name": "Dwarkesh Podcast",
       "rss_url": "https://api.substack.com/feed/podcast/69345.rss",
       "spotify_id": "",
-      "episodes": {}
+      "episodes": {
+        "02oacFsX2U0OB1SXA5KTpK": {
+          "title": "The most important question nobody's asking about AI",
+          "published": "2026-03-11",
+          "audio_url": "https://api.substack.com/feed/podcast/190633588/94a1857634f9ebd3857e20d95893ec75.mp3",
+          "rss_guid": "substack:post:190633588",
+          "transcript_path": ".work/transcripts/2026-03-11 - The most important question nobodys asking about AI.txt",
+          "note_path": "Podcasts/Dwarkesh Podcast/2026-03-11 - The most important question nobody's asking about AI.md",
+          "processed_at": "2026-03-23T02:17:13.084167+00:00",
+          "status": "completed"
+        }
+      }
     },
     "the-pragmatic-engineer": {
       "name": "The Pragmatic Engineer",
@@ -84,6 +114,71 @@
           "transcript_path": ".work/transcripts/2026-03-04 - Building Claude Code with Boris Cherny.txt",
           "note_path": "Podcasts/The Pragmatic Engineer/2026-03-04 - Building Claude Code with Boris Cherny.md",
           "processed_at": "2026-03-05T04:07:03.501020+00:00",
+          "status": "completed"
+        }
+      }
+    },
+    "naval": {
+      "name": "Naval",
+      "rss_url": "https://rss.libsyn.com/shows/166112/destinations/1103966.xml",
+      "spotify_id": "7qZAVw03FuurfYnWIWwkHY",
+      "episodes": {
+        "7sj2zpcWmS8NqJjfjV8o31": {
+          "title": "A Motorcycle for the Mind",
+          "published": "2026-02-18",
+          "audio_url": "",
+          "transcript_path": ".work/transcripts/2026-02-18 - A Motorcycle for the Mind.txt",
+          "note_path": "Podcasts/Naval/2026-02-18 - A Motorcycle for the Mind.md",
+          "processed_at": "2026-03-20T12:00:00+00:00",
+          "status": "completed"
+        }
+      }
+    },
+    "no-priors": {
+      "name": "No Priors: Artificial Intelligence | Technology | Startups",
+      "rss_url": "https://feeds.megaphone.fm/nopriors",
+      "spotify_id": "",
+      "episodes": {
+        "e12140a6-245e-11f1-83d8-d393763beb3b": {
+          "title": "Andrej Karpathy on Code Agents, AutoResearch, and the Loopy Era of AI",
+          "published": "2026-03-20",
+          "audio_url": "https://traffic.megaphone.fm/PDP8703207384.mp3",
+          "transcript_path": "Podcasts/No Priors: Artificial Intelligence | Technology | Startups/transcripts/2026-03-20 - Andrej Karpathy on Code Agents, AutoResearch, and the Loopy Era of AI.txt",
+          "note_path": "Podcasts/No Priors Artificial Intelligence  Technology  Startups/2026-03-20 - Andrej Karpathy on Code Agents, AutoResearch, and the Loopy Era of AI.md",
+          "processed_at": "2026-03-22T11:14:25.034445+00:00",
+          "status": "completed"
+        }
+      }
+    },
+    "cgi-conversations": {
+      "name": "CGI Conversations",
+      "rss_url": "",
+      "spotify_id": "",
+      "episodes": {
+        "cgi-accelerating-insurance-sdlc-ai": {
+          "title": "Accelerating the Insurance SDLC with AI",
+          "published": "2026-03-18",
+          "audio_url": "",
+          "source_url": "https://www.cgi.com/canada/en-ca/podcast/artificial-intelligence/accelerating-insurance-sdlc-ai",
+          "transcript_path": "",
+          "note_path": "Podcasts/CGI Conversations/2026-03-18 - Accelerating the Insurance SDLC with AI.md",
+          "processed_at": "2026-03-25T00:00:00Z",
+          "status": "completed"
+        }
+      }
+    },
+    "latent-space": {
+      "name": "Latent Space: The AI Engineer Podcast",
+      "rss_url": "https://www.latent.space/feed",
+      "spotify_id": "",
+      "episodes": {
+        "1mYToOvlWpXWuSQ9YShJ0H": {
+          "title": "Dreamer: the Personal Agent OS - David Singleton",
+          "published": "2026-03-20",
+          "audio_url": "https://api.substack.com/feed/podcast/191603783/2317717a636a1484d239498d8e0d100e.mp3",
+          "transcript_path": ".work/transcripts/2026-03-20 - Dreamer the Personal Agent OS David Singleton.txt",
+          "note_path": "Podcasts/Latent Space The AI Engineer Podcast/2026-03-20 - Dreamer the Personal Agent OS David Singleton.md",
+          "processed_at": "2026-03-22T00:00:00Z",
           "status": "completed"
         }
       }

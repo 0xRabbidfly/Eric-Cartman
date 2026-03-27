@@ -55,6 +55,16 @@
             "name": "The Pragmatic Engineer",
             "rss_url": "https://api.substack.com/feed/podcast/458709.rss",
             "enabled": true
+        },
+        "naval": {
+            "name": "Naval",
+            "rss_url": "https://rss.libsyn.com/shows/166112/destinations/1103966.xml",
+            "enabled": true
+        },
+        "no-priors": {
+            "name": "No Priors: Artificial Intelligence | Technology | Startups",
+            "rss_url": "https://feeds.megaphone.fm/nopriors",
+            "enabled": true
         }
     },
     "spotify": {
