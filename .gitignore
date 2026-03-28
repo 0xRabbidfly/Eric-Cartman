@@ -92,6 +92,9 @@ scratch/
 # Used Car Search - private skill with API keys and results
 .claude/skills/used-car-search/
 
+# Zehrs Grocery - private skill
+.claude/skills/zehrs-grocery/
+
 # Teams Daily Digest - contains PII and internal channel names
 .claude/skills/teams-daily-digest/
 
