@@ -23,6 +23,14 @@ Apply the core `autoresearch` pattern to skill development in this repo:
 Use this skill when the goal is not merely to write a `SKILL.md`, but to improve
 it empirically through bounded experiments.
 
+**Simplicity criterion**: All else being equal, simpler is better. A small score
+gain that adds convoluted workflow steps or brittle guardrails is not worth it.
+Conversely, removing instructions and getting equal or better results is a
+simplification win — always keep those. When evaluating whether to keep a change,
+weigh complexity cost against improvement magnitude. A 2% pass-rate bump that
+adds 40 lines of edge-case rules? Probably not worth it. A 2% bump from deleting
+redundant steps? Definitely keep. A flat score but 30% fewer instructions? Keep.
+
 This skill is the control plane. It does not replace `skill-creator` or
 `session-skill-forge`.
 
@@ -111,7 +119,7 @@ Before editing the candidate:
 1. Capture the current target as the baseline.
 2. Define a fixed eval batch, typically 3-5 realistic prompts.
 3. Add assertions only where outputs are objectively checkable.
-4. Record the baseline score in `results.tsv`.
+4. Run the baseline eval and record the score in `results.tsv`.
 
 Baseline rules:
 
@@ -120,6 +128,25 @@ Baseline rules:
 
 If `skill-creator` already has a useful benchmark harness for the target, reuse
 it instead of inventing a new one.
+
+#### How to score an eval run
+
+Each eval prompt is run against the candidate skill and scored on a 0–1 rubric.
+The primary metric is the mean score across the batch.
+
+Concrete execution steps:
+
+1. For each eval prompt, invoke the target skill (or simulate invocation by
+   providing the skill text as system context to `skill-creator`'s benchmark
+   runner if available).
+2. Score each output against the rubric. Use binary pass/fail (0 or 1) for
+   objective checks (correct format, required sections present, triggers fired).
+   Use a 0.0–1.0 scale for subjective quality (clarity, usefulness, tone).
+3. Record per-prompt scores in the iteration snapshot directory.
+4. Compute the mean as the primary metric for `results.tsv`.
+
+If the eval cannot be automated, score manually — but use the same rubric and
+prompts every time. Consistency matters more than automation.
 
 ### Phase 4: Run One-Hypothesis Iterations
 
@@ -143,19 +170,32 @@ For each iteration:
 
 1. Copy the current winner into an iteration snapshot.
 2. Edit only the mutable surface.
-3. Run the same eval batch as the baseline.
+3. Run the same eval batch as the baseline using the same scoring rubric.
 4. Record scores, observations, and failures in `results.tsv`.
 5. Decide `keep`, `discard`, or `crash`.
+
+#### Crash triage
+
+Not all failures are equal:
+
+- **Dumb crash** (skill doesn't parse, missing section, broken template
+  reference): fix immediately and re-run. Do not count as a full iteration.
+- **Fundamentally broken idea** (the hypothesis itself produces nonsense or
+  makes the skill worse in every eval prompt): log status as `crash`, revert
+  to the last winner, and move on. Do not spend more than one retry on a
+  fundamentally broken direction.
 
 ### Phase 5: Keep or Revert
 
 Apply the `autoresearch` promotion rule in adapted form:
 
 - **Keep** when the primary metric improves and no important guardrail regresses.
-- **Keep** on a flat score only if the skill becomes materially simpler or more
-  portable.
+- **Keep** on a flat score if the skill becomes meaningfully simpler (fewer
+  instructions, fewer steps, less conditional logic). Simplification at equal
+  performance is always a win.
 - **Discard** when the score is worse, the trigger gets noisier, or the review
-  burden increases without enough gain.
+  burden increases without enough gain. A tiny improvement that adds significant
+  complexity is a discard — the complexity cost outweighs the gain.
 - **Crash** when the candidate breaks invocation, formatting, or the eval run.
 
 When discarding, revert to the last winning snapshot. Do not manually blend the
@@ -173,6 +213,21 @@ Use bounded batches such as:
 - stop once the remaining ideas are broad rewrites instead of clean hypotheses
 
 Ask the user for another batch only after you finish the current one.
+
+#### When you run out of ideas
+
+Do not stop early just because the obvious hypotheses are exhausted. Before
+ending a batch:
+
+- Re-read the target skill's related skills for patterns worth borrowing.
+- Review eval failures for thematic gaps (are certain prompt types always weak?).
+- Check session logs or past `skill-reflection` outputs for friction that the
+  current skill doesn't address.
+- Try combining two near-miss hypotheses from earlier iterations.
+- Try deletion: remove a section or rule and see if the score holds.
+
+Only end the batch when remaining ideas require scope expansion beyond the
+mutable surface.
 
 ### Phase 7: Promote the Winner
 
@@ -262,8 +317,10 @@ baseline	skill-autoresearch	create	0.00	0.62	0.62	keep	initial draft	structure p
 - Prefer prompt-only skill revisions before adding scripts.
 - Reuse `skill-creator` for benchmark harnesses instead of duplicating them.
 - Log every run, including crashes and dead ends.
-- Do not commit or reset git unless the user explicitly asks for git actions.
-- Use snapshots or workspace copies when you need safe reverts.
+- Use workspace snapshots (iteration directories) as the default revert
+  mechanism. Git commits and resets are optional — use them only if the user
+  explicitly sets up a dedicated branch for the experiment.
+- Do not commit to the main working branch without the user's approval.
 - Treat human judgment as part of the control plane, not an afterthought.
 - Only promote README and registry changes after the skill proves value.
 - If the skill duplicates an existing one, stop and narrow the scope instead of
