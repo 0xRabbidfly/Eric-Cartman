@@ -29,6 +29,8 @@ if exist "%USERPROFILE%\.local\bin\claude.exe" (
 )
 
 echo.>> "%LOG%"
+echo [%date% %time%] Starting Tailscale Funnel on port 3838 >> "%LOG%"
+start /min "" tailscale funnel 3838
 echo [%date% %time%] Starting Remote Skills API from "%ROOT%" >> "%LOG%"
 if defined CLAUDE_PATH echo [%date% %time%] CLAUDE_PATH="%CLAUDE_PATH%" >> "%LOG%"
 

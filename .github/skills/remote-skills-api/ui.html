@@ -481,7 +481,8 @@
       <h1>Skills</h1>
     </div>
     <div class="header-actions">
-      <button class="icon-btn" onclick="openDrawer()" title="Skills">⚡</button>
+      <button class="icon-btn" onclick="openDrawer('oss')" title="Public Skills">🌐</button>
+      <button class="icon-btn" onclick="openDrawer('personal')" title="Private Skills">🔒</button>
       <button class="icon-btn" onclick="promptSetToken()" title="Set API Token">🔑</button>
       <button class="icon-btn" onclick="restartServer()" title="Restart Server">🔁</button>
       <button class="icon-btn" onclick="cancelRequest()" title="Cancel">✕</button>
@@ -492,7 +493,7 @@
   <div id="drawerOverlay" class="drawer-overlay" onclick="closeDrawer()"></div>
   <div id="drawer" class="drawer">
     <div class="drawer-handle"></div>
-    <div class="drawer-title">Available Skills</div>
+    <div id="drawerTitle" class="drawer-title">Available Skills</div>
     <div id="skillList" class="skill-list"></div>
   </div>
 
@@ -693,8 +694,11 @@
       updateSessionId(res.headers.get('X-Session-ID'));
       if (res.status === 401) {
         localStorage.removeItem('skills_api_token');
-        showToast('Invalid API secret. Reloading...', 'error', 1200);
-        setTimeout(() => location.reload(), 1200);
+        API_TOKEN = '';
+        if (!promptForTokenOnLoad) {
+          showToast('Session expired. Enter API secret.', 'error', 1500);
+          setTimeout(() => promptSetToken(), 1500);
+        }
         throw new Error('Unauthorized');
       }
       const data = await res.json().catch(() => ({}));
@@ -743,7 +747,8 @@
 
     function renderSkillList() {
       const el = document.getElementById('skillList');
-      el.innerHTML = skills.map(s => `
+      const filtered = drawerFilter ? skills.filter(s => s.source === drawerFilter) : skills;
+      el.innerHTML = filtered.map(s => `
         <div class="skill-item ${activeSkill === s.name ? 'active' : ''}" onclick="selectSkill('${s.name}')">
           <div class="skill-icon">${skillIcon(s.name)}</div>
           <div class="skill-info">
@@ -787,7 +792,12 @@
     }
 
     // ── Drawer ──
-    function openDrawer() {
+    let drawerFilter = null;
+    function openDrawer(filter) {
+      drawerFilter = filter || null;
+      const title = filter === 'personal' ? '🔒 Private Skills' : filter === 'oss' ? '🌐 Public Skills' : 'Available Skills';
+      document.getElementById('drawerTitle').textContent = title;
+      renderSkillList();
       document.getElementById('drawer').classList.add('open');
       document.getElementById('drawerOverlay').classList.add('open');
     }
@@ -1224,11 +1234,14 @@
 
     // ── Init ──
     wireModal();
-    loadSkills();
     if (promptForTokenOnLoad) {
-      setTimeout(() => {
-        promptSetToken();
+      // No token yet — show prompt first, then load skills after
+      setTimeout(async () => {
+        await promptSetToken();
+        if (API_TOKEN) loadSkills();
       }, 150);
+    } else {
+      loadSkills();
     }
   </script>
 </body>
