@@ -1,3 +1,14 @@
+---
+name: insights-report
+description: Generate a comprehensive cross-session insights report from session logs in .github/sessions/. Surfaces patterns, friction points, and workflow improvements. Use when user says "insights report", "session analysis", "what's working", "retrospective", or "weekly review".
+argument-hint: (no args) | --from 2026-02-01 --to 2026-02-09
+user-invocable: true
+disable-model-invocation: false
+metadata:
+  author: 0xrabbidfly
+  version: "1.0.0"
+---
+
 # Insights Report Skill
 
 Generate a comprehensive insights report by analyzing all captured session logs.

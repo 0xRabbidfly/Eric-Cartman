@@ -1,3 +1,14 @@
+---
+name: session-log
+description: Capture session insights, checkpoints, and end-of-session summaries into .github/sessions/ for later analysis. Use when user says "log this", "session checkpoint", "end session", "session log", or "capture progress".
+argument-hint: checkpoint | end | "free text message to log"
+user-invocable: true
+disable-model-invocation: false
+metadata:
+  author: 0xrabbidfly
+  version: "1.0.0"
+---
+
 # Session Log Skill
 
 Capture session insights and metrics for later analysis.
