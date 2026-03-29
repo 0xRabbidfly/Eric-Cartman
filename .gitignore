@@ -89,17 +89,8 @@ private/
 notes/
 scratch/
 
-# RBC Banking - entire folder (contains sensitive credentials and automation)
-.claude/skills/rbc-banking/
-
-# Used Car Search - private skill with API keys and results
-.claude/skills/used-car-search/
-
-# Zehrs Grocery - private skill
-.claude/skills/zehrs-grocery/
-
-# Teams Daily Digest - contains PII and internal channel names
-.claude/skills/teams-daily-digest/
+# Private skills (backed up to separate private repo)
+.claude/skills/
 
 # Portugal Lawyer
 .github/agents/portuguese-lawyer.md
