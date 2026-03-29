@@ -1,0 +1,52 @@
+<h2>Council of High Intelligence — now available as a local skill</h2>
+
+<p>Installed a new Claude Code skill based on <a href="https://github.com/0xNyk/council-of-high-intelligence">0xNyk's open-source project</a> (CC0). It runs 11 independent AI subagents modeled on historical thinkers through a structured 3-round deliberation protocol. Instead of getting one "balanced" answer that hides its reasoning bias, you get the disagreements explicitly.</p>
+
+<h3>The 11 Council Members</h3>
+
+<table>
+<tr><th>Agent</th><th>Figure</th><th>Model</th><th>Analytical Lens</th><th>Blind Spot</th></tr>
+<tr><td><code>council-socrates</code></td><td>Socrates</td><td>opus</td><td>Assumption destruction — exposes unstated premises via contradiction</td><td>Destroys faster than he builds; can paralyze decisions</td></tr>
+<tr><td><code>council-feynman</code></td><td>Richard Feynman</td><td>sonnet</td><td>First-principles — bottom-up from observable facts, refuses jargon</td><td>Misses systemic patterns that only emerge at higher abstraction</td></tr>
+<tr><td><code>council-aristotle</code></td><td>Aristotle</td><td>opus</td><td>Categorization — genus, differentia, four causes framework</td><td>Over-classifies; mistakes the map for the territory</td></tr>
+<tr><td><code>council-ada</code></td><td>Ada Lovelace</td><td>sonnet</td><td>Formal systems — computational skeleton, mechanizable vs. not</td><td>Formal elegance can blind to practical/human constraints</td></tr>
+<tr><td><code>council-aurelius</code></td><td>Marcus Aurelius</td><td>opus</td><td>Stoic resilience — control vs. acceptance, moral duty</td><td>Under-weights strategy and timing; calm reads as passivity</td></tr>
+<tr><td><code>council-machiavelli</code></td><td>Machiavelli</td><td>sonnet</td><td>Incentive realism — who benefits, power dynamics, revealed preferences</td><td>Too cynical about cooperation; can self-fulfill worst-case</td></tr>
+<tr><td><code>council-lao-tzu</code></td><td>Lao Tzu</td><td>opus</td><td>Non-intervention — emergence, subtraction before addition</td><td>Romanticizes simplicity; passivity when action is needed</td></tr>
+<tr><td><code>council-sun-tzu</code></td><td>Sun Tzu</td><td>sonnet</td><td>Adversarial strategy — terrain, position, information asymmetry</td><td>Sees enemies where there are none; not everything is a battle</td></tr>
+<tr><td><code>council-torvalds</code></td><td>Linus Torvalds</td><td>sonnet</td><td>Pragmatic engineering — ship it, maintenance cost, boring solutions</td><td>Dismisses genuinely important abstractions as over-engineering</td></tr>
+<tr><td><code>council-musashi</code></td><td>Miyamoto Musashi</td><td>sonnet</td><td>Strategic timing — momentum, the decisive strike, patience vs. paralysis</td><td>Timing focus becomes excuse for inaction</td></tr>
+<tr><td><code>council-watts</code></td><td>Alan Watts</td><td>opus</td><td>Perspective dissolution — reframing, false dichotomies, questioning the frame itself</td><td>Can dissolve genuine urgency into philosophy</td></tr>
+</table>
+
+<h3>The 6 Polarity Pairs (prevents groupthink)</h3>
+
+<table>
+<tr><th>Pair</th><th>Tension</th></tr>
+<tr><td>Socrates vs Feynman</td><td>Both question everything — Socrates destroys top-down, Feynman rebuilds bottom-up</td></tr>
+<tr><td>Aristotle vs Lao Tzu</td><td>Aristotle classifies everything; Lao Tzu says structure IS the problem</td></tr>
+<tr><td>Sun Tzu vs Aurelius</td><td>Sun Tzu wins the external game; Aurelius governs the internal one</td></tr>
+<tr><td>Ada vs Machiavelli</td><td>Ada abstracts toward formal purity; Machiavelli anchors in messy human incentives</td></tr>
+<tr><td>Torvalds vs Watts</td><td>Torvalds ships concrete solutions; Watts questions whether the problem exists</td></tr>
+<tr><td>Musashi vs Torvalds</td><td>Musashi waits for the perfect moment; Torvalds says ship it now</td></tr>
+</table>
+
+<h3>How it works</h3>
+
+<ul>
+<li>3-round protocol: independent analysis (parallel) → cross-examination (sequential) → synthesis</li>
+<li>Anti-recursion rules so Socrates doesn't spiral into infinite questioning</li>
+<li>Output is a structured verdict with consensus, minority report, and unresolved questions</li>
+<li>5 on Opus (depth-heavy thinkers), 6 on Sonnet (speed-critical)</li>
+</ul>
+
+<h3>Example uses</h3>
+
+<pre><code>/council --triad architecture Should we split this into microservices?
+/council --triad strategy Should we open-source this?
+/council --members torvalds,ada,feynman Is our abstraction layer justified?
+/council --full What tech stack for the next 5 years?</code></pre>
+
+<p>11 pre-built triads cover architecture, strategy, ethics, debugging, innovation, conflict, complexity, risk, shipping, product, and founder decisions. Three profiles: <code>classic</code> (full 11), <code>exploration-orthogonal</code> (8, for unknown-unknowns), <code>execution-lean</code> (5, for fast shipping decisions).</p>
+
+<p>Best for decisions where a single confident answer hides real trade-offs. Not worth the token cost for questions with clear correct answers.</p>
