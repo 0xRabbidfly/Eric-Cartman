@@ -29,8 +29,17 @@ if exist "%USERPROFILE%\.local\bin\claude.exe" (
 )
 
 echo.>> "%LOG%"
-echo [%date% %time%] Starting Tailscale Funnel on port 3838 >> "%LOG%"
-start /min "" tailscale funnel 3838
+echo [%date% %time%] Resetting stale Tailscale serve/funnel config >> "%LOG%"
+tailscale serve reset >> "%LOG%" 2>&1
+tailscale funnel reset >> "%LOG%" 2>&1
+echo [%date% %time%] Starting Tailscale Funnel on port 3838 (background) >> "%LOG%"
+tailscale funnel --bg 3838 >> "%LOG%" 2>&1
+if errorlevel 1 (
+	echo [%date% %time%] WARNING: Tailscale Funnel failed to start >> "%LOG%"
+) else (
+	echo [%date% %time%] Tailscale Funnel active >> "%LOG%"
+)
+
 echo [%date% %time%] Starting Remote Skills API from "%ROOT%" >> "%LOG%"
 if defined CLAUDE_PATH echo [%date% %time%] CLAUDE_PATH="%CLAUDE_PATH%" >> "%LOG%"
 

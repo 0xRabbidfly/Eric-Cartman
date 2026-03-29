@@ -191,6 +191,11 @@ function getScopedHistory(sess, scope) {
 function prepareSessionContext(sess, scope) {
   const previousScope = sess.contextScope || GENERAL_SCOPE;
   if (previousScope !== scope) {
+    // Leaving a browser skill scope — shut down Playwright
+    if (BROWSER_SKILLS.has(previousScope) && isPlaywrightRunning()) {
+      console.log(`[Playwright] Scope changed from "${previousScope}" → "${scope}" — stopping browser`);
+      stopPlaywright();
+    }
     return resetSessionContext(sess, scope, `scope changed: ${previousScope} -> ${scope}`);
   }
   if (isContextExpired(sess)) {
@@ -320,6 +325,106 @@ function auth(req, res, next) {
 // Claude CLI Runner (queue-based, one at a time)
 // ---------------------------------------------------------------------------
 
+// Skills that require a browser (Playwright MCP via HTTP).
+// These get an on-demand Playwright server that starts when the skill is
+// first invoked and stops when the skill scope ends or goes idle.
+const BROWSER_SKILLS = new Set([
+  'rbc-banking', 'zehrs-grocery', 'used-car-search',
+]);
+
+// On-demand Playwright MCP server management
+const PLAYWRIGHT_PORT = 3939;
+const PLAYWRIGHT_CLI = path.join(PROJECT_DIR, '.claude', 'skills', 'rbc-banking', 'node_modules', '@playwright', 'mcp', 'cli.js');
+const STEALTH_INIT = path.join(PROJECT_DIR, '.claude', 'skills', 'rbc-banking', 'stealth-init.js');
+let playwrightProc = null;
+let playwrightIdleTimer = null;
+const PLAYWRIGHT_IDLE_MS = 5 * 60 * 1000; // Kill after 5 min of inactivity
+
+function isPlaywrightRunning() {
+  return playwrightProc && !playwrightProc.killed;
+}
+
+async function ensurePlaywright() {
+  if (isPlaywrightRunning()) {
+    resetPlaywrightIdleTimer();
+    return true;
+  }
+  if (!fs.existsSync(PLAYWRIGHT_CLI)) {
+    console.error('[Playwright] CLI not found at', PLAYWRIGHT_CLI);
+    return false;
+  }
+  console.log('[Playwright] Starting on-demand server on port', PLAYWRIGHT_PORT);
+  playwrightProc = spawn('node', [
+    PLAYWRIGHT_CLI,
+    '--port', String(PLAYWRIGHT_PORT),
+    '--no-sandbox',
+    '--user-data-dir', 'C:/Playwright-Profile',
+    '--init-script', STEALTH_INIT.replace(/\\/g, '/'),
+    '--shared-browser-context',
+  ], {
+    cwd: PROJECT_DIR,
+    stdio: ['ignore', 'pipe', 'pipe'],
+    detached: false,
+  });
+  playwrightProc.stdout.on('data', d => {
+    const msg = d.toString().trim();
+    if (msg) console.log(`[Playwright] ${msg}`);
+  });
+  playwrightProc.stderr.on('data', d => {
+    const msg = d.toString().trim();
+    if (msg) console.warn(`[Playwright:err] ${msg}`);
+  });
+  playwrightProc.on('close', code => {
+    console.log(`[Playwright] Server exited (code ${code})`);
+    playwrightProc = null;
+  });
+  // Wait for it to be ready
+  for (let i = 0; i < 20; i++) {
+    await new Promise(r => setTimeout(r, 500));
+    try {
+      const res = await fetch(`http://localhost:${PLAYWRIGHT_PORT}/mcp`, { method: 'OPTIONS' });
+      if (res.ok || res.status === 405 || res.status === 400) {
+        console.log('[Playwright] Server ready');
+        resetPlaywrightIdleTimer();
+        return true;
+      }
+    } catch {}
+  }
+  console.error('[Playwright] Server failed to start within 10s');
+  stopPlaywright();
+  return false;
+}
+
+function stopPlaywright() {
+  if (playwrightIdleTimer) { clearTimeout(playwrightIdleTimer); playwrightIdleTimer = null; }
+  if (playwrightProc && !playwrightProc.killed) {
+    console.log('[Playwright] Stopping server');
+    try { playwrightProc.kill('SIGTERM'); } catch {}
+    playwrightProc = null;
+  }
+}
+
+function resetPlaywrightIdleTimer() {
+  if (playwrightIdleTimer) clearTimeout(playwrightIdleTimer);
+  playwrightIdleTimer = setTimeout(() => {
+    console.log(`[Playwright] Idle for ${PLAYWRIGHT_IDLE_MS / 1000}s — shutting down`);
+    stopPlaywright();
+  }, PLAYWRIGHT_IDLE_MS);
+}
+
+function getMcpConfig(skillName) {
+  const browserMcp = path.join(PROJECT_DIR, '.mcp-browser.json');
+  const defaultMcp = path.join(PROJECT_DIR, '.mcp.json');
+  if (skillName && BROWSER_SKILLS.has(skillName) && fs.existsSync(browserMcp)) {
+    console.log(`[MCP] Browser skill "${skillName}" → .mcp-browser.json`);
+    return browserMcp.replace(/\\/g, '/');
+  }
+  if (fs.existsSync(defaultMcp)) {
+    return defaultMcp.replace(/\\/g, '/');
+  }
+  return null;
+}
+
 let requestQueue = [];
 let isProcessing = false;
 let currentGoal   = '';
@@ -355,6 +460,7 @@ function scheduleRestart(reason) {
   if (restartScheduled) return;
   restartScheduled = true;
   console.log(`[Admin] Restart requested: ${reason}`);
+  stopPlaywright();
 
   const exitWithRestartCode = () => {
     console.log(`[Admin] Exiting with restart code ${RESTART_EXIT_CODE}`);
@@ -375,7 +481,13 @@ function scheduleRestart(reason) {
 /**
  * Run Claude CLI once and return the full result text.
  */
-function runClaude(prompt, opts = {}) {
+async function runClaude(prompt, opts = {}) {
+  // Start Playwright on-demand for browser skills
+  if (opts.skill && BROWSER_SKILLS.has(opts.skill)) {
+    const ok = await ensurePlaywright();
+    if (!ok) throw new Error('Failed to start Playwright browser server');
+  }
+
   return new Promise((resolve, reject) => {
     const model = opts.model || CLAUDE_MODEL;
     const args = [
@@ -388,13 +500,11 @@ function runClaude(prompt, opts = {}) {
 
     if (MAX_BUDGET_USD != null) args.push('--max-budget-usd', String(MAX_BUDGET_USD));
 
-    // If there's an MCP config, reference it
-    const mcpConfig = path.join(PROJECT_DIR, '.mcp.json');
-    if (fs.existsSync(mcpConfig)) {
-      args.push('--mcp-config', mcpConfig.replace(/\\/g, '/'));
-    }
+    // Pick the right MCP config — browser skills get the persistent Playwright SSE server
+    const mcpConfig = opts.mcpConfig || getMcpConfig(opts.skill);
+    if (mcpConfig) args.push('--mcp-config', mcpConfig);
 
-    console.log(`[Claude] ${model} | ${prompt.substring(0, 100)}…`);
+    console.log(`[Claude] ${model}${opts.skill ? ` [${opts.skill}]` : ''} | ${prompt.substring(0, 100)}…`);
     const start = Date.now();
 
     const proc = spawn(CLAUDE_PATH, args, {
@@ -407,16 +517,20 @@ function runClaude(prompt, opts = {}) {
     proc.stdin.end(prompt);
 
     let killTimeout;
-    if (CLAUDE_TIMEOUT_MS > 0) {
-      killTimeout = setTimeout(() => {
-        console.warn(`[Claude] Timeout (${CLAUDE_TIMEOUT_MS / 1000}s) — killing hung process`);
-        try { proc.kill('SIGTERM'); } catch {}
-      }, CLAUDE_TIMEOUT_MS);
-    }
+    const resetTimeout = () => {
+      if (CLAUDE_TIMEOUT_MS > 0) {
+        if (killTimeout) clearTimeout(killTimeout);
+        killTimeout = setTimeout(() => {
+          console.warn(`[Claude] Timeout (${CLAUDE_TIMEOUT_MS / 1000}s since last output) — killing hung process`);
+          try { proc.kill('SIGTERM'); } catch {}
+        }, CLAUDE_TIMEOUT_MS);
+      }
+    };
+    resetTimeout();
 
     let stdout = '', stderr = '';
-    proc.stdout.on('data', d => stdout += d);
-    proc.stderr.on('data', d => stderr += d);
+    proc.stdout.on('data', d => { stdout += d; resetTimeout(); if (isPlaywrightRunning()) resetPlaywrightIdleTimer(); });
+    proc.stderr.on('data', d => { stderr += d; resetTimeout(); if (isPlaywrightRunning()) resetPlaywrightIdleTimer(); });
 
     proc.on('close', code => {
       if (killTimeout) clearTimeout(killTimeout);
@@ -444,7 +558,13 @@ function runClaude(prompt, opts = {}) {
  * Calls onEvent(event) for each parsed event.
  * Returns a promise that resolves with the final result text.
  */
-function runClaudeStreaming(prompt, onEvent, opts = {}) {
+async function runClaudeStreaming(prompt, onEvent, opts = {}) {
+  // Start Playwright on-demand for browser skills
+  if (opts.skill && BROWSER_SKILLS.has(opts.skill)) {
+    const ok = await ensurePlaywright();
+    if (!ok) throw new Error('Failed to start Playwright browser server');
+  }
+
   return new Promise((resolve, reject) => {
     const model = opts.model || CLAUDE_MODEL;
     const args = [
@@ -458,12 +578,11 @@ function runClaudeStreaming(prompt, onEvent, opts = {}) {
 
     if (MAX_BUDGET_USD != null) args.push('--max-budget-usd', String(MAX_BUDGET_USD));
 
-    const mcpConfig = path.join(PROJECT_DIR, '.mcp.json');
-    if (fs.existsSync(mcpConfig)) {
-      args.push('--mcp-config', mcpConfig.replace(/\\/g, '/'));
-    }
+    // Pick the right MCP config — browser skills get the persistent Playwright SSE server
+    const mcpConfig = opts.mcpConfig || getMcpConfig(opts.skill);
+    if (mcpConfig) args.push('--mcp-config', mcpConfig);
 
-    console.log(`[Claude:stream] ${model} | ${prompt.substring(0, 100)}…`);
+    console.log(`[Claude:stream] ${model}${opts.skill ? ` [${opts.skill}]` : ''} | ${prompt.substring(0, 100)}…`);
     const start = Date.now();
 
     const proc = spawn(CLAUDE_PATH, args, {
@@ -476,13 +595,17 @@ function runClaudeStreaming(prompt, onEvent, opts = {}) {
     proc.stdin.end(prompt);
 
     let killTimeout;
-    if (CLAUDE_TIMEOUT_MS > 0) {
-      killTimeout = setTimeout(() => {
-        console.warn(`[Claude:stream] Timeout (${CLAUDE_TIMEOUT_MS / 1000}s) — killing hung process`);
-        try { proc.kill('SIGTERM'); } catch {}
-        onEvent({ type: 'error', code: 'timeout', error: `Request timed out after ${CLAUDE_TIMEOUT_MS / 1000}s` });
-      }, CLAUDE_TIMEOUT_MS);
-    }
+    const resetTimeout = () => {
+      if (CLAUDE_TIMEOUT_MS > 0) {
+        if (killTimeout) clearTimeout(killTimeout);
+        killTimeout = setTimeout(() => {
+          console.warn(`[Claude:stream] Timeout (${CLAUDE_TIMEOUT_MS / 1000}s since last output) — killing hung process`);
+          try { proc.kill('SIGTERM'); } catch {}
+          onEvent({ type: 'error', code: 'timeout', error: `Request timed out after ${CLAUDE_TIMEOUT_MS / 1000}s of inactivity` });
+        }, CLAUDE_TIMEOUT_MS);
+      }
+    };
+    resetTimeout();
 
     let stderr = '';
     let buffer = '';
@@ -490,6 +613,8 @@ function runClaudeStreaming(prompt, onEvent, opts = {}) {
     let toolCallCount = 0;
 
     proc.stdout.on('data', chunk => {
+      resetTimeout();
+      if (isPlaywrightRunning()) resetPlaywrightIdleTimer();
       buffer += chunk.toString();
       // Process complete lines
       const lines = buffer.split('\n');
@@ -838,7 +963,7 @@ app.post('/api/chat', auth, async (req, res) => {
         return runClaudeStreaming(prompt, (evt) => {
           // Forward each streaming event to the client
           try { res.write(`data: ${JSON.stringify(evt)}\n\n`); } catch {}
-        });
+        }, { skill: resolved.skill });
       });
       appendHistory(sess, 'assistant', result);
       sess.contextLastActivity = Date.now();
@@ -862,7 +987,7 @@ app.post('/api/chat', auth, async (req, res) => {
       appendHistory(sess, 'user', message);
       sess.contextLastActivity = Date.now();
       saveSessions();
-      const result = await enqueue(() => runClaude(prompt));
+      const result = await enqueue(() => runClaude(prompt, { skill: resolved.skill }));
       appendHistory(sess, 'assistant', result);
       sess.contextLastActivity = Date.now();
       saveSessions();
@@ -927,7 +1052,7 @@ app.get('/api/chat/stream', auth, async (req, res) => {
     const result = await enqueue(() => {
       return runClaudeStreaming(prompt, (evt) => {
         try { res.write(`data: ${JSON.stringify(evt)}\n\n`); } catch {}
-      });
+      }, { skill: resolved.skill });
     });
     appendHistory(sess, 'assistant', result);
     sess.contextLastActivity = Date.now();
@@ -966,7 +1091,7 @@ app.post('/api/invoke/:skill', auth, async (req, res) => {
   try {
     currentGoal = `/${name} ${(args || '').substring(0, 40)}`;
     appendHistory(sess, 'user', formatInvokeHistoryEntry(name, args));
-    const result = await enqueue(() => runClaude(prompt));
+    const result = await enqueue(() => runClaude(prompt, { skill: name }));
     appendHistory(sess, 'assistant', result);
     res.json({ skill: name, result, sessionId: sess.id });
   } catch (err) {
@@ -1042,6 +1167,19 @@ app.post('/api/cancel', auth, (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
+// Serve static reports (HTML files in project root)
+// ---------------------------------------------------------------------------
+app.get('/report/:filename', (req, res) => {
+  const filename = path.basename(req.params.filename); // prevent path traversal
+  const reportPath = path.join(__dirname, '..', '..', '..', filename);
+  if (fs.existsSync(reportPath) && filename.endsWith('.html')) {
+    res.sendFile(reportPath);
+  } else {
+    res.status(404).send('<h1>Report not found</h1>');
+  }
+});
+
+// ---------------------------------------------------------------------------
 // Serve the UI
 // ---------------------------------------------------------------------------
 app.get('/', (req, res) => {
@@ -1057,6 +1195,12 @@ app.get('/', (req, res) => {
 // Start
 // ---------------------------------------------------------------------------
 serverHandle = app.listen(PORT, '0.0.0.0', () => {
+  // Disable Node.js default request timeout (300s) — Claude handles its own timeout
+  serverHandle.timeout = 0;
+  serverHandle.requestTimeout = 0;
+  serverHandle.headersTimeout = 0;
+  serverHandle.keepAliveTimeout = 0;
+
   console.log('');
   console.log(`🚀  Remote Skills API running on port ${PORT}`);
   console.log(`📍  Local:     http://localhost:${PORT}`);
