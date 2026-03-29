@@ -81,16 +81,6 @@ mcp-servers/
 *.bak
 *.backup
 
-# Ephemeral skill run snapshots (debug artifacts)
-cart-*.md
-snap*.md
-lists-*.md
-zehrs-state.md
-product-page.md
-checkout*.md
-staples-list*.md
-whatsapp-qr.png
-
 # MCP browser config (local server setup)
 .mcp-browser.json
 
