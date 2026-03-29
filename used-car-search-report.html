@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Used Car Search: Outback &amp; Rogue | March 28, 2026</title>
+<style>
+  :root {
+    --bg: #0f172a; --surface: #1e293b; --card: #334155;
+    --text: #e2e8f0; --muted: #94a3b8; --accent: #38bdf8;
+    --green: #4ade80; --yellow: #fbbf24; --red: #f87171;
+    --blue: #60a5fa; --purple: #a78bfa;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; padding: 12px; }
+  h1 { font-size: 1.4rem; color: var(--accent); margin-bottom: 4px; }
+  h2 { font-size: 1.15rem; color: var(--blue); margin: 20px 0 10px; border-bottom: 1px solid var(--card); padding-bottom: 6px; }
+  h3 { font-size: 1rem; color: var(--purple); margin: 14px 0 8px; }
+  .meta { color: var(--muted); font-size: 0.82rem; margin-bottom: 16px; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; margin-bottom: 16px; }
+  .stat { background: var(--surface); border-radius: 8px; padding: 10px; text-align: center; }
+  .stat .num { font-size: 1.5rem; font-weight: 700; color: var(--accent); }
+  .stat .label { font-size: 0.75rem; color: var(--muted); }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 0.7rem; font-weight: 600; }
+  .badge-private { background: #065f46; color: #6ee7b7; }
+  .badge-dealer { background: #713f12; color: #fcd34d; }
+  .badge-deal { background: #064e3b; color: #34d399; }
+  .badge-fair { background: #1e3a5f; color: #93c5fd; }
+  .badge-high { background: #7f1d1d; color: #fca5a5; }
+  .badge-outback { background: #312e81; color: #a5b4fc; }
+  .badge-rogue { background: #581c87; color: #d8b4fe; }
+  .score-bar { height: 6px; border-radius: 3px; background: var(--card); overflow: hidden; margin-top: 4px; }
+  .score-fill { height: 100%; border-radius: 3px; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.8rem; margin-bottom: 16px; }
+  th { background: var(--surface); color: var(--muted); text-align: left; padding: 8px 6px; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; position: sticky; top: 0; }
+  td { padding: 8px 6px; border-bottom: 1px solid rgba(255,255,255,0.05); vertical-align: top; }
+  tr:hover td { background: rgba(56, 189, 248, 0.05); }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .card { background: var(--surface); border-radius: 10px; padding: 14px; margin-bottom: 12px; border-left: 3px solid var(--accent); }
+  .card.gold { border-left-color: var(--yellow); }
+  .card.green { border-left-color: var(--green); }
+  .card .title { font-weight: 700; font-size: 0.95rem; }
+  .card .detail { color: var(--muted); font-size: 0.8rem; margin-top: 4px; }
+  .pills { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px; }
+  @media (max-width: 600px) {
+    .grid2 { grid-template-columns: 1fr; }
+    table { font-size: 0.72rem; }
+    th, td { padding: 6px 4px; }
+  }
+  .nowrap { white-space: nowrap; }
+  .rank { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; font-weight: 700; font-size: 0.75rem; }
+  .rank-1 { background: var(--yellow); color: #000; }
+  .rank-2 { background: #9ca3af; color: #000; }
+  .rank-3 { background: #b45309; color: #fff; }
+  .rank-n { background: var(--card); color: var(--muted); }
+</style>
+</head>
+<body>
+
+<h1>Used Car Search: Subaru Outback &amp; Nissan Rogue</h1>
+<p class="meta">Generated March 28, 2026 | 250 km from Newmarket, ON | AWD only | Private sale preferred | Relaxed: 2015+, &le;$32k, &le;140k km</p>
+
+<div class="stats">
+  <div class="stat"><div class="num">27</div><div class="label">Total Listings</div></div>
+  <div class="stat"><div class="num">10</div><div class="label">Outbacks</div></div>
+  <div class="stat"><div class="num">17</div><div class="label">Rogues</div></div>
+  <div class="stat"><div class="num">6</div><div class="label">Private Sellers</div></div>
+  <div class="stat"><div class="num">$17,000</div><div class="label">Lowest Price</div></div>
+  <div class="stat"><div class="num">$21,650</div><div class="label">Avg Price</div></div>
+</div>
+
+<!-- TOP PICKS -->
+<h2>Top Recommendations</h2>
+
+<div class="grid2">
+  <div class="card gold">
+    <div class="title">Best Overall Value</div>
+    <div class="detail">2019 Nissan Rogue SV TECH AWD &mdash; $18,480 | 83,987 km</div>
+    <div class="detail">Panoramic moonroof, 360 camera, navigation. Reasonable km for the year. Stouffville Nissan &mdash; close to Newmarket.</div>
+    <div class="pills"><span class="badge badge-rogue">Rogue</span> <span class="badge badge-dealer">Dealer</span> <span class="badge badge-deal">-14% below market</span></div>
+  </div>
+  <div class="card green">
+    <div class="title">Best Private Seller Deal</div>
+    <div class="detail">2018 Nissan Rogue SL AWD &mdash; $20,000 | 76,600 km</div>
+    <div class="detail">Low km, no accidents, winter tires included. North York. SL = top trim with leather, nav, Bose audio.</div>
+    <div class="pills"><span class="badge badge-rogue">Rogue</span> <span class="badge badge-private">Private</span> <span class="badge badge-deal">-7% below market</span></div>
+  </div>
+  <div class="card gold">
+    <div class="title">Best Budget Outback</div>
+    <div class="detail">2019 Subaru Outback Touring &mdash; $17,880 | 139,857 km</div>
+    <div class="detail">Lowest price Outback. No accident, AWD, CarPlay. Higher mileage but solid. Needs cert ($899 extra).</div>
+    <div class="pills"><span class="badge badge-outback">Outback</span> <span class="badge badge-dealer">Dealer</span> <span class="badge badge-deal">-17% below market</span></div>
+  </div>
+  <div class="card">
+    <div class="title">Best Low-KM Rogue</div>
+    <div class="detail">2020 Nissan Rogue S AWD &mdash; $18,990 | 79,348 km</div>
+    <div class="detail">One owner, clean CarFax, heated steering wheel. Strong balance of price and condition.</div>
+    <div class="pills"><span class="badge badge-rogue">Rogue</span> <span class="badge badge-dealer">Dealer</span> <span class="badge badge-deal">-9% below market</span></div>
+  </div>
+</div>
+
+<!-- SUBARU OUTBACK SECTION -->
+<h2>Subaru Outback <span class="badge badge-outback">32.5 cu ft cargo | Symmetrical AWD</span></h2>
+
+<table>
+<thead>
+<tr><th>#</th><th>Score</th><th>Year</th><th>Trim</th><th>Price</th><th>KM</th><th>Market</th><th>Seller</th><th>Accident</th><th>Source</th><th>Link</th></tr>
+</thead>
+<tbody>
+<tr>
+  <td><span class="rank rank-1">1</span></td>
+  <td><strong>76</strong><div class="score-bar"><div class="score-fill" style="width:76%;background:var(--green)"></div></div></td>
+  <td>2019</td><td>Touring</td>
+  <td class="nowrap">$17,880</td><td>139,857</td>
+  <td><span class="badge badge-deal">-17%</span></td>
+  <td><span class="badge badge-dealer">Dealer</span></td>
+  <td>Clean</td>
+  <td>AT</td>
+  <td><a href="https://www.autotrader.ca/cars/subaru/outback/?rcp=0&rcs=20&prx=250&loc=Newmarket%2C+ON&pRng=%2C32000&yRng=2018%2C&oRng=%2C140000&dtn=AWD&srt=35" target="_blank">Search</a></td>
+</tr>
+<tr>
+  <td><span class="rank rank-2">2</span></td>
+  <td><strong>73</strong><div class="score-bar"><div class="score-fill" style="width:73%;background:var(--green)"></div></div></td>
+  <td>2020</td><td>Touring</td>
+  <td class="nowrap">$19,499</td><td>99,210</td>
+  <td><span class="badge badge-deal">-12%</span></td>
+  <td><span class="badge badge-dealer">Dealer</span></td>
+  <td>Repaired*</td>
+  <td>AT</td>
+  <td><a href="https://www.autotrader.ca/cars/subaru/outback/?rcp=0&rcs=20&prx=250&loc=Newmarket%2C+ON&pRng=%2C32000&yRng=2018%2C&oRng=%2C140000&dtn=AWD&srt=35" target="_blank">Search</a></td>
+</tr>
+<tr>
+  <td><span class="rank rank-3">3</span></td>
+  <td><strong>71</strong><div class="score-bar"><div class="score-fill" style="width:71%;background:var(--green)"></div></div></td>
+  <td>2018</td><td>Limited 3.6L</td>
+  <td class="nowrap">$18,888</td><td>135,423</td>
+  <td><span class="badge badge-deal">-9%</span></td>
+  <td><span class="badge badge-dealer">Dealer</span></td>
+  <td>Clean</td>
+  <td>AT</td>
+  <td><a href="https://www.autotrader.ca/cars/subaru/outback/?rcp=0&rcs=20&prx=250&loc=Newmarket%2C+ON&pRng=%2C32000&yRng=2018%2C&oRng=%2C140000&dtn=AWD&srt=35" target="_blank">Search</a></td>
+</tr>
+<tr>
+  <td><span class="rank rank-n">4</span></td>
+  <td><strong>70</strong><div class="score-bar"><div class="score-fill" style="width:70%;background:var(--blue)"></div></div></td>
+  <td>2019</td><td>Touring</td>
+  <td class="nowrap">$19,770</td><td>128,000</td>
+  <td><span class="badge badge-fair">-5%</span></td>
+  <td><span class="badge badge-dealer">Dealer</span></td>
+  <td>Unknown</td>
+  <td>AT</td>
+  <td><a href="https://www.autotrader.ca/cars/subaru/outback/?rcp=0&rcs=20&prx=250&loc=Newmarket%2C+ON&pRng=%2C32000&yRng=2018%2C&oRng=%2C140000&dtn=AWD&srt=35" target="_blank">Search</a></td>
+</tr>
+<tr>
+  <td><span class="rank rank-n">5</span></td>
+  <td><strong>69</strong><div class="score-bar"><div class="score-fill" style="width:69%;background:var(--blue)"></div></div></td>
+  <td>2018</td><td>Limited AWD</td>
+  <td class="nowrap">$19,800</td><td>123,506</td>
+  <td><span class="badge badge-fair">-4%</span></td>
+  <td><span class="badge badge-dealer">Dealer</span></td>
+  <td>Unknown</td>
+  <td>AT</td>
+  <td><a href="https://www.autotrader.ca/cars/subaru/outback/?rcp=0&rcs=20&prx=250&loc=Newmarket%2C+ON&pRng=%2C32000&yRng=2018%2C&oRng=%2C140000&dtn=AWD&srt=35" target="_blank">Search</a></td>
+</tr>
+<tr>
+  <td><span class="rank rank-n">6</span></td>
+  <td><strong>68</strong><div class="score-bar"><div class="score-fill" style="width:68%;background:var(--blue)"></div></div></td>
+  <td>2019</td><td>Touring</td>
+  <td class="nowrap">$20,369</td><td>104,709</td>
+  <td><span class="badge badge-fair">-2%</span></td>
+  <td><span class="badge badge-dealer">Dealer</span></td>
+  <td>Unknown</td>
+  <td>AT</td>
+  <td><a href="https://www.autotrader.ca/cars/subaru/outback/?rcp=0&rcs=20&prx=250&loc=Newmarket%2C+ON&pRng=%2C32000&yRng=2018%2C&oRng=%2C140000&dtn=AWD&srt=35" target="_blank">Search</a></td>
+</tr>
+<tr>
+  <td><span class="rank rank-n">7</span></td>
+  <td><strong>72</strong><div class="score-bar"><div class="score-fill" style="width:72%;background:var(--green)"></div></div></td>
+  <td>2020</td><td>Full Pkg</td>
+  <td class="nowrap">$28,550</td><td>98,820</td>
+  <td><span class="badge badge-high">+10%</span></td>
+  <td><span class="badge badge-private">Private</span></td>
+  <td>Unknown</td>
+  <td>Kijiji</td>
+  <td><a href="https://www.kijiji.ca/v-cars-trucks/oakville-halton-region/2020-subaru-outback-for-sale/1735084992" target="_blank">View</a></td>
+</tr>
+<tr>
+  <td><span class="rank rank-n">8</span></td>
+  <td><strong>64</strong><div class="score-bar"><div class="score-fill" style="width:64%;background:var(--blue)"></div></div></td>
+  <td>2023</td><td>Convenience</td>
+  <td class="nowrap">$22,999</td><td>136,695</td>
+  <td><span class="badge badge-deal">-15%</span></td>
+  <td><span class="badge badge-dealer">Dealer</span></td>
+  <td>Clean</td>
+  <td>AT</td>
+  <td><a href="https://www.autotrader.ca/cars/subaru/outback/?rcp=0&rcs=20&prx=250&loc=Newmarket%2C+ON&pRng=%2C32000&yRng=2018%2C&oRng=%2C140000&dtn=AWD&srt=35" target="_blank">Search</a></td>
+</tr>
+<tr>
+  <td><span class="rank rank-n">9</span></td>
+  <td><strong>62</strong><div class="score-bar"><div class="score-fill" style="width:62%;background:var(--blue)"></div></div></td>
+  <td>2022</td><td>Touring</td>
+  <td class="nowrap">$23,750</td><td>128,034</td>
+  <td><span class="badge badge-fair">-3%</span></td>
+  <td><span class="badge badge-dealer">Dealer</span></td>
+  <td>Unknown</td>
+  <td>AT</td>
+  <td><a href="https://www.autotrader.ca/cars/subaru/outback/?rcp=0&rcs=20&prx=250&loc=Newmarket%2C+ON&pRng=%2C32000&yRng=2018%2C&oRng=%2C140000&dtn=AWD&srt=35" target="_blank">Search</a></td>
+</tr>
+<tr>
+  <td><span class="rank rank-n">10</span></td>
+  <td><strong>58</strong><div class="score-bar"><div class="score-fill" style="width:58%;background:var(--yellow)"></div></div></td>
+  <td>2022</td><td>Limited</td>
+  <td class="nowrap">$26,384</td><td>99,677</td>
+  <td><span class="badge badge-fair">+2%</span></td>
+  <td><span class="badge badge-dealer">Dealer</span></td>
+  <td>Clean</td>
+  <td>AT</td>
+  <td><a href="https://www.autotrader.ca/cars/subaru/outback/?rcp=0&rcs=20&prx=250&loc=Newmarket%2C+ON&pRng=%2C32000&yRng=2018%2C&oRng=%2C140000&dtn=AWD&srt=35" target="_blank">Search</a></td>
+</tr>
+</tbody>
+</table>
+
+<!-- NISSAN ROGUE SECTION -->
+<h2>Nissan Rogue <span class="badge badge-rogue">36.5 cu ft cargo | Intelligent AWD</span></h2>
+
+<table>
+<thead>
+<tr><th>#</th><th>Score</th><th>Year</th><th>Trim</th><th>Price</th><th>KM</th><th>Market</th><th>Seller</th><th>Accident</th><th>Source</th><th>Link</th></tr>
+</thead>
+<tbody>
+<tr>
+  <td><span class="rank rank-1">1</span></td>
+  <td><strong>82</strong><div class="score-bar"><div class="score-fill" style="width:82%;background:var(--green)"></div></div></td>
+  <td>2019</td><td>SV TECH AWD</td>
+  <td class="nowrap">$18,480</td><td>83,987</td>
+  <td><span class="badge badge-deal">-14%</span></td>
+  <td><span class="badge badge-dealer">Dealer</span></td>
+  <td>Unknown</td>
+  <td>AT</td>
+  <td><a href="https://www.autotrader.ca/cars/nissan/rogue/?rcp=0&rcs=20&prx=250&loc=Newmarket%2C+ON&pRng=%2C32000&yRng=2018%2C&oRng=%2C140000&dtn=AWD&srt=35" target="_blank">Search</a></td>
+</tr>
+<tr>
+  <td><span class="rank rank-2">2</span></td>
+  <td><strong>80</strong><div class="score-bar"><div class="score-fill" style="width:80%;background:var(--green)"></div></div></td>
+  <td>2018</td><td>SL AWD</td>
+  <td class="nowrap">$20,000</td><td>76,600</td>
+  <td><span class="badge badge-deal">-7%</span></td>
+  <td><span class="badge badge-private">Private</span></td>
+  <td>Clean</td>
+  <td>Kijiji</td>
+  <td><a href="https://www.kijiji.ca/v-cars-trucks/city-of-toronto/2018-nissan-rogue-sl-awd-low-km-no-accidents-winter-tires-in/1735036949" target="_blank">View</a></td>
+</tr>
+<tr>
+  <td><span class="rank rank-3">3</span></td>
+  <td><strong>78</strong><div class="score-bar"><div class="score-fill" style="width:78%;background:var(--green)"></div></div></td>
+  <td>2020</td><td>S AWD</td>
+  <td class="nowrap">$18,990</td><td>79,348</td>
+  <td><span class="badge badge-deal">-9%</span></td>
+  <td><span class="badge badge-dealer">Dealer</span></td>
+  <td>Clean</td>
+  <td>AT</td>
+  <td><a href="https://www.autotrader.ca/cars/nissan/rogue/?rcp=0&rcs=20&prx=250&loc=Newmarket%2C+ON&pRng=%2C32000&yRng=2018%2C&oRng=%2C140000&dtn=AWD&srt=35" target="_blank">Search</a></td>
+</tr>
+<tr>
+  <td><span class="rank rank-n">4</span></td>
+  <td><strong>77</strong><div class="score-bar"><div class="score-fill" style="width:77%;background:var(--green)"></div></div></td>
+  <td>2020</td><td>S AWD</td>
+  <td class="nowrap">$18,588</td><td>68,997</td>
+  <td><span class="badge badge-deal">-13%</span></td>
+  <td><span class="badge badge-dealer">Dealer</span></td>
+  <td>Unknown</td>
+  <td>AT</td>
+  <td><a href="https://www.autotrader.ca/cars/nissan/rogue/?rcp=0&rcs=20&prx=250&loc=Newmarket%2C+ON&pRng=%2C32000&yRng=2018%2C&oRng=%2C140000&dtn=AWD&srt=35" target="_blank">Search</a></td>
+</tr>
+<tr>
+  <td><span class="rank rank-n">5</span></td>
+  <td><strong>76</strong><div class="score-bar"><div class="score-fill" style="width:76%;background:var(--green)"></div></div></td>
+  <td>2018</td><td>SV AWD</td>
+  <td class="nowrap">$17,000</td><td>112,493</td>
+  <td><span class="badge badge-deal">-18%</span></td>
+  <td><span class="badge badge-private">Private</span></td>
+  <td>Clean</td>
+  <td>Kijiji</td>
+  <td><a href="https://www.kijiji.ca/v-cars-trucks/windsor-area-on/2018-nissan-rogue-sv-awd/1734012372" target="_blank">View</a></td>
+</tr>
+<tr>
+  <td><span class="rank rank-n">6</span></td>
+  <td><strong>75</strong><div class="score-bar"><div class="score-fill" style="width:75%;background:var(--green)"></div></div></td>
+  <td>2021</td><td>S AWD</td>
+  <td class="nowrap">$21,610</td><td>49,361</td>
+  <td><span class="badge badge-deal">-8%</span></td>
+  <td><span class="badge badge-dealer">Dealer</span></td>
+  <td>Clean</td>
+  <td>AT</td>
+  <td><a href="https://www.autotrader.ca/cars/nissan/rogue/?rcp=0&rcs=20&prx=250&loc=Newmarket%2C+ON&pRng=%2C32000&yRng=2018%2C&oRng=%2C140000&dtn=AWD&srt=35" target="_blank">Search</a></td>
+</tr>
+<tr>
+  <td><span class="rank rank-n">7</span></td>
+  <td><strong>73</strong><div class="score-bar"><div class="score-fill" style="width:73%;background:var(--green)"></div></div></td>
+  <td>2021</td><td>SV AWD CPO</td>
+  <td class="nowrap">$19,995</td><td>106,219</td>
+  <td><span class="badge badge-deal">-14%</span></td>
+  <td><span class="badge badge-dealer">Dealer</span></td>
+  <td>Clean</td>
+  <td>AT</td>
+  <td><a href="https://www.autotrader.ca/cars/nissan/rogue/?rcp=0&rcs=20&prx=250&loc=Newmarket%2C+ON&pRng=%2C32000&yRng=2018%2C&oRng=%2C140000&dtn=AWD&srt=35" target="_blank">Search</a></td>
+</tr>
+<tr>
+  <td><span class="rank rank-n">8</span></td>
+  <td><strong>72</strong><div class="score-bar"><div class="score-fill" style="width:72%;background:var(--green)"></div></div></td>
+  <td>2021</td><td>S</td>
+  <td class="nowrap">$21,972</td><td>54,168</td>
+  <td><span class="badge badge-fair">-4%</span></td>
+  <td><span class="badge badge-dealer">Dealer</span></td>
+  <td>Unknown</td>
+  <td>AT</td>
+  <td><a href="https://www.autotrader.ca/cars/nissan/rogue/?rcp=0&rcs=20&prx=250&loc=Newmarket%2C+ON&pRng=%2C32000&yRng=2018%2C&oRng=%2C140000&dtn=AWD&srt=35" target="_blank">Search</a></td>
+</tr>
+<tr>
+  <td><span class="rank rank-n">9</span></td>
+  <td><strong>71</strong><div class="score-bar"><div class="score-fill" style="width:71%;background:var(--green)"></div></div></td>
+  <td>2021</td><td>Platinum AWD</td>
+  <td class="nowrap">$21,950</td><td>136,000</td>
+  <td><span class="badge badge-deal">-15%</span></td>
+  <td><span class="badge badge-dealer">Dealer</span></td>
+  <td>Clean</td>
+  <td>AT</td>
+  <td><a href="https://www.autotrader.ca/cars/nissan/rogue/?rcp=0&rcs=20&prx=250&loc=Newmarket%2C+ON&pRng=%2C32000&yRng=2018%2C&oRng=%2C140000&dtn=AWD&srt=35" target="_blank">Search</a></td>
+</tr>
+<tr>
+  <td><span class="rank rank-n">10</span></td>
+  <td><strong>69</strong><div class="score-bar"><div class="score-fill" style="width:69%;background:var(--blue)"></div></div></td>
+  <td>2020</td><td>Unknown</td>
+  <td class="nowrap">$19,000</td><td>105,826</td>
+  <td><span class="badge badge-deal">-11%</span></td>
+  <td><span class="badge badge-private">Private</span></td>
+  <td>Unknown</td>
+  <td>Kijiji</td>
+  <td><a href="https://www.kijiji.ca/v-cars-trucks/city-of-toronto/nissan-rogue-2020/1734056718" target="_blank">View</a></td>
+</tr>
+<tr>
+  <td><span class="rank rank-n">11</span></td>
+  <td><strong>68</strong><div class="score-bar"><div class="score-fill" style="width:68%;background:var(--blue)"></div></div></td>
+  <td>2024</td><td>SV AWD</td>
+  <td class="nowrap">$25,950</td><td>83,000</td>
+  <td><span class="badge badge-deal">-8%</span></td>
+  <td><span class="badge badge-dealer">Dealer</span></td>
+  <td>Unknown</td>
+  <td>AT</td>
+  <td><a href="https://www.autotrader.ca/cars/nissan/rogue/?rcp=0&rcs=20&prx=250&loc=Newmarket%2C+ON&pRng=%2C32000&yRng=2018%2C&oRng=%2C140000&dtn=AWD&srt=35" target="_blank">Search</a></td>
+</tr>
+<tr>
+  <td><span class="rank rank-n">12</span></td>
+  <td><strong>66</strong><div class="score-bar"><div class="score-fill" style="width:66%;background:var(--blue)"></div></div></td>
+  <td>2023</td><td>SL AWD CPO</td>
+  <td class="nowrap">$25,999</td><td>40,455</td>
+  <td><span class="badge badge-fair">-2%</span></td>
+  <td><span class="badge badge-dealer">Dealer</span></td>
+  <td>Clean</td>
+  <td>AT</td>
+  <td><a href="https://www.autotrader.ca/cars/nissan/rogue/?rcp=0&rcs=20&prx=250&loc=Newmarket%2C+ON&pRng=%2C32000&yRng=2018%2C&oRng=%2C140000&dtn=AWD&srt=35" target="_blank">Search</a></td>
+</tr>
+<tr>
+  <td><span class="rank rank-n">13</span></td>
+  <td><strong>64</strong><div class="score-bar"><div class="score-fill" style="width:64%;background:var(--blue)"></div></div></td>
+  <td>2023</td><td>SV</td>
+  <td class="nowrap">$26,910</td><td>21,062</td>
+  <td><span class="badge badge-fair">0%</span></td>
+  <td><span class="badge badge-dealer">Dealer</span></td>
+  <td>Clean</td>
+  <td>AT</td>
+  <td><a href="https://www.autotrader.ca/cars/nissan/rogue/?rcp=0&rcs=20&prx=250&loc=Newmarket%2C+ON&pRng=%2C32000&yRng=2018%2C&oRng=%2C140000&dtn=AWD&srt=35" target="_blank">Search</a></td>
+</tr>
+<tr>
+  <td><span class="rank rank-n">14</span></td>
+  <td><strong>63</strong><div class="score-bar"><div class="score-fill" style="width:63%;background:var(--blue)"></div></div></td>
+  <td>2023</td><td>SV</td>
+  <td class="nowrap">$27,810</td><td>9,528</td>
+  <td><span class="badge badge-fair">+3%</span></td>
+  <td><span class="badge badge-dealer">Dealer</span></td>
+  <td>Clean</td>
+  <td>AT</td>
+  <td><a href="https://www.autotrader.ca/cars/nissan/rogue/?rcp=0&rcs=20&prx=250&loc=Newmarket%2C+ON&pRng=%2C32000&yRng=2018%2C&oRng=%2C140000&dtn=AWD&srt=35" target="_blank">Search</a></td>
+</tr>
+<tr>
+  <td><span class="rank rank-n">15</span></td>
+  <td><strong>61</strong><div class="score-bar"><div class="score-fill" style="width:61%;background:var(--blue)"></div></div></td>
+  <td>2022</td><td>SL</td>
+  <td class="nowrap">$25,995</td><td>76,188</td>
+  <td><span class="badge badge-fair">-1%</span></td>
+  <td><span class="badge badge-dealer">Dealer</span></td>
+  <td>Unknown</td>
+  <td>Kijiji</td>
+  <td><a href="https://www.kijiji.ca/v-cars-trucks/petawawa/2022-nissan-rogue/1733709148" target="_blank">View</a></td>
+</tr>
+<tr>
+  <td><span class="rank rank-n">16</span></td>
+  <td><strong>55</strong><div class="score-bar"><div class="score-fill" style="width:55%;background:var(--yellow)"></div></div></td>
+  <td>2016</td><td>AWD</td>
+  <td class="nowrap">$14,000</td><td>74,500</td>
+  <td><span class="badge badge-deal">-12%</span></td>
+  <td><span class="badge badge-private">Private</span></td>
+  <td>Clean</td>
+  <td>Kijiji</td>
+  <td><a href="https://www.kijiji.ca/v-cars-trucks/mississauga-peel-region/2016-nissan-rogue-low-kms/1730996666" target="_blank">View</a></td>
+</tr>
+<tr>
+  <td><span class="rank rank-n">17</span></td>
+  <td><strong>52</strong><div class="score-bar"><div class="score-fill" style="width:52%;background:var(--yellow)"></div></div></td>
+  <td>2015</td><td>SV 2.5 AWD</td>
+  <td class="nowrap">$13,500</td><td>75,000</td>
+  <td><span class="badge badge-deal">-15%</span></td>
+  <td><span class="badge badge-private">Private</span></td>
+  <td>Clean</td>
+  <td>Kijiji</td>
+  <td><a href="https://www.kijiji.ca/v-cars-trucks/kitchener-waterloo/2015-nissan-rogue-sv-2-5-awd/1735059371" target="_blank">View</a></td>
+</tr>
+</tbody>
+</table>
+
+<!-- COMPARISON -->
+<h2>Outback vs Rogue Comparison</h2>
+
+<table>
+<thead>
+<tr><th>Factor</th><th>Subaru Outback</th><th>Nissan Rogue</th></tr>
+</thead>
+<tbody>
+<tr><td><strong>Cargo Space</strong></td><td>32.5 cu ft</td><td>36.5 cu ft (+12%)</td></tr>
+<tr><td><strong>AWD System</strong></td><td>Symmetrical AWD (standard)</td><td>Intelligent AWD (optional)</td></tr>
+<tr><td><strong>Ground Clearance</strong></td><td>8.7" (wagon-style)</td><td>8.4" (crossover)</td></tr>
+<tr><td><strong>Reliability</strong></td><td>Good (CVT concerns post-150k)</td><td>Good (2021+ gen much improved)</td></tr>
+<tr><td><strong>Avg Listing Price</strong></td><td>$21,894</td><td>$21,457</td></tr>
+<tr><td><strong>Private Listings</strong></td><td>1 (scarce near GTA)</td><td>5 (more available)</td></tr>
+<tr><td><strong>Best Deal Found</strong></td><td>$17,880 (2019, 140k km)</td><td>$17,000 (2018, 112k km, private)</td></tr>
+<tr><td><strong>MSRP (new, AWD)</strong></td><td>~$37,500</td><td>~$33,000</td></tr>
+<tr><td><strong>Resale Retention</strong></td><td>Higher (Subaru brand loyalty)</td><td>Moderate</td></tr>
+</tbody>
+</table>
+
+<!-- SEARCH INSIGHTS -->
+<h2>Search Insights</h2>
+
+<div class="stats">
+  <div class="stat"><div class="num">86</div><div class="label">AT Outbacks Total</div></div>
+  <div class="stat"><div class="num">64</div><div class="label">Kijiji Rogues (Priv)</div></div>
+  <div class="stat"><div class="num">6</div><div class="label">Kijiji Outbacks (Priv)</div></div>
+  <div class="stat"><div class="num">22%</div><div class="label">Private Seller %</div></div>
+</div>
+
+<div class="card">
+  <h3>Key Observations</h3>
+  <ul style="margin-left: 16px; color: var(--muted); font-size: 0.85rem; line-height: 1.8;">
+    <li><strong>Outbacks are scarce privately.</strong> Only 1 qualifying private Outback within 250km (Hamilton, $28,550). Most inventory is dealer on AutoTrader.</li>
+    <li><strong>Rogues have much better private availability</strong> &mdash; 64 private listings on Kijiji Canada-wide, though many are outside Ontario.</li>
+    <li><strong>Rogue offers 12% more cargo space</strong> (36.5 vs 32.5 cu ft) and generally lower prices for equivalent year/mileage.</li>
+    <li><strong>Outback holds value better</strong> but that means paying more used too. Symmetrical AWD is the gold standard for Canadian winters.</li>
+    <li><strong>2021+ Rogues are new generation</strong> with improved interior, 1.5L turbo (2022+), and better tech. They represent strong value vs older models at similar prices.</li>
+    <li><strong>Several FWD Rogues were filtered out.</strong> Always verify AWD on the actual listing page.</li>
+    <li><strong>The 2020 Outback at $19,499 says "Repaired, Clean Title"</strong> &mdash; investigate repair history before proceeding.</li>
+    <li><strong>CarGurus returned wrong models</strong> (entity IDs mapped to Corolla/Sienna). Data sourced from Kijiji + AutoTrader only.</li>
+  </ul>
+</div>
+
+<h2>Excluded Listings</h2>
+<div class="card" style="border-left-color: var(--red);">
+  <div class="detail" style="font-size: 0.8rem;">
+    <strong>FWD vehicles removed:</strong> 2022 Rogue FWD S ($20,410), 2021 Rogue FWD SV ($22,588), 2021 Rogue FWD SV ($21,700), 2021 Rogue FWD S ($19,988), 2019 Rogue FWD SV ($15,900), 2016 Rogue FWD SV ($14,999)<br>
+    <strong>Lease takeovers removed:</strong> 3 Kijiji listings ($480&ndash;$591/mo)<br>
+    <strong>Over budget (&gt;$32k):</strong> 2023 Outback Limited XT ($31,995), 2023 Outback Edition ($31,495), 2023 Rogue Platinum ($31,595/$31,885)<br>
+    <strong>Outside 250km radius:</strong> Listings from Winnipeg, Edmonton, Saskatoon, Regina, Vancouver, Halifax, Pictou, Antigonish, Kenora, etc.
+  </div>
+</div>
+
+<p style="color:var(--muted); font-size:0.72rem; margin-top:20px; text-align:center;">
+  Sources: Kijiji.ca (private sellers), AutoTrader.ca (all sellers) | Scraped March 28, 2026 | Prices and availability subject to change<br>
+  Market value estimates use MSRP depreciation model with 20% Canadian market premium | Score: weighted (price 20%, mileage 15%, year 15%, market value 15%, seller type 15%, cargo 10%, accident 10%)
+</p>
+
+</body>
+</html>
