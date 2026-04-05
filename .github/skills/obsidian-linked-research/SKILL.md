@@ -6,7 +6,7 @@ user-invocable: true
 disable-model-invocation: false
 metadata:
   author: 0xrabbidfly
-  version: "1.4.0"
+  version: "1.5.0"
 ---
 
 # Obsidian Linked Research
@@ -79,8 +79,10 @@ whose `url:` frontmatter matches the input URL. This catches duplicates even
 when the slug or folder differ. Use the Obsidian search API:
 
 ```powershell
-python -c "import sys; sys.stdout.reconfigure(encoding='utf-8'); sys.path.insert(0,'.github/skills/obsidian/scripts'); from obsidian import Obsidian; r=Obsidian().search(query='url: <INPUT_URL>', context_length=120); print(r.text if hasattr(r,'text') else r)"
+python -c "import sys; sys.stdout.reconfigure(encoding='utf-8'); sys.path.insert(0,'.github/skills/obsidian/scripts'); from obsidian import Obsidian; r=Obsidian().search(query='<INPUT_URL>'); print(r.text if hasattr(r,'text') else r)"
 ```
+
+> **Note**: Obsidian's local search does not support `url:` field-operator syntax — `url: <value>` throws "Operator not recognized". Use a plain-text query with the URL string or a distinctive fragment of it (e.g., the tweet ID or domain path).
 
 If a match is found, **stop** — tell the user the note already exists, give them
 the path and an Obsidian link, and ask whether they want to update the existing
@@ -95,6 +97,9 @@ Use this routing table unless the live vault has changed again:
 | `Research/Library/03 Evals, Reliability & Control/` | evals, reliability, governance, testing, review, controls |
 | `Research/Library/04 SDLC, Workflow & Strategy/` | SDLC, workflow redesign, consulting POV, product/API strategy |
 | `Research/Library/05 Knowledge, RAG & Memory/` | RAG, retrieval, knowledge systems, Obsidian, memory, second brain |
+| `Research/Library/06 Cryptography/` | cryptography, post-quantum, blockchain security, zero-knowledge proofs |
+| `Research/Library/07 Macrotrends & Futures/` | space, off-world, megatrends, long-horizon futures, civilizational shifts |
+| `Research/Library/08 Org Design & AI Transformation/` | organizational design, corporate transformation via AI, hierarchy-vs-intelligence, management theory |
 
 Tagging rules before you write anything:
 
@@ -149,6 +154,10 @@ page (tracking pixels, favicons, and tiny icons are filtered out). Use Step 3b t
 download them into the vault.
 
 If the result contains an `"error"` key, report it to the user and stop.
+
+> **Transient retry**: If the error is `"No JSON in response"` for a tweet URL, retry once — the xAI Responses API occasionally returns a top-level array `[{...}]` instead of a plain `{...}` object; a second call usually returns the plain object. If it fails twice, report to the user.
+
+> **X/Twitter fallback dead-ends**: Do NOT try Playwright for x.com URLs — it returns a login wall for unauthenticated sessions. Do NOT try Firecrawl — it explicitly does not support x.com. The only supported path for tweet content is `fetch.py` via the xAI `x_search` tool.
 
 **If a non-X web page is truncated or loses useful structure**: `fetch.py` is
 still the required first pass, but long articles may come back clipped (for
@@ -323,10 +332,6 @@ the user's workflow. Be specific about what to keep, change, or investigate.}
 - [[Note Title 1]] · [[Note Title 2]]
 - External source: {url}
 
-## Images
-
-{if images present}
-
 ## My Notes
 
 
@@ -349,20 +354,20 @@ And if it's a thread, add a Thread Context section before Summary:
 {thread_context}
 ```
 
-**If images are present**, add an Images section before My Notes:
+**If images are present**, embed them **inline** within the section they belong to
+— right after the paragraph or heading they illustrate. Do NOT collect images into
+a separate `## Images` section at the end. Place each image where a reader would
+naturally expect to see it, using this format:
 
 ```markdown
-## Images
-
 ![[{slug}-1.jpg]]
 *{media_description_1}*
-
-![[{slug}-2.png]]
-*{media_description_2}*
 ```
 
 Use `![[filename]]` (Obsidian wiki-link embed) for each image. If
 `media_descriptions` are available, add them as italic captions below each image.
+If an image doesn't clearly belong to a specific section (e.g., a generic hero
+image or author avatar), place it just below the metadata header block.
 
 ### Step 3b — Download Images
 
@@ -463,6 +468,7 @@ At minimum:
 - add the note to the relevant folder section if it is useful for navigation
 - append or refresh an entry under `Recently Added`
 - keep the one-line description current and specific
+- **prune `Recently Added` entries older than 7 days** (see pruning logic below)
 
 If the master MOC would need a larger restructure, stop after creating the note and
 suggest a separate `obsidian-vault-linker` refresh.
@@ -472,8 +478,9 @@ library bucket list plus `Recently Added`), prefer a clean overwrite instead of
 stacking append-only blocks at the end of the file:
 
 1. Read the current MOC
-2. Update the markdown in memory so the new note lands in the right section
-3. Rewrite the full note through the obsidian wrapper using `create --overwrite`
+2. Prune stale `Recently Added` entries (older than 7 days)
+3. Add the new note to the relevant folder section and `Recently Added`
+4. Rewrite the full note through the obsidian wrapper using `create --overwrite`
 
 Example pattern (use the Python API directly — do not use heredoc pipes from bash):
 
@@ -500,26 +507,80 @@ print('MOC updated')
 > **Windows UTF-8**: `ob.read()` and `ob.create()` handle encoding correctly. Do not go
 > through subprocess pipes for MOC reads/writes — encoding errors will occur with emoji paths.
 
-Use the lighter `append` approach only when a small footer-style refresh is
-good enough and the file does not need an in-place insertion:
+#### Recently Added entry format
+
+When writing a new `Recently Added` entry, always include an inline date tag so
+the pruning step can identify stale entries without reading every linked note:
+
+```markdown
+- [[{slug}|{title}]] — {one-line why this note matters} `{YYYY-MM-DD}`
+```
+
+Example:
+
+```markdown
+- [[five-ai-paradigm-shifts|Five AI Paradigm Shifts]] — Miessler's framework for agent-era mental models `2026-03-30`
+```
+
+#### Pruning stale Recently Added entries
+
+Whenever Step 5 runs (i.e., on every successful note save), prune `Recently Added`
+entries whose inline date is more than 7 days before today. Entries without an
+inline date are left untouched (they predate this feature).
+
+Use this Python snippet as part of the in-memory MOC edit before rewriting:
 
 ```python
-python -c "
-import sys
-sys.path.insert(0, '.github/skills/obsidian/scripts')
-from obsidian import Obsidian
+import re
+from datetime import date, timedelta
 
-ob = Obsidian()
-append_text = '''
+cutoff = date.today() - timedelta(days=7)
 
-## Recently Added
+def prune_recently_added(moc_content: str) -> tuple[str, int]:
+    """Remove Recently Added list items whose `YYYY-MM-DD` date is older than cutoff.
+    Returns (updated_content, number_pruned).
+    Items without a date tag are kept unchanged.
+    """
+    # Match list items that end with a backtick-wrapped date: `2026-03-22`
+    date_pattern = re.compile(r'`(\d{4}-\d{2}-\d{2})`')
+    pruned = 0
+    output_lines = []
+    in_recently_added = False
 
-- [[{slug}|{title}]] — {one-line why this note matters}
-- Tags: #{tag1} #{tag2} #{tag3}
-'''
-ob.append(path='Research/Library/00 MOC/🗺️ MOC - Research Library.md', content=append_text)
-"
+    for line in moc_content.splitlines(keepends=True):
+        # Detect entry into / exit from the Recently Added section
+        if re.match(r'^##\s+Recently Added', line):
+            in_recently_added = True
+            output_lines.append(line)
+            continue
+        if in_recently_added and re.match(r'^##\s+', line):
+            in_recently_added = False
+
+        if in_recently_added and line.startswith('- '):
+            m = date_pattern.search(line)
+            if m:
+                entry_date = date.fromisoformat(m.group(1))
+                if entry_date < cutoff:
+                    pruned += 1
+                    continue  # drop this line
+        output_lines.append(line)
+
+    return ''.join(output_lines), pruned
 ```
+
+Apply it before inserting the new entry:
+
+```python
+updated_content, n_pruned = prune_recently_added(moc_content)
+if n_pruned:
+    print(f"Pruned {n_pruned} stale Recently Added entries")
+# then insert new entry and rewrite
+```
+
+Use the lighter `append` approach only when a small footer-style refresh is
+good enough and the file does not need an in-place insertion. Even in that case,
+**still run `prune_recently_added` on the current content first**, rewrite with
+pruning applied, then append the new entry.
 
 If a topic MOC clearly applies, update it secondarily after the master MOC is
 current. The master MOC remains authoritative for canonical tags and library-wide freshness.

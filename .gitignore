@@ -98,6 +98,15 @@ scratch/
 # Zehrs Grocery - private skill
 .claude/skills/zehrs-grocery/
 
+# CIBC Banking - private skill
+.claude/skills/cibc-banking/
+
+# Scotia Banking - private skill
+.claude/skills/scotia-banking/
+
+# CIBC Investor's Edge - private skill
+.claude/skills/edge-banking/
+
 # Teams Daily Digest - contains PII and internal channel names
 .claude/skills/teams-daily-digest/
 
