@@ -12,7 +12,7 @@ metadata:
 
 ## Purpose
 
-Run a comprehensive 9-phase verification and commit workflow before code is considered "ready" for pull request. Catches issues locally before they reach CI/CD, ensures constitutional compliance, performs an obvious code-smell review, and closes with a proper conventional commit summarizing all branch changes.
+Run a comprehensive 10-phase verification and commit workflow before code is considered "ready" for pull request. Catches issues locally before they reach CI/CD, ensures constitutional compliance, runs an OWASP Top 10 security scan, performs an obvious code-smell review, and closes with a proper conventional commit summarizing all branch changes.
 
 ## When to Use
 
@@ -128,7 +128,28 @@ Select-String -Path "components/**/*.tsx","app/**/*.tsx" -Pattern "<(h[1-6]|p|sp
 
 ---
 
-### Phase 6: Import & Style Hygiene
+### Phase 6: OWASP Security Review
+
+**Composable skill call** — invoke the `owasp-security-review` skill to run a quick-scan against the OWASP Top 10:2025 checklist. The skill is tuned for React/TypeScript + Azure AD (Entra ID) + Azure App Service.
+
+See: `.github/skills/owasp-security-review/SKILL.md`
+
+**Gate behavior:**
+- If the scan returns **FAIL** (any HIGH-severity finding): **stop the pipeline immediately.** Do not proceed to Phase 7. Report all findings to terminal.
+- If the scan returns **PASS** (no HIGH findings): continue. MEDIUM and LOW findings are reported in the terminal and included in the verification report, but do not block.
+
+**What it catches:**
+- Broken access control (wildcard CORS, missing auth middleware, IDOR)
+- Security misconfiguration (missing CSP, source maps in prod, HTTPS disabled)
+- Supply chain risks (missing lockfile, `npm install` in CI)
+- Cryptographic failures (secrets in code, tokens in localStorage)
+- Injection escape hatches (`dangerouslySetInnerHTML`, `eval()`, `.innerHTML`)
+- Auth failures (permissive tenant, implicit flow, missing token validation)
+- Azure App Service misconfig (remote debugging, FTP, TLS version)
+
+---
+
+### Phase 7: Import & Style Hygiene
 
 ```powershell
 # 1. Check for relative imports (should use @/ alias)
@@ -156,7 +177,7 @@ Get-ChildItem scripts/*.ts | Where-Object { $pkgJson -notmatch $_.Name } |
 
 ---
 
-### Phase 7: Git Diff Review
+### Phase 8: Git Diff Review
 
 ```powershell
 # Show what changed
@@ -174,7 +195,7 @@ git diff HEAD~1 --name-only 2>$null || git diff --cached --name-only
 
 ---
 
-### Phase 8: Code Smell Review (Obvious Smells)
+### Phase 9: Code Smell Review (Obvious Smells)
 
 Perform a quick static review for obvious refactoring opportunities and track them.
 
@@ -199,7 +220,7 @@ Select-String -Path "**/*.{ts,tsx,js,jsx}" -Pattern "TODO|FIXME|HACK|\?.*\?.*:" 
 
 ---
 
-### Phase 9: Commit
+### Phase 10: Commit
 
 Only runs if all blocking phases passed. Stages all changes and creates a conventional commit summarizing the branch work.
 
@@ -241,6 +262,7 @@ After running all phases, produce this verification report:
 ║  Lint:       [PASS/FAIL] (X warnings, Y errors)              ║
 ║  Tests:      [PASS/FAIL] (X/Y passed, Z% coverage)           ║
 ║  Security:   [PASS/FAIL] (X constitutional violations)       ║
+║  OWASP:      [PASS/FAIL] (X HIGH, Y MED, Z LOW)             ║
 ║  Hygiene:    [PASS/FAIL] (X issues)                          ║
 ║  Diff:       X files changed                                 ║
 ║  Smells:     [PASS/FAIL] (X P0, Y refactor opportunities)    ║
@@ -274,15 +296,16 @@ Refactoring Opportunities (written to code-smells.md):
 
 | Phase | Blocking? | Rule |
 |-------|-----------|------|
-| Build | ✅ Yes | Cannot proceed if build fails |
-| Types | ⚠️ Soft | Report errors, suggest fixes |
-| Lint | ⚠️ Soft | Report issues, allow override |
-| Tests | ✅ Yes | Cannot proceed if tests fail |
-| Security | ✅ Yes | Constitutional violations block PR |
-| Hygiene | ⚠️ Soft | Report for cleanup |
-| Diff | 📋 Info | Human review checkpoint |
-| Code Smells | ✅ Yes (P0 only) | Stop on any P0 smell; otherwise track refactors in code-smells.md |
-| Commit | ✅ Yes | Only runs if no P0/P1 blockers. Stages + commits all changes. |
+| 1. Build | ✅ Yes | Cannot proceed if build fails |
+| 2. Types | ⚠️ Soft | Report errors, suggest fixes |
+| 3. Lint | ⚠️ Soft | Report issues, allow override |
+| 4. Tests | ✅ Yes | Cannot proceed if tests fail |
+| 5. Security | ✅ Yes | Constitutional violations block PR |
+| 6. OWASP | ✅ Yes (HIGH only) | Any HIGH finding = stop pipeline. MEDIUM/LOW = report and continue. |
+| 7. Hygiene | ⚠️ Soft | Report for cleanup |
+| 8. Diff | 📋 Info | Human review checkpoint |
+| 9. Code Smells | ✅ Yes (P0 only) | Stop on any P0 smell; otherwise track refactors in code-smells.md |
+| 10. Commit | ✅ Yes | Only runs if no P0/P1 blockers. Stages + commits all changes. |
 
 ---
 
@@ -307,9 +330,10 @@ Near the end of a full run, add 1–2 implementable app ideas in `code-smells.md
 
 | Skill | Relationship |
 |-------|--------------|
+| `owasp-security-review` | Called as Phase 6 (composable). HIGH findings kill the pipeline. |
 | `code-review` | Branch-wrapup is tactical (pass/fail); code-review is strategic (architectural) |
 | `testing` | Branch-wrapup runs tests; testing skill helps write them |
-| `git-commit` | Branch-wrapup uses git-commit conventions for Phase 8 |
+| `git-commit` | Branch-wrapup uses git-commit conventions for Phase 10 |
 | `deployment` | Run branch-wrapup before deployment skill |
 | `ci-cd` | Branch-wrapup is local preview of what CI will check |
 
@@ -326,7 +350,7 @@ For automated runs, use the bundled script:
 .\.github\skills\branch-wrapup\verify.ps1
 
 # Run specific phases
-.\.github\skills\branch-wrapup\verify.ps1 -Phases Build,Types,Lint
+.\.github\skills\branch-wrapup\verify.ps1 -Phases Build,Types,Lint,OWASP
 
 # Skip commit (verify only)
 .\.github\skills\branch-wrapup\verify.ps1 -NoCommit
@@ -359,6 +383,6 @@ If a pattern is intentionally used (e.g., `localStorage` in a polyfill check):
 
 ## Related Skills
 
+- `owasp-security-review` - OWASP Top 10:2025 quick scan (Phase 6 of this skill)
 - `code-review` - Deep constitutional analysis
 - `testing` - Test creation and debugging
-- `security-review` - Comprehensive security audit (beyond quick scan)
