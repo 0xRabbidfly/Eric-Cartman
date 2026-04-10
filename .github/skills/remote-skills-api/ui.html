@@ -1004,6 +1004,34 @@
       return events;
     }
 
+    // Poll a server-side job buffer until complete (fallback when SSE drops on mobile)
+    async function pollJobResult(jobId, bot) {
+      const MAX_WAIT_MS = 8 * 60 * 1000; // 8 minutes
+      const INTERVAL_MS = 2500;
+      const deadline = Date.now() + MAX_WAIT_MS;
+
+      bot.setPhase('📡', 'Reconnecting…');
+
+      while (Date.now() < deadline) {
+        await sleep(INTERVAL_MS);
+        try {
+          const data = await api(`/api/jobs/${jobId}`);
+          if (data.status === 'done') {
+            bot.done(data.text || data.result || 'Done', {});
+            return;
+          }
+          if (data.status === 'error') {
+            bot.fail(data.error || 'Unknown error');
+            return;
+          }
+          // Still running — keep polling
+        } catch {
+          // Server temporarily unreachable — keep trying
+        }
+      }
+      bot.fail('⏱ Timed out waiting for response — it may still complete in the background.');
+    }
+
     async function streamChat(message, skillForMsg) {
       const response = await fetch('/api/chat', {
         method: 'POST',
@@ -1032,6 +1060,8 @@
       const bot = addStreamingMessage(skillForMsg ? `skill: ${skillForMsg}` : null);
       bot.setPhase('🧠', 'Thinking…');
 
+      let pendingJobId = null;
+
       try {
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
@@ -1054,6 +1084,7 @@
             if (evt.type === 'heartbeat') continue; // Server keepalive — ignore
             if (evt.type === 'start') {
               if (evt.sessionId) updateSessionId(evt.sessionId);
+              if (evt.jobId) pendingJobId = evt.jobId;
               bot.setPhase('🧠', 'Starting…');
             } else if (evt.type === 'init') {
               bot.setPhase('🧠', 'Session ready…');
@@ -1070,6 +1101,7 @@
               bot.appendText(evt.text || '');
             } else if (evt.type === 'done') {
               sawDone = true;
+              pendingJobId = null; // Clean — no need to poll
               bot.done(evt.result, evt);
             } else if (evt.type === 'error') {
               const code = evt.code ? ` (${evt.code})` : '';
@@ -1082,17 +1114,25 @@
         }
 
         if (!sawDone) {
-          bot.done();
+          if (pendingJobId) {
+            // SSE ended without a done event — poll for the buffered result
+            await pollJobResult(pendingJobId, bot);
+          } else {
+            bot.done();
+          }
         }
       } catch (err) {
         // Network-level error (e.g. Safari "Load failed" when SSE connection drops)
         const isNetworkError = /load failed|failed to fetch|network|aborted/i.test(err.message);
-        if (isNetworkError) {
-          bot.fail('📡 Connection lost — skill may still be running in background. Check Obsidian or server logs.');
+        if (isNetworkError && pendingJobId) {
+          // Claude is still running on the server — poll for the result
+          await pollJobResult(pendingJobId, bot);
+        } else if (isNetworkError) {
+          bot.fail('📡 Connection lost — skill may still be running in background.');
         } else {
           bot.fail(err.message);
         }
-        return; // bot.fail() already displayed the error
+        return;
       }
     }
 

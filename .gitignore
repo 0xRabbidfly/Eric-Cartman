@@ -52,6 +52,7 @@ out/
 .claude/settings.local.json
 .claude/mcp.json
 .claude/mcp.example.json
+.claude/worktrees/
 .claude/**/.__pycache__/
 .claude/**/__pycache__/
 **/__pycache__/

@@ -150,6 +150,30 @@ function getConversationScope(skillName) {
   return skillName || GENERAL_SCOPE;
 }
 
+// ---------------------------------------------------------------------------
+// Job Buffer (server-side result cache for mobile reconnects)
+// ---------------------------------------------------------------------------
+const JOB_TTL_MS = 30 * 60 * 1000; // 30 minutes
+const jobs = new Map();
+
+function makeJobId() {
+  return 'j_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+
+function createJob() {
+  const job = { id: makeJobId(), status: 'running', text: '', result: null, error: null, createdAt: Date.now() };
+  jobs.set(job.id, job);
+  return job;
+}
+
+// Prune expired jobs periodically
+setInterval(() => {
+  const now = Date.now();
+  for (const [id, job] of jobs) {
+    if (now - job.createdAt > JOB_TTL_MS) jobs.delete(id);
+  }
+}, 5 * 60 * 1000).unref();
+
 function isContextExpired(sess, now = Date.now()) {
   if (!isFinite(SESSION_CONTEXT_TTL_MS)) return false;
   const lastContextActivity = sess.contextLastActivity || sess.lastActivity || 0;
@@ -945,8 +969,11 @@ app.post('/api/chat', auth, async (req, res) => {
     });
     res.flushHeaders();  // Force headers out immediately
 
-    // Send initial event (includes session ID for client)
-    res.write(`data: ${JSON.stringify({ type: 'start', skill: resolved.skill || null, mode: resolved.mode, sessionId: sess.id })}\n\n`);
+    // Create a server-side job to buffer results for mobile reconnect
+    const job = createJob();
+
+    // Send initial event (includes session ID and jobId for client reconnects)
+    res.write(`data: ${JSON.stringify({ type: 'start', skill: resolved.skill || null, mode: resolved.mode, sessionId: sess.id, jobId: job.id })}\n\n`);
 
     // Keepalive heartbeat — real data events so they flush through any
     // intermediate buffering and keep mobile Safari from killing the connection
@@ -961,6 +988,10 @@ app.post('/api/chat', auth, async (req, res) => {
       saveSessions();
       const result = await enqueue(() => {
         return runClaudeStreaming(prompt, (evt) => {
+          // Buffer to job for mobile reconnect
+          if (evt.type === 'text') job.text += evt.text || '';
+          if (evt.type === 'done') { job.status = 'done'; job.result = evt.result || null; }
+          if (evt.type === 'error') { job.status = 'error'; job.error = evt.error || 'Unknown error'; }
           // Forward each streaming event to the client
           try { res.write(`data: ${JSON.stringify(evt)}\n\n`); } catch {}
         }, { skill: resolved.skill });
@@ -973,6 +1004,8 @@ app.post('/api/chat', auth, async (req, res) => {
     } catch (err) {
       const e = classifyError(err, 'chat_stream_failed');
       console.error('[Chat:stream] Error:', e.error);
+      job.status = 'error';
+      job.error = e.error || 'Unknown error';
       res.write(`data: ${JSON.stringify({ type: 'error', ...e })}\n\n`);
       res.end();
     } finally {
@@ -998,6 +1031,13 @@ app.post('/api/chat', auth, async (req, res) => {
       res.status(500).json(e);
     }
   }
+});
+
+// Job result polling — lets mobile clients reconnect after SSE drops
+app.get('/api/jobs/:id', auth, (req, res) => {
+  const job = jobs.get(req.params.id);
+  if (!job) return res.status(404).json({ error: 'Job not found or expired' });
+  res.json({ id: job.id, status: job.status, text: job.text, result: job.result, error: job.error });
 });
 
 // Chat with SSE streaming (GET — kept for direct URL/EventSource usage)
