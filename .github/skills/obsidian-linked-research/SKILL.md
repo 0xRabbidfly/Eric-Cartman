@@ -41,7 +41,7 @@ Vault writes go through the **obsidian** skill (composable CLI wrapper).
 ## Prerequisites
 
 - **Obsidian** must be running with CLI enabled
-- **XAI_API_KEY** required for tweet URLs (in `.env`, environment, or `~/.config/last30days/.env`)
+- **XAI_API_KEY** required for tweet URLs (via keyring `automation/api`, env var, or `~/.config/last30days/.env`)
 - Web URLs work without any API key
 
 ## Workflow
@@ -639,7 +639,7 @@ library pages and respects the live MOC/tag taxonomy already in the vault.
 |-------|-------------|
 | `obsidian` | Composable vault wrapper — used for all vault writes |
 | `obsidian-daily-research` | Automated daily pipeline — produces `Research/Dailies/` notes with `#keep` tags that get promoted to `Research/Library/` |
-| `last30days` | Research skill — shares xAI API patterns and `.env` key cascade |
+| `last30days` | Research skill — shares xAI API patterns and keyring/env/config key cascade |
 | `content-research-writer` | Long-form writing partner — can use Library notes as sources |
 
 ## Architecture

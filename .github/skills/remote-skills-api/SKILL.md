@@ -30,7 +30,7 @@ vacation.
 1. **Node.js 18+** installed
 2. **Claude CLI** installed and on PATH (`claude --version`)
 3. **Tailscale** installed and running on both PC and phone
-4. **API_SECRET** set in project root `.env`
+4. **API_SECRET** — set via keyring (`automation/api`), env var, or project root `.env`
 
 ## Quick Start
 

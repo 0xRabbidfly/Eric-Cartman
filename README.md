@@ -320,7 +320,7 @@ Surfaces what people are actually discussing, recommending, and debating right n
 - Works without any API keys using web search fallback
 - Add `OPENAI_API_KEY` → Reddit threads with real upvotes & comments
 - Add `XAI_API_KEY` → X posts with real likes & reposts
-- Keys go in `~/.config/last30days/.env`
+- Keys stored via Python `keyring` (Windows Credential Manager), env vars, or `~/.config/last30days/.env`
 
 **Copilot Version Notes:**
 The GitHub Copilot version saves a full `report.md` to your local share folder:
@@ -759,7 +759,7 @@ Lightweight Express.js server that auto-discovers every skill from `.github/skil
 | Chat Interface | Natural language, Claude picks the right skill |
 | Skill Picker | Pin a specific skill to scope your messages |
 | Queue | Requests serialize — safe for concurrent use |
-| Auth | Bearer token via `API_SECRET` in `.env` |
+| Auth | Bearer token via `API_SECRET` (keyring, env var, or `.env`) |
 | Reboot Survival | Startup shortcut launches server at login |
 | Remote Restart | Authenticated endpoint can restart the Node service via the launcher |
 
