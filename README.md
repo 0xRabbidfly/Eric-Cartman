@@ -854,28 +854,12 @@ It is for measured skill iteration, not one-shot drafting.
 └── instructions/               # File-pattern-specific rules
 
 .claude/
-├── CLAUDE.md                   # Claude Code root context
-├── readme-mcp.md               # MCP configuration guide
-├── google-mcp.json             # Google Workspace MCP config (gitignored, inactive)
-└── skills/                     # Claude Code–specific skills (gitignored)
-    ├── cibc-banking/           # 🏦 CIBC online banking
-    ├── council/                # 🧠 Multi-persona deliberation
-    ├── edge-banking/           # 📈 CIBC Investor's Edge brokerage
-    ├── humanizer/              # ✍️ Remove AI writing patterns
-    ├── insights-report/        # 📈 Cross-session analysis (Claude version)
-    ├── last30days/             # 🔍 Research (Claude version)
-    ├── rbc-banking/            # 🏦 RBC online banking
-    ├── scotia-banking/         # 🏦 Scotiabank online banking
-    ├── session-log/            # 🗒️ Session capture (Claude version)
-    ├── skill-creator/          # 🛠️ Skill creation (Claude version)
-    ├── teams-daily-digest/     # 📋 Teams daily digest
-    ├── used-car-search/        # 🚗 Used car search across listings
-    └── zehrs-grocery/          # 🛒 Zehrs grocery cart automation
+├── CLAUDE.md                   # Claude Code root context (open-source)
+└── skills/                     # Personal/local Claude Code skills (gitignored)
 ```
 
 > **Note:** `.github/skills/` is the open-source portable scaffold (works with any AI IDE).
-> `.claude/skills/` contains personal/local skills for Claude Code (gitignored, not part of the OSS repo).
-> Some skills (last30days, insights-report, session-log, skill-creator) have versions in both.
+> `.claude/` contains local-only config and personal skills — gitignored except `CLAUDE.md`.
 
 ---
 
