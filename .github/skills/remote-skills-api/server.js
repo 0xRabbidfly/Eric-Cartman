@@ -355,6 +355,8 @@ function auth(req, res, next) {
 const BROWSER_SKILLS = new Set([
   'rbc-banking', 'zehrs-grocery', 'used-car-search',
 ]);
+// Skills that spawn their own Playwright via stdio (skip ensurePlaywright HTTP server)
+const STDIO_BROWSER_SKILLS = new Set(['rbc-banking']);
 
 // On-demand Playwright MCP server management
 const PLAYWRIGHT_PORT = 3939;
@@ -437,10 +439,16 @@ function resetPlaywrightIdleTimer() {
 }
 
 function getMcpConfig(skillName) {
-  const browserMcp = path.join(PROJECT_DIR, '.mcp-browser.json');
-  const defaultMcp = path.join(PROJECT_DIR, '.mcp.json');
+  const rbcMcp     = path.join(PROJECT_DIR, '.claude', 'rbc-mcp.json');
+  const browserMcp = path.join(PROJECT_DIR, '.claude', 'mcp-browser.json');
+  const defaultMcp = path.join(PROJECT_DIR, '.claude', 'mcp.json');
+  // RBC gets its own stdio Playwright with stealth + persistent profile
+  if (skillName && STDIO_BROWSER_SKILLS.has(skillName) && fs.existsSync(rbcMcp)) {
+    console.log(`[MCP] Stdio browser skill "${skillName}" → .claude/rbc-mcp.json`);
+    return rbcMcp.replace(/\\/g, '/');
+  }
   if (skillName && BROWSER_SKILLS.has(skillName) && fs.existsSync(browserMcp)) {
-    console.log(`[MCP] Browser skill "${skillName}" → .mcp-browser.json`);
+    console.log(`[MCP] Browser skill "${skillName}" → .claude/mcp-browser.json`);
     return browserMcp.replace(/\\/g, '/');
   }
   if (fs.existsSync(defaultMcp)) {
@@ -506,8 +514,8 @@ function scheduleRestart(reason) {
  * Run Claude CLI once and return the full result text.
  */
 async function runClaude(prompt, opts = {}) {
-  // Start Playwright on-demand for browser skills
-  if (opts.skill && BROWSER_SKILLS.has(opts.skill)) {
+  // Start Playwright on-demand for browser skills (skip for stdio skills that spawn their own)
+  if (opts.skill && BROWSER_SKILLS.has(opts.skill) && !STDIO_BROWSER_SKILLS.has(opts.skill)) {
     const ok = await ensurePlaywright();
     if (!ok) throw new Error('Failed to start Playwright browser server');
   }
@@ -583,8 +591,8 @@ async function runClaude(prompt, opts = {}) {
  * Returns a promise that resolves with the final result text.
  */
 async function runClaudeStreaming(prompt, onEvent, opts = {}) {
-  // Start Playwright on-demand for browser skills
-  if (opts.skill && BROWSER_SKILLS.has(opts.skill)) {
+  // Start Playwright on-demand for browser skills (skip for stdio skills that spawn their own)
+  if (opts.skill && BROWSER_SKILLS.has(opts.skill) && !STDIO_BROWSER_SKILLS.has(opts.skill)) {
     const ok = await ensurePlaywright();
     if (!ok) throw new Error('Failed to start Playwright browser server');
   }
