@@ -16,6 +16,8 @@
 
 require('dotenv').config({ path: require('path').join(__dirname, '../../../.env') });
 
+process.title = 'Remote Skills API';
+
 const express = require('express');
 const cors    = require('cors');
 const path    = require('path');
