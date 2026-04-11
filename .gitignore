@@ -52,6 +52,10 @@ out/
 .claude/settings.local.json
 .claude/mcp.json
 .claude/mcp.example.json
+.claude/telegram-mcp.json
+.claude/mcp-browser.json
+.claude/rbc-mcp.json
+.claude/google-mcp.json
 .claude/worktrees/
 .claude/**/.__pycache__/
 .claude/**/__pycache__/

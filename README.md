@@ -821,45 +821,61 @@ It is for measured skill iteration, not one-shot drafting.
 │   ├── agentic-evaluator/      # ⭐ Score repo agentic maturity
 │   ├── branch-wrapup/          # ✅ Pre-PR quality gate
 │   ├── content-research-writer/ # ✍️ Writing partner
-│   ├── obsidian-daily-research/ # 📡 Daily AI research pipeline
-│   ├── obsidian-linked-research/ # 🔗 URL → research note using the master Library MOC
-│   ├── podcast-to-obsidian/    # 🎙️ Podcast → transcript → Obsidian
 │   ├── doc-sync-all/           # 🔄 Documentation sync
 │   ├── health-audit/           # 🩺 Artifact health checks
 │   ├── insights-report/        # 📈 Cross-session analysis
 │   ├── last30days/             # 🔍 Research (Copilot version)
 │   ├── obsidian/               # 📓 Vault operations (composable)
+│   ├── obsidian-daily-research/ # 📡 Daily AI research pipeline
+│   ├── obsidian-linked-research/ # 🔗 URL → research note using the master Library MOC
 │   ├── obsidian-vault-digest/  # 🔍 Vault topic synthesis
 │   ├── obsidian-vault-linker/  # 🔗 Missing links, MOC gaps, and graph health
+│   ├── owasp-security-review/  # 🔒 OWASP Top 10 security scan
+│   ├── podcast-to-obsidian/    # 🎙️ Podcast → transcript → Obsidian
 │   ├── project-guide/          # 🧭 Codebase exploration
 │   ├── project-infographic/    # 🎨 Sprint demo visuals
 │   ├── project-scaffold/       # 🏗️ Agentic scaffold wizard
+│   ├── remote-skills-api/      # 📱 Phone access over Tailscale
 │   ├── repo-state-sync/        # 🔃 Onboarding sync
+│   ├── session-context-audit/  # 🔬 Context file health check
 │   ├── session-learning/       # 📚 Pattern extraction
 │   ├── session-log/            # 🗒️ Session capture
-│   ├── session-context-audit/  # 🔬 Context file health check
 │   ├── session-skill-forge/    # ⚒️ Workflow → reusable skill
 │   ├── session_context_optimizer/ # 🧹 Meta-optimize AI context
-│   ├── remote-skills-api/      # 📱 Phone access over Tailscale
 │   ├── skill-autoresearch/     # 🧪 Keep-or-revert skill improvement loops
 │   ├── skill-creator/          # 🛠️ Create, test, and refine skills
 │   ├── skill-reflection/       # 🪞 Composable after-action review
 │   └── visual-explainer/       # 🎨 HTML diagrams, diff reviews, slide decks
 ├── agents/                     # Specialized agent configs
-│   └── eric-cartman.md         # 🎭 Cartman-flavored project guide
-├── instructions/               # File-pattern-specific rules
-└── prompts/                    # Reusable prompt templates
+│   ├── eric-cartman.md         # 🎭 Cartman-flavored project guide
+│   ├── portuguese-lawyer.md    # ⚖️ Portuguese legal advisor
+│   ├── ui-designer.md          # 🎨 UI design and Fluent UI patterns
+│   └── ux-designer.md          # 🧑‍💻 UX flows and information architecture
+└── instructions/               # File-pattern-specific rules
 
 .claude/
-├── settings.local.json         # Local Claude Code permissions (gitignored)
-└── skills/                     # Claude Code skills
-    └── last30days/             # 🔍 Research skill (Claude version)
-        ├── SKILL.md            # Skill definition
-        └── scripts/            # Python implementation
+├── CLAUDE.md                   # Claude Code root context
+├── readme-mcp.md               # MCP configuration guide
+├── google-mcp.json             # Google Workspace MCP config (gitignored, inactive)
+└── skills/                     # Claude Code–specific skills (gitignored)
+    ├── cibc-banking/           # 🏦 CIBC online banking
+    ├── council/                # 🧠 Multi-persona deliberation
+    ├── edge-banking/           # 📈 CIBC Investor's Edge brokerage
+    ├── humanizer/              # ✍️ Remove AI writing patterns
+    ├── insights-report/        # 📈 Cross-session analysis (Claude version)
+    ├── last30days/             # 🔍 Research (Claude version)
+    ├── rbc-banking/            # 🏦 RBC online banking
+    ├── scotia-banking/         # 🏦 Scotiabank online banking
+    ├── session-log/            # 🗒️ Session capture (Claude version)
+    ├── skill-creator/          # 🛠️ Skill creation (Claude version)
+    ├── teams-daily-digest/     # 📋 Teams daily digest
+    ├── used-car-search/        # 🚗 Used car search across listings
+    └── zehrs-grocery/          # 🛒 Zehrs grocery cart automation
 ```
 
-> **Note:** `.github/skills/` is for GitHub Copilot, `.claude/skills/` is for Claude Code.
-> The `last30days` skill is available for both — same Python scripts, different SKILL.md frontmatter.
+> **Note:** `.github/skills/` is the open-source portable scaffold (works with any AI IDE).
+> `.claude/skills/` contains personal/local skills for Claude Code (gitignored, not part of the OSS repo).
+> Some skills (last30days, insights-report, session-log, skill-creator) have versions in both.
 
 ---
 
