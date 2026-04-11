@@ -8,6 +8,15 @@ CONFIG_DIR = Path.home() / ".config" / "last30days"
 CONFIG_FILE = CONFIG_DIR / ".env"
 
 
+def _keyring_get(service: str, key: str) -> Optional[str]:
+    """Try to fetch a secret from Windows Credential Manager via keyring. Returns None on any failure."""
+    try:
+        import keyring
+        return keyring.get_password(service, key)
+    except Exception:
+        return None
+
+
 def load_env_file(path: Path) -> Dict[str, str]:
     """Load environment variables from a file."""
     env = {}
@@ -32,14 +41,14 @@ def load_env_file(path: Path) -> Dict[str, str]:
 
 
 def get_config() -> Dict[str, Any]:
-    """Load configuration from ~/.config/last30days/.env and environment."""
+    """Load configuration. Priority: env vars > config file > keyring."""
     # Load from config file first
     file_env = load_env_file(CONFIG_FILE)
 
-    # Environment variables override file
+    # Environment variables override file, keyring is last fallback
     config = {
-        'OPENAI_API_KEY': os.environ.get('OPENAI_API_KEY') or file_env.get('OPENAI_API_KEY'),
-        'XAI_API_KEY': os.environ.get('XAI_API_KEY') or file_env.get('XAI_API_KEY'),
+        'OPENAI_API_KEY': os.environ.get('OPENAI_API_KEY') or file_env.get('OPENAI_API_KEY') or _keyring_get('automation/api', 'openai_api_key'),
+        'XAI_API_KEY': os.environ.get('XAI_API_KEY') or file_env.get('XAI_API_KEY') or _keyring_get('automation/api', 'xai_api_key'),
         'OPENAI_MODEL_POLICY': os.environ.get('OPENAI_MODEL_POLICY') or file_env.get('OPENAI_MODEL_POLICY', 'auto'),
         'OPENAI_MODEL_PIN': os.environ.get('OPENAI_MODEL_PIN') or file_env.get('OPENAI_MODEL_PIN'),
         'XAI_MODEL_POLICY': os.environ.get('XAI_MODEL_POLICY') or file_env.get('XAI_MODEL_POLICY', 'latest'),

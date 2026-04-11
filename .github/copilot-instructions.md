@@ -32,7 +32,7 @@ Eric Cartman is a **meta-prompt library** — a portable scaffold of agentic dev
 - **Known gaps**: Obsidian-related workflows need more skill coverage.
 
 ## Non-Negotiables
-- Never commit secrets, API keys, or tokens. Use `.env` (gitignored).
+- Never commit secrets, API keys, or tokens. Use Python `keyring` (Windows Credential Manager) under `automation/*` service names. Fallback cascade: env vars → keyring. `.env` files should not contain secrets.
 - Keep skills portable — no hardcoded absolute paths or machine-specific assumptions.
 - Every skill must have a `SKILL.md` with clear purpose, triggers, and workflow.
 - Prefer cross-platform commands (PowerShell + CI-friendly). Avoid bash-only scripts.

@@ -20,7 +20,7 @@ const express = require('express');
 const cors    = require('cors');
 const path    = require('path');
 const fs      = require('fs');
-const { spawn } = require('child_process');
+const { spawn, execSync } = require('child_process');
 
 // ---------------------------------------------------------------------------
 // Config
@@ -28,7 +28,10 @@ const { spawn } = require('child_process');
 const PORT        = process.env.SKILLS_PORT || 3838;
 const PROJECT_DIR = path.resolve(__dirname, '../../..');
 const CLAUDE_PATH = process.env.CLAUDE_PATH || 'claude';
-const API_SECRET  = process.env.API_SECRET;
+const API_SECRET  = process.env.API_SECRET || (() => {
+  try { return execSync('python -c "import keyring; print(keyring.get_password(\'automation/api\', \'api_secret\'))"', { encoding: 'utf8' }).trim(); }
+  catch { return undefined; }
+})();
 const CLAUDE_MODEL = process.env.CLAUDE_MODEL || 'sonnet';
 const ALLOW_QUERY_TOKEN = (process.env.ALLOW_QUERY_TOKEN || '').toLowerCase() === 'true';
 const RESTART_EXIT_CODE = process.env.RESTART_EXIT_CODE

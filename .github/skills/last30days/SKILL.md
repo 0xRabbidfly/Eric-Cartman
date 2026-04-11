@@ -110,22 +110,26 @@ Once you show the synthesized output, you are now an **EXPERT** on this topic.
 
 ## Setup (Optional but Recommended)
 
-The skill works without API keys using WebSearch fallback. For better results with real engagement metrics, configure:
+The skill works without API keys using WebSearch fallback. For better results with real engagement metrics, configure via **one** of these methods (checked in order):
 
+**Option A — Windows Credential Manager (recommended on Windows):**
 ```powershell
-# Create config directory and file
+pip install keyring
+python -c "import keyring; keyring.set_password('automation/api', 'openai_api_key', 'your-openai-key')"
+python -c "import keyring; keyring.set_password('automation/api', 'xai_api_key', 'your-xai-key')"
+```
+
+**Option B — Config file:**
+```powershell
 New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.config\last30days"
 @"
 # last30days API Configuration
-# Both keys are optional - skill works with WebSearch fallback
-
-# For Reddit research (uses OpenAI's web_search tool)
 OPENAI_API_KEY=your-openai-key
-
-# For X/Twitter research (uses xAI's x_search tool)
 XAI_API_KEY=your-xai-key
 "@ | Out-File -FilePath "$env:USERPROFILE\.config\last30days\.env" -Encoding UTF8
 ```
+
+**Option C — Environment variables** (`OPENAI_API_KEY`, `XAI_API_KEY`)
 
 ## RECOMMENDATIONS Query Type
 

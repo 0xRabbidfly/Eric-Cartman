@@ -191,7 +191,7 @@ The reflection skill will analyze the run and produce improvement recommendation
 
 - Reuses `last30days` lib modules (openai_reddit, xai_x, normalize, score, dedupe)
 - Composes with `obsidian` skill for all vault I/O (read, write, search, list files)
-- API keys from `~/.config/last30days/.env` (OPENAI_API_KEY, XAI_API_KEY)
+- API keys via keyring (`automation/api`), env vars, or `~/.config/last30days/.env` (OPENAI_API_KEY, XAI_API_KEY)
 - Python 3.10+ (stdlib only — zero pip dependencies)
 - Obsidian must be running with CLI enabled
 

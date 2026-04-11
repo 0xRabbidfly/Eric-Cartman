@@ -64,25 +64,14 @@ The skill works in three modes based on available API keys:
 
 ### First-Time Setup (Optional but Recommended)
 
-If the user wants to add API keys for better results:
+If the user wants to add API keys for better results, store them in **Windows Credential Manager** via Python `keyring`:
 
 ```bash
-mkdir -p ~/.config/last30days
-cat > ~/.config/last30days/.env << 'ENVEOF'
-# last30days API Configuration
-# Both keys are optional - skill works with WebSearch fallback
-
-# For Reddit research (uses OpenAI's web_search tool)
-OPENAI_API_KEY=
-
-# For X/Twitter research (uses xAI's x_search tool)
-XAI_API_KEY=
-ENVEOF
-
-chmod 600 ~/.config/last30days/.env
-echo "Config created at ~/.config/last30days/.env"
-echo "Edit to add your API keys for enhanced research."
+python -c "import keyring; keyring.set_password('automation/api', 'openai_api_key', 'sk-...')"
+python -c "import keyring; keyring.set_password('automation/api', 'xai_api_key', 'xai-...')"
 ```
+
+The script checks: env vars → `~/.config/last30days/.env` → keyring (in that order).
 
 **DO NOT stop if no keys are configured.** Proceed with web-only mode.
 
