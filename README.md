@@ -578,6 +578,13 @@ Thin, composable wrapper around the Obsidian CLI (v1.12+) that other skills impo
 | Graph | `backlinks`, `links`, `orphans`, `unresolved` |
 | Tasks | `tasks`, `task_toggle`, `task_done` |
 
+**Composable Patterns:**
+| Pattern | Purpose |
+|---------|---------|
+| Agent Memory | Agents autonomously save insights to `Agent Memories/` for cross-session recall |
+| Research Reports | Skills producing deep-thought output save structured reports to `Research/Reports/` with `[[wikilinks]]` to all source notes |
+| Friction Self-Healing | When a skill breaks mid-run, triggers `skill-reflection` immediately and applies fixes |
+
 **Invocation (PowerShell):**
 ```powershell
 @'
