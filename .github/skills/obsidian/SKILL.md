@@ -291,6 +291,94 @@ python .github/skills/obsidian/scripts/obsidian.py search "<problem keywords>" -
 
 ---
 
+## Research Reports (Composable)
+
+### Purpose
+
+When a skill produces deep-thought output — research syntheses, strategy frameworks,
+analysis reports, visual explainers — the output must be captured as a structured
+markdown note in `Research/Reports/` in the Obsidian vault.
+
+This ensures every significant research artifact is findable, linkable, and connected
+to the source notes that informed it.
+
+### When to Trigger
+
+Any skill that produces substantial analytical or research output should save a report:
+
+| Trigger | Example |
+|---------|---------|
+| **Research synthesis completed** | `visual-explainer` generates an HTML strategy framework |
+| **Deep analysis produced** | `insights-report` generates cross-session analysis |
+| **Obsidian-linked research output** | `obsidian-linked-research` produces a comprehensive summary |
+| **Any "deep thought" skill output** | User asks for analysis that produces multi-section structured output |
+
+### Report Note Format
+
+All reports go to `Research/Reports/<kebab-case-title>.md`:
+
+```markdown
+---
+tags: [research-report, <topic-tags>]
+type: report
+created: <YYYY-MM-DD>
+source-skill: <skill-name>
+status: published | draft
+---
+# <Report Title>
+
+<Report body — converted to clean markdown>
+
+---
+
+## Source Notes
+
+Research Library notes that informed this report:
+
+### <Category>
+- [[note-name]]
+- [[note-name]]
+
+### External Sources (not in vault)
+- <Author, "Title," Date>
+```
+
+### Rules
+
+1. **Always link source notes.** Every vault note used as input gets a `[[wikilink]]` in the Source Notes section.
+2. **Separate vault notes from external sources.** Group `[[wikilinks]]` by Research Library category. List external sources (papers, articles not in vault) separately.
+3. **Search before creating.** Check if a report already exists: `search --query "<title>" --path "Research/Reports"`. Update if it does.
+4. **Use kebab-case filenames.** Match the source artifact name where possible (e.g., `harness-engineering-accelerator.md`).
+5. **Tag with `research-report`** plus topic-specific tags from the vault's tag taxonomy.
+6. **Record `source-skill`** in frontmatter so we know which skill generated the report.
+
+### How to Save a Report (Inline)
+
+```powershell
+@'
+---
+tags: [research-report, <topic-tags>]
+type: report
+created: 2026-04-16
+source-skill: visual-explainer
+status: published
+---
+# Report Title
+
+<body>
+
+---
+
+## Source Notes
+
+### Category
+- [[source-note-1]]
+- [[source-note-2]]
+'@ | python .github/skills/obsidian/scripts/obsidian.py create --path "Research/Reports/<kebab-title>.md"
+```
+
+---
+
 ## Friction Self-Healing (Composable)
 
 ### Purpose
