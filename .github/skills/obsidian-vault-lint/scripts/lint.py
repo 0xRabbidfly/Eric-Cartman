@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 obsidian-vault-lint — Weekly vault maintenance pipeline.
 
@@ -164,6 +164,8 @@ def _git_commit_vault(run_date: str):
             cwd=vault_path,
             capture_output=True,
             text=True,
+            encoding='utf-8',
+            errors='replace',
             timeout=30,
         )
         if add_result.returncode != 0:
@@ -177,6 +179,8 @@ def _git_commit_vault(run_date: str):
             cwd=vault_path,
             capture_output=True,
             text=True,
+            encoding='utf-8',
+            errors='replace',
             timeout=30,
         )
 
