@@ -1,6 +1,6 @@
 ---
 name: obsidian-daily-research
-description: Use this skill when the user wants to run the daily AI research pipeline, scan Reddit or X for AI news, or write today's research into their Obsidian vault. Triggers for 'run the daily research', 'what's new in AI today', 'pull today's research', 'catch me up on agents/MCP/models', 'run the pipeline', 'daily scan'. Also use when the user wants to scan only specific sources (Reddit or X only), specify a vault path, or catch up after missing days.
+description: Use this skill when the user wants to run the daily AI research pipeline, scan X for AI news, or write today's research into their Obsidian vault. Triggers for 'run the daily research', 'what's new in AI today', 'pull today's research', 'catch me up on agents/MCP/models', 'run the pipeline', 'daily scan'. Also use when the user wants to scan only specific sources, specify a vault path, or catch up after missing days.
 argument-hint: daily research, run pipeline, what's new in AI
 user-invocable: true
 disable-model-invocation: true
@@ -13,7 +13,7 @@ metadata:
 
 ## Purpose
 
-Automated daily research pipeline that scans 5 topic tracks across Reddit and X,
+Automated daily research pipeline that scans 5 topic tracks on X,
 deduplicates against your Obsidian vault history, and writes a structured daily note
 with a Lab Pulse rollup, Deep Dives section, and per-topic breakdowns.
 
@@ -45,10 +45,10 @@ python .github/skills/obsidian-daily-research/scripts/run.py --promote-only
 1. **Promote Pass** — Scans previous dailies for `#keep` tags, promotes those items to `Research/Library/{topic}.md`
 2. **Feedback Pass** — Scans previous dailies for `#good` / `#bad` tags, logs them to `feedback.json`, marks as processed
 3. **Vault Dedup** — Scans all dailies + library files (including year/month subfolders), extracts every URL and title seen before (zero tokens — filesystem only)
-4. **Multi-Topic Scan** — For each of 5 topics, runs Reddit + X search in scan mode (auto-selected model, no enrichment, 5-12 items each)
+4. **Multi-Topic Scan** — For each of 5 topics, runs X search in scan mode (auto-selected model, no enrichment, 5-12 items each)
 5. **Spam Detection** — Filters out misleading content (claim/link mismatches like fake "official guides", engagement bait)
 6. **Reply Filtering** — Drops replies from topic scans using both `is_reply` API field and text-pattern detection
-7. **Quality Filters** — Strict engagement floor (100+ likes on X, 50+ on Reddit — items with unknown engagement are dropped, not bypassed), long-form bonus, priority account boost
+7. **Quality Filters** — Strict engagement floor (100+ likes on X — items with unknown engagement are dropped, not bypassed), long-form bonus, priority account boost
 8. **Content Classification** — Tags each item as `deep-dive`, `lab-pulse`, or `general`
 9. **Cross-Dedup** — Filters out any URLs/titles already in the vault
 10. **Must-Follow Scan** — Dedicated per-person X search for tracked accounts. No engagement floor — catches everything they post.
@@ -143,7 +143,6 @@ Research/Dailies/2026/02/2026-02-26.md
 ├── Reading List (top 15, checkboxes, topic tags)
 ├── Per-topic sections
 │   ├── Headline + key points
-│   ├── Reddit sources table
 │   └── X sources table
 ├── Promote to Library instructions
 ├── Rate Results (feedback tag instructions with examples + stats)
@@ -164,8 +163,8 @@ Post-scoring filters applied inside `run_topic_scan()` via `config.json → qual
 |--------|-------------|------------|
 | **Spam detection** | Drops fake "official guide" link bait, engagement farming posts. Catches claim/link mismatches and low-effort patterns. | `spam_detection.enabled`, `claim_link_mismatch_patterns`, `low_effort_patterns` |
 | **Reply filtering** | Drops replies from topic scans using `is_reply` API field and text-pattern detection (`@someone` prefix). Applied to all topic scans. | N/A (always on) |
-| **Engagement floor** | Drops Reddit items with `score < 50` and X items with `likes < 100`. Items with unknown engagement are dropped (not bypassed). Lab/priority accounts bypass the floor. Must-follow accounts have no floor. | `min_engagement.reddit_score`, `min_engagement.x_likes` |
-| **Long-form bonus** | +15 pts for X posts with ≥800 chars (threads) and Reddit links to article domains (medium, substack, arxiv, etc.) | `long_form_bonus`, `long_form_min_chars`, `article_domains` |
+| **Engagement floor** | Drops X items with `likes < 100`. Items with unknown engagement are dropped (not bypassed). Lab/priority accounts bypass the floor. Must-follow accounts have no floor. | `min_engagement.x_likes` |
+| **Long-form bonus** | +15 pts for X posts with ≥800 chars (threads). | `long_form_bonus`, `long_form_min_chars` |
 | **Priority accounts** | +20 pts for posts from tracked accounts. Frontier lab releases always surface. | `priority_accounts.x`, `priority_account_bonus` |
 | **Lab accounts** | Accounts from the 5 major labs, used for Lab Pulse rollup. Bypass engagement floor. | `lab_accounts.anthropic`, `lab_accounts.openai`, etc. |
 
@@ -189,7 +188,7 @@ The reflection skill will analyze the run and produce improvement recommendation
 
 ## Dependencies
 
-- Reuses `last30days` lib modules (openai_reddit, xai_x, normalize, score, dedupe)
+- Reuses `last30days` lib modules (xai_x, normalize, score, dedupe)
 - Composes with `obsidian` skill for all vault I/O (read, write, search, list files)
 - API keys via keyring (`automation/api`), env vars, or `~/.config/last30days/.env` (OPENAI_API_KEY, XAI_API_KEY)
 - Python 3.10+ (stdlib only — zero pip dependencies)

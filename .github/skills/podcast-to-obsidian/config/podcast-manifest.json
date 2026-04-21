@@ -82,6 +82,16 @@
           "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-03-21 - NVIDIA's $1 Trillion Prediction, Anthropic Beats OpenAI, Tesla vs. TSMC & The CS Job Collapse  240.md",
           "processed_at": "2026-03-22T20:00:00Z",
           "status": "completed"
+        },
+        "7cxuYgtegHjyLVm7mY78qO": {
+          "title": "Elon Musk vs. Sam Altman, AI Job Loss, and OpenAI's $852B Valuation | EP #247",
+          "published": "2026-04-14",
+          "audio_url": "https://traffic.megaphone.fm/DVVTS1439719517.mp3?updated=1776175230",
+          "rss_guid": "b320ec2a-378b-11f1-9dab-1be003e118cf",
+          "transcript_path": ".work/transcripts/2026-04-14 - Elon Musk vs Sam Altman AI Job Loss and OpenAIs 852B Valuation EP 247.txt",
+          "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-04-14 - Elon Musk vs. Sam Altman, AI Job Loss, and OpenAI's $852B Valuation  EP #247.md",
+          "processed_at": "2026-04-15T00:00:00Z",
+          "status": "completed"
         }
       }
     },
@@ -99,6 +109,17 @@
           "note_path": "Podcasts/Dwarkesh Podcast/2026-03-11 - The most important question nobody's asking about AI.md",
           "processed_at": "2026-03-23T02:17:13.084167+00:00",
           "status": "completed"
+        },
+        "1viBRy6dQdlSw0OdFvogXB": {
+          "title": "Jensen Huang – TPU competition, why we should sell chips to China, & Nvidia’s supply chain moat",
+          "published": "2026-04-15",
+          "audio_url": "https://api.substack.com/feed/podcast/194289889/4ad9f4582dd59f13b5a5cc452125b1f6.mp3",
+          "rss_guid": "substack:post:194289889",
+          "transcript_path": ".work/transcripts/2026-04-15 - Jensen Huang – TPU competition, why we should sell chips to China, & Nvidia’s supply chain moat.txt",
+          "note_path": "Podcasts/Dwarkesh Podcast/2026-04-15 - Jensen Huang – TPU competition, why we should sell chips to China, & Nvidia’s supply chain moat.md",
+          "processed_at": "2026-04-20T11:50:00Z",
+          "status": "completed",
+          "spotify_url": "https://open.spotify.com/episode/1viBRy6dQdlSw0OdFvogXB"
         }
       }
     },
@@ -179,6 +200,32 @@
           "transcript_path": ".work/transcripts/2026-03-20 - Dreamer the Personal Agent OS David Singleton.txt",
           "note_path": "Podcasts/Latent Space The AI Engineer Podcast/2026-03-20 - Dreamer the Personal Agent OS David Singleton.md",
           "processed_at": "2026-03-22T00:00:00Z",
+          "status": "completed"
+        }
+      }
+    },
+    "the-a16z-podcast": {
+      "name": "The a16z Podcast",
+      "rss_url": "https://feeds.simplecast.com/JGE3yC0V",
+      "spotify_id": "",
+      "episodes": {
+        "d8e62120-c865-428e-b1c2-1d965406f293": {
+          "title": "The Agent Era: Building Software Beyond Chat with Box CEO Aaron Levie",
+          "published": "2026-04-08",
+          "audio_url": "https://mgln.ai/e/1344/afp-848985-injected.calisto.simplecastaudio.com/3f86df7b-51c6-4101-88a2-550dba782de8/episodes/78b49179-3322-4bee-b3b9-7117831ba9cd/audio/128/default.mp3?aid=rss_feed&awCollectionId=3f86df7b-51c6-4101-88a2-550dba782de8&awEpisodeId=78b49179-3322-4bee-b3b9-7117831ba9cd&feed=JGE3yC0V",
+          "transcript_path": ".work/transcripts/2026-04-08 - The Agent Era Building Software Beyond Chat with Box CEO Aaron Levie.txt",
+          "note_path": "Podcasts/The a16z Podcast/2026-04-08 - The Agent Era Building Software Beyond Chat with Box CEO Aaron Levie.md",
+          "processed_at": "2026-04-14T10:47:37.671703+00:00",
+          "status": "completed"
+        },
+        "0GRcjqAjGv7dLafpqW58uj": {
+          "title": "Marc Andreessen on AI Winters and Agent Breakthroughs",
+          "published": "2026-04-03",
+          "audio_url": "https://mgln.ai/e/1344/afp-848985-injected.calisto.simplecastaudio.com/3f86df7b-51c6-4101-88a2-550dba782de8/episodes/49988fe6-d35d-40a3-9709-0576315fd18e/audio/128/default.mp3?aid=rss_feed&awCollectionId=3f86df7b-51c6-4101-88a2-550dba782de8&awEpisodeId=49988fe6-d35d-40a3-9709-0576315fd18e&feed=JGE3yC0V",
+          "rss_guid": "fd960df5-9d0a-4630-b24a-fdfa37583be1",
+          "transcript_path": ".work/transcripts/2026-04-03 - Marc Andreessen on AI Winters and Agent Breakthroughs.txt",
+          "note_path": "Podcasts/The a16z Podcast/2026-04-03 - Marc Andreessen on AI Winters and Agent Breakthroughs.md",
+          "processed_at": "2026-04-14T00:00:00Z",
           "status": "completed"
         }
       }

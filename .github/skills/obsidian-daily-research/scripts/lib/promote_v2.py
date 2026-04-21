@@ -2,12 +2,11 @@
 
 Scans daily notes for items tagged #keep:
 1. Fetches the URL content
-2. Generates a structured summary with an LLM (OpenAI gpt-5.2)
+2. Generates a structured summary via Claude CLI (Max account)
 3. Creates a standalone research note in Research/Library/
 4. Replaces #keep with #kept in the original daily
 
-Falls back to a basic note (title + URL + summary) when no API key
-is provided or when enrichment fails.
+Falls back to a basic note (title + URL + summary) when enrichment fails.
 
 Uses the Obsidian CLI via vault_v2 for all file operations.
 """
@@ -16,11 +15,14 @@ import html
 import importlib.util
 import json
 import re
+import subprocess
 import urllib.error
 import urllib.request
 from datetime import datetime
 from pathlib import Path
 from typing import List, Optional, Tuple
+
+CLAUDE_CLI = r"C:\Users\nuno_\.local\bin\claude.exe"
 
 # Load vault_v2 from the same directory (avoids 'lib' package name clash
 # with last30days when loaded via importlib from run.py)
@@ -145,14 +147,13 @@ def _fetch_url_content(url: str, timeout: int = 15) -> Optional[str]:
 
 
 def _summarize_with_llm(
-    api_key: str,
     title: str,
     url: str,
     page_content: Optional[str],
     summary_hint: str,
     topic_slug: str,
 ) -> Optional[dict]:
-    """Call OpenAI gpt-5.2 to produce a structured research note summary.
+    """Call Claude CLI to produce a structured research note summary (Max account).
 
     Returns a dict with: title, slug, author, source, summary,
     key_insights, actionable_takeaways, relevance, tags.
@@ -192,30 +193,17 @@ RULES:
 - author: extract from page content or URL if possible
 - Output ONLY valid JSON, no markdown fences"""
 
-    payload = {
-        "model": "gpt-5.2",
-        "messages": [{"role": "user", "content": prompt}],
-        "response_format": {"type": "json_object"},
-        "temperature": 0.3,
-    }
-
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json",
-    }
-
     try:
-        data = json.dumps(payload).encode("utf-8")
-        req = urllib.request.Request(
-            "https://api.openai.com/v1/chat/completions",
-            data=data,
-            headers=headers,
-            method="POST",
+        result = subprocess.run(
+            [CLAUDE_CLI, "--print", "-p", prompt],
+            capture_output=True, text=True, timeout=120,
         )
-        with urllib.request.urlopen(req, timeout=60) as resp:
-            result = json.loads(resp.read().decode("utf-8"))
-
-        content = result["choices"][0]["message"]["content"]
+        content = result.stdout.strip()
+        if not content:
+            print(f"  [warn] LLM enrichment failed: no output. stderr={result.stderr.strip()}")
+            return None
+        content = re.sub(r'^```(?:json)?\s*', '', content)
+        content = re.sub(r'\s*```$', '', content)
         return json.loads(content)
     except Exception as e:
         print(f"  [warn] LLM enrichment failed: {e}")
@@ -334,20 +322,18 @@ def _slugify(title: str) -> str:
 def promote_items(
     config: dict,
     *,
-    api_key: Optional[str] = None,
     dry_run: bool = False,
+    **_kwargs,  # absorb legacy api_key= callers
 ) -> List[dict]:
     """Run the full promote pass.
 
     1. Scan dailies for #keep items
-    2. Fetch URL content and generate structured summary (if api_key provided)
+    2. Fetch URL content and generate structured summary via Claude CLI
     3. Create standalone research notes in Research/Library/
     4. Replace #keep → #kept in originals
 
     Args:
         config: Pipeline config dict.
-        api_key: OpenAI API key for LLM enrichment. If None, creates basic
-                 notes with just the title/URL/summary from the daily.
         dry_run: If True, scan and return items without writing anything.
 
     Returns list of promoted item dicts (each gets a 'library_path' key).
@@ -372,30 +358,24 @@ def promote_items(
             slug = None
             note_content = None
 
-            if api_key:
-                # Enriched path: fetch URL → summarize with LLM → standalone note
-                print(f"  [enrich] Fetching {item['url']}...")
-                page_content = _fetch_url_content(item["url"])
+            # Enriched path: fetch URL → summarize via Claude CLI → standalone note
+            print(f"  [enrich] Fetching {item['url']}...")
+            page_content = _fetch_url_content(item["url"])
 
-                print(f"  [enrich] Summarizing with LLM...")
-                enrichment = _summarize_with_llm(
-                    api_key,
-                    item["title"],
-                    item["url"],
-                    page_content,
-                    item.get("summary", ""),
-                    item["topic_slug"],
-                )
+            print(f"  [enrich] Summarizing via Claude CLI...")
+            enrichment = _summarize_with_llm(
+                item["title"],
+                item["url"],
+                page_content,
+                item.get("summary", ""),
+                item["topic_slug"],
+            )
 
-                if enrichment:
-                    slug = enrichment.get("slug", _slugify(item["title"]))
-                    note_content = _render_enriched_note(enrichment, item)
-                else:
-                    # LLM failed — fall back to basic note
-                    slug = _slugify(item["title"])
-                    note_content = _render_basic_note(item)
+            if enrichment:
+                slug = enrichment.get("slug", _slugify(item["title"]))
+                note_content = _render_enriched_note(enrichment, item)
             else:
-                # No API key — basic note only
+                # Claude CLI failed — fall back to basic note
                 slug = _slugify(item["title"])
                 note_content = _render_basic_note(item)
 

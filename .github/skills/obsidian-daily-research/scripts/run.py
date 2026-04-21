@@ -23,7 +23,11 @@ import io
 import json
 import os
 import re
+import subprocess
 import sys
+import urllib.parse
+import urllib.request
+import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -71,13 +75,9 @@ FEEDBACK_FILE = SCRIPT_DIR / "feedback.json"
 # (exact cost), so rates below are irrelevant for Grok models in practice.
 # Override via DEFAULT_COST_RATES dict above.
 DEFAULT_COST_RATES = {
-    # OpenAI Responses API (web_search)
-    "gpt-4o":        {"input": 2.50, "output": 10.00},
-    "gpt-4o-mini":   {"input": 0.15, "output": 0.60},
-    # OpenAI Chat Completions
-    "gpt-5.4":       {"input": 2.50, "output": 15.00},
-    "gpt-5.2":       {"input": 2.00, "output": 8.00},
-    "gpt-4.1":       {"input": 2.00, "output": 8.00},
+    # Anthropic — synthesis
+    "claude-sonnet-4-6": {"input": 3.00, "output": 15.00},
+    "claude-haiku-4-5":  {"input": 0.80, "output": 4.00},
     # xAI — fallback only; prefer cost_in_usd_ticks from API response
     "grok-4-1-fast": {"input": 2.00, "output": 8.00},
     "grok-3":        {"input": 3.00, "output": 15.00},
@@ -99,7 +99,7 @@ class TokenTracker:
         """Record a single API call's usage.
 
         Args:
-            label:  Human-readable call label (e.g. 'Reddit/agents')
+            label:  Human-readable call label (e.g. 'X/agents')
             model:  Model name used
             usage:  Raw usage dict from API response (or None)
         """
@@ -219,7 +219,7 @@ def _extract_usage(response: dict) -> dict | None:
 # Quality filter defaults. X account membership is derived from pipeline.md,
 # not hardcoded here.
 DEFAULT_QUALITY_FILTERS = {
-    "min_engagement": {"reddit_score": 50, "x_likes": 100},
+    "min_engagement": {"x_likes": 100},
     "long_form_bonus": 15,
     "long_form_min_chars": 800,
     "article_domains": [
@@ -233,9 +233,6 @@ DEFAULT_QUALITY_FILTERS = {
     ],
     "priority_accounts": {
         "x": [],
-        "reddit_subreddits": [
-            "Anthropic", "OpenAI", "LocalLLaMA", "MachineLearning",
-        ],
     },
     "priority_account_bonus": 20,
     "spam_detection": {
@@ -487,6 +484,50 @@ def _is_spam(item, config: dict, source: str = "x") -> bool:
     return False
 
 
+# Patterns indicating a tweet is reporting on someone else's work rather than being that work.
+# Examples: "X just dropped a 10-step guide", "@boris just published an article", "check out this thread by @Y"
+_AMPLIFIER_PATTERNS = [
+    r"\bjust\s+(?:dropped|released|published|shared|launched|posted|wrote|announced|put\s+out)\b",
+    r"\bjust\s+(?:came\s+out\s+with|dropped\s+a)\b",
+    r"\b(?:check\s+out|go\s+read|you\s+(?:need\s+to\s+)?(?:check|read|see|watch))\b",
+    r"\bhere(?:'s|\s+is)\s+(?:a\s+)?(?:thread|article|guide|summary|breakdown|writeup|post)\s+(?:by|from)\b",
+    r"\bthread\s+by\s+@",
+    r"\bsummary\s+(?:of|from)\b",
+    r"\bmy\s+notes\s+on\b",
+    r"\b@\w+\s+(?:just\s+)?(?:dropped|released|published|wrote|posted|shared|announced)\b",
+]
+
+# Counter-signals: explicit first-person experimentation that adds original value.
+_NOVEL_ANALYSIS_SIGNALS = [
+    r"\bI\s+(?:tested|tried|built|ran|measured|benchmarked|deployed|implemented|reproduced|validated|replicated)\b",
+    r"\bI\s+found\s+(?:that\s+)?(?:it|this|the)\b",
+    r"\bmy\s+(?:analysis|results|findings|benchmark|experiment|test)\b",
+    r"\bhere(?:'s|\s+is)\s+(?:what\s+(?:I\s+found|happened|it\s+does)|my\b)\b",
+]
+
+_AMPLIFIER_RE = [re.compile(p, re.IGNORECASE) for p in _AMPLIFIER_PATTERNS]
+_NOVEL_RE = [re.compile(p, re.IGNORECASE) for p in _NOVEL_ANALYSIS_SIGNALS]
+_NOVEL_ANALYSIS_MIN_CHARS = 600
+
+
+def _is_amplifier(item) -> bool:
+    """Drop tweets that only report someone else's work with no original contribution.
+
+    Catches patterns like "X just dropped a 10-step guide..." or "@Y just published
+    an article on...". Exception: long posts (≥600 chars) with first-person analysis
+    signals ("I tested", "I built", "I found") are kept — they add genuine value.
+    """
+    text = item.text.strip()
+    if not any(p.search(text) for p in _AMPLIFIER_RE):
+        return False
+    # Amplifier pattern matched — check for novel-analysis exception
+    has_novel = any(p.search(text) for p in _NOVEL_RE)
+    is_long = len(text) >= _NOVEL_ANALYSIS_MIN_CHARS
+    if has_novel and is_long:
+        return False
+    return True
+
+
 def _classify_content(item, config: dict, source: str = "x") -> str:
     """Classify an item as 'deep-dive', 'lab-pulse', or 'general'.
 
@@ -511,13 +552,6 @@ def _classify_content(item, config: dict, source: str = "x") -> str:
     # Deep dive check
     if source == "x" and len(item.text) >= long_form_min:
         return "deep-dive"
-    if source == "reddit":
-        url_lower = item.url.lower()
-        if any(domain in url_lower for domain in article_domains):
-            return "deep-dive"
-        if len(item.title) > 100:
-            return "deep-dive"
-
     return "general"
 
 
@@ -542,10 +576,6 @@ def apply_quality_filters(result: dict, config: dict) -> dict:
         item for item in result["x_items"]
         if not _is_spam(item, config, "x")
     ]
-    result["reddit_items"] = [
-        item for item in result["reddit_items"]
-        if not _is_spam(item, config, "reddit")
-    ]
 
     # --- 0b. Reply filtering (drop replies from topic scans) ---
     # Replies leak through when the API returns them despite prompt instructions.
@@ -562,8 +592,13 @@ def apply_quality_filters(result: dict, config: dict) -> dict:
         filtered_x.append(item)
     result["x_items"] = filtered_x
 
+    # --- 0c. Amplifier filtering (drop "X just dropped a guide" signal-laundering) ---
+    result["x_items"] = [
+        item for item in result["x_items"]
+        if not _is_amplifier(item)
+    ]
+
     min_eng = qf.get("min_engagement", {})
-    reddit_floor = min_eng.get("reddit_score", 0)
     x_likes_floor = min_eng.get("x_likes", 0)
 
     long_form_bonus = qf.get("long_form_bonus", 0)
@@ -572,7 +607,6 @@ def apply_quality_filters(result: dict, config: dict) -> dict:
 
     priority = qf.get("priority_accounts", {})
     priority_x = {h.lower() for h in priority.get("x", [])}
-    priority_subs = {s.lower() for s in priority.get("reddit_subreddits", [])}
     priority_bonus = qf.get("priority_account_bonus", 0)
 
     # --- 1. Engagement floor (drop low-engagement items) ---
@@ -581,13 +615,6 @@ def apply_quality_filters(result: dict, config: dict) -> dict:
     for handles in qf.get("lab_accounts", {}).values():
         lab_handles.update(h.lower() for h in handles)
 
-    if reddit_floor > 0:
-        result["reddit_items"] = [
-            item for item in result["reddit_items"]
-            if (item.engagement is not None
-                and item.engagement.score is not None
-                and item.engagement.score >= reddit_floor)
-        ]
     if x_likes_floor > 0:
         result["x_items"] = [
             item for item in result["x_items"]
@@ -600,17 +627,8 @@ def apply_quality_filters(result: dict, config: dict) -> dict:
 
     # --- 2. Long-form content bonus ---
     if long_form_bonus > 0:
-        # X: boost items with long text (threads, article links)
         for item in result["x_items"]:
             if len(item.text) >= long_form_min_chars:
-                item.score = min(100, item.score + long_form_bonus)
-
-        # Reddit: boost items linking to article domains or with long titles
-        for item in result["reddit_items"]:
-            url_lower = item.url.lower()
-            is_article = any(domain in url_lower for domain in article_domains)
-            is_long_title = len(item.title) > 100
-            if is_article or is_long_title:
                 item.score = min(100, item.score + long_form_bonus)
 
     # --- 3. Priority account boost ---
@@ -619,15 +637,9 @@ def apply_quality_filters(result: dict, config: dict) -> dict:
             if item.author_handle.lower() in priority_x:
                 item.score = min(100, item.score + priority_bonus)
 
-        for item in result["reddit_items"]:
-            if item.subreddit.lower() in priority_subs:
-                item.score = min(100, item.score + priority_bonus)
-
     # --- 4. Classify content (attach category metadata) ---
     for item in result["x_items"]:
         item._category = _classify_content(item, config, "x")
-    for item in result["reddit_items"]:
-        item._category = _classify_content(item, config, "reddit")
 
     return result
 
@@ -648,7 +660,6 @@ def run_topic_scan(
     Uses last30days lib modules directly in scan mode.
     """
     from vendor.last30days import (
-        openai_reddit,
         xai_x,
         normalize,
         score,
@@ -658,41 +669,11 @@ def run_topic_scan(
 
     result = {
         "topic": topic,
-        "reddit_items": [],
         "x_items": [],
         "errors": [],
     }
 
     combined_query = topic.display_name
-
-    # --- Reddit scan ---
-    if l30_config.get("OPENAI_API_KEY"):
-        try:
-            # web_search tool requires a model that supports it (gpt-4o or higher)
-            # gpt-4o-mini doesn't support web_search in Responses API
-            model = selected_models.get("openai", "gpt-4o")
-            raw = openai_reddit.search_reddit(
-                l30_config["OPENAI_API_KEY"],
-                model,
-                combined_query,
-                from_date,
-                to_date,
-                depth="scan",
-            )
-            if tracker:
-                tracker.record(f"Reddit/{topic.slug}", model, _extract_usage(raw))
-            items = openai_reddit.parse_reddit_response(raw)
-            # Normalize
-            normalized = normalize.normalize_reddit_items(items, from_date, to_date)
-            filtered = normalize.filter_by_date_range(normalized, from_date, to_date)
-            # Score
-            scored = score.score_reddit_items(filtered)
-            sorted_items = score.sort_items(scored)
-            # Dedupe internally
-            deduped = dedupe.dedupe_reddit(sorted_items)
-            result["reddit_items"] = deduped
-        except Exception as e:
-            result["errors"].append(f"Reddit/{topic.slug}: {e}")
 
     # --- X scan ---
     if l30_config.get("XAI_API_KEY"):
@@ -722,11 +703,6 @@ def run_topic_scan(
     result = apply_quality_filters(result, config)
 
     # --- Vault dedup: remove items already seen ---
-    result["reddit_items"] = [
-        item for item in result["reddit_items"]
-        if item.url not in seen_urls
-        and not vault.title_is_seen(item.title, seen_titles)
-    ]
     result["x_items"] = [
         item for item in result["x_items"]
         if item.url not in seen_urls
@@ -735,35 +711,22 @@ def run_topic_scan(
     return result
 
 
+SYNTHESIS_MODEL = "claude-sonnet-4-6"
+CLAUDE_CLI = r"C:\Users\nuno_\.local\bin\claude.exe"
+
+
 def synthesize_all(
-    api_key: str,
     topic_results: list,
     from_date: str,
     to_date: str,
     tracker: TokenTracker | None = None,
 ) -> dict:
-    """Single batched synthesis call across all topics.
-
-    Sends one gpt-5.2 call with combined data instead of 5 separate calls.
-    """
-    from vendor.last30days import http
+    """Single batched synthesis call across all topics using Claude CLI (Max account)."""
 
     # Build per-topic summaries
     sections = []
     for tr in topic_results:
         topic = tr["topic"]
-        reddit_lines = []
-        for item in tr["reddit_items"][:5]:
-            eng = ""
-            if item.engagement:
-                parts = []
-                if item.engagement.score is not None:
-                    parts.append(f"{item.engagement.score}pts")
-                if item.engagement.num_comments is not None:
-                    parts.append(f"{item.engagement.num_comments}cmt")
-                eng = f" [{', '.join(parts)}]" if parts else ""
-            reddit_lines.append(f"  - r/{item.subreddit}: \"{item.title}\"{eng}")
-
         x_lines = []
         for item in tr["x_items"][:5]:
             eng = ""
@@ -776,11 +739,9 @@ def synthesize_all(
             x_lines.append(f"  - @{item.author_handle}{eng}: \"{text}\"")
 
         section = f"### {topic.display_name}\n"
-        if reddit_lines:
-            section += "Reddit:\n" + "\n".join(reddit_lines) + "\n"
         if x_lines:
             section += "X:\n" + "\n".join(x_lines) + "\n"
-        if not reddit_lines and not x_lines:
+        else:
             section += "(No new results)\n"
         sections.append(section)
 
@@ -816,33 +777,22 @@ RULES:
 - If a topic had no results, say "Quiet day for this topic"
 - Output ONLY valid JSON"""
 
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json",
-    }
-    payload = {
-        "model": "gpt-5.2",
-        "messages": [{"role": "user", "content": prompt}],
-        "response_format": {"type": "json_object"},
-        "temperature": 0.5,
-    }
-
     try:
-        resp = http.post(
-            "https://api.openai.com/v1/chat/completions",
-            payload,
-            headers=headers,
-            timeout=60,
+        result = subprocess.run(
+            [CLAUDE_CLI, "--print", "-p", prompt],
+            capture_output=True, text=True, encoding="utf-8", timeout=120,
         )
-        if tracker:
-            tracker.record("Synthesis", "gpt-5.2", _extract_usage(resp))
-        if "choices" in resp and resp["choices"]:
-            content = resp["choices"][0].get("message", {}).get("content", "{}")
-            return json.loads(content)
+        content = result.stdout.strip()
+        if not content:
+            err = result.stderr.strip()
+            return {"briefing": f"Synthesis failed: no output. stderr={err}", "topics": [], "error": err}
+        print(f"[synth] Claude CLI synthesis done")
+        # Strip markdown code fences if Claude wraps the JSON
+        content = re.sub(r'^```(?:json)?\s*', '', content)
+        content = re.sub(r'\s*```$', '', content)
+        return json.loads(content)
     except Exception as e:
         return {"briefing": f"Synthesis failed: {e}", "topics": [], "error": str(e)}
-
-    return {"briefing": "", "topics": []}
 
 
 # ---------------------------------------------------------------------------
@@ -1458,9 +1408,8 @@ def generate_proposals(analysis: dict, config: dict) -> list[str]:
         proposals.append(
             f"**Low-engagement leak** — {low_eng}/{total_bad} bad items ({pct:.0f}%) had "
             f"suspiciously low engagement. Check if unknown-engagement items are being "
-            f"let through instead of dropped. Current floors: "
-            f"X={config.get('quality_filters', {}).get('min_engagement', {}).get('x_likes', '?')} likes, "
-            f"Reddit={config.get('quality_filters', {}).get('min_engagement', {}).get('reddit_score', '?')} score."
+            f"let through instead of dropped. Current floor: "
+            f"X={config.get('quality_filters', {}).get('min_engagement', {}).get('x_likes', '?')} likes."
         )
 
     # Misleading content
@@ -1801,6 +1750,99 @@ def _find_vault_connections(topic_slugs: list[str], config: dict) -> dict[str, l
     return connections
 
 
+# ---------------------------------------------------------------------------
+# Google News RSS
+# ---------------------------------------------------------------------------
+
+
+def _fetch_google_news_topic(query: str, max_items: int = 10) -> list:
+    """Fetch Google News RSS for a single query. Returns list of article dicts."""
+    encoded = urllib.parse.quote(query)
+    url = f"https://news.google.com/rss/search?q={encoded}&hl=en-US&gl=US&ceid=US:en"
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            xml_data = resp.read()
+        root = ET.fromstring(xml_data)
+        items = []
+        for item_el in root.findall(".//item")[:max_items]:
+            title = item_el.findtext("title", "").strip()
+            link = item_el.findtext("link", "").strip()
+            pub_date = item_el.findtext("pubDate", "").strip()
+            source_el = item_el.find("source")
+            source = source_el.text.strip() if source_el is not None else ""
+            raw_desc = item_el.findtext("description", "")
+            description = re.sub(r"<[^>]+>", " ", raw_desc).strip()
+            description = re.sub(r"\s{2,}", " ", description)[:200]
+            items.append({
+                "title": title,
+                "url": link,
+                "source": source,
+                "pub_date": pub_date,
+                "description": description,
+                "query": query,
+            })
+        return items
+    except Exception as e:
+        print(f"  [news] Error fetching '{query}': {e}")
+        return []
+
+
+def _score_news_with_llm(items: list) -> list:
+    """Use Claude CLI to score and select top 10 news items for relevance."""
+    if not items:
+        return []
+
+    item_lines = []
+    for i, item in enumerate(items, 1):
+        desc = f": {item['description'][:120]}" if item.get("description") else ""
+        item_lines.append(f"{i}. [{item.get('source', '')}] {item['title']}{desc}")
+
+    prompt = (
+        "You are scoring AI news headlines for relevance to an AI practitioner focused on: "
+        "agent development, LLM models, MCP (Model Context Protocol), RAG, and AI-assisted SDLC.\n\n"
+        "Score each item 1-10 for relevance. Return ONLY a JSON array of the top 10 most relevant:\n"
+        '[{"index": 1, "score": 9}, {"index": 3, "score": 8}, ...]\n\n'
+        "Only include items with score >= 5. Sort by score descending.\n\n"
+        "Items:\n" + "\n".join(item_lines)
+    )
+
+    try:
+        result = subprocess.run(
+            [CLAUDE_CLI, "--print", "-p", prompt],
+            capture_output=True, text=True, encoding="utf-8", timeout=60,
+        )
+        content = result.stdout.strip()
+        content = re.sub(r"^```(?:json)?\s*", "", content)
+        content = re.sub(r"\s*```$", "", content)
+        rankings = json.loads(content)
+        scored = []
+        for r in rankings[:10]:
+            idx = r.get("index", 0) - 1  # 1-based → 0-based
+            if 0 <= idx < len(items):
+                item = dict(items[idx])
+                item["llm_score"] = r.get("score", 0)
+                scored.append(item)
+        return sorted(scored, key=lambda x: x.get("llm_score", 0), reverse=True)
+    except Exception as e:
+        print(f"  [news] LLM scoring failed: {e}")
+        return items[:10]
+
+
+def fetch_google_news(topics: list, config: dict) -> list:
+    """Fetch Google News RSS across all topics, LLM-score, return top 10."""
+    all_items = []
+    for topic in topics:
+        query = f"{topic.display_name} AI"
+        items = _fetch_google_news_topic(query, max_items=10)
+        all_items.extend(items)
+        print(f"  [news/{topic.slug}] {len(items)} articles")
+    if not all_items:
+        return []
+    print(f"  [news] Scoring {len(all_items)} articles via Claude CLI...")
+    return _score_news_with_llm(all_items)
+
+
 def render_daily_note(
     date_str: str,
     topic_results: list,
@@ -1808,6 +1850,7 @@ def render_daily_note(
     config: dict,
     must_follow_results: list = None,
     prominent_results: list = None,
+    news_items: list = None,
     feedback_summary: dict = None,
     feedback_analysis: dict = None,
     feedback_proposals: list[str] = None,
@@ -1815,14 +1858,12 @@ def render_daily_note(
 ) -> str:
     """Render the full daily note markdown."""
     topic_slugs = [tr["topic"].slug for tr in topic_results]
-    total_reddit = sum(len(tr["reddit_items"]) for tr in topic_results)
     total_x = sum(len(tr["x_items"]) for tr in topic_results)
 
     # Count must-follow tweets
     mf_count = sum(len(r["items"]) for r in (must_follow_results or []))
     prom_count = len(prominent_results or [])
-
-
+    news_count = len(news_items or [])
 
     # Collect categorized items across all topics
     deep_dives = []
@@ -1835,10 +1876,6 @@ def render_daily_note(
                 deep_dives.append((item, topic, 'x'))
             elif cat == 'lab-pulse':
                 lab_pulse_items.append((item, topic, 'x'))
-        for item in tr["reddit_items"]:
-            cat = getattr(item, '_category', 'general')
-            if cat == 'deep-dive':
-                deep_dives.append((item, topic, 'reddit'))
 
     # Build frontmatter
     fm_lines = [
@@ -1848,12 +1885,12 @@ def render_daily_note(
         f"tags: [{', '.join(topic_slugs)}]",
         "status: unread",
         f"up: \"[[🤖 MOC - AI Agent Development]]\"",
-        f"reddit_items: {total_reddit}",
         f"x_items: {total_x}",
         f"must_follow_tweets: {mf_count}",
         f"prominent_voices: {prom_count}",
         f"deep_dives: {len(deep_dives)}",
         f"lab_pulse: {len(lab_pulse_items)}",
+        f"news_items: {news_count}",
     ]
     fm_lines.extend(["---", ""])
 
@@ -1938,6 +1975,28 @@ def render_daily_note(
             )
         lines.append("")
 
+    # News — top 10 Google News articles scored by LLM for relevance
+    if news_items:
+        lines.extend([
+            "## News \U0001f4f0",
+            "",
+            "| # | Headline | Source | Date |",
+            "|---|----------|--------|------|",
+        ])
+        for i, item in enumerate(news_items[:10], 1):
+            title = _oneline(item.get("title", ""), 0)
+            source = _oneline(item.get("source", ""), 0)
+            # pubDate from RSS: "Sun, 20 Apr 2025 10:00:00 GMT" → "Apr 20"
+            raw_date = item.get("pub_date", "")
+            try:
+                dt = datetime.strptime(raw_date, "%a, %d %b %Y %H:%M:%S %Z")
+                pub_short = dt.strftime("%b %d")
+            except ValueError:
+                pub_short = raw_date[:12]
+            url = item.get("url", "")
+            lines.append(f"| {i} | [{title}]({url}) | {source} | {pub_short} |")
+        lines.append("")
+
     # Lab Pulse — what the model providers said/shipped today
     lab_pulse_summary = synthesis.get("lab_pulse_summary", "")
     if lab_pulse_summary or lab_pulse_items:
@@ -1965,11 +2024,8 @@ def render_daily_note(
             "",
         ])
         for item, topic, source in deep_dives[:8]:
-            if source == 'x':
-                title = _oneline(item.text, 0)
-                lines.append(f"- [ ] [{title}]({item.url}) — @{item.author_handle} #{topic.slug}")
-            else:
-                lines.append(f"- [ ] [{item.title}]({item.url}) — r/{item.subreddit} #{topic.slug}")
+            title = _oneline(item.text, 0)
+            lines.append(f"- [ ] [{title}]({item.url}) — @{item.author_handle} #{topic.slug}")
         lines.append("")
 
     # Reading list (top items across all topics, ranked by score)
@@ -2011,22 +2067,6 @@ def render_daily_note(
                 lines.append(f"- {kp}")
             lines.append("")
 
-        # Sources table — Reddit
-        if tr["reddit_items"]:
-            lines.extend([
-                "### Reddit",
-                "",
-                "| # | Title | Subreddit | Score | Link |",
-                "|---|-------|-----------|-------|------|",
-            ])
-            for i, item in enumerate(tr["reddit_items"][:8], 1):
-                score_val = item.score if hasattr(item, "score") else 0
-                title_short = _oneline(item.title, 60)
-                lines.append(
-                    f"| {i} | {title_short} | r/{item.subreddit} | {score_val} | [→]({item.url}) |"
-                )
-            lines.append("")
-
         # Sources table — X
         if tr["x_items"]:
             lines.extend([
@@ -2043,7 +2083,7 @@ def render_daily_note(
                 )
             lines.append("")
 
-        if not tr["reddit_items"] and not tr["x_items"]:
+        if not tr["x_items"]:
             lines.extend(["*No new results for this topic today.*", ""])
 
     # Footer
@@ -2097,15 +2137,6 @@ def _build_reading_list(topic_results: list, config: dict) -> list:
 
     for tr in topic_results:
         topic = tr["topic"]
-        for item in tr["reddit_items"]:
-            all_items.append({
-                "title": item.title,
-                "url": item.url,
-                "summary": item.why_relevant or f"r/{item.subreddit}",
-                "topic_slug": topic.slug,
-                "score": item.score * topic.weight,
-                "source": "reddit",
-            })
         for item in tr["x_items"]:
             all_items.append({
                 "title": _oneline(item.text, 80),
@@ -2139,11 +2170,38 @@ def main():
     parser.add_argument("--costs", action="store_true", help="Show estimated token costs after run")
     parser.add_argument("--debug", action="store_true", help="Enable verbose debug logging")
     parser.add_argument("--force-rerun", action="store_true", help="Ignore same-day note protection and rerun intentionally")
+    parser.add_argument("--note-suffix", default="", help="Append a suffix to the output note filename (e.g. '_new' → 2026-04-20_new.md). Bypasses same-day protection.")
+    parser.add_argument("--test-synth", action="store_true", help="Test synthesis with mock data and exit")
     args = parser.parse_args()
+
+    # --test-synth: call synthesize_all with mock data and exit
+    if args.test_synth:
+        from types import SimpleNamespace
+        mock_item = SimpleNamespace(
+            text="Anthropic released Claude 4 with 200K context and new tool use features today.",
+            author_handle="AnthropicAI",
+            engagement=SimpleNamespace(likes=1200),
+            url="https://x.com/AnthropicAI/status/mock",
+        )
+        mock_topic = SimpleNamespace(slug="agents", display_name="AI Agents")
+        mock_result = {"topic": mock_topic, "x_items": [mock_item]}
+        today = datetime.now().strftime("%Y-%m-%d")
+        print(f"[test-synth] Calling synthesize_all with mock data...")
+        result = synthesize_all([mock_result], today, today)
+        if "error" in result:
+            print(f"[test-synth] FAILED: {result['error']}")
+        else:
+            print(f"[test-synth] SUCCESS")
+            print(f"  POW: {result.get('briefing', '')[:120]}...")
+            print(f"  lab_pulse: {result.get('lab_pulse_summary', '')[:80]}...")
+            topics = result.get("topics", [])
+            print(f"  topics: {len(topics)} returned")
+        return
 
     # Load config
     config = load_config()
     today = datetime.now().strftime("%Y-%m-%d")
+    note_date_key = today + args.note_suffix  # used for filename; today kept for dedup/date logic
 
     # --show-dedup: just dump URLs and exit
     if args.show_dedup:
@@ -2155,15 +2213,11 @@ def main():
 
     # --promote-only: just run promotion pass and exit
     if args.promote_only:
-        # Load API key for LLM enrichment
         from vendor.last30days import env as l30_env
         l30_config = l30_env.get_config()
-        openai_key = l30_config.get("OPENAI_API_KEY")
-        if not openai_key:
-            print("[warn] No OPENAI_API_KEY - will create basic notes without summaries")
 
         promoted = promote.promote_items(
-            config, api_key=openai_key, dry_run=args.dry_run,
+            config, dry_run=args.dry_run,
         )
         if promoted:
             print(f"Promoted {len(promoted)} items to Library:")
@@ -2178,19 +2232,17 @@ def main():
     if args.debug:
         os.environ["LAST30DAYS_DEBUG"] = "1"
 
-    if not args.dry_run and not args.force_rerun and vault.daily_exists(config, today):
+    if not args.dry_run and not args.force_rerun and not args.note_suffix and vault.daily_exists(config, today):
         print(f"[skip] Daily research note already exists for {today}. Use --force-rerun to run again intentionally.")
         return
 
     # Run promote pass first (tag-to-library for previous dailies)
-    # Load API key early so promote can do LLM enrichment
     from vendor.last30days import env as l30_env
     l30_config = l30_env.get_config()
-    openai_key = l30_config.get("OPENAI_API_KEY")
 
-    promoted = promote.promote_items(config, api_key=openai_key)
+    promoted = promote.promote_items(config)
     if promoted:
-        print(f"[promote] Enriched & moved {len(promoted)} items to Library")
+        print(f"[promote] Moved {len(promoted)} items to Library")
 
     # Process feedback tags (#good / #bad) from previous dailies
     print("[feedback] Scanning for #good / #bad tags...")
@@ -2206,8 +2258,8 @@ def main():
     if feedback_proposals:
         print(f"[feedback] Generated {len(feedback_proposals)} improvement proposals")
 
-    if not l30_config.get("OPENAI_API_KEY") and not l30_config.get("XAI_API_KEY"):
-        print("Error: No API keys found. Set them in ~/.config/last30days/.env", file=sys.stderr)
+    if not l30_config.get("XAI_API_KEY"):
+        print("Error: No XAI_API_KEY found. Set it in ~/.config/last30days/.env", file=sys.stderr)
         sys.exit(1)
 
     # Load topics
@@ -2251,15 +2303,12 @@ def main():
             from_date, to_date, seen_urls, seen_titles,
             tracker=tracker,
         )
-        r_count = len(result["reddit_items"])
         x_count = len(result["x_items"])
-        print(f"-> {r_count}R + {x_count}X items (new)")
+        print(f"-> {x_count}X items (new)")
         topic_results.append(result)
         total_errors.extend(result["errors"])
 
         # Add found URLs to seen set to dedup across topics
-        for item in result["reddit_items"]:
-            seen_urls.add(item.url)
         for item in result["x_items"]:
             seen_urls.add(item.url)
 
@@ -2297,33 +2346,36 @@ def main():
         for item in prominent_results:
             seen_urls.add(item.url)
 
-    # Synthesize (single batched call)
+    # Google News RSS — top 10 LLM-scored articles across all topics
+    print(f"\n[news] Fetching Google News RSS for {len(all_topics)} topics...")
+    news_items = fetch_google_news(all_topics, config)
+    print(f"[news] Selected {len(news_items)} articles")
+
+    # Synthesize (single batched Claude CLI call — uses Max account, no API key)
     synthesis = {}
-    if l30_config.get("OPENAI_API_KEY"):
-        total_items = sum(
-            len(tr["reddit_items"]) + len(tr["x_items"])
-            for tr in topic_results
+    total_items = sum(len(tr["x_items"]) for tr in topic_results)
+    if total_items > 0:
+        print(f"\n[synth] Synthesizing {total_items} items across {len(all_topics)} topics via Claude CLI...")
+        synthesis = synthesize_all(
+            topic_results,
+            from_date,
+            to_date,
+            tracker=tracker,
         )
-        if total_items > 0:
-            print(f"\n[synth] Synthesizing {total_items} items across {len(all_topics)} topics...")
-            synthesis = synthesize_all(
-                l30_config["OPENAI_API_KEY"],
-                topic_results,
-                from_date,
-                to_date,
-                tracker=tracker,
-            )
-            if synthesis.get("briefing"):
-                print(f"[synth] Briefing: {synthesis['briefing'][:120]}...")
-        else:
-            print("\n[synth] No new items to synthesize")
-            synthesis = {"briefing": "No new research results today.", "topics": []}
+        if synthesis.get("briefing"):
+            print(f"[synth] Briefing: {synthesis['briefing'][:120]}...")
+        if synthesis.get("error"):
+            print(f"[synth] Error: {synthesis['error']}", file=sys.stderr)
+    else:
+        print("\n[synth] No new items to synthesize")
+        synthesis = {"briefing": "No new research results today.", "topics": []}
 
     # Render daily note
     note_content = render_daily_note(
         today, topic_results, synthesis, config,
         must_follow_results=must_follow_results,
         prominent_results=prominent_results,
+        news_items=news_items,
         feedback_summary=feedback_summary,
         feedback_analysis=feedback_analysis,
         feedback_proposals=feedback_proposals,
@@ -2338,7 +2390,7 @@ def main():
         return
 
     # Write to vault via Obsidian CLI
-    filepath = vault.write_daily_note(config, today, note_content, overwrite=args.force_rerun)
+    filepath = vault.write_daily_note(config, note_date_key, note_content, overwrite=args.force_rerun)
     print(f"\n[vault] Written -> {filepath}")
 
     # Cost summary (always print — replaces old --costs heuristic)
@@ -2351,11 +2403,11 @@ def main():
         print(f"  {model}: {data['calls']}× | {data['total']:,} tokens | {tag}${data['cost']:.4f}")
 
     # Final summary
-    total_reddit = sum(len(tr["reddit_items"]) for tr in topic_results)
     total_x = sum(len(tr["x_items"]) for tr in topic_results)
     mf_total = sum(len(r["items"]) for r in must_follow_results)
     prom_total = len(prominent_results)
-    print(f"\nDone! {total_reddit}R + {total_x}X + {mf_total}MF + {prom_total}PA items across {len(all_topics)} topics.")
+    news_total = len(news_items)
+    print(f"\nDone! {total_x}X + {mf_total}MF + {prom_total}PA + {news_total}News items across {len(all_topics)} topics.")
 
 
 if __name__ == "__main__":

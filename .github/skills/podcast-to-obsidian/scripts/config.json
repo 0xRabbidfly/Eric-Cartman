@@ -65,6 +65,11 @@
             "name": "No Priors: Artificial Intelligence | Technology | Startups",
             "rss_url": "https://feeds.megaphone.fm/nopriors",
             "enabled": true
+        },
+        "the-a16z-podcast": {
+            "name": "The a16z Podcast",
+            "rss_url": "https://feeds.simplecast.com/JGE3yC0V",
+            "enabled": true
         }
     },
     "spotify": {
