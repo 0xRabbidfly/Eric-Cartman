@@ -1755,17 +1755,21 @@ def _find_vault_connections(topic_slugs: list[str], config: dict) -> dict[str, l
 # ---------------------------------------------------------------------------
 
 
-def _fetch_google_news_topic(query: str, max_items: int = 10) -> list:
-    """Fetch Google News RSS for a single query. Returns list of article dicts."""
+def _fetch_google_news_topic(query: str, max_items: int = 10, max_age_days: int = 7) -> list:
+    """Fetch Google News RSS for a single query. Returns list of article dicts.
+
+    Only returns items published within the last `max_age_days` days.
+    """
     encoded = urllib.parse.quote(query)
     url = f"https://news.google.com/rss/search?q={encoded}&hl=en-US&gl=US&ceid=US:en"
+    cutoff = datetime.now(timezone.utc) - timedelta(days=max_age_days)
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
         with urllib.request.urlopen(req, timeout=10) as resp:
             xml_data = resp.read()
         root = ET.fromstring(xml_data)
         items = []
-        for item_el in root.findall(".//item")[:max_items]:
+        for item_el in root.findall(".//item")[:max_items * 2]:  # fetch extra to compensate for date filter
             title = item_el.findtext("title", "").strip()
             link = item_el.findtext("link", "").strip()
             pub_date = item_el.findtext("pubDate", "").strip()
@@ -1774,6 +1778,16 @@ def _fetch_google_news_topic(query: str, max_items: int = 10) -> list:
             raw_desc = item_el.findtext("description", "")
             description = re.sub(r"<[^>]+>", " ", raw_desc).strip()
             description = re.sub(r"\s{2,}", " ", description)[:200]
+
+            # Date filter: only keep items from the last max_age_days
+            try:
+                dt = datetime.strptime(pub_date, "%a, %d %b %Y %H:%M:%S %Z")
+                dt = dt.replace(tzinfo=timezone.utc)
+                if dt < cutoff:
+                    continue
+            except ValueError:
+                pass  # keep items with unparseable dates
+
             items.append({
                 "title": title,
                 "url": link,
@@ -1782,6 +1796,8 @@ def _fetch_google_news_topic(query: str, max_items: int = 10) -> list:
                 "description": description,
                 "query": query,
             })
+            if len(items) >= max_items:
+                break
         return items
     except Exception as e:
         print(f"  [news] Error fetching '{query}': {e}")
@@ -1829,18 +1845,64 @@ def _score_news_with_llm(items: list) -> list:
         return items[:10]
 
 
+# General AI backfill queries used when topic-specific news yields < 10 items
+_GENERAL_AI_QUERIES = [
+    "artificial intelligence news",
+    "AI breakthrough",
+    "machine learning latest",
+]
+
+
 def fetch_google_news(topics: list, config: dict) -> list:
-    """Fetch Google News RSS across all topics, LLM-score, return top 10."""
+    """Fetch Google News RSS across all topics, LLM-score, return top 10.
+
+    Only includes articles from the last 7 days.  If topic-specific queries
+    yield fewer than 10 scored items, backfills with general AI news.
+    """
     all_items = []
+    seen_urls: set[str] = set()
+
     for topic in topics:
         query = f"{topic.display_name} AI"
-        items = _fetch_google_news_topic(query, max_items=10)
-        all_items.extend(items)
-        print(f"  [news/{topic.slug}] {len(items)} articles")
+        items = _fetch_google_news_topic(query, max_items=10, max_age_days=7)
+        for item in items:
+            if item["url"] not in seen_urls:
+                seen_urls.add(item["url"])
+                all_items.append(item)
+        print(f"  [news/{topic.slug}] {len(items)} articles (last 7 days)")
+
     if not all_items:
-        return []
+        # Nothing from topics — try general queries directly
+        for gq in _GENERAL_AI_QUERIES:
+            items = _fetch_google_news_topic(gq, max_items=10, max_age_days=7)
+            for item in items:
+                if item["url"] not in seen_urls:
+                    seen_urls.add(item["url"])
+                    all_items.append(item)
+            print(f"  [news/general] {len(items)} articles for '{gq}'")
+        if not all_items:
+            return []
+
     print(f"  [news] Scoring {len(all_items)} articles via Claude CLI...")
-    return _score_news_with_llm(all_items)
+    scored = _score_news_with_llm(all_items)
+
+    # Backfill: if fewer than 10 scored items, fetch general AI news
+    if len(scored) < 10:
+        shortfall = 10 - len(scored)
+        print(f"  [news] Only {len(scored)} topic items — backfilling {shortfall} from general AI news...")
+        backfill_items = []
+        for gq in _GENERAL_AI_QUERIES:
+            items = _fetch_google_news_topic(gq, max_items=10, max_age_days=7)
+            for item in items:
+                if item["url"] not in seen_urls:
+                    seen_urls.add(item["url"])
+                    backfill_items.append(item)
+        if backfill_items:
+            extra_scored = _score_news_with_llm(backfill_items)
+            scored.extend(extra_scored[:shortfall])
+            print(f"  [news] Backfilled {min(len(extra_scored), shortfall)} general AI articles")
+
+    return scored[:10]
 
 
 def render_daily_note(
@@ -2028,63 +2090,50 @@ def render_daily_note(
             lines.append(f"- [ ] [{title}]({item.url}) — @{item.author_handle} #{topic.slug}")
         lines.append("")
 
-    # Reading list (top items across all topics, ranked by score)
-    reading_list = _build_reading_list(topic_results, config)
-    if reading_list:
-        lines.extend([
-            "## Reading List",
-            "",
-        ])
-        for item in reading_list:
-            source_tag = f"#{item['topic_slug']}"
-            lines.append(
-                f"- [ ] [{item['title']}]({item['url']}) — {item['summary']} {source_tag}"
-            )
-        lines.append("")
-
-    # Per-topic sections
+    # Unified research table: reading list + per-topic items merged
     topic_synths = {t.get("slug", ""): t for t in synthesis.get("topics", [])}
+
+    # Topic synthesis summaries (compact)
+    has_any_synth = False
     for tr in topic_results:
         topic = tr["topic"]
         synth = topic_synths.get(topic.slug, {})
-
-        lines.extend([
-            "---",
-            "",
-            f"## {topic.display_name}",
-            "",
-        ])
-
-        # Topic headline
         headline = synth.get("headline", "")
-        if headline:
-            lines.extend([f"**{headline}**", ""])
-
-        # Key points
         key_points = synth.get("key_points", [])
-        if key_points:
+        if headline or key_points:
+            if not has_any_synth:
+                lines.extend(["---", "", "## Topic Summaries", ""])
+                has_any_synth = True
+            if headline:
+                lines.append(f"**{topic.display_name}** — {headline}")
+            else:
+                lines.append(f"**{topic.display_name}**")
             for kp in key_points:
                 lines.append(f"- {kp}")
             lines.append("")
 
-        # Sources table — X
-        if tr["x_items"]:
-            lines.extend([
-                "### X",
-                "",
-                "| # | Post | Author | Likes | Link |",
-                "|---|------|--------|-------|------|",
-            ])
-            for i, item in enumerate(tr["x_items"][:8], 1):
-                likes = item.engagement.likes if item.engagement and item.engagement.likes else 0
-                text_short = _oneline(item.text, 0)
-                lines.append(
-                    f"| {i} | {text_short} | @{item.author_handle} | {likes} | [→]({item.url}) |"
-                )
-            lines.append("")
-
-        if not tr["x_items"]:
-            lines.extend(["*No new results for this topic today.*", ""])
+    # Build single merged table from all topic items, ranked by weighted score
+    reading_list = _build_reading_list(topic_results, config)
+    if reading_list:
+        lines.extend([
+            "---",
+            "",
+            "## Research Feed",
+            "",
+            "| # | Topic | Post | Author | Link |",
+            "|---|-------|------|--------|------|",
+        ])
+        for i, item in enumerate(reading_list, 1):
+            topic_tag = item['topic_slug']
+            title = _oneline(item['title'], 0)
+            author = item['summary']
+            url = item['url']
+            lines.append(
+                f"| {i} | {topic_tag} | {title} | {author} | [→]({url}) |"
+            )
+        lines.append("")
+    else:
+        lines.extend(["*No new research results today.*", ""])
 
     # Footer
     lines.extend([
