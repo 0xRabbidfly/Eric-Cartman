@@ -55,7 +55,17 @@
       "name": "Bankless",
       "rss_url": "https://feeds.flightcast.com/p83fuj0y0u58o82l41xei7zo.xml",
       "spotify_id": "",
-      "episodes": {}
+      "episodes": {
+        "dbbc417b-8b86-42d3-9391-aa82e607d085": {
+          "title": "Has Bitcoin Bottomed? Jordi Visser on AI, Inflation, and Moats",
+          "published": "2026-04-27",
+          "audio_url": "https://episode.flightcast.com/01KQ6ZJ6EN0NWX1N9CW5KCT12C.mp3",
+          "transcript_path": "Podcasts/Bankless/transcripts/2026-04-27 - Has Bitcoin Bottomed Jordi Visser on AI, Inflation, and Moats.txt",
+          "note_path": "Podcasts/Bankless/2026-04-27 - Has Bitcoin Bottomed Jordi Visser on AI, Inflation, and Moats.md",
+          "processed_at": "2026-04-28T10:41:00.580741+00:00",
+          "status": "completed"
+        }
+      }
     },
     "limitless": {
       "name": "Limitless",

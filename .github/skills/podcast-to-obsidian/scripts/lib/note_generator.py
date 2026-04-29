@@ -224,7 +224,89 @@ Rules:
 """
 
 
-def generate_ai_summary(
+# ---------------------------------------------------------------------------
+# Claude CLI summary (uses Pro account — no API key needed)
+# ---------------------------------------------------------------------------
+
+def _generate_summary_claude_cli(
+    transcript_text: str,
+    episode_title: str = "",
+    show_name: str = "",
+    model: str = "sonnet",
+) -> Optional[Dict[str, Any]]:
+    """Generate summary using Claude CLI (Pro account, no API credits)."""
+    import shutil
+    import subprocess
+
+    claude_bin = shutil.which("claude")
+    if not claude_bin:
+        return None
+
+    # Truncate transcript if too long
+    words = transcript_text.split()
+    if len(words) > 12000:
+        transcript_text = " ".join(words[:12000])
+        truncation_note = f" (truncated to 12k of {len(words)} words)"
+    else:
+        truncation_note = ""
+
+    prompt = (
+        f"{SUMMARIZE_SYSTEM_PROMPT}\n\n"
+        f"---\n\n"
+        f"Podcast: {show_name} — {episode_title}{truncation_note}\n\n"
+        f"Transcript:\n\n{transcript_text}\n\n"
+        f"---\n\n"
+        f"Respond with ONLY valid JSON. No markdown code fences, no explanation."
+    )
+
+    try:
+        print(f"  [ai] Generating summary with Claude CLI ({model})...")
+        result = subprocess.run(
+            [claude_bin, '--print', '--output-format', 'text',
+             '--input-format', 'text', '--model', model],
+            input=prompt,
+            capture_output=True,
+            text=True,
+            timeout=300,
+            encoding='utf-8',
+        )
+
+        if result.returncode != 0:
+            print(f"  [warn] Claude CLI exited with code {result.returncode}")
+            if result.stderr:
+                print(f"  [warn] {result.stderr.strip()[:200]}")
+            return None
+
+        output = result.stdout.strip()
+
+        # Strip markdown code fences if present
+        if output.startswith("```"):
+            first_nl = output.index("\n") if "\n" in output else len(output)
+            output = output[first_nl + 1:]
+        if output.endswith("```"):
+            output = output[: output.rfind("```")]
+        output = output.strip()
+
+        summary = json.loads(output)
+        print("  [ai] Summary generated successfully via Claude CLI")
+        return summary
+
+    except subprocess.TimeoutExpired:
+        print("  [warn] Claude CLI timed out after 5 minutes")
+        return None
+    except json.JSONDecodeError as e:
+        print(f"  [warn] Claude CLI returned invalid JSON: {e}")
+        return None
+    except Exception as e:
+        print(f"  [warn] Claude CLI failed: {e}")
+        return None
+
+
+# ---------------------------------------------------------------------------
+# OpenAI API summary (fallback)
+# ---------------------------------------------------------------------------
+
+def _generate_summary_openai(
     transcript_text: str,
     episode_title: str = "",
     show_name: str = "",
@@ -232,22 +314,9 @@ def generate_ai_summary(
     model: str = "gpt-4o-mini",
     base_url: str = "https://api.openai.com/v1",
 ) -> Optional[Dict[str, Any]]:
-    """Call OpenAI-compatible API to generate a structured summary.
-
-    Args:
-        transcript_text: Full transcript text.
-        episode_title: Episode title for context.
-        show_name: Show name for context.
-        api_key: OpenAI API key. Falls back to OPENAI_API_KEY env var.
-        model: Model to use.
-        base_url: API base URL (for local/alternative APIs).
-
-    Returns:
-        Parsed summary dict, or None on failure.
-    """
+    """Generate summary via OpenAI-compatible API (requires API key)."""
     api_key = api_key or os.environ.get("OPENAI_API_KEY", "")
     if not api_key:
-        print("  [warn] No OPENAI_API_KEY — using template-only mode (no AI summaries)")
         return None
 
     # Truncate transcript if too long (keep ~12k words for context window)
@@ -287,19 +356,55 @@ def generate_ai_summary(
     )
 
     try:
-        print(f"  [ai] Generating summary with {model}...")
+        print(f"  [ai] Generating summary with {model} (OpenAI API)...")
         with urllib.request.urlopen(req, timeout=120) as resp:
             result = json.loads(resp.read().decode("utf-8"))
 
         content = result["choices"][0]["message"]["content"]
         summary = json.loads(content)
-        print("  [ai] Summary generated successfully")
+        print("  [ai] Summary generated successfully via OpenAI API")
         return summary
 
     except Exception as e:
-        print(f"  [warn] AI summary failed: {e}")
-        print("  [warn] Falling back to template-only mode")
+        print(f"  [warn] OpenAI API summary failed: {e}")
         return None
+
+
+# ---------------------------------------------------------------------------
+# Unified summary entrypoint
+# ---------------------------------------------------------------------------
+
+def generate_ai_summary(
+    transcript_text: str,
+    episode_title: str = "",
+    show_name: str = "",
+    api_key: Optional[str] = None,
+    model: str = "gpt-4o-mini",
+    base_url: str = "https://api.openai.com/v1",
+) -> Optional[Dict[str, Any]]:
+    """Generate a structured summary. Tries Claude CLI first, then OpenAI API.
+
+    Returns:
+        Parsed summary dict, or None on failure.
+    """
+    # 1. Try Claude CLI (Pro account — no API key needed)
+    summary = _generate_summary_claude_cli(
+        transcript_text, episode_title, show_name,
+    )
+    if summary:
+        return summary
+
+    # 2. Fall back to OpenAI API
+    summary = _generate_summary_openai(
+        transcript_text, episode_title, show_name,
+        api_key=api_key, model=model, base_url=base_url,
+    )
+    if summary:
+        return summary
+
+    print("  [warn] No AI backend available — using template-only mode")
+    print("  [hint] Install Claude CLI (Pro account) or set OPENAI_API_KEY")
+    return None
 
 
 # ---------------------------------------------------------------------------

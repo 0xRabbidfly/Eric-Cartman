@@ -54,19 +54,27 @@ if str(SCRIPT_DIR) not in sys.path:
 # ---------------------------------------------------------------------------
 
 def _load_dotenv() -> None:
-    """Load key=value pairs from .env into os.environ (no external deps)."""
-    env_file = SKILL_DIR / ".env"
-    if not env_file.exists():
-        return
-    for line in env_file.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
+    """Load key=value pairs from .env into os.environ (no external deps).
+
+    Checks skill-level .env first, then project root .env as fallback.
+    Existing env vars are never overwritten.
+    """
+    env_files = [
+        SKILL_DIR / ".env",
+        SKILL_DIR.parents[2] / ".env",  # project root
+    ]
+    for env_file in env_files:
+        if not env_file.exists():
             continue
-        key, _, value = line.partition("=")
-        key = key.strip()
-        value = value.strip().strip('"').strip("'")
-        if key and key not in os.environ:
-            os.environ[key] = value
+        for line in env_file.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, value = line.partition("=")
+            key = key.strip()
+            value = value.strip().strip('"').strip("'")
+            if key and key not in os.environ:
+                os.environ[key] = value
 
 _load_dotenv()
 
