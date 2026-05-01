@@ -189,6 +189,87 @@ ob.run("search", query="test", format="json")  # any CLI command
 ob.eval("app.vault.getFiles().length")          # run JS in Obsidian
 ```
 
+## Output Formatting Rules
+
+When any skill generates vault content, it must use valid Obsidian Flavored Markdown.
+Standard Markdown (headings, bold, italic, lists, tables, code blocks) is assumed.
+These are the Obsidian-specific extensions to follow.
+
+### Internal Links (Wikilinks)
+
+```markdown
+[[Note Name]]                        Link to note
+[[Note Name|Display Text]]           Custom display text
+[[Note Name#Heading]]                Link to specific heading
+[[Note Name#^block-id]]              Link to block
+[[#Heading in same note]]            Same-note heading link
+```
+
+> Use `[[wikilinks]]` for all vault-internal notes. Use `[text](url)` only for external URLs.
+> Obsidian tracks renames automatically with wikilinks; Markdown links break on rename.
+
+### Embeds
+
+```markdown
+![[Note Name]]                       Embed full note inline
+![[Note Name#Heading]]               Embed a section
+![[image.png]]                       Embed image
+![[image.png|300]]                   Embed image with pixel width
+![[document.pdf#page=3]]             Embed specific PDF page
+```
+
+### Callouts
+
+```markdown
+> [!note]
+> Basic callout.
+
+> [!warning] Custom Title
+> Callout with a custom title.
+
+> [!tip]- Collapsed by default
+> Foldable callout (- = collapsed, + = expanded).
+```
+
+Common types: `note`, `tip`, `warning`, `info`, `important`, `example`, `quote`, `bug`, `danger`, `success`, `failure`, `question`, `abstract`, `todo`.
+
+### Properties (Frontmatter)
+
+```yaml
+---
+title: My Note
+date: 2024-01-15
+tags:
+  - project
+  - active
+aliases:
+  - Alternative Name
+cssclasses:
+  - custom-class
+---
+```
+
+- `tags` — searchable labels; also valid as inline `#tag` or `#nested/tag`
+- `aliases` — alternative note names surfaced in link suggestions
+- `cssclasses` — CSS classes applied to the note in reading view
+- Custom properties (e.g. `status`, `source-skill`, `created`) use any YAML-valid key
+
+**Tag syntax rules**: letters, numbers (not first character), underscores, hyphens, forward slashes (for nesting). No spaces.
+
+### Highlights and Comments
+
+```markdown
+==Highlighted text==                 Yellow highlight in reading view
+
+This is visible %%but this is hidden%% text.
+
+%%
+This entire block is hidden in reading view.
+%%
+```
+
+---
+
 ## Agent Memory (Composable)
 
 ### Purpose
