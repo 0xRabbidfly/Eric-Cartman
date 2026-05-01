@@ -162,6 +162,15 @@
           "note_path": "Podcasts/Naval/2026-02-18 - A Motorcycle for the Mind.md",
           "processed_at": "2026-03-20T12:00:00+00:00",
           "status": "completed"
+        },
+        "c020d40f-fb3c-4b96-8012-c2ff41d00434": {
+          "title": "A Return to Code",
+          "published": "2026-04-28",
+          "audio_url": "https://traffic.libsyn.com/secure/naval/Naval_-_April_-_A_Return_to_Code_2.mp3?dest-id=1103966",
+          "transcript_path": "Podcasts/Naval/transcripts/2026-04-28 - A Return to Code.txt",
+          "note_path": "Podcasts/Naval/2026-04-28 - A Return to Code.md",
+          "processed_at": "2026-04-30T15:34:25.779708+00:00",
+          "status": "completed"
         }
       }
     },

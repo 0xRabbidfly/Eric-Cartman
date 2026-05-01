@@ -333,18 +333,15 @@ def step_generate_notes(
                 except Exception as e:
                     print(f"  [warn] Could not load summary JSON: {e}")
 
-            # 2. If no pre-generated summary and use_ai, try OpenAI API
+            # 2. If no pre-generated summary and use_ai, try Claude CLI then OpenAI API
             if ai_summary is None and use_ai:
                 api_key = os.environ.get("OPENAI_API_KEY")
-                if api_key:
-                    ai_summary = generate_ai_summary(
-                        transcript_text=transcript_text,
-                        episode_title=ep.title,
-                        show_name=ep.show_name,
-                        api_key=api_key,
-                    )
-                else:
-                    print(f"  [info] No summary JSON found — run orchestrator or set OPENAI_API_KEY")
+                ai_summary = generate_ai_summary(
+                    transcript_text=transcript_text,
+                    episode_title=ep.title,
+                    show_name=ep.show_name,
+                    api_key=api_key,
+                )
 
             # Generate note
             note_content = generate_note(
