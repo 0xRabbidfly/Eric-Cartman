@@ -27,13 +27,15 @@ and backlinks.
 | "transcribe podcast" | Process a specific episode or show |
 | "add podcast show" | Register a new show in the manifest |
 | "list podcast shows" | Show all tracked shows and episode counts |
+| `--url <web video URL>` | One-off mode: transcribe a single X/YouTube/Vimeo/etc. video via yt-dlp (no manifest, no RSS) |
 
 ## Prerequisites
 
-- **Spotify MCP** configured in VS Code (see Setup section below)
+- **Spotify MCP** configured in VS Code (see Setup section below) — only for podcast detection mode
 - **Obsidian** running with CLI enabled (Settings → General → CLI)
 - **faster-whisper** installed (`pip install faster-whisper`)
 - **feedparser** installed (`pip install feedparser`)
+- **yt-dlp + ffmpeg** for `--url` mode (`pip install yt-dlp`, plus ffmpeg on PATH)
 - Python 3.10+
 
 ## Quick Start
@@ -68,6 +70,12 @@ python .github/skills/podcast-to-obsidian/scripts/pipeline.py --model large-v3
 
 # Retry failed episodes
 python .github/skills/podcast-to-obsidian/scripts/pipeline.py --retry-failed
+
+# URL mode — one-off clip from X / YouTube / Vimeo / etc. (uses yt-dlp, bypasses manifest)
+python .github/skills/podcast-to-obsidian/scripts/pipeline.py --url "https://x.com/handle/status/123/video/1"
+
+# URL mode + custom folder + title override
+python .github/skills/podcast-to-obsidian/scripts/pipeline.py --url "https://youtu.be/abc" --clips-folder "Clips" --title "My Clean Title"
 ```
 
 ## Pipeline Flow
@@ -121,6 +129,55 @@ This step is **manual** — the agent reads the transcript and writes the note.
   ```powershell
   python .github/skills/obsidian/scripts/obsidian.py read --path "Podcasts/<Show>/<YYYY-MM-DD> - <Title>.md"
   ```
+
+## URL Mode (one-off clips)
+
+For single web videos that aren't tracked podcast episodes (X tweets,
+YouTube videos, Vimeo clips, etc.), use `--url` to bypass RSS detection
+and the manifest:
+
+```powershell
+python .github/skills/podcast-to-obsidian/scripts/pipeline.py --url "<web video URL>"
+```
+
+**How it differs from podcast mode:**
+
+| Aspect | Podcast mode | URL mode (`--url`) |
+|--------|-------------|--------------------|
+| Source | RSS feed enclosure | yt-dlp (X, YouTube, Vimeo, …) |
+| Detection | Spotify MCP / RSS poll | Direct URL |
+| Manifest | Tracks episodes by show | Skipped — no manifest write |
+| Show grouping | `Podcasts/<Show>/` | `<clips_folder>/<platform> — @<handle>/` |
+| Default folder | `Podcasts` | `Clips` |
+| Filename | `YYYY-MM-DD - <Episode Title>.md` | `YYYY-MM-DD - <Derived Title>.md` |
+| Note frontmatter | `source: podcast-to-obsidian` | adds `source_url: "<original URL>"` |
+
+**Title derivation:** yt-dlp doesn't expose a clean title for X tweets — it
+uses the tweet description. The pipeline auto-derives a note title by
+stripping the `<uploader> -` prefix, dropping trailing `t.co/...` links,
+and keeping the first sentence (~100 chars). Use `--title` to override.
+
+**Source label / folder:** auto-derived from extractor + uploader, e.g.
+`X — @servasyy_ai`, `YouTube — @somechannel`. Override with `--show-name`.
+
+**Playlists (X tweets with multiple videos):** the pipeline always picks
+the first video. There's no equivalent of `/video/N` selection — re-run
+with a more specific URL if needed.
+
+**URL-mode flags:**
+
+| Flag | Purpose |
+|------|---------|
+| `--url <URL>` | The web video URL (required to trigger URL mode) |
+| `--clips-folder <name>` | Vault subfolder (default: `Clips`) |
+| `--show-name <label>` | Override the auto-derived `Platform — @handle` folder |
+| `--title <text>` | Override the auto-derived note title |
+| `--check-only` | Download + report metadata, skip transcription |
+| `--transcribe-only` | Download + transcribe, skip note + write |
+| `--dry-run` | Run everything except the Obsidian write |
+| `--model <size>` | Whisper model (base / large-v3 / …) |
+| `--no-ai` | Skip AI summary, write template-only note |
+| `--keep-audio` | Don't purge the .mp3 after success |
 
 ## Manifest
 
@@ -292,7 +349,7 @@ Restart VS Code after configuration.
 
 | Flag | What it does | What it skips |
 |------|-------------|---------------|
-| `--check-only` | Lists new episodes | Download, transcribe, generate, write |
+| `--check-only` | Lists new episodes (or downloads + reports metadata in URL mode) | Download/transcribe/generate/write (podcast mode); transcription (URL mode) |
 | `--dry-run` | Downloads + transcribes | **Vault write only** (Step 7) |
 | `--transcribe-only` | Downloads + transcribes | Generate, write, manifest |
 | `--episode "text"` | Filters to episodes matching title substring | Other episodes |
@@ -301,6 +358,10 @@ Restart VS Code after configuration.
 | `--model <size>` | Sets whisper model (base/large-v3) | — |
 | `--retry-failed` | Re-processes failed episodes | Already-completed episodes |
 | `--keep-audio` | Keeps .mp3 files after successful run | Cleanup step |
+| `--url <URL>` | One-off mode via yt-dlp (X/YouTube/Vimeo/…) | RSS detection, manifest |
+| `--clips-folder <name>` | Vault subfolder for URL-mode notes (default `Clips`) | — |
+| `--show-name <label>` | Override URL-mode source folder | Auto-derived `Platform — @handle` |
+| `--title <text>` | Override URL-mode note title | Auto-derived title |
 
 ## Troubleshooting
 

@@ -97,6 +97,16 @@ rss_mod = _load_module("p2o_rss", _lib / "rss.py")
 downloader_mod = _load_module("p2o_downloader", _lib / "downloader.py")
 note_gen_mod = _load_module("p2o_note_generator", _lib / "note_generator.py")
 
+# yt_downloader is loaded lazily (only when --url is used; needs yt-dlp)
+_yt_downloader_mod = None
+
+
+def _get_yt_downloader():
+    global _yt_downloader_mod
+    if _yt_downloader_mod is None:
+        _yt_downloader_mod = _load_module("p2o_yt_downloader", _lib / "yt_downloader.py")
+    return _yt_downloader_mod
+
 # Transcriber is loaded lazily (requires faster-whisper)
 _transcriber_mod = None
 
@@ -511,6 +521,237 @@ def step_cleanup(
 
 
 # ---------------------------------------------------------------------------
+# URL-mode pipeline (one-off clips via yt-dlp — bypasses RSS + manifest)
+# ---------------------------------------------------------------------------
+
+class _UrlEpisode:
+    """Episode-like adapter so existing note-gen + write steps work for URL mode.
+
+    Mirrors the relevant fields of rss.Episode without participating in the
+    show-based manifest.
+    """
+
+    def __init__(self, clip, source_label: str, source_url: str):
+        self.id = clip.id
+        self.title = _derive_clean_title(clip)
+        self.published = clip.published
+        self.audio_url = source_url  # original web URL, not the audio CDN URL
+        self.duration = clip.duration
+        self.description = clip.description
+        self.link = source_url
+        self.show_name = source_label
+
+    def safe_filename(self) -> str:
+        safe_title = re.sub(r'[<>:"/\\|?*]', '', self.title)
+        safe_title = safe_title.strip('. ')
+        if len(safe_title) > 120:
+            safe_title = safe_title[:120].rsplit(' ', 1)[0]
+        if not safe_title:
+            safe_title = self.id
+        return f"{self.published} - {safe_title}"
+
+    def to_dict(self) -> Dict[str, str]:
+        return {
+            "id": self.id,
+            "title": self.title,
+            "published": self.published,
+            "audio_url": self.audio_url,
+            "duration": self.duration,
+            "description": self.description,
+            "link": self.link,
+            "show_name": self.show_name,
+        }
+
+
+def _derive_clean_title(clip) -> str:
+    """Build a readable title for the note from yt-dlp metadata.
+
+    yt-dlp titles for X tweets look like "uploader - <description>".
+    Strip the uploader prefix and keep the first sentence-ish chunk.
+    """
+    raw = (clip.title or "").strip()
+    uploader = (clip.uploader or "").strip()
+
+    # Strip "<uploader> - " prefix that yt-dlp adds for X
+    if uploader and raw.lower().startswith(uploader.lower() + " - "):
+        raw = raw[len(uploader) + 3:].strip()
+
+    # Drop trailing t.co URLs
+    raw = re.sub(r"\s*https?://t\.co/\S+\s*$", "", raw).strip()
+
+    # Take first sentence-ish chunk (split on newlines, then on "。" or ". ")
+    first_line = raw.split("\n", 1)[0].strip()
+    for sep in ("。", ". ", "！", "？"):
+        if sep in first_line:
+            first_line = first_line.split(sep, 1)[0].strip() + sep.strip()
+            break
+
+    if not first_line:
+        first_line = f"{clip.extractor or 'clip'} {clip.id}"
+
+    if len(first_line) > 100:
+        first_line = first_line[:100].rsplit(" ", 1)[0] + "…"
+
+    return first_line
+
+
+def _source_label_for(clip) -> str:
+    """Folder/group label for clips, e.g. "X — @servasyy_ai" or "YouTube — channel"."""
+    extractor = (clip.extractor or "").lower()
+    platform_map = {
+        "twitter": "X",
+        "x": "X",
+        "youtube": "YouTube",
+        "vimeo": "Vimeo",
+        "tiktok": "TikTok",
+        "instagram": "Instagram",
+    }
+    platform = "Clip"
+    for key, label in platform_map.items():
+        if key in extractor:
+            platform = label
+            break
+
+    handle = clip.uploader_id or clip.uploader or "unknown"
+    handle = handle.lstrip("@")
+    return f"{platform} — @{handle}"
+
+
+def run_url_pipeline(args: argparse.Namespace) -> None:
+    """One-off pipeline: download a single web video via yt-dlp, transcribe, write note.
+
+    Bypasses RSS detection and the manifest. Used when --url is provided.
+    """
+    config = load_config()
+
+    print("╔══════════════════════════════════════════════════════╗")
+    print("║   podcast-to-obsidian — URL Mode (one-off clip)     ║")
+    print("╚══════════════════════════════════════════════════════╝")
+    print(f"  URL : {args.url}")
+    print(f"  Time: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}")
+
+    # Override config with CLI args
+    if args.model:
+        config["whisper_model"] = args.model
+    if args.device:
+        config["whisper_device"] = args.device
+
+    work_dir = SKILL_DIR / config.get("work_dir", ".work")
+    work_dir.mkdir(parents=True, exist_ok=True)
+
+    # --- Step 1: Download via yt-dlp ---
+    print("\n=== Step 1: Download Audio (yt-dlp) ===\n")
+    try:
+        yt = _get_yt_downloader()
+        clip = yt.download_clip(url=args.url, output_dir=work_dir / "audio")
+    except Exception as e:
+        import traceback
+        print(f"  [error] yt-dlp download failed: {e}")
+        traceback.print_exc()
+        return
+
+    source_label = args.show_name or _source_label_for(clip)
+    if args.title:
+        # Manual title override — bypass auto-derivation
+        clip_title_override = args.title
+        episode = _UrlEpisode(clip, source_label, args.url)
+        episode.title = clip_title_override
+    else:
+        episode = _UrlEpisode(clip, source_label, args.url)
+
+    print(f"  Title    : {episode.title}")
+    print(f"  Uploader : {clip.uploader} (@{clip.uploader_id})")
+    print(f"  Published: {episode.published}")
+    print(f"  Duration : {episode.duration or '(unknown)'}")
+    print(f"  Folder   : {source_label}")
+
+    if args.check_only:
+        print("\n[check-only] Stopping before transcription.")
+        return
+
+    # --- Step 2: Transcribe ---
+    transcribed = step_transcribe(
+        downloaded=[(episode, clip.audio_path)],
+        work_dir=work_dir,
+        model=config.get("whisper_model", "base"),
+        device=config.get("whisper_device", "auto"),
+        language=config.get("whisper_language"),
+    )
+    if not transcribed:
+        print("\n[error] Transcription produced no output.")
+        return
+
+    if args.transcribe_only:
+        print("\n=== Transcript ready ===")
+        for ep, audio_path, transcript_path, meta in transcribed:
+            print(f"  Transcript: {transcript_path}")
+        return
+
+    # --- Step 3: Generate note ---
+    notes = step_generate_notes(
+        transcribed=transcribed,
+        config=config,
+        work_dir=work_dir,
+        use_ai=not args.no_ai,
+    )
+    if not notes:
+        print("\n[error] Note generation failed.")
+        return
+
+    # --- Step 4: Inject source_url into frontmatter + write to vault ---
+    clips_folder = args.clips_folder or config.get("clips_folder", "Clips")
+    safe_show = re.sub(r'[<>:"/\\|?*]', '', source_label).strip()
+
+    if args.dry_run:
+        print("\n=== Step 4: Write to Vault (dry-run) ===\n")
+        for ep, content, _vault_path in notes:
+            vault_path = f"{clips_folder}/{safe_show}/{ep.safe_filename()}.md"
+            content = _inject_source_url(content, args.url)
+            print(f"  [dry-run] Would write: {vault_path}")
+            print(f"            ({len(content)} chars)")
+        return
+
+    print("\n=== Step 4: Write to Vault ===\n")
+    try:
+        ob = Obsidian()
+    except Exception as e:
+        print(f"  [error] Cannot connect to Obsidian: {e}")
+        return
+
+    written = 0
+    for ep, content, _old_vault_path in notes:
+        vault_path = f"{clips_folder}/{safe_show}/{ep.safe_filename()}.md"
+        content = _inject_source_url(content, args.url)
+        print(f"  [write] {vault_path}")
+        try:
+            result = ob.create(path=vault_path, content=content, overwrite=True)
+            if result.ok:
+                written += 1
+                print(f"  [ok] Written")
+            else:
+                print(f"  [error] Obsidian write failed: {result.stderr}")
+        except Exception as e:
+            print(f"  [error] Write exception: {e}")
+
+    # --- Cleanup ---
+    if written > 0:
+        step_cleanup(work_dir=work_dir, written_episodes=[], keep_audio=args.keep_audio)
+
+    print(f"\n{'='*60}")
+    print(f"  URL Pipeline Complete — {written}/{len(notes)} note(s) written")
+    print(f"{'='*60}\n")
+
+
+def _inject_source_url(note_content: str, source_url: str) -> str:
+    """Inject `source_url` field into note frontmatter (after `source:` line)."""
+    if "source_url:" in note_content:
+        return note_content
+    pattern = re.compile(r"^(source: podcast-to-obsidian)$", re.MULTILINE)
+    replacement = f'\\1\nsource_url: "{source_url}"'
+    return pattern.sub(replacement, note_content, count=1)
+
+
+# ---------------------------------------------------------------------------
 # Main pipeline
 # ---------------------------------------------------------------------------
 
@@ -773,6 +1014,16 @@ def main() -> None:
     parser.add_argument("--episode", type=str, default=None,
                         help="Filter to episodes matching this title substring (case-insensitive)")
 
+    # URL mode (one-off clips via yt-dlp — bypasses RSS + manifest)
+    parser.add_argument("--url", type=str, default=None,
+                        help="One-off mode: download + transcribe a single web video (X, YouTube, etc.) via yt-dlp")
+    parser.add_argument("--clips-folder", type=str, default=None,
+                        help="Vault subfolder for --url notes (default: Clips)")
+    parser.add_argument("--show-name", type=str, default=None,
+                        help="Override the auto-derived source label/folder (e.g. \"X — @servasyy_ai\")")
+    parser.add_argument("--title", type=str, default=None,
+                        help="Override the auto-derived note title (URL mode only)")
+
     # Subcommands
     parser.add_argument("--add-show", action="store_true",
                         help="Add a new show")
@@ -798,6 +1049,8 @@ def main() -> None:
         cmd_list_shows(args)
     elif args.retry_failed:
         cmd_retry_failed(args)
+    elif args.url:
+        run_url_pipeline(args)
     else:
         run_pipeline(args)
 
