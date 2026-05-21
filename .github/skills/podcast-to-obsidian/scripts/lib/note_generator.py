@@ -60,7 +60,7 @@ created: {created}
 
 ---
 
-## � Deep Dives
+## 🧠 Deep Dives
 
 {deep_dives}
 
