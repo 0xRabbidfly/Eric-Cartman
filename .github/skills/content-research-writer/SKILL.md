@@ -46,6 +46,16 @@ It is designed to stay context-efficient:
 - A **Draft** written from packets
 - A **Review** (logic, flow, missing evidence, numbered references)
 
+## Key Constraints at a Glance
+
+| Category | Light Mode (default) | Deep Mode (escalation) |
+|----------|---------------------|------------------------|
+| Sources | 3–5 total | 6–10 total |
+| Evidence packets | 8–12 total | 15–25 total |
+| Per packet | max 5 bullets, max 2 quotes | same |
+| Stop condition | Every factual claim has ≥1 sufficient packet | Same |
+| No source found | Flag claim for user review; suggest softening or removal | Same |
+
 ## Operating Principles (Stay Token-Efficient)
 
 1. **Citation-first**: No new factual claim gets written without an evidence packet and a numbered reference.
@@ -55,6 +65,8 @@ It is designed to stay context-efficient:
 5. **Section-at-a-time collaboration**: Review only the current section and minimal surrounding context.
 
 ## Workflow (Phases)
+
+**Overview**: Brief → Outline → Choose research depth → Source plan → Extract evidence (parallel) → Draft from packets → Review.
 
 ### Phase 0 — Research Brief (Inputs)
 
@@ -98,6 +110,7 @@ Give the user a choice. Default to **Light**.
 - Per packet: same caps (keep packets atomic)
 
 Stop condition: Stop researching as soon as every factual claim in the outline has at least one “sufficient” evidence packet.
+No-source fallback: If no suitable sources can be found for a claim, flag it for user review and suggest softening (reframe as opinion/experience) or removing it from the outline.
 
 ### Phase 3 — Build a Source Plan (Before Reading Deeply)
 
@@ -105,7 +118,7 @@ Select sources deliberately before extracting:
 
 - Prefer first-party docs/standards/regulators/original datasets
 - Prefer sources with a clear publication date/version
-- Avoid long secondary writeups unless they add unique primary data
+- Avoid secondary writeups exceeding ~1,000 words unless they contain unique primary data (original datasets, interviews, or novel analysis)
 
 Output: a source log with selected/rejected decisions.
 
