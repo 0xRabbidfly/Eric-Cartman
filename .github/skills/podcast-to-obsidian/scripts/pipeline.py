@@ -320,6 +320,7 @@ def step_generate_notes(
     """
     print("\n=== Step 4: Generate Notes ===\n")
     results = []
+    skipped_no_ai = []
     podcasts_folder = config.get("podcasts_folder", "Podcasts")
     summaries_dir = work_dir / "summaries"
     summaries_dir.mkdir(parents=True, exist_ok=True)
@@ -353,6 +354,14 @@ def step_generate_notes(
                     api_key=api_key,
                 )
 
+            if use_ai and ai_summary is None:
+                print(
+                    "  [error] AI summary unavailable; refusing to write a template-only note. "
+                    "Install/configure Claude CLI or explicitly pass --no-ai if you truly want a skeleton note."
+                )
+                skipped_no_ai.append(ep)
+                continue
+
             # Generate note
             note_content = generate_note(
                 episode=ep.to_dict(),
@@ -371,6 +380,13 @@ def step_generate_notes(
             print(f"  [error] Failed to generate note for '{ep.title}': {e}")
 
     print(f"\n  Generated: {len(results)}/{len(transcribed)}")
+    if skipped_no_ai:
+        print(
+            f"  Skipped (AI unavailable): {len(skipped_no_ai)} — "
+            "left unprocessed for retry once Claude CLI is configured:"
+        )
+        for ep in skipped_no_ai:
+            print(f"    - {ep.title}")
     return results
 
 
@@ -1043,17 +1059,4 @@ def main() -> None:
     # Route to subcommands
     if args.add_show:
         if not args.name or not args.rss:
-            parser.error("--add-show requires --name and --rss")
-        cmd_add_show(args)
-    elif args.list_shows:
-        cmd_list_shows(args)
-    elif args.retry_failed:
-        cmd_retry_failed(args)
-    elif args.url:
-        run_url_pipeline(args)
-    else:
-        run_pipeline(args)
-
-
-if __name__ == "__main__":
-    main()
+            pa
