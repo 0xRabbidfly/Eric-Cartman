@@ -176,7 +176,7 @@ with a more specific URL if needed.
 | `--transcribe-only` | Download + transcribe, skip note + write |
 | `--dry-run` | Run everything except the Obsidian write |
 | `--model <size>` | Whisper model (base / large-v3 / …) |
-| `--no-ai` | Skip AI summary, write template-only note |
+| `--no-ai` | Skip AI summary and intentionally write a template-only skeleton note |
 | `--keep-audio` | Don't purge the .mp3 after success |
 
 ## Manifest
@@ -342,6 +342,7 @@ Restart VS Code after configuration.
 | Spotify MCP `SpotifyGetInfo` does not support episode URIs | **P0** | Use `fetch_webpage` on the Spotify episode URL to scrape metadata |
 | `obsidian.com create` with stdin-piped content silently produces 0-byte files (RC 0, says "Overwrote") | **P0** | Write directly to vault filesystem via `Path.write_text()`, then verify with `obsidian.com file`. The Python wrapper `obsidian.py` also fails because its `run()` uses `stdin=subprocess.DEVNULL`. |
 | `--dry-run` still downloads audio and runs transcription | **P1** | Use `--check-only` for true no-side-effects preview. `--dry-run` only skips vault write (Step 7). |
+| AI summarization unavailable during a normal run | **P1** | The pipeline now fails that episode instead of silently writing a template-only note; install Claude CLI or explicitly pass `--no-ai` only if you truly want a skeleton note |
 | Pipeline downloads all new episodes per show, not just the target | **P1** | Use `--episode "title substring"` to filter, or `--max-episodes 1` |
 | Pipeline may exit with code 1 during large batch downloads | **P2** | Re-run with `--retry-failed` or `--transcribe-only` if audio already downloaded |
 

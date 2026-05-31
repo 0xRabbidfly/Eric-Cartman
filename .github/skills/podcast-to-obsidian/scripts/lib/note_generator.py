@@ -402,8 +402,8 @@ def generate_ai_summary(
     if summary:
         return summary
 
-    print("  [warn] No AI backend available — using template-only mode")
-    print("  [hint] Install Claude CLI (Pro account) or set OPENAI_API_KEY")
+    print("  [warn] No AI backend available")
+    print("  [hint] Claude CLI is tried first. OpenAI-compatible API is only a secondary fallback when configured.")
     return None
 
 
