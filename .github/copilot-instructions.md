@@ -62,6 +62,17 @@ Eric Cartman is a **meta-prompt library** — a portable scaffold of agentic dev
 - When a skill is added, deleted, or modified, also review `.github/skills/remote-skills-api/` and update it if the change affects remote discovery, invocation, examples, or user-facing behavior.
 - Test skills by invoking them before marking complete.
 
+## Browser Skill Artifact Cleanup
+Skills that use Playwright MCP (rbc-banking, scotia-banking, cibc-banking, edge-banking, zehrs-grocery, used-car-search) generate temp artifacts:
+- `.playwright-mcp/` — console logs, page snapshots (`.yml`), screenshots (`.png`, `.jpeg`). Purge contents at end of each run.
+- Loose files in project root — screenshots, markdown dumps, or HTML files saved during exploration. Delete before finishing.
+
+**Rule:** Every browser-using skill must clean up after itself. At the end of a successful run (or after reporting results), run:
+```powershell
+Remove-Item -Force -ErrorAction SilentlyContinue "$PWD/.playwright-mcp/*"
+```
+And delete any other temp files created during the session. Do not leave artifacts in the project root.
+
 ## Friction Rule
 If you experienced friction completing a task — retries, workarounds, encoding issues,
 missing params, unclear docs, unexpected errors — run **`/skill-reflection`** **immediately**

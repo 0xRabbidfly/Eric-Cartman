@@ -1059,4 +1059,17 @@ def main() -> None:
     # Route to subcommands
     if args.add_show:
         if not args.name or not args.rss:
-            pa
+            parser.error("--add-show requires --name and --rss")
+        cmd_add_show(args)
+    elif args.list_shows:
+        cmd_list_shows(args)
+    elif args.retry_failed:
+        cmd_retry_failed(args)
+    elif args.url:
+        run_url_pipeline(args)
+    else:
+        run_pipeline(args)
+
+
+if __name__ == "__main__":
+    main()

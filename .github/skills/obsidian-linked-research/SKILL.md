@@ -6,16 +6,16 @@ user-invocable: true
 disable-model-invocation: false
 metadata:
   author: 0xrabbidfly
-  version: "1.5.0"
+  version: "1.6.0"
 ---
 
 # Obsidian Linked Research
 
 ## Purpose
 
-Take a URL → fetch its content → generate a structured summary → write a
-standalone research note into the active `Research/Library/` taxonomy in the
-Obsidian vault.
+Take a URL → fetch its content → generate a structured summary → check for
+thesis drift against existing notes → write a standalone research note into
+the active `Research/Library/` taxonomy in the Obsidian vault.
 
 The library is no longer flat. Notes should be routed into the existing numbered
 subfolders and tagged using the vocabulary established by the **master Research
@@ -265,10 +265,154 @@ Think through the content and produce this structure internally:
 - `author`: extract from content or URL. "Unknown" if not identifiable
 - For tweets: incorporate engagement stats and thread context
 
+### Step 2.5 — Thesis Drift Check
+
+After generating the summary (Step 2), check whether the new note's core thesis
+conflicts with, supersedes, or complements existing vault notes. This step uses
+**your own reasoning** (the VS Code agent model) — no external API call.
+
+#### 2.5a — Find related existing notes
+
+Search the vault for existing notes that share tags or are in the same library bucket
+as the new note:
+
+```powershell
+# Search by primary tags (run for each of the top 2-3 tags)
+python -c "import sys; sys.stdout.reconfigure(encoding='utf-8'); sys.path.insert(0,'.github/skills/obsidian/scripts'); from obsidian import Obsidian; ob=Obsidian(); r=ob.search(query='<primary_tag>', path='Research/Library/<bucket>'); print(r.text if hasattr(r,'text') else r)"
+```
+
+Also check the `related_notes` identified in Step 2 — read any that exist.
+
+From the search results plus related notes, select the **top 3-5 most related
+existing notes** by this priority:
+1. Notes in the same library bucket with 2+ shared tags
+2. Notes in any bucket with 3+ shared tags
+3. Notes explicitly listed in `related_notes` from Step 2
+
+#### 2.5b — Read and compare theses
+
+For each of the top 3-5 related notes:
+
+```powershell
+python -c "import sys; sys.stdout.reconfigure(encoding='utf-8'); sys.path.insert(0,'.github/skills/obsidian/scripts'); from obsidian import Obsidian; ob=Obsidian(); content=ob.read(path='<existing_note_path>'); print(content[:2000])"
+```
+
+Extract the `## Core Thesis` section (or the first substantive paragraph if no
+Core Thesis heading exists). Compare it against the new note's `core_thesis`
+from Step 2.
+
+#### 2.5c — Classify the relationship
+
+For each comparison, make a judgment call. This is semantic analysis, not keyword
+matching. Apply these definitions:
+
+| Relationship | Definition | Action |
+|-------------|-----------|--------|
+| **Supersedes** | The new source covers the same ground but with updated data, revised conclusions, or a more complete framework. The old note is no longer the best reference on its specific claim. | Add `supersedes: [[old-note-slug]]` to new note frontmatter. After writing (Step 4), update old note's frontmatter with `status: superseded` and `superseded_by: [[new-note-slug]]`. |
+| **Conflicts** | The two sources genuinely disagree on a meaningful claim — not just emphasis or scope differences, but contradictory conclusions or incompatible frameworks. | Flag in output. Create a synthesis note (see 2.5d). Add both notes to each other's `## Related` with a conflict annotation. |
+| **Complements** | The new source adds a different angle on the same topic without contradicting. Different scope, different data, or different perspective that enriches understanding. | No special action — just ensure it appears in `related_notes` for Step 3. |
+
+**Judgment guidance:**
+- A 2025 study updating a 2024 study's numbers = **Supersedes** (if same methodology and claims)
+- "LLMs can't reason" vs "LLMs exhibit emergent reasoning" = **Conflicts**
+- "Here's how to implement RAG" vs "Here's how to evaluate RAG" = **Complements**
+- A broader survey covering the same narrow topic = **Supersedes** only if it renders the narrow one redundant; otherwise **Complements**
+- Two articles saying similar things with different examples = **Complements** (not supersedes — both add value)
+
+#### 2.5d — Handle conflicts and supersessions
+
+**If Supersedes:**
+
+1. Add to the new note's frontmatter (will be written in Step 4):
+   ```yaml
+   supersedes: "[[old-note-slug]]"
+   ```
+2. After the new note is written (end of Step 4), update the old note:
+   ```python
+   python -c "
+   import sys
+   sys.path.insert(0, '.github/skills/obsidian/scripts')
+   from obsidian import Obsidian
+   ob = Obsidian()
+   content = ob.read(path='<old_note_path>')
+   # Add superseded status to frontmatter
+   content = content.replace('status: unread', 'status: superseded', 1)
+   # If no status field, add one after the last frontmatter field before ---
+   # Also add superseded_by field
+   import re
+   if 'superseded_by:' not in content:
+       content = re.sub(r'^(---\s*$)', r'superseded_by: \"[[<new-note-slug>]]\"\n\1', content, count=1, flags=re.MULTILINE)
+   ob.create(path='<old_note_path>', content=content, overwrite=True)
+   print('Updated old note with superseded status')
+   "
+   ```
+3. Report to user: "Note X supersedes [[old-note]]: [one-line explanation]"
+
+**If Conflicts (genuinely important disagreement):**
+
+1. Flag in Step 7 output: "THESIS CONFLICT: [[new-note]] vs [[old-note]]: [explanation]"
+2. Create a synthesis note that captures both sides of the disagreement:
+
+   ```markdown
+   ---
+   type: research-note
+   source: synthesis
+   date_saved: {today YYYY-MM-DD}
+   tags: [synthesis, {shared-tags}]
+   status: unread
+   resolves:
+     - "[[note-slug-1]]"
+     - "[[note-slug-2]]"
+   ---
+
+   # Conflict: {Topic} — {Slug1} vs {Slug2}
+
+   ## The Disagreement
+
+   **[[{slug1}]]** argues: {thesis 1}
+
+   **[[{slug2}]]** argues: {thesis 2}
+
+   ## Why It Matters
+
+   {2-3 sentences on why this tension is meaningful for the research library}
+
+   ## Possible Resolution
+
+   {Your analysis of which position has stronger evidence, or whether they're
+   actually addressing different aspects of the same problem}
+
+   ## Related
+
+   - [[{slug1}]] · [[{slug2}]]
+   ```
+
+   Write this synthesis note to:
+   `Research/Library/<bucket>/conflict-<slug1>-vs-<slug2>.md`
+
+3. Add the synthesis note to both original notes' `## Related` sections.
+
+**If Complements:**
+
+No special action. Ensure the existing note appears in `related_notes` (Step 2
+output) so the `## Related` section in the new note will include it.
+
+#### 2.5e — Report drift check results
+
+Before proceeding to Step 3, briefly report what the drift check found:
+- Number of existing notes compared
+- Any supersessions or conflicts detected
+- Any synthesis notes that will be created
+- If no conflicts found: "Thesis drift check: clean — no conflicts with N existing notes"
+
 ### Step 3 — Compose Note
 
 Assemble the markdown. The note should be **comprehensive enough to replace
 reading the original** — a full technical reference, not a summary card.
+
+If Step 2.5 found a supersession, include `supersedes: "[[old-note-slug]]"` in
+the frontmatter. If a conflict was found, the synthesis note will be created
+after this note is written (in Step 4).
 
 Use this template as a starting point, but adapt sections to match the content:
 
@@ -282,6 +426,7 @@ date_found: {today YYYY-MM-DD}
 date_saved: {today YYYY-MM-DD}
 tags: [{comma-separated tags}]
 status: unread
+supersedes: "[[old-note-slug]]"  # only if Step 2.5 found a supersession
 ---
 
 # {title}
@@ -458,6 +603,13 @@ print('EXISTS' if result and not result.startswith('Error') else 'NOT_FOUND')
 
 If the note already exists, append `-2`, `-3`, etc. to the slug before calling `ob.create()`.
 
+**Post-write drift actions (from Step 2.5):**
+
+After the new note is successfully written, apply any pending drift actions:
+- If a supersession was detected: update the old note's frontmatter (see Step 2.5d)
+- If a conflict was detected: create the synthesis note (see Step 2.5d)
+- If synthesis notes were created: add them to both original notes' `## Related` sections
+
 ### Step 5 — Update the Master MOC
 
 After the note exists, refresh the **master Research Library MOC** as part of the
@@ -598,6 +750,9 @@ Report to the user:
 - Brief summary (1-2 sentences)
 - Tag list
 - Whether the master MOC was updated, and whether any topic MOC was also updated
+- **Thesis drift results**: how many notes were compared, any supersessions or conflicts
+- If a supersession occurred: which old note was marked superseded
+- If a conflict was found: path to the synthesis note
 - Obsidian link: `obsidian://open?vault=Obsidian%20Vault&file=Research%2FLibrary%2F{library_bucket_urlencoded}%2F{slug}`
 
 ### Step 8 — Reflection (composable)
@@ -606,7 +761,7 @@ Invoke the `skill-reflection` skill with the following context:
 
 - **Calling skill**: `obsidian-linked-research`
 - **SKILL.md path**: `.github/skills/obsidian-linked-research/SKILL.md`
-- **Steps completed**: list each step with pass/fail/skipped
+- **Steps completed**: list each step with pass/fail/skipped (including Step 2.5)
 - **Friction notes**: any workarounds, retries, unexpected errors, or manual interventions
 
 The reflection skill will analyze the run and produce improvement recommendations.
@@ -616,6 +771,10 @@ The reflection skill will analyze the run and produce improvement recommendation
 The output is a `Research/Library/<bucket>/{slug}.md` file in the Obsidian vault,
 following the enriched note template above. The format matches the existing
 library pages and respects the live MOC/tag taxonomy already in the vault.
+
+If thesis drift was detected, additional outputs may include:
+- Updated frontmatter on superseded notes (`status: superseded`, `superseded_by:`)
+- Synthesis notes at `Research/Library/<bucket>/conflict-<slug1>-vs-<slug2>.md`
 
 ## Rules
 
@@ -632,6 +791,9 @@ library pages and respects the live MOC/tag taxonomy already in the vault.
 11. **Prefer existing tags** — reuse the master MOC's canonical lowercase kebab-case tags before introducing a new one
 12. **Keep the master MOC fresh** — update it with every successful research-note addition unless the change truly requires larger curation work
 13. **Use topic MOCs secondarily** — they are optional supporting maps, not the authoritative taxonomy source
+14. **Thesis drift check is semantic, not syntactic** — use your own judgment to compare core theses; do not reduce this to keyword overlap or string matching
+15. **Supersession updates are post-write** — only modify old notes after the new note is successfully written to the vault
+16. **Synthesis notes are for genuine conflicts only** — do not create synthesis notes for mere differences in emphasis, scope, or audience; reserve them for real disagreements on factual claims or framework incompatibilities
 
 ## Related Skills
 
@@ -639,6 +801,7 @@ library pages and respects the live MOC/tag taxonomy already in the vault.
 |-------|-------------|
 | `obsidian` | Composable vault wrapper — used for all vault writes |
 | `obsidian-daily-research` | Automated daily pipeline — produces `Research/Dailies/` notes with `#keep` tags that get promoted to `Research/Library/` |
+| `obsidian-vault-lint` | Weekly maintenance — Phase 2.5 backward propagation detects taxonomy drift; thesis drift check complements it at ingest time |
 | `last30days` | Research skill — shares xAI API patterns and keyring/env/config key cascade |
 | `content-research-writer` | Long-form writing partner — can use Library notes as sources |
 
@@ -664,6 +827,10 @@ User: "research this: <url>"
 ┌─────────────────────────┐
 │  Agent (VS Code model)  │  ← Summarize, structure, compose
 │  ├─ Generate summary    │
+│  ├─ Thesis drift check  │     ← NEW: compare against existing notes
+│  │  ├─ Supersedes?      │        Update old note frontmatter
+│  │  ├─ Conflicts?       │        Create synthesis note
+│  │  └─ Complements?     │        Add to Related
 │  ├─ Compose markdown    │
 │  └─ Write → Python API  │
 └──────────┬──────────────┘
@@ -673,6 +840,11 @@ User: "research this: <url>"
 │  obsidian.py create     │  ← CLI wrapper (composable)
 │  └─ Research/Library/   │
 │     <bucket>/{slug}.md  │
+└──────────┬──────────────┘
+           │
+           ▼
+┌─────────────────────────┐
+│  Post-write drift ops   │  ← Update superseded notes, create synthesis
 └──────────┬──────────────┘
            │
            ▼

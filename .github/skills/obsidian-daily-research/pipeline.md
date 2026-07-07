@@ -13,7 +13,7 @@
 > Weight controls score multiplier (default 1.0). Higher = more prominent.
 
 - agents | Agent Development | 1.2
-- skills | Agent Skills & Tools | 1.1
+- skills | LLM Agent Skills & AI Developer Tools | 1.1
 - models | Frontier Model Releases | 1.0
 - sdd | Spec Driven Development & AI frameworks | 1.0
 - sdlc | Software development lifecycle & AI | 0.9
@@ -83,3 +83,4 @@
 - reading_list_max: 15
 - depth: scan
 - prominent_ai_min_likes: 500
+- xai_model: auto

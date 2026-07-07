@@ -20,11 +20,12 @@ from inventory import collect_inventory, LOG_FOLDER
 from fixes import apply_fixes
 from connections import discover_connections, format_connections_report, apply_connection_proposals
 from moc import reorganize_moc, format_moc_proposals
+from recommend import recommend_reading, format_recommendations, render_report_section
 
 
 def main():
     parser = argparse.ArgumentParser(description="obsidian-vault-lint-cowork - weekly vault maintenance (Cowork-native)")
-    parser.add_argument("--phase", type=int, choices=[1, 2, 3, 4], metavar="N")
+    parser.add_argument("--phase", type=int, choices=[1, 2, 3, 4, 5], metavar="N")
     parser.add_argument("--apply", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--verbose", action="store_true")
@@ -46,6 +47,7 @@ def main():
     fix_result = None
     moc_result = None
     conn_proposals = []
+    rec_result = None
 
     if args.phase is None or args.phase == 1:
         print("\n=== Phase 1: Inventory ===")
@@ -96,9 +98,24 @@ def main():
         if args.phase == 4:
             return
 
+    if args.phase is None or args.phase == 5:
+        print("\n=== Phase 5: Reading Recommendations ===")
+        rec_result = recommend_reading(verbose=args.verbose)
+        _print_recommendations(rec_result)
+        if rec_result.recommendations:
+            path = f"{LOG_FOLDER}/vault-lint-{run_date}-reading.md"
+            content = format_recommendations(rec_result, run_date)
+            if not args.dry_run:
+                ob.create(path=path, content=content, overwrite=True)
+                print(f"[lint] Reading recommendations written to: {path}")
+            else:
+                print(f"[lint] [DRY RUN] {len(rec_result.recommendations)} recommendations - not written")
+        if args.phase == 5:
+            return
+
     if args.phase is None:
-        print("\n=== Phase 5: Report ===")
-        report = _build_report(run_date, inv, fix_result, moc_result, conn_proposals)
+        print("\n=== Phase 6: Report ===")
+        report = _build_report(run_date, inv, fix_result, moc_result, conn_proposals, rec_result)
         path = f"{LOG_FOLDER}/vault-lint-{run_date}.md"
         if not args.dry_run:
             ob.create(path=path, content=report, overwrite=True)
@@ -181,7 +198,17 @@ def _print_moc(moc_result):
             print(f"  ⚠ Proposal: new Topic MOC for '{p['section']}' ({p['entry_count']} entries)")
 
 
-def _build_report(run_date, inv, fix_result, moc_result, conn_proposals):
+def _print_recommendations(rec_result):
+    if not rec_result.recommendations:
+        print("  No recommendations (no dated Library notes matched interests)")
+        return
+    for i, r in enumerate(rec_result.recommendations, 1):
+        matched = ", ".join(r.matched_interests) if r.matched_interests else "-"
+        print(f"  {i}. {r.title}  [{r.date_saved} · {r.status}]")
+        print(f"       interests: {matched}")
+
+
+def _build_report(run_date, inv, fix_result, moc_result, conn_proposals, rec_result=None):
     lines = [f"# Vault Lint - {run_date}", "", "## Health Metrics"]
     if inv:
         orphan_noise = inv.orphans_unscoped_count - inv.orphan_count
@@ -220,6 +247,9 @@ def _build_report(run_date, inv, fix_result, moc_result, conn_proposals):
         lines += pending
     else:
         lines.append("- None")
+
+    if rec_result and rec_result.recommendations:
+        lines += render_report_section(rec_result)
 
     if inv and inv.similar_tags:
         lines += ["", "## Similar Tags (Review Manually)"]

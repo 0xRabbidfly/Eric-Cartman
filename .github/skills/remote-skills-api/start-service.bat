@@ -48,10 +48,11 @@ if defined CLAUDE_PATH echo [%date% %time%] CLAUDE_PATH="%CLAUDE_PATH%" >> "%LOG
 node ".github\skills\remote-skills-api\server.js" >> "%LOG%" 2>&1
 set "EXITCODE=%ERRORLEVEL%"
 echo [%date% %time%] Remote Skills API exited with code %EXITCODE% >> "%LOG%"
-if "%EXITCODE%"=="%RESTART_EXIT_CODE%" (
-	echo [%date% %time%] Restart requested; relaunching in 2 seconds >> "%LOG%"
-	timeout /t 2 /nobreak >nul
-	goto launch
+if "%EXITCODE%"=="0" (
+	echo [%date% %time%] Clean shutdown (exit 0); not restarting >> "%LOG%"
+	popd
+	exit /b 0
 )
-popd
-exit /b %EXITCODE%
+echo [%date% %time%] Non-zero exit (%EXITCODE%); relaunching in 2 seconds >> "%LOG%"
+timeout /t 2 /nobreak >nul
+goto launch
