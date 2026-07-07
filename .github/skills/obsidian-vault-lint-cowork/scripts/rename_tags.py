@@ -70,6 +70,10 @@ RENAME_MAP = {
     "custom-benchmarks": "benchmarking",
     "eval-loops": "evals",
     "ai-evaluation": "evals",
+
+    # === RESEARCH family (added 2026-05-30) ===
+    "ai-research": "research",
+    "autoResearch": "autoresearch",
 }
 
 # Tags to leave alone but worth flagging for manual review

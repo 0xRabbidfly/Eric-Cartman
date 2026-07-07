@@ -51,6 +51,14 @@ const CLAUDE_TIMEOUT_MS = process.env.CLAUDE_TIMEOUT_MS
   ? parseInt(process.env.CLAUDE_TIMEOUT_MS, 10)
   : 5 * 60 * 1000;
 
+// Stability: max concurrent sessions before oldest is evicted
+const MAX_SESSIONS = process.env.MAX_SESSIONS
+  ? parseInt(process.env.MAX_SESSIONS, 10) : 20;
+
+// Stability: RSS threshold (MB) for automatic restart (0 = disabled)
+const MAX_RSS_MB = process.env.MAX_RSS_MB
+  ? parseInt(process.env.MAX_RSS_MB, 10) : 512;
+
 if (!API_SECRET) {
   console.error('❌  API_SECRET not set in .env — aborting');
   process.exit(1);
@@ -121,6 +129,18 @@ function getOrCreateSession(id) {
     if (now - sess.lastActivity <= SESSION_TTL_MS) return sess;
     activeSessions.delete(id);
   }
+  // Evict oldest session if at capacity
+  if (activeSessions.size >= MAX_SESSIONS) {
+    let oldestId = null, oldestTime = Infinity;
+    for (const [sid, s] of activeSessions) {
+      if (s.lastActivity < oldestTime) { oldestTime = s.lastActivity; oldestId = sid; }
+    }
+    if (oldestId) {
+      activeSessions.delete(oldestId);
+      console.log(`[Sessions] Evicted oldest session ${oldestId} (cap ${MAX_SESSIONS})`);
+    }
+  }
+
   const sess = {
     id: makeSessionId(),
     createdAt: now,
@@ -137,9 +157,9 @@ function getOrCreateSession(id) {
   return sess;
 }
 
-function appendHistory(sess, role, content, maxTurns = 10) {
+function appendHistory(sess, role, content, maxTurns = 6) {
   if (!sess.history) sess.history = [];
-  sess.history.push({ role, content: content.substring(0, 4000) });
+  sess.history.push({ role, content: content.substring(0, 2000) });
   if (sess.history.length > maxTurns * 2) {
     sess.history = sess.history.slice(-(maxTurns * 2));
   }
@@ -259,6 +279,20 @@ if (isFinite(SESSION_TTL_MS)) {
     }
     if (purged) { console.log(`[Sessions] Purged ${purged} expired session(s)`); saveSessions(); }
   }, 10 * 60_000);
+}
+
+// Memory watchdog — restart if RSS exceeds threshold (default 512 MB)
+if (MAX_RSS_MB > 0) {
+  const MAX_RSS_BYTES = MAX_RSS_MB * 1024 * 1024;
+  setInterval(() => {
+    const rss = process.memoryUsage().rss;
+    const rssMB = (rss / 1024 / 1024).toFixed(1);
+    console.log(`[Memory] RSS: ${rssMB} MB (limit: ${MAX_RSS_MB} MB, sessions: ${activeSessions.size})`);
+    if (rss > MAX_RSS_BYTES) {
+      console.warn(`[Memory] RSS ${rssMB} MB exceeds ${MAX_RSS_MB} MB limit — scheduling restart`);
+      scheduleRestart(`memory watchdog: RSS ${rssMB} MB > ${MAX_RSS_MB} MB`);
+    }
+  }, 5 * 60_000).unref();
 }
 
 loadSessions();

@@ -67,6 +67,70 @@ FEEDBACK_FILE = SCRIPT_DIR / "feedback.json"
 
 
 # ---------------------------------------------------------------------------
+# Model auto-resolution — query xAI API for latest available models
+# ---------------------------------------------------------------------------
+
+def resolve_xai_model(api_key: str, preferred: str = "grok-4-1-fast") -> str:
+    """Query xAI API for available models and return the best one.
+
+    Strategy: prefer the configured model if available, otherwise pick the
+    latest grok text/chat model. Filters out image/video/build models.
+    Falls back to preferred if the API call fails.
+    """
+    # Substrings that indicate non-text models (image gen, video gen, build tools)
+    _EXCLUDE = ["imagine", "image", "video", "build", "embed"]
+
+    try:
+        req = urllib.request.Request(
+            "https://api.x.ai/v1/models",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+        )
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+
+        models = data.get("data", [])
+        if not models:
+            return preferred
+
+        # Extract grok text/chat model IDs (exclude image/video/build models)
+        grok_models = []
+        for m in models:
+            mid = m.get("id", "")
+            if "grok" not in mid.lower():
+                continue
+            if any(exc in mid.lower() for exc in _EXCLUDE):
+                continue
+            grok_models.append(mid)
+
+        if not grok_models:
+            return preferred
+
+        # If preferred is available, use it
+        if preferred in grok_models:
+            return preferred
+
+        # Pick the best model:
+        # 1. Prefer non-reasoning variants (cheaper, faster for search tasks)
+        # 2. Among remaining, prefer shorter names (e.g. grok-4.3 over grok-4.20-0309-reasoning)
+        # 3. Sort by version number descending
+        non_reasoning = [m for m in grok_models if "reasoning" not in m and "multi-agent" not in m]
+        candidates = non_reasoning if non_reasoning else grok_models
+        # Sort: higher version first, shorter name preferred for ties
+        candidates.sort(key=lambda m: (m.split("-")[0] if "-" in m else m, -len(m)), reverse=True)
+        chosen = candidates[0]
+        print(f"[model] Configured model '{preferred}' not found. Available text models: {grok_models}")
+        print(f"[model] Selected '{chosen}'")
+        return chosen
+
+    except Exception as e:
+        print(f"[model] Could not query xAI models API ({e}), using '{preferred}'")
+        return preferred
+
+
+# ---------------------------------------------------------------------------
 # Token / cost tracking
 # ---------------------------------------------------------------------------
 
@@ -549,9 +613,18 @@ def _classify_content(item, config: dict, source: str = "x") -> str:
     if source == "x" and item.author_handle.lower() in lab_handles:
         return "lab-pulse"
 
-    # Deep dive check
-    if source == "x" and len(item.text) >= long_form_min:
-        return "deep-dive"
+    # Deep dive check — long threads OR posts linking to article domains
+    if source == "x":
+        if len(item.text) >= long_form_min:
+            return "deep-dive"
+        # Check if the post links to a known article/blog domain
+        item_url = (item.url if hasattr(item, 'url') else "").lower()
+        urls_in_text = re.findall(r'https?://\S+', item.text.lower()) if hasattr(item, 'text') else []
+        all_urls = [item_url] + urls_in_text
+        for url in all_urls:
+            for domain in article_domains:
+                if domain in url:
+                    return "deep-dive"
     return "general"
 
 
@@ -711,8 +784,54 @@ def run_topic_scan(
     return result
 
 
-SYNTHESIS_MODEL = "claude-sonnet-4-6"
-CLAUDE_CLI = r"C:\Users\nuno_\.local\bin\claude.exe"
+SYNTHESIS_MODEL = "claude-sonnet-4-6"  # kept as fallback reference
+CLAUDE_CLI = r"C:\Users\nuno_\.local\bin\claude.exe"  # kept as fallback reference
+
+
+def _call_xai_chat(api_key: str, model: str, prompt: str, max_tokens: int = 4096) -> tuple[str, dict | None]:
+    """Call xAI chat completions API directly. Returns (content_text, usage_dict)."""
+    payload = json.dumps({
+        "model": model,
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": max_tokens,
+        "temperature": 0.3,
+    }).encode("utf-8")
+
+    req = urllib.request.Request(
+        "https://api.x.ai/v1/chat/completions",
+        data=payload,
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+    )
+    with urllib.request.urlopen(req, timeout=120) as resp:
+        data = json.loads(resp.read().decode("utf-8"))
+
+    content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+    usage = data.get("usage")
+    return content, usage
+
+
+def _extract_json_object(text: str) -> dict | None:
+    """Robustly extract a JSON object from text that may contain prose or code fences."""
+    # Strip markdown code fences
+    text = re.sub(r'^```(?:json)?\s*', '', text.strip())
+    text = re.sub(r'\s*```$', '', text.strip())
+    # Try direct parse first
+    try:
+        return json.loads(text)
+    except (json.JSONDecodeError, ValueError):
+        pass
+    # Find first { and last } — extract the JSON object
+    first_brace = text.find('{')
+    last_brace = text.rfind('}')
+    if first_brace >= 0 and last_brace > first_brace:
+        try:
+            return json.loads(text[first_brace:last_brace + 1])
+        except (json.JSONDecodeError, ValueError):
+            pass
+    return None
 
 
 def synthesize_all(
@@ -720,6 +839,8 @@ def synthesize_all(
     from_date: str,
     to_date: str,
     tracker: TokenTracker | None = None,
+    api_key: str = "",
+    model: str = "grok-4.3",
 ) -> dict:
     """Single batched synthesis call across all topics using Claude CLI (Max account)."""
 
@@ -775,29 +896,82 @@ RULES:
 - lab_pulse_summary: focus on the 3 big labs (Anthropic, OpenAI, Google) + any notable from Meta/Mistral
 - Each topic: 1-3 key_points (short, specific, actionable)
 - If a topic had no results, say "Quiet day for this topic"
-- Output ONLY valid JSON"""
+- Output ONLY valid JSON, no prose before or after"""
 
-    try:
-        result = subprocess.run(
-            [CLAUDE_CLI, "--print", "-p", prompt],
-            capture_output=True, text=True, encoding="utf-8", timeout=120,
-        )
-        content = result.stdout.strip()
-        if not content:
-            err = result.stderr.strip()
-            return {"briefing": f"Synthesis failed: no output. stderr={err}", "topics": [], "error": err}
-        print(f"[synth] Claude CLI synthesis done")
-        # Strip markdown code fences if Claude wraps the JSON
-        content = re.sub(r'^```(?:json)?\s*', '', content)
-        content = re.sub(r'\s*```$', '', content)
-        return json.loads(content)
-    except Exception as e:
-        return {"briefing": f"Synthesis failed: {e}", "topics": [], "error": str(e)}
+    max_retries = 2
+    last_error = None
+    for attempt in range(max_retries + 1):
+        try:
+            content, usage = _call_xai_chat(api_key, model, prompt, max_tokens=4096)
+            if tracker and usage:
+                tracker.record("Synthesis", model, usage)
+            if not content:
+                last_error = "empty response from API"
+                if attempt < max_retries:
+                    print(f"[synth] Attempt {attempt+1} failed: no output, retrying...")
+                    continue
+                return {"briefing": f"Synthesis failed after {max_retries+1} attempts: {last_error}", "topics": [], "error": last_error}
+            print(f"[synth] xAI synthesis done (attempt {attempt+1})")
+            parsed = _extract_json_object(content)
+            if parsed and "briefing" in parsed:
+                return parsed
+            # JSON extraction failed — retry
+            preview = content[:200].replace('\n', '\\n')
+            last_error = f"Could not extract valid JSON from output ({len(content)} chars): {preview}"
+            if attempt < max_retries:
+                print(f"[synth] Attempt {attempt+1} failed: {last_error}, retrying...")
+                continue
+            return {"briefing": f"Synthesis failed: {last_error}", "topics": [], "error": last_error}
+        except Exception as e:
+            last_error = str(e)
+            if attempt < max_retries:
+                print(f"[synth] Attempt {attempt+1} failed: {e}, retrying...")
+                continue
+    return {"briefing": f"Synthesis failed after {max_retries+1} attempts: {last_error}", "topics": [], "error": last_error}
 
 
 # ---------------------------------------------------------------------------
 # Must-Follow Account Scanning (hybrid batch/solo)
 # ---------------------------------------------------------------------------
+
+# Minimum text length for must-follow tweets (after stripping URLs/mentions)
+_MF_MIN_SUBSTANCE_CHARS = 40
+
+# Patterns indicating a tweet is just a social reaction, not research-relevant
+_MF_LOW_SUBSTANCE_PATTERNS = [
+    re.compile(r'^[\U0001f300-\U0001faff☀-➿‍️\s]+$'),  # pure emoji
+    re.compile(r'^(?:lm[fa]+o|haha|wow|nice|ty|thanks|thank you|congrats|yep|yes|no|agreed|exactly|this|same|100%|real|true|fr|w$)', re.IGNORECASE),
+    re.compile(r'^(?:glad you|great meeting|good to see|nice to meet|was great|had a great|so glad)', re.IGNORECASE),
+]
+
+
+def _filter_must_follow_substance(items: list) -> list:
+    """Drop must-follow tweets that lack substance (reactions, emojis, social chat).
+
+    Keeps tweets that are either:
+    - Long enough to contain real content (40+ chars after stripping URLs/mentions)
+    - Contain a URL (likely sharing something worth reading)
+    """
+    filtered = []
+    for item in items:
+        text = item.text.strip()
+        # Always keep if the tweet contains a non-x.com URL (sharing an article/resource)
+        urls_in_text = re.findall(r'https?://\S+', text)
+        external_urls = [u for u in urls_in_text if 'x.com/' not in u and 'twitter.com/' not in u]
+        if external_urls:
+            filtered.append(item)
+            continue
+        # Strip URLs and @mentions for substance check
+        clean = re.sub(r'https?://\S+', '', text)
+        clean = re.sub(r'@\w+', '', clean).strip()
+        # Check minimum length
+        if len(clean) < _MF_MIN_SUBSTANCE_CHARS:
+            continue
+        # Check low-substance patterns
+        if any(p.match(clean) for p in _MF_LOW_SUBSTANCE_PATTERNS):
+            continue
+        filtered.append(item)
+    return filtered
 
 
 def run_must_follow_scan(
@@ -874,6 +1048,9 @@ def run_must_follow_scan(
                     continue
                 final.append(item)
 
+            # Substance filter: drop low-value posts (reactions, emojis, social chat)
+            final = _filter_must_follow_substance(final)
+
             # Must-follow: NO engagement floor — catch everything
             # (engagement floor is for topic scans only)
 
@@ -941,6 +1118,9 @@ def run_must_follow_scan(
                 if getattr(item, 'is_reply', False):
                     continue
                 final.append(item)
+
+            # Substance filter: drop low-value posts (reactions, emojis, social chat)
+            final = _filter_must_follow_substance(final)
 
             # Must-follow: NO engagement floor — catch everything
             # (engagement floor is for topic scans only)
@@ -1548,6 +1728,168 @@ def _render_feedback_insights(analysis: dict, proposals: list[str]) -> list[str]
 
 
 # ---------------------------------------------------------------------------
+# Self-Healing Pipeline — 4 levels of automatic recovery
+# ---------------------------------------------------------------------------
+
+def validate_note(note_content: str) -> list[str]:
+    """Level 2: Check rendered note for quality issues after writing.
+
+    Returns a list of issue keys (empty = all good):
+      'pow_failed'     — synthesis text contains a failure message
+      'news_missing'   — no News section rendered
+      'note_too_sparse' — fewer than 5 non-boilerplate content lines
+    """
+    issues = []
+    if "Synthesis failed" in note_content or "Synthesis failed" in note_content:
+        issues.append("pow_failed")
+    if "## News" not in note_content:
+        issues.append("news_missing")
+    # Count real content lines (not frontmatter, blockquotes, headers, dividers)
+    content_lines = [
+        l for l in note_content.split("\n")
+        if l.strip()
+        and not l.strip().startswith("---")
+        and not l.strip().startswith(">")
+        and not l.strip().startswith("#")
+        and not l.strip().startswith("|--")
+    ]
+    if len(content_lines) < 5:
+        issues.append("note_too_sparse")
+    return issues
+
+
+def detect_drift(config: dict, lookback_days: int = 7) -> list[str]:
+    """Level 3: Scan recent dailies for multi-day metric decay.
+
+    Reads YAML frontmatter from the last N daily notes and flags any
+    tracked metric that has been 0 for 3+ consecutive days. Also detects
+    repeated synthesis failures.
+
+    Returns a list of markdown warning strings (empty = healthy).
+    """
+    warnings = []
+    vault_path = Path(config.get("vault_path", ""))
+    dailies_folder = config.get("dailies_folder", "Research/Dailies")
+
+    # Collect frontmatter metrics from recent notes (newest first)
+    metrics_history = []
+    for i in range(1, lookback_days + 1):
+        date = (datetime.now() - timedelta(days=i)).strftime("%Y-%m-%d")
+        year, month = date[:4], date[5:7]
+        note_path = vault_path / dailies_folder / year / month / f"{date}.md"
+        if not note_path.exists():
+            continue
+        try:
+            text = note_path.read_text(encoding="utf-8")
+            fm = {}
+            if text.startswith("---"):
+                end = text.find("---", 3)
+                if end > 0:
+                    for line in text[3:end].strip().split("\n"):
+                        if ":" in line:
+                            k, v = line.split(":", 1)
+                            k, v = k.strip(), v.strip()
+                            try:
+                                fm[k] = int(v)
+                            except ValueError:
+                                fm[k] = v
+            fm["_date"] = date
+            fm["_has_synth_failure"] = "Synthesis failed" in text
+            metrics_history.append(fm)
+        except Exception:
+            continue
+
+    if len(metrics_history) < 3:
+        return warnings
+
+    # Check each metric for consecutive zeros (newest first)
+    tracked_metrics = [
+        ("prominent_voices", "Prominent Voices"),
+        ("deep_dives", "Deep Dives"),
+        ("lab_pulse", "Lab Pulse"),
+        ("x_items", "Research Feed (X)"),
+        ("must_follow_tweets", "Must Follow"),
+    ]
+    for key, label in tracked_metrics:
+        consecutive_zeros = 0
+        for fm in metrics_history:
+            val = fm.get(key, -1)
+            if isinstance(val, int) and val == 0:
+                consecutive_zeros += 1
+            else:
+                break
+        if consecutive_zeros >= 3:
+            warnings.append(
+                f"**{label}** has been 0 for {consecutive_zeros} consecutive days "
+                f"— possible filter, search query, or API issue"
+            )
+
+    # Check for repeated synthesis failures
+    synth_failures = sum(1 for fm in metrics_history if fm.get("_has_synth_failure"))
+    if synth_failures >= 3:
+        warnings.append(
+            f"**POW synthesis** failed {synth_failures}/{len(metrics_history)} "
+            f"recent days — check model availability or API auth"
+        )
+
+    # Check for consistently low total items
+    total_items = [
+        fm.get("x_items", 0) + fm.get("must_follow_tweets", 0) + fm.get("news_items", 0)
+        for fm in metrics_history[:5]
+        if isinstance(fm.get("x_items", 0), int)
+    ]
+    if total_items and all(t < 3 for t in total_items):
+        warnings.append(
+            f"**Total content** has been very low ({total_items}) for the "
+            f"last {len(total_items)} days — API may be degraded"
+        )
+
+    return warnings
+
+
+def auto_repair_config(config: dict, resolved_model: str):
+    """Level 4: Update pipeline.md when configured model was deprecated.
+
+    If the model resolver found a different model than what's in pipeline.md,
+    update the config file so future runs don't need to re-resolve.
+    Only updates if the current setting isn't 'auto'.
+    """
+    if not PIPELINE_MD.exists():
+        return
+
+    text = PIPELINE_MD.read_text(encoding="utf-8")
+    configured = config.get("xai_model", "")
+
+    # Don't update if set to 'auto' — that's intentional
+    if not configured or configured == "auto":
+        return
+
+    if configured != resolved_model:
+        old_line = f"- xai_model: {configured}"
+        new_line = f"- xai_model: {resolved_model}"
+        if old_line in text:
+            text = text.replace(old_line, new_line)
+            PIPELINE_MD.write_text(text, encoding="utf-8")
+            print(f"[heal] Auto-updated pipeline.md: xai_model {configured} → {resolved_model}")
+
+
+def _render_health_warnings(warnings: list[str]) -> list[str]:
+    """Render pipeline health warnings section in the daily note."""
+    if not warnings:
+        return []
+    lines = [
+        "## Pipeline Health ⚠️",
+        "",
+        "> Auto-detected issues from recent daily runs:",
+        "",
+    ]
+    for w in warnings:
+        lines.append(f"- {w}")
+    lines.append("")
+    return lines
+
+
+# ---------------------------------------------------------------------------
 # Cost summary + efficiency recommendations (rendered in daily note)
 # ---------------------------------------------------------------------------
 
@@ -1804,8 +2146,8 @@ def _fetch_google_news_topic(query: str, max_items: int = 10, max_age_days: int 
         return []
 
 
-def _score_news_with_llm(items: list) -> list:
-    """Use Claude CLI to score and select top 10 news items for relevance."""
+def _score_news_with_llm(items: list, api_key: str = "", model: str = "grok-4.3") -> list:
+    """Use xAI API to score, deduplicate, and select top 10 news items for relevance."""
     if not items:
         return []
 
@@ -1817,20 +2159,26 @@ def _score_news_with_llm(items: list) -> list:
     prompt = (
         "You are scoring AI news headlines for relevance to an AI practitioner focused on: "
         "agent development, LLM models, MCP (Model Context Protocol), RAG, and AI-assisted SDLC.\n\n"
-        "Score each item 1-10 for relevance. Return ONLY a JSON array of the top 10 most relevant:\n"
-        '[{"index": 1, "score": 9}, {"index": 3, "score": 8}, ...]\n\n'
-        "Only include items with score >= 5. Sort by score descending.\n\n"
+        "IMPORTANT: Many items may cover the SAME story from different outlets. "
+        "Group items by story first, then pick only the BEST item (highest quality source) per story. "
+        "Do NOT return multiple items about the same event.\n\n"
+        "Score each UNIQUE story 1-10 for relevance. Return ONLY a JSON array of the top 10:\n"
+        '[{"index": 1, "score": 9, "also_covered_by": ["Source2", "Source3"]}, ...]\n\n'
+        "The 'also_covered_by' field lists other sources covering the same story (use the source name from brackets). "
+        "Only include stories with score >= 5. Sort by score descending.\n\n"
         "Items:\n" + "\n".join(item_lines)
     )
 
     try:
-        result = subprocess.run(
-            [CLAUDE_CLI, "--print", "-p", prompt],
-            capture_output=True, text=True, encoding="utf-8", timeout=60,
-        )
-        content = result.stdout.strip()
+        content, _usage = _call_xai_chat(api_key, model, prompt, max_tokens=2048)
+        content = content.strip()
         content = re.sub(r"^```(?:json)?\s*", "", content)
         content = re.sub(r"\s*```$", "", content)
+        # Robust extraction: find the JSON array
+        first_bracket = content.find('[')
+        last_bracket = content.rfind(']')
+        if first_bracket >= 0 and last_bracket > first_bracket:
+            content = content[first_bracket:last_bracket + 1]
         rankings = json.loads(content)
         scored = []
         for r in rankings[:10]:
@@ -1838,6 +2186,9 @@ def _score_news_with_llm(items: list) -> list:
             if 0 <= idx < len(items):
                 item = dict(items[idx])
                 item["llm_score"] = r.get("score", 0)
+                also = r.get("also_covered_by", [])
+                if also:
+                    item["also_covered_by"] = also
                 scored.append(item)
         return sorted(scored, key=lambda x: x.get("llm_score", 0), reverse=True)
     except Exception as e:
@@ -1853,7 +2204,7 @@ _GENERAL_AI_QUERIES = [
 ]
 
 
-def fetch_google_news(topics: list, config: dict) -> list:
+def fetch_google_news(topics: list, config: dict, api_key: str = "", model: str = "grok-4.3") -> list:
     """Fetch Google News RSS across all topics, LLM-score, return top 10.
 
     Only includes articles from the last 7 days.  If topic-specific queries
@@ -1883,8 +2234,8 @@ def fetch_google_news(topics: list, config: dict) -> list:
         if not all_items:
             return []
 
-    print(f"  [news] Scoring {len(all_items)} articles via Claude CLI...")
-    scored = _score_news_with_llm(all_items)
+    print(f"  [news] Scoring {len(all_items)} articles via xAI API...")
+    scored = _score_news_with_llm(all_items, api_key=api_key, model=model)
 
     # Backfill: if fewer than 10 scored items, fetch general AI news
     if len(scored) < 10:
@@ -1898,7 +2249,7 @@ def fetch_google_news(topics: list, config: dict) -> list:
                     seen_urls.add(item["url"])
                     backfill_items.append(item)
         if backfill_items:
-            extra_scored = _score_news_with_llm(backfill_items)
+            extra_scored = _score_news_with_llm(backfill_items, api_key=api_key, model=model)
             scored.extend(extra_scored[:shortfall])
             print(f"  [news] Backfilled {min(len(extra_scored), shortfall)} general AI articles")
 
@@ -1917,6 +2268,7 @@ def render_daily_note(
     feedback_analysis: dict = None,
     feedback_proposals: list[str] = None,
     tracker: TokenTracker | None = None,
+    health_warnings: list[str] = None,
 ) -> str:
     """Render the full daily note markdown."""
     topic_slugs = [tr["topic"].slug for tr in topic_results]
@@ -1965,9 +2317,13 @@ def render_daily_note(
     if tracker and tracker.num_calls > 0:
         lines.extend(_render_cost_summary(tracker))
 
-    # Briefing — the POW moment
+    # Pipeline health warnings (Level 3: drift detection)
+    if health_warnings:
+        lines.extend(_render_health_warnings(health_warnings))
+
+    # Briefing — the POW moment (Level 1: omit section if synthesis failed)
     briefing = synthesis.get("briefing", "")
-    if briefing:
+    if briefing and "Synthesis failed" not in briefing:
         lines.extend([
             "## Today's POW",
             "",
@@ -2037,18 +2393,15 @@ def render_daily_note(
             )
         lines.append("")
 
-    # News — top 10 Google News articles scored by LLM for relevance
+    # News — top stories, deduplicated by story (one headline per event)
     if news_items:
         lines.extend([
             "## News \U0001f4f0",
             "",
-            "| # | Headline | Source | Date |",
-            "|---|----------|--------|------|",
         ])
         for i, item in enumerate(news_items[:10], 1):
             title = _oneline(item.get("title", ""), 0)
             source = _oneline(item.get("source", ""), 0)
-            # pubDate from RSS: "Sun, 20 Apr 2025 10:00:00 GMT" → "Apr 20"
             raw_date = item.get("pub_date", "")
             try:
                 dt = datetime.strptime(raw_date, "%a, %d %b %Y %H:%M:%S %Z")
@@ -2056,7 +2409,9 @@ def render_daily_note(
             except ValueError:
                 pub_short = raw_date[:12]
             url = item.get("url", "")
-            lines.append(f"| {i} | [{title}]({url}) | {source} | {pub_short} |")
+            also = item.get("also_covered_by", [])
+            also_str = f" *(also: {', '.join(also[:3])})*" if also else ""
+            lines.append(f"{i}. [{title}]({url}) — {source}, {pub_short}{also_str}")
         lines.append("")
 
     # Lab Pulse — what the model providers said/shipped today
@@ -2135,21 +2490,11 @@ def render_daily_note(
     else:
         lines.extend(["*No new research results today.*", ""])
 
-    # Footer
+    # Footer — compact tag instructions
     lines.extend([
         "---",
         "",
-        "## Promote to Library",
-        "",
-        "> Add `#keep` to any reading list item above to promote it to",
-        f"> `{config.get('library_folder', 'Research/Library')}/` on the next run.",
-        "",
-        "## Rate Results",
-        "",
-        "> Tag any item with `#good <reason>` or `#bad <reason>` to give feedback.",
-        "> Add a short reason after the tag — it powers the learning loop below.",
-        "> Examples: `#bad it was a reply` · `#good deep practical tutorial` · `#bad bot-generated spam`",
-        "> Next run picks it up, classifies it, and generates improvement proposals.",
+        "> **Tags:** `#keep` → promote to Library | `#good <reason>` / `#bad <reason>` → feedback loop",
         "",
     ])
 
@@ -2167,14 +2512,18 @@ def render_daily_note(
     if feedback_analysis:
         lines.extend(_render_feedback_insights(feedback_analysis, feedback_proposals or []))
 
-    # Efficiency recommendations (at the very end)
+    # Efficiency recommendations — only render if there are actual issues
     if tracker and tracker.num_calls > 0:
         topic_count = len(topic_results)
         mf_count_accts = len(config.get("must_follow_accounts", []))
-        lines.extend(["---", ""])
-        lines.extend(_render_efficiency_recommendations(
+        recs = _render_efficiency_recommendations(
             tracker, config, topic_count, mf_count_accts,
-        ))
+        )
+        # Only include if there are actual recommendations (not just "No issues")
+        has_recs = any("**" in line for line in recs)
+        if has_recs:
+            lines.extend(["---", ""])
+            lines.extend(recs)
 
     return "\n".join(lines)
 
@@ -2337,6 +2686,28 @@ def main():
     from vendor.last30days import models as l30_models
     selected_models = l30_models.get_models(l30_config)
 
+    # Auto-resolve xAI model: check API for latest available
+    configured_xai = l30_config.get("xai_model") or config.get("xai_model", "grok-4-1-fast")
+    if configured_xai == "auto":
+        configured_xai = "grok-4-1-fast"  # default seed for auto-resolution
+    resolved_xai = resolve_xai_model(l30_config["XAI_API_KEY"], configured_xai)
+    if resolved_xai != configured_xai:
+        print(f"[model] xAI model resolved: {configured_xai} → {resolved_xai}")
+    l30_config["xai_model"] = resolved_xai
+
+    # Level 4: Auto-repair config if model changed
+    auto_repair_config(config, resolved_xai)
+
+    # Level 3: Detect cross-day metric drift
+    print("[health] Checking recent daily notes for drift...")
+    health_warnings = detect_drift(config, lookback_days=7)
+    if health_warnings:
+        print(f"[health] Detected {len(health_warnings)} issue(s):")
+        for w in health_warnings:
+            print(f"  ⚠ {w}")
+    else:
+        print("[health] All metrics healthy")
+
     # Initialize token tracker
     tracker = TokenTracker(config.get("cost_rates"))
 
@@ -2367,6 +2738,8 @@ def main():
         for err in total_errors:
             print(f"  ! {err}")
 
+    # Level 1: Resilient step execution — each step recovers independently
+
     # Must-follow account scan (hybrid batch/solo, no quality filters)
     must_follow_results = []
     mf_accounts = config.get("must_follow_accounts", [])
@@ -2375,41 +2748,53 @@ def main():
         n_solo = sum(1 for a in mf_accounts if a.get("solo"))
         n_calls = (1 if n_batch else 0) + n_solo
         print(f"\n[must-follow] Scanning {len(mf_accounts)} accounts ({n_batch} batch + {n_solo} solo = {n_calls} calls) | last 24h ({mf_from_date} -> {to_date})...")
-        must_follow_results = run_must_follow_scan(
-            config, l30_config, mf_from_date, to_date,
-            tracker=tracker,
-        )
-        mf_total = sum(len(r["items"]) for r in must_follow_results)
-        print(f"[must-follow] Captured {mf_total} tweets from {len(mf_accounts)} accounts")
+        try:
+            must_follow_results = run_must_follow_scan(
+                config, l30_config, mf_from_date, to_date,
+                tracker=tracker,
+            )
+            mf_total = sum(len(r["items"]) for r in must_follow_results)
+            print(f"[must-follow] Captured {mf_total} tweets from {len(mf_accounts)} accounts")
+        except Exception as e:
+            print(f"[heal] Must-follow scan failed ({e}) — continuing without it")
 
     # Prominent AI voices scan (single broad search, 500+ likes)
     prominent_results = []
     if l30_config.get("XAI_API_KEY"):
         print(f"\n[prominent-ai] Scanning for high-engagement AI voices | last 24h ({mf_from_date} -> {to_date})...")
-        prominent_results = run_prominent_ai_scan(
-            config, l30_config, mf_from_date, to_date,
-            seen_urls,
-            tracker=tracker,
-        )
-        # Add to seen_urls so synthesis doesn't double-count
-        for item in prominent_results:
-            seen_urls.add(item.url)
+        try:
+            prominent_results = run_prominent_ai_scan(
+                config, l30_config, mf_from_date, to_date,
+                seen_urls,
+                tracker=tracker,
+            )
+            # Add to seen_urls so synthesis doesn't double-count
+            for item in prominent_results:
+                seen_urls.add(item.url)
+        except Exception as e:
+            print(f"[heal] Prominent AI scan failed ({e}) — continuing without it")
 
     # Google News RSS — top 10 LLM-scored articles across all topics
     print(f"\n[news] Fetching Google News RSS for {len(all_topics)} topics...")
-    news_items = fetch_google_news(all_topics, config)
-    print(f"[news] Selected {len(news_items)} articles")
+    try:
+        news_items = fetch_google_news(all_topics, config, api_key=l30_config["XAI_API_KEY"], model=resolved_xai)
+        print(f"[news] Selected {len(news_items)} articles")
+    except Exception as e:
+        news_items = []
+        print(f"[heal] News fetch failed ({e}) — continuing without news")
 
     # Synthesize (single batched Claude CLI call — uses Max account, no API key)
     synthesis = {}
     total_items = sum(len(tr["x_items"]) for tr in topic_results)
     if total_items > 0:
-        print(f"\n[synth] Synthesizing {total_items} items across {len(all_topics)} topics via Claude CLI...")
+        print(f"\n[synth] Synthesizing {total_items} items across {len(all_topics)} topics via xAI API ({resolved_xai})...")
         synthesis = synthesize_all(
             topic_results,
             from_date,
             to_date,
             tracker=tracker,
+            api_key=l30_config["XAI_API_KEY"],
+            model=resolved_xai,
         )
         if synthesis.get("briefing"):
             print(f"[synth] Briefing: {synthesis['briefing'][:120]}...")
@@ -2429,6 +2814,7 @@ def main():
         feedback_analysis=feedback_analysis,
         feedback_proposals=feedback_proposals,
         tracker=tracker,
+        health_warnings=health_warnings,
     )
 
     if args.dry_run:
@@ -2441,6 +2827,49 @@ def main():
     # Write to vault via Obsidian CLI
     filepath = vault.write_daily_note(config, note_date_key, note_content, overwrite=args.force_rerun)
     print(f"\n[vault] Written -> {filepath}")
+
+    # Level 2: Post-write validation — check note quality and attempt repair
+    validation_issues = validate_note(note_content)
+    if validation_issues:
+        print(f"\n[validate] Issues detected: {validation_issues}")
+        repaired = False
+        # Attempt repair: re-run synthesis if POW failed
+        if "pow_failed" in validation_issues and total_items > 0:
+            print("[validate] Attempting synthesis repair with fallback model...")
+            # Try a different model variant
+            fallback_models = ["grok-4.20-0309-non-reasoning", "grok-4.3", resolved_xai]
+            # Remove the model we already tried
+            fallback_models = [m for m in fallback_models if m != resolved_xai]
+            for fb_model in fallback_models[:2]:
+                print(f"[validate] Trying fallback model: {fb_model}")
+                repair_synth = synthesize_all(
+                    topic_results, from_date, to_date,
+                    tracker=tracker,
+                    api_key=l30_config["XAI_API_KEY"],
+                    model=fb_model,
+                )
+                if repair_synth.get("briefing") and "Synthesis failed" not in repair_synth.get("briefing", ""):
+                    print(f"[validate] Synthesis repaired with {fb_model}")
+                    synthesis = repair_synth
+                    note_content = render_daily_note(
+                        today, topic_results, synthesis, config,
+                        must_follow_results=must_follow_results,
+                        prominent_results=prominent_results,
+                        news_items=news_items,
+                        feedback_summary=feedback_summary,
+                        feedback_analysis=feedback_analysis,
+                        feedback_proposals=feedback_proposals,
+                        tracker=tracker,
+                        health_warnings=health_warnings,
+                    )
+                    filepath = vault.write_daily_note(config, note_date_key, note_content, overwrite=True)
+                    print(f"[validate] Repaired note written -> {filepath}")
+                    repaired = True
+                    break
+            if not repaired:
+                print("[validate] All fallback models failed — note shipped without POW")
+    else:
+        print("[validate] Note passed all quality checks")
 
     # Cost summary (always print — replaces old --costs heuristic)
     ts = tracker.summary_dict()
