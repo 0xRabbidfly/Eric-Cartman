@@ -44,7 +44,7 @@ IMPORTANT RULES:
 {{
   "items": [
     {{
-      "text": "Post text content (truncated if long)",
+      "text": "Full post text — include the complete text of long posts/threads, do not truncate or summarize",
       "url": "https://x.com/user/status/...",
       "author_handle": "username",
       "date": "YYYY-MM-DD or null if unknown",
@@ -90,7 +90,7 @@ IMPORTANT: Return ONLY valid JSON in this exact format, no other text:
 {{
   "items": [
     {{
-      "text": "Post text content (truncated if long)",
+      "text": "Full post text — include the complete text of long posts/threads, do not truncate or summarize",
       "url": "https://x.com/{handle}/status/...",
       "author_handle": "{handle}",
       "date": "YYYY-MM-DD or null if unknown",
@@ -289,7 +289,7 @@ IMPORTANT: Return ONLY valid JSON in this exact format, no other text:
 {{
   "items": [
     {{
-      "text": "Post text content (truncated if long)",
+      "text": "Full post text — include the complete text of long posts/threads, do not truncate or summarize",
       "url": "https://x.com/username/status/...",
       "author_handle": "username",
       "date": "YYYY-MM-DD or null if unknown",
@@ -315,6 +315,8 @@ Find {min_items}-{max_items} HIGH-ENGAGEMENT ORIGINAL tweets from prominent AI r
 engineers, executives, and founders. These should be the most impactful posts in the AI space
 from {from_date} to {to_date}.
 
+Use a search filter like min_faves:{min_likes} so results are already high-engagement.
+
 I'm looking for tweets that would be newsworthy or insightful for AI industry professionals:
 - Frontier model releases, benchmarks, or technical deep-dives
 - AI research breakthroughs or paper highlights
@@ -324,7 +326,14 @@ I'm looking for tweets that would be newsworthy or insightful for AI industry pr
 - Open-source AI releases, frameworks, or tooling announcements
 
 QUALITY BAR:
-- Each tweet MUST have 500+ likes — this is non-negotiable
+- Aim for tweets with {min_likes}+ likes. Since your search already filters by
+  engagement, INCLUDE every relevant search result even if you cannot see its
+  exact like count — set "engagement" to null instead of omitting the tweet.
+  Returning an empty items list when the search produced results is wrong.
+- If your searches surface fewer than {min_items} qualifying tweets, run MORE
+  searches with different keywords, modes (Top and Latest), and phrasings
+  before finalizing. Only return fewer than {min_items} items when repeated
+  searches genuinely produce nothing more.
 - ONLY original posts — NO replies, NO retweets/reposts
 - Prefer longer, substantive posts over short quips or hot takes
 - Diverse voices — don't over-index on any single person or company
@@ -353,7 +362,7 @@ IMPORTANT: Return ONLY valid JSON in this exact format, no other text:
 
 Rules:
 - url MUST be the exact URL from the search results — never invent a status ID
-- Every item MUST have 500+ likes
+- engagement may be null when counts are not visible — include the tweet anyway
 - No replies (is_reply must be false for all items)
 - Include the author's full text, not a summary"""
 
@@ -365,12 +374,13 @@ def search_x_prominent_ai(
     to_date: str,
     depth: str = "scan",
     mock_response: Optional[Dict] = None,
+    min_likes: int = 500,
 ) -> Dict[str, Any]:
     """Search X for high-engagement AI tweets from prominent voices.
 
     A single broad search that captures what the top AI minds are saying
     without hardcoding specific account names. Relies on engagement
-    thresholds (500+ likes) to surface quality content.
+    thresholds (min_likes, default 500) to surface quality content.
 
     Args:
         api_key: xAI API key
@@ -379,6 +389,7 @@ def search_x_prominent_ai(
         to_date: End date (YYYY-MM-DD)
         depth: Research depth
         mock_response: Mock response for testing
+        min_likes: Engagement floor baked into the search prompt
 
     Returns:
         Raw API response
@@ -409,6 +420,7 @@ def search_x_prominent_ai(
                     to_date=to_date,
                     min_items=min_items,
                     max_items=max_items,
+                    min_likes=min_likes,
                 ),
             }
         ],
@@ -662,6 +674,30 @@ def _fix_urls_from_citations(
     return items
 
 
+def _parse_count(value: Any) -> Optional[int]:
+    """Parse an engagement count that may be an int, "1234", "1,234", or "1.2K"/"3M".
+
+    Returns None when the value is missing or unparseable — callers treat
+    None as "unknown" rather than zero.
+    """
+    if value is None or isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return int(value)
+    s = str(value).strip().replace(",", "")
+    if not s:
+        return None
+    multiplier = 1
+    if s[-1].upper() == "K":
+        multiplier, s = 1_000, s[:-1]
+    elif s[-1].upper() == "M":
+        multiplier, s = 1_000_000, s[:-1]
+    try:
+        return int(float(s) * multiplier)
+    except ValueError:
+        return None
+
+
 def parse_x_response(response: Dict[str, Any]) -> List[Dict[str, Any]]:
     """Parse xAI response to extract X items.
 
@@ -727,20 +763,24 @@ def parse_x_response(response: Dict[str, Any]) -> List[Dict[str, Any]]:
         if not url:
             continue
 
-        # Parse engagement
+        # Parse engagement — counts may come back as ints, "1234", or "1.2K"
         engagement = None
         eng_raw = item.get("engagement")
         if isinstance(eng_raw, dict):
             engagement = {
-                "likes": int(eng_raw.get("likes", 0)) if eng_raw.get("likes") else None,
-                "reposts": int(eng_raw.get("reposts", 0)) if eng_raw.get("reposts") else None,
-                "replies": int(eng_raw.get("replies", 0)) if eng_raw.get("replies") else None,
-                "quotes": int(eng_raw.get("quotes", 0)) if eng_raw.get("quotes") else None,
+                "likes": _parse_count(eng_raw.get("likes")),
+                "reposts": _parse_count(eng_raw.get("reposts")),
+                "replies": _parse_count(eng_raw.get("replies")),
+                "quotes": _parse_count(eng_raw.get("quotes")),
             }
 
         clean_item = {
             "id": f"X{i+1}",
-            "text": str(item.get("text", "")).strip()[:500],  # Truncate long text
+            # Cap must stay well above the deep-dive length threshold in the
+            # daily-research pipeline (long_form_min_chars) — a 500-char cap
+            # against an 800-char threshold made deep-dive classification
+            # unreachable for months.
+            "text": str(item.get("text", "")).strip()[:2000],
             "url": url,
             "author_handle": str(item.get("author_handle", "")).strip().lstrip("@"),
             "date": item.get("date"),

@@ -84,9 +84,9 @@ Each item gets classified into one of three categories:
 
 | Category | What it catches | Where it appears |
 |----------|----------------|------------------|
-| **Lab Pulse** | Posts from Anthropic, OpenAI, Google, Meta, Mistral and their lead devs | Dedicated Lab Pulse section at the top |
-| **Prominent Voices** | High-engagement tweets (500+ likes) from any prominent AI figure, found via broad search | Prominent Voices section with engagement stats |
-| **Deep Dives** | Long-form threads (≥800 chars), articles from known domains (substack, arxiv, medium, etc.) | Deep Dives section with checkboxes |
+| **Lab Pulse** | Posts from Anthropic, OpenAI, Google, xAI, Meta, Mistral and their lead devs — sourced from both the must-follow scan (primary) and topic scans | Dedicated Lab Pulse section at the top |
+| **Prominent Voices** | High-engagement tweets (`prominent_ai_min_likes`, default 500+) from any prominent AI figure, found via broad search. Items with unverifiable like counts are kept — the search query itself enforces the floor. | Prominent Voices section with engagement stats |
+| **Deep Dives** | Long-form threads (≥400 chars), articles from known domains (substack, arxiv, medium, etc.) | Deep Dives section with checkboxes |
 | **General** | Everything else that passes quality filters | Per-topic sections + Reading List |
 
 ### Tagging System
@@ -137,9 +137,9 @@ Research/Dailies/2026/02/2026-02-26.md
 │   ├── Google (GoogleDeepMind, JeffDean)
 │   ├── Thought Leaders (karpathy)
 │   └── ...other groups
-├── Prominent Voices 🎙️ (high-engagement 500+ likes tweets from top AI minds, sorted by likes)
-├── Lab Pulse 🧪 (model provider rollup + table of lab posts)
-├── Deep Dives 📖 (long-form threads ≥800 chars and articles, checkboxes)
+├── Prominent Voices 🎙️ (high-engagement tweets from top AI minds, sorted by likes)
+├── Lab Pulse 🧪 (model provider rollup + table of lab posts from must-follow + topic scans)
+├── Deep Dives 📖 (long-form threads ≥400 chars and articles, checkboxes)
 ├── Reading List (top 15, checkboxes, topic tags)
 ├── Per-topic sections
 │   ├── Headline + key points
@@ -164,7 +164,7 @@ Post-scoring filters applied inside `run_topic_scan()` via `config.json → qual
 | **Spam detection** | Drops fake "official guide" link bait, engagement farming posts. Catches claim/link mismatches and low-effort patterns. | `spam_detection.enabled`, `claim_link_mismatch_patterns`, `low_effort_patterns` |
 | **Reply filtering** | Drops replies from topic scans using `is_reply` API field and text-pattern detection (`@someone` prefix). Applied to all topic scans. | N/A (always on) |
 | **Engagement floor** | Drops X items with `likes < 100`. Items with unknown engagement are dropped (not bypassed). Lab/priority accounts bypass the floor. Must-follow accounts have no floor. | `min_engagement.x_likes` |
-| **Long-form bonus** | +15 pts for X posts with ≥800 chars (threads). | `long_form_bonus`, `long_form_min_chars` |
+| **Long-form bonus** | +15 pts for X posts with ≥400 chars (threads). | `long_form_bonus`, `long_form_min_chars` |
 | **Priority accounts** | +20 pts for posts from tracked accounts. Frontier lab releases always surface. | `priority_accounts.x`, `priority_account_bonus` |
 | **Lab accounts** | Accounts from the 5 major labs, used for Lab Pulse rollup. Bypass engagement floor. | `lab_accounts.anthropic`, `lab_accounts.openai`, etc. |
 
