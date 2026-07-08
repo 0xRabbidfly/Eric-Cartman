@@ -28,6 +28,7 @@ import sys
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
+from types import SimpleNamespace
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -285,7 +286,11 @@ def _extract_usage(response: dict) -> dict | None:
 DEFAULT_QUALITY_FILTERS = {
     "min_engagement": {"x_likes": 100},
     "long_form_bonus": 15,
-    "long_form_min_chars": 800,
+    # NOTE: scan-mode tweet text is capped at 2000 chars by parse_x_response;
+    # this threshold must stay comfortably below that cap or deep-dive
+    # classification becomes unreachable (it was 800 vs a 500-char cap for
+    # months — every deep_dives count was 0).
+    "long_form_min_chars": 400,
     "article_domains": [
         "medium.com", "substack.com", "arxiv.org", "github.com",
         "huggingface.co", "openai.com", "anthropic.com", "blog.",
@@ -326,6 +331,7 @@ LAB_GROUP_MAP = {
     "google": "google",
     "meta": "meta",
     "mistral": "mistral",
+    "xai": "xai",
 }
 
 
@@ -592,6 +598,14 @@ def _is_amplifier(item) -> bool:
     return True
 
 
+def _links_article_domain(item, article_domains: list[str]) -> bool:
+    """True if the item's URL or any URL in its text points at a known article/blog domain."""
+    item_url = (getattr(item, 'url', '') or "").lower()
+    text = (getattr(item, 'text', '') or "").lower()
+    all_urls = [item_url] + re.findall(r'https?://\S+', text)
+    return any(domain in url for url in all_urls for domain in article_domains)
+
+
 def _classify_content(item, config: dict, source: str = "x") -> str:
     """Classify an item as 'deep-dive', 'lab-pulse', or 'general'.
 
@@ -617,14 +631,8 @@ def _classify_content(item, config: dict, source: str = "x") -> str:
     if source == "x":
         if len(item.text) >= long_form_min:
             return "deep-dive"
-        # Check if the post links to a known article/blog domain
-        item_url = (item.url if hasattr(item, 'url') else "").lower()
-        urls_in_text = re.findall(r'https?://\S+', item.text.lower()) if hasattr(item, 'text') else []
-        all_urls = [item_url] + urls_in_text
-        for url in all_urls:
-            for domain in article_domains:
-                if domain in url:
-                    return "deep-dive"
+        if _links_article_domain(item, article_domains):
+            return "deep-dive"
     return "general"
 
 
@@ -666,9 +674,13 @@ def apply_quality_filters(result: dict, config: dict) -> dict:
     result["x_items"] = filtered_x
 
     # --- 0c. Amplifier filtering (drop "X just dropped a guide" signal-laundering) ---
+    # Exception: posts linking to a known article domain are kept — they are the
+    # primary carriers for the Deep Dives section, and "X just published..." posts
+    # that link to the actual article still have reference value.
+    _amp_article_domains = [d.lower() for d in qf.get("article_domains", [])]
     result["x_items"] = [
         item for item in result["x_items"]
-        if not _is_amplifier(item)
+        if not _is_amplifier(item) or _links_article_domain(item, _amp_article_domains)
     ]
 
     min_eng = qf.get("min_engagement", {})
@@ -1166,9 +1178,10 @@ def run_prominent_ai_scan(
     """Run a single broad X search for high-engagement AI tweets.
 
     Instead of spending tokens on per-account searches, this does ONE API
-    call asking for high-engagement (500+ likes) original tweets from
-    prominent AI voices. The xAI model naturally surfaces the most impactful
-    posts without needing hardcoded account names.
+    call asking for high-engagement original tweets from prominent AI
+    voices. The like floor comes from pipeline.md (`prominent_ai_min_likes`,
+    default 500) and is enforced twice: in the search query the model runs
+    (min_faves) and in the post-filter below.
 
     Returns a list of XItem objects (already filtered for quality).
     """
@@ -1178,8 +1191,12 @@ def run_prominent_ai_scan(
         return []
 
     model = l30_config.get("xai_model", "grok-4-1-fast")
+    try:
+        min_likes = int(config.get("prominent_ai_min_likes", 500) or 500)
+    except (TypeError, ValueError):
+        min_likes = 500
 
-    print(f"  [prominent-ai] Searching for high-engagement AI tweets...", end=" ", flush=True)
+    print(f"  [prominent-ai] Searching for high-engagement AI tweets ({min_likes}+ likes)...", end=" ", flush=True)
 
     try:
         raw = xai_x.search_x_prominent_ai(
@@ -1188,21 +1205,50 @@ def run_prominent_ai_scan(
             from_date,
             to_date,
             depth="scan",
+            min_likes=min_likes,
         )
         if tracker:
             tracker.record("ProminentAI", model, _extract_usage(raw))
 
         items = xai_x.parse_x_response(raw)
+
+        # The model sometimes answers {"items": []} even though its searches
+        # found candidates (url_citations attached to the response). Retry
+        # once — an independent sample usually recovers the run.
+        if not items:
+            n_hits = len(xai_x._extract_citation_urls(raw))
+            if n_hits > 0:
+                print(f"(empty despite {n_hits} search hits — retrying)", end=" ", flush=True)
+                raw = xai_x.search_x_prominent_ai(
+                    l30_config["XAI_API_KEY"],
+                    model,
+                    from_date,
+                    to_date,
+                    depth="scan",
+                    min_likes=min_likes,
+                )
+                if tracker:
+                    tracker.record("ProminentAI/retry", model, _extract_usage(raw))
+                items = xai_x.parse_x_response(raw)
+                if not items:
+                    print("(retry also empty)", end=" ", flush=True)
+
         normalized = normalize.normalize_x_items(items, from_date, to_date)
         scored = score.score_x_items(normalized)
 
-        # Filter: must have 500+ likes (the whole point of this scan)
+        # Filter: drop replies, and drop items only when likes are KNOWN and
+        # below the floor. The model's x_search query already enforces
+        # min_faves, so items with unverifiable engagement are kept — the old
+        # behavior (drop unknowns) plus a "500+ non-negotiable" prompt made
+        # the model return empty lists whenever counts weren't visible.
         high_signal = [
             item for item in scored
             if not getattr(item, 'is_reply', False)
-            and item.engagement is not None
-            and item.engagement.likes is not None
-            and item.engagement.likes >= 500
+            and not (
+                item.engagement is not None
+                and item.engagement.likes is not None
+                and item.engagement.likes < min_likes
+            )
         ]
 
         # Also filter reply patterns from text
@@ -1758,14 +1804,21 @@ def validate_note(note_content: str) -> list[str]:
     return issues
 
 
-def detect_drift(config: dict, lookback_days: int = 7) -> list[str]:
+def detect_drift(config: dict, lookback_days: int = 30) -> list[dict]:
     """Level 3: Scan recent dailies for multi-day metric decay.
 
     Reads YAML frontmatter from the last N daily notes and flags any
-    tracked metric that has been 0 for 3+ consecutive days. Also detects
-    repeated synthesis failures.
+    tracked metric that has been 0 for 3+ consecutive days, reporting the
+    true streak length and the last non-zero date within the lookback
+    window (a 7-day lookback made months-old breakage read as a week old).
+    Also detects repeated synthesis failures (last 7 days).
 
-    Returns a list of markdown warning strings (empty = healthy).
+    Returns a list of warning dicts (empty = healthy):
+      {"metric": <frontmatter key or "_synth"/"_total">, "label": str,
+       "streak": int, "message": <markdown string>}
+    The structured fields let the renderer reconcile each warning against
+    TODAY's counts — a warning about past zeros in a note whose own run
+    just produced items reads as a false alarm otherwise.
     """
     warnings = []
     vault_path = Path(config.get("vault_path", ""))
@@ -1819,18 +1872,42 @@ def detect_drift(config: dict, lookback_days: int = 7) -> list[str]:
             else:
                 break
         if consecutive_zeros >= 3:
-            warnings.append(
-                f"**{label}** has been 0 for {consecutive_zeros} consecutive days "
-                f"— possible filter, search query, or API issue"
+            last_nonzero = next(
+                (fm["_date"] for fm in metrics_history[consecutive_zeros:]
+                 if isinstance(fm.get(key), int) and fm.get(key) > 0),
+                None,
             )
+            if consecutive_zeros >= len(metrics_history):
+                streak = f"0 for all {consecutive_zeros} days checked"
+            else:
+                streak = f"0 for {consecutive_zeros} consecutive days"
+            tail = (
+                f" (last non-zero: {last_nonzero})" if last_nonzero
+                else f" (no non-zero value in the last {len(metrics_history)} notes)"
+            )
+            warnings.append({
+                "metric": key,
+                "label": label,
+                "streak": consecutive_zeros,
+                "message": (
+                    f"**{label}** was {streak}"
+                    f" — possible filter, search query, or API issue{tail}"
+                ),
+            })
 
-    # Check for repeated synthesis failures
-    synth_failures = sum(1 for fm in metrics_history if fm.get("_has_synth_failure"))
+    # Check for repeated synthesis failures (recent window only)
+    recent = metrics_history[:7]
+    synth_failures = sum(1 for fm in recent if fm.get("_has_synth_failure"))
     if synth_failures >= 3:
-        warnings.append(
-            f"**POW synthesis** failed {synth_failures}/{len(metrics_history)} "
-            f"recent days — check model availability or API auth"
-        )
+        warnings.append({
+            "metric": "_synth",
+            "label": "POW synthesis",
+            "streak": synth_failures,
+            "message": (
+                f"**POW synthesis** failed {synth_failures}/{len(recent)} "
+                f"recent days — check model availability or API auth"
+            ),
+        })
 
     # Check for consistently low total items
     total_items = [
@@ -1839,10 +1916,15 @@ def detect_drift(config: dict, lookback_days: int = 7) -> list[str]:
         if isinstance(fm.get("x_items", 0), int)
     ]
     if total_items and all(t < 3 for t in total_items):
-        warnings.append(
-            f"**Total content** has been very low ({total_items}) for the "
-            f"last {len(total_items)} days — API may be degraded"
-        )
+        warnings.append({
+            "metric": "_total",
+            "label": "Total content",
+            "streak": len(total_items),
+            "message": (
+                f"**Total content** has been very low ({total_items}) for the "
+                f"last {len(total_items)} days — API may be degraded"
+            ),
+        })
 
     return warnings
 
@@ -1873,18 +1955,47 @@ def auto_repair_config(config: dict, resolved_model: str):
             print(f"[heal] Auto-updated pipeline.md: xai_model {configured} → {resolved_model}")
 
 
-def _render_health_warnings(warnings: list[str]) -> list[str]:
-    """Render pipeline health warnings section in the daily note."""
+def _render_health_warnings(
+    warnings: list[dict],
+    today_counts: dict | None = None,
+    synth_ok: bool = False,
+) -> list[str]:
+    """Render pipeline health section, reconciled against TODAY's results.
+
+    A metric that was 0 on previous days but produced items in this run is
+    reported as recovered, not warned about — otherwise the first healthy
+    note after a fix still carries stale alarms.
+    """
     if not warnings:
         return []
+    today_counts = today_counts or {}
+    rendered = []
+    for w in warnings:
+        metric = w.get("metric")
+        if metric in today_counts:
+            n = today_counts[metric]
+            if n > 0:
+                rendered.append(
+                    f"✅ **{w['label']}** recovered today ({n} item{'s' if n != 1 else ''}) "
+                    f"— was 0 for the previous {w['streak']} day(s)"
+                )
+            else:
+                rendered.append(f"{w['message']} — still 0 today")
+        elif metric == "_synth" and synth_ok:
+            rendered.append(
+                f"✅ **POW synthesis** succeeded today — had failed "
+                f"{w['streak']}/7 recent days before this run"
+            )
+        else:
+            rendered.append(w["message"])
     lines = [
         "## Pipeline Health ⚠️",
         "",
-        "> Auto-detected issues from recent daily runs:",
+        "> Auto-detected signals from recent daily runs, reconciled against today's results:",
         "",
     ]
-    for w in warnings:
-        lines.append(f"- {w}")
+    for r in rendered:
+        lines.append(f"- {r}")
     lines.append("")
     return lines
 
@@ -2291,6 +2402,29 @@ def render_daily_note(
             elif cat == 'lab-pulse':
                 lab_pulse_items.append((item, topic, 'x'))
 
+    # Lab Pulse also draws from must-follow results: the dedicated per-account
+    # scan is the reliable source for lab posts — broad topic scans almost
+    # never surface posts authored by the labs themselves (lab_pulse sat at 0
+    # for months when topic scans were the only source).
+    _lab_seen_urls = {getattr(item, 'url', '') for item, _, _ in lab_pulse_items}
+    _mf_topic = SimpleNamespace(slug="must-follow", display_name="Must Follow")
+    for r in (must_follow_results or []):
+        group_key = (r.get("group") or "").strip().lower()
+        if group_key not in LAB_GROUP_MAP:
+            continue
+        for item in r.get("items", []):
+            url = getattr(item, 'url', '')
+            if url and url in _lab_seen_urls:
+                continue
+            _lab_seen_urls.add(url)
+            lab_pulse_items.append((item, _mf_topic, 'x'))
+
+    # Highest engagement first — the render caps at 10 rows
+    lab_pulse_items.sort(
+        key=lambda t: (t[0].engagement.likes if t[0].engagement and t[0].engagement.likes else 0),
+        reverse=True,
+    )
+
     # Build frontmatter
     fm_lines = [
         "---",
@@ -2317,9 +2451,19 @@ def render_daily_note(
     if tracker and tracker.num_calls > 0:
         lines.extend(_render_cost_summary(tracker))
 
-    # Pipeline health warnings (Level 3: drift detection)
+    # Pipeline health warnings (Level 3: drift detection), reconciled
+    # against what THIS run actually produced
     if health_warnings:
-        lines.extend(_render_health_warnings(health_warnings))
+        _today_counts = {
+            "x_items": total_x,
+            "must_follow_tweets": mf_count,
+            "prominent_voices": prom_count,
+            "deep_dives": len(deep_dives),
+            "lab_pulse": len(lab_pulse_items),
+        }
+        _briefing = synthesis.get("briefing", "")
+        _synth_ok = bool(_briefing) and "Synthesis failed" not in _briefing
+        lines.extend(_render_health_warnings(health_warnings, _today_counts, _synth_ok))
 
     # Briefing — the POW moment (Level 1: omit section if synthesis failed)
     briefing = synthesis.get("briefing", "")
@@ -2361,7 +2505,7 @@ def render_daily_note(
                         date_str_item = ""
                         if hasattr(item, 'date') and item.date:
                             date_str_item = f" ({item.date})"
-                        text_display = _oneline(text, 0)
+                        text_display = _oneline(text, 280)
                         lines.append(
                             f"- @{acct['handle']}{date_str_item}: {text_display} "
                             f"[{likes}\u2764\ufe0f]({url})"
@@ -2374,7 +2518,7 @@ def render_daily_note(
         lines.extend([
             "## Prominent Voices \U0001f399\ufe0f",
             "",
-            "> High-engagement tweets (500+ likes) from prominent AI researchers, engineers, and executives.",
+            f"> High-engagement tweets ({config.get('prominent_ai_min_likes', 500)}+ likes) from prominent AI researchers, engineers, and executives.",
             "",
             "| Author | Post | Likes | Link |",
             "|--------|------|-------|------|",
@@ -2387,7 +2531,7 @@ def render_daily_note(
         )
         for item in sorted_prom[:15]:
             likes = item.engagement.likes if item.engagement and item.engagement.likes else 0
-            text_short = _oneline(item.text, 0)
+            text_short = _oneline(item.text, 280)
             lines.append(
                 f"| @{item.author_handle} | {text_short} | {likes}\u2764\ufe0f | [→]({item.url}) |"
             )
@@ -2428,7 +2572,7 @@ def render_daily_note(
             lines.append("|--------|------|-------|------|")
             for item, topic, source in lab_pulse_items[:10]:
                 likes = item.engagement.likes if item.engagement and item.engagement.likes else 0
-                text_short = _oneline(item.text, 0)
+                text_short = _oneline(item.text, 280)
                 lines.append(
                     f"| @{item.author_handle} | {text_short} | {likes} | [→]({item.url}) |"
                 )
@@ -2441,7 +2585,8 @@ def render_daily_note(
             "",
         ])
         for item, topic, source in deep_dives[:8]:
-            title = _oneline(item.text, 0)
+            # Cap the link title — scan text can now run to 2000 chars
+            title = _oneline(item.text, 200)
             lines.append(f"- [ ] [{title}]({item.url}) — @{item.author_handle} #{topic.slug}")
         lines.append("")
 
@@ -2559,6 +2704,57 @@ def _format_date(date_str: str) -> str:
         return date_str
 
 
+class _TeeStream(io.TextIOBase):
+    """Mirror writes to the original stream and a log file.
+
+    The scheduled task invokes run.py directly (bypassing run-scheduled.ps1),
+    which left nightly runs with no log at all — errors like a failing scan
+    vanished. This guarantees a per-run log regardless of how the script is
+    launched. Log-file write errors are swallowed so logging can never break
+    the pipeline itself.
+    """
+
+    def __init__(self, stream, logfile):
+        self._stream = stream
+        self._logfile = logfile
+
+    def write(self, s):
+        try:
+            self._stream.write(s)
+        except (UnicodeEncodeError, OSError):
+            pass
+        try:
+            self._logfile.write(s)
+        except (ValueError, OSError):
+            pass
+        return len(s)
+
+    def flush(self):
+        for f in (self._stream, self._logfile):
+            try:
+                f.flush()
+            except (ValueError, OSError):
+                pass
+
+
+def _setup_run_logging() -> Path | None:
+    """Tee stdout/stderr to logs/daily-research-<timestamp>.log; prune logs >30 days old."""
+    logs_dir = SKILL_DIR / "logs"
+    try:
+        logs_dir.mkdir(exist_ok=True)
+        for old in logs_dir.glob("daily-research-*.log"):
+            age_days = (datetime.now() - datetime.fromtimestamp(old.stat().st_mtime)).days
+            if age_days > 30:
+                old.unlink()
+        log_path = logs_dir / f"daily-research-{datetime.now().strftime('%Y-%m-%d_%H%M%S')}.log"
+        logfile = open(log_path, "w", encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+    sys.stdout = _TeeStream(sys.stdout, logfile)
+    sys.stderr = _TeeStream(sys.stderr, logfile)
+    return log_path
+
+
 def main():
     parser = argparse.ArgumentParser(description="Daily research pipeline → Obsidian")
     parser.add_argument("--topic", help="Run only this topic slug (e.g., agents)")
@@ -2571,6 +2767,10 @@ def main():
     parser.add_argument("--note-suffix", default="", help="Append a suffix to the output note filename (e.g. '_new' → 2026-04-20_new.md). Bypasses same-day protection.")
     parser.add_argument("--test-synth", action="store_true", help="Test synthesis with mock data and exit")
     args = parser.parse_args()
+
+    log_path = _setup_run_logging()
+    if log_path:
+        print(f"[log] Run log: {log_path}")
 
     # --test-synth: call synthesize_all with mock data and exit
     if args.test_synth:
@@ -2682,6 +2882,11 @@ def main():
     # Must-follow: always last 24 hours only
     mf_from_date = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
 
+    # Prominent voices: last 48 hours — a 24h window plus vault dedup starved
+    # the section (viral tweets found yesterday get deduped, and too few new
+    # ones cross the like floor within a single day). Dedup handles repeats.
+    prom_from_date = (datetime.now() - timedelta(days=2)).strftime("%Y-%m-%d")
+
     # Select models (reuse last30days model selection with caching)
     from vendor.last30days import models as l30_models
     selected_models = l30_models.get_models(l30_config)
@@ -2700,11 +2905,11 @@ def main():
 
     # Level 3: Detect cross-day metric drift
     print("[health] Checking recent daily notes for drift...")
-    health_warnings = detect_drift(config, lookback_days=7)
+    health_warnings = detect_drift(config)
     if health_warnings:
-        print(f"[health] Detected {len(health_warnings)} issue(s):")
+        print(f"[health] Detected {len(health_warnings)} issue(s) in recent notes (reconciled against today's results in the note):")
         for w in health_warnings:
-            print(f"  ⚠ {w}")
+            print(f"  ⚠ {w['message']}")
     else:
         print("[health] All metrics healthy")
 
@@ -2758,13 +2963,13 @@ def main():
         except Exception as e:
             print(f"[heal] Must-follow scan failed ({e}) — continuing without it")
 
-    # Prominent AI voices scan (single broad search, 500+ likes)
+    # Prominent AI voices scan (single broad search, engagement floor from config)
     prominent_results = []
     if l30_config.get("XAI_API_KEY"):
-        print(f"\n[prominent-ai] Scanning for high-engagement AI voices | last 24h ({mf_from_date} -> {to_date})...")
+        print(f"\n[prominent-ai] Scanning for high-engagement AI voices | last 48h ({prom_from_date} -> {to_date})...")
         try:
             prominent_results = run_prominent_ai_scan(
-                config, l30_config, mf_from_date, to_date,
+                config, l30_config, prom_from_date, to_date,
                 seen_urls,
                 tracker=tracker,
             )
