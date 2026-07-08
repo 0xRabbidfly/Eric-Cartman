@@ -79,6 +79,7 @@ class Manifest:
         tmp = self.path.with_suffix(".json.tmp")
         with open(tmp, "w", encoding="utf-8") as f:
             json.dump(self._data, f, indent=2, ensure_ascii=False)
+            f.write("\n")
         tmp.replace(self.path)
 
     @staticmethod
