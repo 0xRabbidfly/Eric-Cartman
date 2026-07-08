@@ -25,6 +25,7 @@ import json
 import os
 import re
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -215,10 +216,11 @@ def step_detect_episodes(
             episodes = parse_feed(rss_url, max_episodes=config.get("max_episodes", 5) * 2)
             print(f"  [found] {len(episodes)} episodes in feed")
 
-            # Filter to new episodes only
+            # Filter to new episodes only (match by key, rss_guid, or
+            # title+published so Spotify-keyed entries aren't reprocessed)
             new = []
             for ep in episodes:
-                if not manifest.is_processed(show_id, ep.id):
+                if not manifest.is_processed(show_id, ep.id, title=ep.title, published=ep.published):
                     new.append(ep)
                     ep.show_name = show_name
 
@@ -310,13 +312,13 @@ def step_generate_notes(
     config: Dict[str, Any],
     work_dir: Path,
     use_ai: bool = True,
-) -> List[Tuple[Episode, str, str]]:
+) -> List[Tuple[Episode, str, str, Path]]:
     """Generate Obsidian notes from transcripts.
 
     Checks .work/summaries/<name>.json for a pre-generated summary first
     (written by the orchestrator/AI).  Falls back to template-only if absent.
 
-    Returns: [(Episode, note_content, vault_path), ...]
+    Returns: [(Episode, note_content, vault_path, transcript_path), ...]
     """
     print("\n=== Step 4: Generate Notes ===\n")
     results = []
@@ -373,7 +375,7 @@ def step_generate_notes(
             safe_show = re.sub(r'[<>:"/\\|?*]', '', ep.show_name).strip()
             vault_path = f"{podcasts_folder}/{safe_show}/{ep.safe_filename()}.md"
 
-            results.append((ep, note_content, vault_path))
+            results.append((ep, note_content, vault_path, transcript_path))
             print(f"  [ok] → {vault_path}")
 
         except Exception as e:
@@ -390,14 +392,130 @@ def step_generate_notes(
     return results
 
 
+def _cli_failed(result) -> bool:
+    """True when an Obsidian CLI call failed.
+
+    The CLI can print "Error: ..." while still exiting 0 (observed with
+    append to a missing file), so the exit code alone is not trustworthy.
+    """
+    if not result.ok:
+        return True
+    combined = f"{result.stdout}\n{result.stderr}"
+    return "Error:" in combined
+
+
+def _vault_write_large(ob, path: str, text: str, chunk_chars: int = 8000):
+    """Write potentially large content to the vault via the Obsidian CLI.
+
+    Constraints discovered the hard way:
+    - The CLI takes content as a command-line argument and Windows caps a
+      process command line at ~32K chars → create with the first chunk,
+      append the rest in line-boundary pieces (inline=True reconstructs the
+      original text exactly).
+    - The CLI is a notes tool: non-.md paths are silently created as .md,
+      so callers MUST pass a .md path (asserted here).
+    - Failed appends can exit 0 while printing "Error: ..." → every step is
+      checked with _cli_failed, and the final content length is verified by
+      reading the note back.
+    - The CLI rejects a content argument whose FIRST LINE contains a colon
+      (exit -1, no output — observed with "[00:00:12] ..." transcript
+      timestamps and any "a: b" text). Workaround: every chunk after the
+      first starts with the newline it would otherwise end on, and the first
+      chunk gets a leading newline prepended if its first line has a colon
+      (Obsidian strips a leading blank line harmlessly).
+
+    Returns (ok: bool, detail: str).
+    """
+    if not path.endswith(".md"):
+        return False, f"vault writes must target .md paths, got: {path}"
+
+    pieces = []
+    for line in text.splitlines(keepends=True):
+        while len(line) > chunk_chars:
+            pieces.append(line[:chunk_chars])
+            line = line[chunk_chars:]
+        pieces.append(line)
+
+    chunks, buf = [], ""
+    for piece in pieces:
+        if buf and len(buf) + len(piece) > chunk_chars:
+            chunks.append(buf)
+            buf = ""
+        buf += piece
+    if buf:
+        chunks.append(buf)
+    if not chunks:
+        chunks = [""]
+
+    # Colon-in-first-line workaround: shift each chunk's trailing newline to
+    # the START of the next chunk so appended chunks begin with an empty
+    # first line, which the CLI parses safely.
+    for i in range(1, len(chunks)):
+        if chunks[i - 1].endswith("\n") and not chunks[i].startswith("\n"):
+            chunks[i - 1] = chunks[i - 1][:-1]
+            chunks[i] = "\n" + chunks[i]
+        elif ":" in chunks[i].split("\n", 1)[0]:
+            # hard-split fragment starting with a colon-bearing line and no
+            # newline to shift — prepend one (introduces a line break; only
+            # possible for single lines longer than chunk_chars)
+            chunks[i] = "\n" + chunks[i]
+    if ":" in chunks[0].split("\n", 1)[0]:
+        chunks[0] = "\n" + chunks[0]
+
+    def _call_with_retry(fn, what):
+        r = fn()
+        if _cli_failed(r):
+            time.sleep(1.0)
+            r = fn()
+        if _cli_failed(r):
+            return f"{what} failed: {r.stderr or r.stdout or 'no output'}"
+        return None
+
+    def _verify():
+        """Read back and compare length; the app applies writes async, so
+        allow it a few seconds to settle before declaring a mismatch.
+        ob.read strips leading/trailing whitespace, so compare stripped."""
+        expected = len(text.strip())
+        written = ""
+        for _ in range(4):
+            try:
+                written = ob.read(path=path)
+            except Exception:
+                written = ""
+            if abs(len(written) - expected) <= 2:
+                return None
+            time.sleep(1.5)
+        return f"read-back length mismatch: wrote {expected} chars, note has {len(written)}"
+
+    last_err = "unknown"
+    for _attempt in range(2):  # full-rewrite retry if verification fails
+        err = _call_with_retry(
+            lambda: ob.create(path=path, content=chunks[0], overwrite=True), "create"
+        )
+        if err is None:
+            for chunk in chunks[1:]:
+                err = _call_with_retry(
+                    lambda c=chunk: ob.append(c, path=path, inline=True), "append"
+                )
+                if err:
+                    break
+        if err is None:
+            err = _verify()
+        if err is None:
+            return True, "ok"
+        last_err = err
+        time.sleep(1.0)
+    return False, last_err
+
+
 def step_write_to_vault(
-    notes: List[Tuple[Episode, str, str]],
+    notes: List[Tuple[Episode, str, str, Path]],
     config: Dict[str, Any],
     manifest: Manifest,
     show_id: str,
     dry_run: bool = False,
 ) -> int:
-    """Write generated notes to Obsidian vault.
+    """Write generated notes (and their transcripts) to Obsidian vault.
 
     Returns: Number of successfully written notes.
     """
@@ -405,7 +523,7 @@ def step_write_to_vault(
     success = 0
 
     if dry_run:
-        for ep, content, vault_path in notes:
+        for ep, content, vault_path, transcript_src in notes:
             print(f"  [dry-run] Would write: {vault_path}")
             print(f"            ({len(content)} chars)")
         return len(notes)
@@ -420,14 +538,39 @@ def step_write_to_vault(
 
     podcasts_folder = config.get("podcasts_folder", "Podcasts")
 
-    for ep, content, vault_path in notes:
+    transcripts_folder = config.get("transcripts_folder", "transcripts")
+
+    for ep, content, vault_path, transcript_src in notes:
         try:
             print(f"  [write] {vault_path}")
             result = ob.create(path=vault_path, content=content, overwrite=True)
 
             if result.ok:
+                # Copy the transcript into the vault so the manifest path is
+                # real (previously the manifest recorded a vault path but the
+                # transcript was never written out of .work/). Stored as .md —
+                # the Obsidian CLI silently converts other extensions anyway.
+                safe_show = re.sub(r'[<>:"/\\|?*]', '', ep.show_name).strip()
+                transcript_path = ""
+                try:
+                    transcript_text = Path(transcript_src).read_text(encoding="utf-8")
+                    t_vault_path = (
+                        f"{podcasts_folder}/{safe_show}/{transcripts_folder}/"
+                        f"{ep.safe_filename()}.md"
+                    )
+                    t_ok, t_detail = _vault_write_large(ob, t_vault_path, transcript_text)
+                    if t_ok:
+                        transcript_path = t_vault_path
+                        print(f"  [transcript] → {t_vault_path}")
+                    else:
+                        print(f"  [warn] Transcript vault write failed: {t_detail}")
+                except (OSError, TypeError) as te:
+                    print(f"  [warn] Could not copy transcript to vault: {te}")
+                if not transcript_path:
+                    # Record the real on-disk location rather than a fiction
+                    transcript_path = str(transcript_src) if transcript_src else ""
+
                 # Update manifest ONLY after successful write
-                transcript_path = f"{podcasts_folder}/{ep.show_name}/transcripts/{ep.safe_filename()}.txt"
                 manifest.mark_episode(
                     show_id=show_id,
                     episode_id=ep.id,
@@ -558,7 +701,9 @@ class _UrlEpisode:
         self.show_name = source_label
 
     def safe_filename(self) -> str:
-        safe_title = re.sub(r'[<>:"/\\|?*]', '', self.title)
+        # Same char set as rss.Episode.safe_filename — includes Obsidian
+        # wikilink-breaking chars (#, ^, [, ])
+        safe_title = re.sub(r'[<>:"/\\|?*\[\]#^]', '', self.title)
         safe_title = safe_title.strip('. ')
         if len(safe_title) > 120:
             safe_title = safe_title[:120].rsplit(' ', 1)[0]
@@ -720,7 +865,7 @@ def run_url_pipeline(args: argparse.Namespace) -> None:
 
     if args.dry_run:
         print("\n=== Step 4: Write to Vault (dry-run) ===\n")
-        for ep, content, _vault_path in notes:
+        for ep, content, _vault_path, _transcript_src in notes:
             vault_path = f"{clips_folder}/{safe_show}/{ep.safe_filename()}.md"
             content = _inject_source_url(content, args.url)
             print(f"  [dry-run] Would write: {vault_path}")
@@ -735,7 +880,7 @@ def run_url_pipeline(args: argparse.Namespace) -> None:
         return
 
     written = 0
-    for ep, content, _old_vault_path in notes:
+    for ep, content, _old_vault_path, _transcript_src in notes:
         vault_path = f"{clips_folder}/{safe_show}/{ep.safe_filename()}.md"
         content = _inject_source_url(content, args.url)
         print(f"  [write] {vault_path}")

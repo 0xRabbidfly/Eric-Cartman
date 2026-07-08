@@ -186,8 +186,9 @@ Persistent JSON file tracking all processed episodes.
 **Location:** `config/podcast-manifest.json`
 
 **Rules:**
-- Spotify episode ID is the primary key
-- If episode ID exists in manifest → skip
+- Spotify episode ID is the primary key (RSS-only entries are keyed by RSS GUID)
+- Dedup matches by key, `rss_guid`/`spotify_id` field, **or** normalized title + published date — the same episode may be keyed by Spotify ID (Spotify detection) or RSS GUID (RSS detection), and a match on ANY of these means already processed. When diffing via Spotify MCP, compare title + published date against manifest entries, not just IDs.
+- If a match exists → skip
 - If not → process and append
 - Manifest updated ONLY after successful Obsidian write
 - Supports manual RSS-only entries (no Spotify ID required)
@@ -199,10 +200,18 @@ Each episode produces a note at:
 
 Filename rule:
 - Use the episode's published date plus title
-- Strip only invalid filename characters: `< > : " / \ | ? *`
+- Strip invalid filename characters `< > : " / \ | ? *` AND Obsidian
+  wikilink-breaking characters `# ^ [ ]` (a `#` in the filename breaks
+  the `[[path|label]]` links in the show index)
 - Trim trailing `.` and space after stripping
 - Truncate the title portion to about 120 chars if needed
 - Do not slugify the filename
+
+The transcript is also written to the vault at
+`Podcasts/<Show Name>/transcripts/<same filename>.md` (the Obsidian CLI
+only creates `.md` notes) and that path is recorded in the manifest. If
+the vault copy fails, the manifest records the real `.work` path instead
+— never a path that does not exist.
 
 ```markdown
 ---

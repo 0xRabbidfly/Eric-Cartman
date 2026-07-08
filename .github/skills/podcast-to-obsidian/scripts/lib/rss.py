@@ -67,8 +67,10 @@ class Episode:
 
     def safe_filename(self) -> str:
         """Generate a filesystem-safe filename from episode metadata."""
-        # Strip dangerous characters
-        safe_title = re.sub(r'[<>:"/\\|?*]', '', self.title)
+        # Strip filesystem-invalid chars AND Obsidian wikilink-breaking chars
+        # (#, ^, [, ]) — '#' in a note filename breaks [[path|label]] links in
+        # the show index because Obsidian parses it as a heading anchor.
+        safe_title = re.sub(r'[<>:"/\\|?*\[\]#^]', '', self.title)
         safe_title = safe_title.strip('. ')
         # Truncate to reasonable length
         if len(safe_title) > 120:
