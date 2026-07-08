@@ -9,6 +9,7 @@ Location: config/podcast-manifest.json (relative to skill root)
 
 import json
 import os
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -153,11 +154,55 @@ class Manifest:
     # Episodes
     # ------------------------------------------------------------------
 
-    def is_processed(self, show_id: str, episode_id: str) -> bool:
-        """Check if an episode has already been processed (completed)."""
+    @staticmethod
+    def _normalize_title(title: str) -> str:
+        """Normalize an episode title for fuzzy dedup matching."""
+        return re.sub(r"[^a-z0-9]+", " ", (title or "").lower()).strip()
+
+    def find_episode(
+        self,
+        show_id: str,
+        episode_id: str = "",
+        title: str = "",
+        published: str = "",
+    ) -> Optional[Dict[str, Any]]:
+        """Find an episode by key, rss_guid, or (title + published) fallback.
+
+        Episodes may be keyed by Spotify ID (Spotify-MCP detection) or RSS
+        GUID (RSS detection) for the same underlying episode. Exact-key-only
+        matching lets the other detection path see the episode as new and
+        reprocess it, so we also match on rss_guid and normalized
+        title+published.
+        """
         show = self._data.get("shows", {}).get(show_id, {})
-        ep = show.get("episodes", {}).get(episode_id, {})
-        return ep.get("status") == "completed"
+        episodes = show.get("episodes", {})
+        if episode_id and episode_id in episodes:
+            return episodes[episode_id]
+        if episode_id:
+            for ep in episodes.values():
+                if ep.get("rss_guid") == episode_id or ep.get("spotify_id") == episode_id:
+                    return ep
+        if title and published:
+            want = self._normalize_title(title)
+            for ep in episodes.values():
+                if ep.get("published") == published and self._normalize_title(ep.get("title", "")) == want:
+                    return ep
+        return None
+
+    def is_processed(
+        self,
+        show_id: str,
+        episode_id: str,
+        title: str = "",
+        published: str = "",
+    ) -> bool:
+        """Check if an episode has already been processed (completed).
+
+        Pass title/published when available so episodes recorded under a
+        different key (Spotify ID vs RSS GUID) still match.
+        """
+        ep = self.find_episode(show_id, episode_id, title=title, published=published)
+        return bool(ep) and ep.get("status") == "completed"
 
     def is_known(self, show_id: str, episode_id: str) -> bool:
         """Check if an episode exists in the manifest (any status)."""

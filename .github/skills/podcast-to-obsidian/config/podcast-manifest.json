@@ -10,7 +10,7 @@
           "title": "This Time IS Different for Crypto",
           "published": "2026-03-19",
           "audio_url": "https://www.podtrac.com/pts/redirect.mp3/chrt.fm/track/1B146C/pscrb.fm/rss/p/traffic.megaphone.fm/ADV3293170802.mp3",
-          "transcript_path": ".work/transcripts/2026-03-19 - This Time IS Different for Crypto.txt",
+          "transcript_path": "",
           "note_path": "Podcasts/Raoul Pal The Journey Man/2026-03-19 - This Time IS Different for Crypto.md",
           "processed_at": "2026-03-21T00:00:00Z",
           "status": "completed"
@@ -19,7 +19,7 @@
           "title": "The AI Intelligence Tsunami Is Here",
           "published": "2026-02-26",
           "audio_url": "https://www.podtrac.com/pts/redirect.mp3/chrt.fm/track/1B146C/pscrb.fm/rss/p/traffic.megaphone.fm/ADV9704558798.mp3",
-          "transcript_path": "Podcasts/Raoul Pal: The Journey Man/transcripts/2026-02-26 - The AI Intelligence Tsunami Is Here.txt",
+          "transcript_path": "Podcasts/Raoul Pal The Journey Man/transcripts/2026-02-26 - The AI Intelligence Tsunami Is Here.md",
           "note_path": "Podcasts/Raoul Pal The Journey Man/2026-02-26 - The AI Intelligence Tsunami Is Here.md",
           "processed_at": "2026-03-01T03:40:36.392525+00:00",
           "status": "completed"
@@ -28,7 +28,7 @@
           "title": "Why the Nasdaq Could Surge Again",
           "published": "2026-02-24",
           "audio_url": "",
-          "transcript_path": ".work/transcripts/2026-02-24 - Why the Nasdaq Could Surge Again.txt",
+          "transcript_path": "Podcasts/Raoul Pal The Journey Man/transcripts/2026-02-24 - Why the Nasdaq Could Surge Again.md",
           "note_path": "Podcasts/Raoul Pal The Journey Man/2026-02-24 - Why the Nasdaq Could Surge Again.md",
           "processed_at": "2026-06-25T00:00:00Z",
           "status": "completed"
@@ -44,7 +44,7 @@
           "title": "#491 - OpenClaw: The Viral AI Agent that Broke the Internet - Peter Steinberger",
           "published": "2026-02-12",
           "audio_url": "https://media.blubrry.com/takeituneasy/ins.blubrry.com/takeituneasy/lex_ai_peter_steinberger.mp3",
-          "transcript_path": ".work/transcripts/2026-02-12 - 491 - OpenClaw The Viral AI Agent that Broke the Internet - Peter Steinberger.txt",
+          "transcript_path": "Podcasts/Lex Fridman Podcast/transcripts/2026-02-12 - 491 - OpenClaw The Viral AI Agent that Broke the Internet - Peter Steinberger.md",
           "note_path": "Podcasts/Lex Fridman Podcast/2026-02-12 - 491 - OpenClaw The Viral AI Agent that Broke the Internet - Peter Steinberger.md",
           "processed_at": "2026-03-02T02:07:05.576489+00:00",
           "status": "completed"
@@ -60,7 +60,7 @@
           "title": "Has Bitcoin Bottomed? Jordi Visser on AI, Inflation, and Moats",
           "published": "2026-04-27",
           "audio_url": "https://episode.flightcast.com/01KQ6ZJ6EN0NWX1N9CW5KCT12C.mp3",
-          "transcript_path": "Podcasts/Bankless/transcripts/2026-04-27 - Has Bitcoin Bottomed Jordi Visser on AI, Inflation, and Moats.txt",
+          "transcript_path": "Podcasts/Bankless/transcripts/2026-04-27 - Has Bitcoin Bottomed Jordi Visser on AI, Inflation, and Moats.md",
           "note_path": "Podcasts/Bankless/2026-04-27 - Has Bitcoin Bottomed Jordi Visser on AI, Inflation, and Moats.md",
           "processed_at": "2026-04-28T10:41:00.580741+00:00",
           "status": "completed"
@@ -88,7 +88,7 @@
           "title": "NVIDIA's $1 Trillion Prediction, Anthropic Beats OpenAI, Tesla vs. TSMC & The CS Job Collapse | 240",
           "published": "2026-03-21",
           "audio_url": "https://traffic.megaphone.fm/DVVTS6372073266.mp3?updated=1774091947",
-          "transcript_path": ".work/transcripts/2026-03-21 - NVIDIA's $1 Trillion Prediction, Anthropic Beats OpenAI, Tesla vs. TSMC & The CS Job Collapse  240.txt",
+          "transcript_path": "",
           "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-03-21 - NVIDIA's $1 Trillion Prediction, Anthropic Beats OpenAI, Tesla vs. TSMC & The CS Job Collapse  240.md",
           "processed_at": "2026-03-22T20:00:00Z",
           "status": "completed"
@@ -98,8 +98,8 @@
           "published": "2026-04-14",
           "audio_url": "https://traffic.megaphone.fm/DVVTS1439719517.mp3?updated=1776175230",
           "rss_guid": "b320ec2a-378b-11f1-9dab-1be003e118cf",
-          "transcript_path": ".work/transcripts/2026-04-14 - Elon Musk vs Sam Altman AI Job Loss and OpenAIs 852B Valuation EP 247.txt",
-          "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-04-14 - Elon Musk vs. Sam Altman, AI Job Loss, and OpenAI's $852B Valuation  EP #247.md",
+          "transcript_path": "",
+          "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-04-14 - Elon Musk vs. Sam Altman, AI Job Loss, and OpenAI's $852B Valuation  EP 247.md",
           "processed_at": "2026-04-15T00:00:00Z",
           "status": "completed"
         },
@@ -107,8 +107,8 @@
           "title": "Sonnet 5 Drops, Fable 5 Will Return & Fusion's First Plant Gets Licensed w/ Philip Johnston | #268",
           "published": "2026-07-01",
           "audio_url": "https://traffic.megaphone.fm/DVVTS3462203264.mp3",
-          "transcript_path": "Podcasts/Moonshots with Peter Diamandis/transcripts/2026-07-01 - Sonnet 5 Drops, Fable 5 Will Return & Fusion's First Plant Gets Licensed w Philip Johnston  #268.txt",
-          "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-07-01 - Sonnet 5 Drops, Fable 5 Will Return & Fusion's First Plant Gets Licensed w Philip Johnston  #268.md",
+          "transcript_path": "Podcasts/Moonshots with Peter Diamandis/transcripts/2026-07-01 - Sonnet 5 Drops, Fable 5 Will Return & Fusion's First Plant Gets Licensed w Philip Johnston  268.md",
+          "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-07-01 - Sonnet 5 Drops, Fable 5 Will Return & Fusion's First Plant Gets Licensed w Philip Johnston  268.md",
           "processed_at": "2026-07-08T00:41:13.600463+00:00",
           "status": "completed"
         }
@@ -124,7 +124,7 @@
           "published": "2026-03-11",
           "audio_url": "https://api.substack.com/feed/podcast/190633588/94a1857634f9ebd3857e20d95893ec75.mp3",
           "rss_guid": "substack:post:190633588",
-          "transcript_path": ".work/transcripts/2026-03-11 - The most important question nobodys asking about AI.txt",
+          "transcript_path": "Podcasts/Dwarkesh Podcast/transcripts/2026-03-11 - The most important question nobody's asking about AI.md",
           "note_path": "Podcasts/Dwarkesh Podcast/2026-03-11 - The most important question nobody's asking about AI.md",
           "processed_at": "2026-03-23T02:17:13.084167+00:00",
           "status": "completed"
@@ -134,7 +134,7 @@
           "published": "2026-04-15",
           "audio_url": "https://api.substack.com/feed/podcast/194289889/4ad9f4582dd59f13b5a5cc452125b1f6.mp3",
           "rss_guid": "substack:post:194289889",
-          "transcript_path": ".work/transcripts/2026-04-15 - Jensen Huang – TPU competition, why we should sell chips to China, & Nvidia’s supply chain moat.txt",
+          "transcript_path": "Podcasts/Dwarkesh Podcast/transcripts/2026-04-15 - Jensen Huang – TPU competition, why we should sell chips to China, & Nvidia’s supply chain moat.md",
           "note_path": "Podcasts/Dwarkesh Podcast/2026-04-15 - Jensen Huang – TPU competition, why we should sell chips to China, & Nvidia’s supply chain moat.md",
           "processed_at": "2026-04-20T11:50:00Z",
           "status": "completed",
@@ -151,7 +151,7 @@
           "title": "Building Claude Code with Boris Cherny",
           "published": "2026-03-04",
           "audio_url": "https://api.substack.com/feed/podcast/189707865/2cbae30ec4559163310b34b9eb413105.mp3",
-          "transcript_path": ".work/transcripts/2026-03-04 - Building Claude Code with Boris Cherny.txt",
+          "transcript_path": "Podcasts/The Pragmatic Engineer/transcripts/2026-03-04 - Building Claude Code with Boris Cherny.md",
           "note_path": "Podcasts/The Pragmatic Engineer/2026-03-04 - Building Claude Code with Boris Cherny.md",
           "processed_at": "2026-03-05T04:07:03.501020+00:00",
           "status": "completed"
@@ -167,7 +167,7 @@
           "title": "A Motorcycle for the Mind",
           "published": "2026-02-18",
           "audio_url": "",
-          "transcript_path": ".work/transcripts/2026-02-18 - A Motorcycle for the Mind.txt",
+          "transcript_path": "Podcasts/Naval/transcripts/2026-02-18 - A Motorcycle for the Mind.md",
           "note_path": "Podcasts/Naval/2026-02-18 - A Motorcycle for the Mind.md",
           "processed_at": "2026-03-20T12:00:00+00:00",
           "status": "completed"
@@ -176,7 +176,7 @@
           "title": "A Return to Code",
           "published": "2026-04-28",
           "audio_url": "https://traffic.libsyn.com/secure/naval/Naval_-_April_-_A_Return_to_Code_2.mp3?dest-id=1103966",
-          "transcript_path": "Podcasts/Naval/transcripts/2026-04-28 - A Return to Code.txt",
+          "transcript_path": "Podcasts/Naval/transcripts/2026-04-28 - A Return to Code.md",
           "note_path": "Podcasts/Naval/2026-04-28 - A Return to Code.md",
           "processed_at": "2026-04-30T15:34:25.779708+00:00",
           "status": "completed"
@@ -192,7 +192,7 @@
           "title": "Andrej Karpathy on Code Agents, AutoResearch, and the Loopy Era of AI",
           "published": "2026-03-20",
           "audio_url": "https://traffic.megaphone.fm/PDP8703207384.mp3",
-          "transcript_path": "Podcasts/No Priors: Artificial Intelligence | Technology | Startups/transcripts/2026-03-20 - Andrej Karpathy on Code Agents, AutoResearch, and the Loopy Era of AI.txt",
+          "transcript_path": "Podcasts/No Priors Artificial Intelligence  Technology  Startups/transcripts/2026-03-20 - Andrej Karpathy on Code Agents, AutoResearch, and the Loopy Era of AI.md",
           "note_path": "Podcasts/No Priors Artificial Intelligence  Technology  Startups/2026-03-20 - Andrej Karpathy on Code Agents, AutoResearch, and the Loopy Era of AI.md",
           "processed_at": "2026-03-22T11:14:25.034445+00:00",
           "status": "completed"
@@ -225,7 +225,7 @@
           "title": "Dreamer: the Personal Agent OS - David Singleton",
           "published": "2026-03-20",
           "audio_url": "https://api.substack.com/feed/podcast/191603783/2317717a636a1484d239498d8e0d100e.mp3",
-          "transcript_path": ".work/transcripts/2026-03-20 - Dreamer the Personal Agent OS David Singleton.txt",
+          "transcript_path": "",
           "note_path": "Podcasts/Latent Space The AI Engineer Podcast/2026-03-20 - Dreamer the Personal Agent OS David Singleton.md",
           "processed_at": "2026-03-22T00:00:00Z",
           "status": "completed"
@@ -241,7 +241,7 @@
           "title": "The Agent Era: Building Software Beyond Chat with Box CEO Aaron Levie",
           "published": "2026-04-08",
           "audio_url": "https://mgln.ai/e/1344/afp-848985-injected.calisto.simplecastaudio.com/3f86df7b-51c6-4101-88a2-550dba782de8/episodes/78b49179-3322-4bee-b3b9-7117831ba9cd/audio/128/default.mp3?aid=rss_feed&awCollectionId=3f86df7b-51c6-4101-88a2-550dba782de8&awEpisodeId=78b49179-3322-4bee-b3b9-7117831ba9cd&feed=JGE3yC0V",
-          "transcript_path": ".work/transcripts/2026-04-08 - The Agent Era Building Software Beyond Chat with Box CEO Aaron Levie.txt",
+          "transcript_path": "Podcasts/The a16z Podcast/transcripts/2026-04-08 - The Agent Era Building Software Beyond Chat with Box CEO Aaron Levie.md",
           "note_path": "Podcasts/The a16z Podcast/2026-04-08 - The Agent Era Building Software Beyond Chat with Box CEO Aaron Levie.md",
           "processed_at": "2026-04-14T10:47:37.671703+00:00",
           "status": "completed"
@@ -251,7 +251,7 @@
           "published": "2026-04-03",
           "audio_url": "https://mgln.ai/e/1344/afp-848985-injected.calisto.simplecastaudio.com/3f86df7b-51c6-4101-88a2-550dba782de8/episodes/49988fe6-d35d-40a3-9709-0576315fd18e/audio/128/default.mp3?aid=rss_feed&awCollectionId=3f86df7b-51c6-4101-88a2-550dba782de8&awEpisodeId=49988fe6-d35d-40a3-9709-0576315fd18e&feed=JGE3yC0V",
           "rss_guid": "fd960df5-9d0a-4630-b24a-fdfa37583be1",
-          "transcript_path": ".work/transcripts/2026-04-03 - Marc Andreessen on AI Winters and Agent Breakthroughs.txt",
+          "transcript_path": "",
           "note_path": "Podcasts/The a16z Podcast/2026-04-03 - Marc Andreessen on AI Winters and Agent Breakthroughs.md",
           "processed_at": "2026-04-14T00:00:00Z",
           "status": "completed"
@@ -267,8 +267,8 @@
           "title": "#2501 - Marc Andreessen",
           "published": "2026-05-19",
           "audio_url": "https://traffic.megaphone.fm/GLT4222257548.mp3",
-          "transcript_path": "Podcasts/The Joe Rogan Experience/transcripts/2026-05-19 - #2501 - Marc Andreessen.txt",
-          "note_path": "Podcasts/The Joe Rogan Experience/2026-05-19 - #2501 - Marc Andreessen.md",
+          "transcript_path": "Podcasts/The Joe Rogan Experience/transcripts/2026-05-19 - 2501 - Marc Andreessen.md",
+          "note_path": "Podcasts/The Joe Rogan Experience/2026-05-19 - 2501 - Marc Andreessen.md",
           "processed_at": "2026-05-27T16:32:53.768496+00:00",
           "status": "completed"
         }
