@@ -111,6 +111,34 @@
           "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-07-01 - Sonnet 5 Drops, Fable 5 Will Return & Fusion's First Plant Gets Licensed w Philip Johnston  268.md",
           "processed_at": "2026-07-08T00:41:13.600463+00:00",
           "status": "completed"
+        },
+        "e2b4dfa8-7afe-11f1-9513-ffafb716b27a": {
+          "title": "Fable 5 Is Back & Govt-Leashed, Altman Offers 5% of OpenAI & AI Grows Conscious | #269",
+          "published": "2026-07-08",
+          "audio_url": "https://traffic.megaphone.fm/DVVTS7825929632.mp3",
+          "transcript_path": "Podcasts/Moonshots with Peter Diamandis/transcripts/2026-07-08 - Fable 5 Is Back & Govt-Leashed, Altman Offers 5% of OpenAI & AI Grows Conscious  269.md",
+          "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-07-08 - Fable 5 Is Back & Govt-Leashed, Altman Offers 5% of OpenAI & AI Grows Conscious  269.md",
+          "processed_at": "2026-07-09T07:11:55.138610+00:00",
+          "status": "completed"
+        },
+        "232f11fa-73f4-11f1-8468-17770bf32298": {
+          "title": "Why the US Government Is Blocking Model Releases (GPT-5.6) | #267",
+          "published": "2026-06-29",
+          "audio_url": "https://traffic.megaphone.fm/DVVTS7136827673.mp3",
+          "transcript_path": "Podcasts/Moonshots with Peter Diamandis/transcripts/2026-06-29 - Why the US Government Is Blocking Model Releases (GPT-5.6)  267.md",
+          "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-06-29 - Why the US Government Is Blocking Model Releases (GPT-5.6)  267.md",
+          "processed_at": "2026-07-09T07:12:03.075696+00:00",
+          "status": "completed"
+        },
+        "ea2ed8d6-70b5-11f1-8c85-dbd8d2b27e4f": {
+          "title": "The $10B Satellite Empire Putting AI in Orbit, Why Chips Beat Rockets & China's #1 Open Model | EP #266",
+          "published": "2026-06-26",
+          "audio_url": "",
+          "transcript_path": "",
+          "note_path": "",
+          "processed_at": "2026-07-09T07:12:03.078023+00:00",
+          "status": "failed",
+          "error": "[Errno 22] Invalid argument"
         }
       }
     },
