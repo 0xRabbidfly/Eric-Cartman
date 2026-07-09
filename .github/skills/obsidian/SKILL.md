@@ -80,6 +80,7 @@ python -c "import sys; sys.path.insert(0,'.github/skills/obsidian/scripts'); fro
 
 - In inline Python usage, `ob.read(path="...")` returns the note content as a plain string. Print the value directly; do not assume a `.text` property.
 - When the CLI output for `create` is terse, verify success with a follow-up `read --path ...` or an inline `print(ob.read(path="..."))`.
+- `search` can transiently return **empty output with exit code 0** while Obsidian's search index is warming up (e.g., right after Obsidian starts). An empty result is NOT proof of no matches — retry once, or cross-check with a tag lookup (`tag_info`) before concluding a note doesn't exist.
 
 > **IMPORTANT**: Always use `@'...'@` (single-quoted heredoc), never `@"..."@`
 > (double-quoted). Double-quoted heredocs still interpret backticks and `$`.
@@ -353,7 +354,7 @@ Workaround: `docker push --insecure myregistry.azurecr.io/app:latest`
 Before creating a memory, search for existing ones on the same topic:
 
 ```powershell
-python .github/skills/obsidian/scripts/obsidian.py search "<keyword>" --path "Agent Memories" --format json
+python .github/skills/obsidian/scripts/obsidian.py search --query "<keyword>" --path "Agent Memories" --format json
 ```
 
 If a matching memory exists:
@@ -367,7 +368,7 @@ At session start or when facing a tricky problem, agents should search memories:
 
 ```powershell
 # Recall relevant memories before tackling a problem
-python .github/skills/obsidian/scripts/obsidian.py search "<problem keywords>" --path "Agent Memories" --format json
+python .github/skills/obsidian/scripts/obsidian.py search --query "<problem keywords>" --path "Agent Memories" --format json
 ```
 
 ---

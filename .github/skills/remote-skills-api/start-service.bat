@@ -45,6 +45,13 @@ echo [%date% %time%] Starting Remote Skills API from "%ROOT%" >> "%LOG%"
 if defined CLAUDE_PATH echo [%date% %time%] CLAUDE_PATH="%CLAUDE_PATH%" >> "%LOG%"
 
 :launch
+echo [%date% %time%] Re-enabling Tailscale Funnel on port 3838 >> "%LOG%"
+tailscale funnel --bg 3838 >> "%LOG%" 2>&1
+if errorlevel 1 (
+	echo [%date% %time%] WARNING: Tailscale Funnel failed to re-enable >> "%LOG%"
+) else (
+	echo [%date% %time%] Tailscale Funnel active >> "%LOG%"
+)
 node ".github\skills\remote-skills-api\server.js" >> "%LOG%" 2>&1
 set "EXITCODE=%ERRORLEVEL%"
 echo [%date% %time%] Remote Skills API exited with code %EXITCODE% >> "%LOG%"
