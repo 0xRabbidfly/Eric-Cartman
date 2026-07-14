@@ -171,8 +171,20 @@ class Obsidian:
     # Graph construction (single-pass, cached)
     # ------------------------------------------------------------------
 
+    # Class-level graph cache shared across every Obsidian() instance in a
+    # process, keyed by vault path. The full lint pipeline constructs a fresh
+    # Obsidian() in each phase; without this, the ~12s graph build ran 3x per
+    # run and pushed the whole pipeline past its time budget on large vaults.
+    _SHARED_GRAPH: dict = {}
+
     def _ensure_graph(self) -> None:
         if self._slug_to_path is not None:
+            return
+
+        cached = Obsidian._SHARED_GRAPH.get(str(self.vault_path))
+        if cached is not None:
+            (self._all_md, self._slug_to_path,
+             self._path_to_links, self._slug_incoming) = cached
             return
 
         slug_to_path: dict = {}
@@ -224,6 +236,9 @@ class Obsidian:
         self._slug_to_path = slug_to_path
         self._path_to_links = path_to_links
         self._slug_incoming = slug_incoming
+        Obsidian._SHARED_GRAPH[str(self.vault_path)] = (
+            self._all_md, slug_to_path, path_to_links, slug_incoming
+        )
 
     # ------------------------------------------------------------------
     # File I/O
@@ -278,6 +293,7 @@ class Obsidian:
         self._slug_to_path = None
         self._path_to_links = None
         self._slug_incoming = None
+        Obsidian._SHARED_GRAPH.pop(str(self.vault_path), None)
 
     # ------------------------------------------------------------------
     # Listing
@@ -499,22 +515,4 @@ def _extract_frontmatter_tags(fm: str) -> List[str]:
         m = re.match(r"^\s*tags\s*:\s*(.*)$", line)
         if not m:
             i += 1
-            continue
-        rest = m.group(1).strip()
-        if rest.startswith("[") and rest.endswith("]"):
-            inner = rest[1:-1]
-            tags += [t.strip().strip("\"'") for t in inner.split(",") if t.strip()]
-        elif rest:
-            tags += [t.strip().strip("\"'") for t in rest.split() if t.strip()]
-        else:
-            # block list — collect indented `- value` lines
-            i += 1
-            while i < len(lines) and re.match(r"^\s+-\s+", lines[i]):
-                v = lines[i].split("-", 1)[1].strip().strip("\"'")
-                if v:
-                    tags.append(v)
-                i += 1
-            continue
-        i += 1
-    # Normalize: strip leading '#' if user wrote `#foo`
-    return [t.lstrip("#") for t in tags if t]
+         
