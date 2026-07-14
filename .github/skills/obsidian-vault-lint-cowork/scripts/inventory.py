@@ -9,7 +9,7 @@ from pathlib import Path
 
 _SCRIPT_DIR = Path(__file__).parent.resolve()
 sys.path.insert(0, str(_SCRIPT_DIR))
-from obsidian import Obsidian
+from obsidian import Obsidian, _SKIP_DIRS
 
 MASTER_MOC_PATH = "Research/Library/00 MOC/\U0001f5fa️ MOC - Research Library.md"
 LIBRARY_FOLDER = "Research/Library"
@@ -61,17 +61,34 @@ def _in_scope(path: str, scope_folders) -> bool:
     return any(path.startswith(folder.rstrip("/") + "/") for folder in scope_folders)
 
 
+_VAULT_BASENAMES_CACHE: dict = {}
+
+
+def _vault_basenames(vault_path: Path) -> set:
+    """Set of every filename in the vault, walked once per vault path and cached.
+
+    Replaces a per-link `rglob` (which walked the entire tree once for every
+    broken attachment link — O(links x tree) and the dominant cost on large
+    vaults). Building the set once is O(tree); lookups are then O(1).
+    """
+    key = str(vault_path)
+    cached = _VAULT_BASENAMES_CACHE.get(key)
+    if cached is not None:
+        return cached
+    names: set = set()
+    for root, dirs, files in os.walk(vault_path):
+        dirs[:] = [d for d in dirs if d not in _SKIP_DIRS]
+        names.update(files)
+    _VAULT_BASENAMES_CACHE[key] = names
+    return names
+
+
 def _is_attachment_link(link: str, vault_path: Path) -> bool:
     """Return True if `link` is an attachment reference whose target file exists in the vault."""
     ext = os.path.splitext(link)[1].lower()
     if ext not in _ATTACHMENT_EXTS:
         return False
-    basename = os.path.basename(link)
-    # If any file with this basename exists anywhere in the vault, treat as resolved
-    for p in vault_path.rglob(basename):
-        if p.is_file():
-            return True
-    return False
+    return os.path.basename(link) in _vault_basenames(vault_path)
 
 
 def collect_inventory(stale_days: int = 7, verbose: bool = False) -> InventoryResult:
