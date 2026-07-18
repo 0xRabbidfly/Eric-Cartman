@@ -4,12 +4,84 @@ Wraps faster-whisper for local GPU/CPU transcription of podcast audio.
 Falls back to whisper.cpp CLI if faster-whisper is not available.
 """
 
+import json
 import os
+import re
 import shutil
 import subprocess
 import sys
 from pathlib import Path
 from typing import Optional, Tuple
+
+
+# ---------------------------------------------------------------------------
+# Domain vocabulary
+#
+# Small Whisper models reliably mangle domain jargon and proper nouns -- an
+# observed run turned "open-weight models" into "opioid models" throughout,
+# which then propagated into every downstream summary.  Two defences:
+#   1. initial_prompt primes the decoder toward correct spellings.
+#   2. corrections patch what still slips through.
+# Both live in config/vocabulary.json so they can be tuned without code edits.
+# ---------------------------------------------------------------------------
+
+_VOCAB_CACHE: Optional[dict] = None
+
+
+def _load_vocabulary() -> dict:
+    """Load config/vocabulary.json (cached).  Returns {} if absent."""
+    global _VOCAB_CACHE
+    if _VOCAB_CACHE is not None:
+        return _VOCAB_CACHE
+
+    _VOCAB_CACHE = {}
+    try:
+        skill_dir = Path(__file__).resolve().parents[2]
+        vocab_path = skill_dir / "config" / "vocabulary.json"
+        if vocab_path.exists():
+            with open(vocab_path, "r", encoding="utf-8") as f:
+                _VOCAB_CACHE = json.load(f)
+    except Exception as e:
+        print(f"  [warn] Could not load vocabulary.json: {e}")
+    return _VOCAB_CACHE
+
+
+def get_initial_prompt() -> Optional[str]:
+    """Domain priming prompt for the Whisper decoder, if configured."""
+    prompt = _load_vocabulary().get("initial_prompt")
+    return prompt or None
+
+
+def apply_corrections(text: str) -> Tuple[str, int]:
+    """Apply vocabulary corrections to a transcript.
+
+    Matching is case-insensitive and word-boundary anchored, and the
+    original capitalisation of the first letter is preserved so
+    sentence-initial matches don't get lower-cased.
+
+    Returns (corrected_text, replacement_count).
+    """
+    corrections = _load_vocabulary().get("corrections") or {}
+    if not corrections:
+        return text, 0
+
+    total = 0
+
+    # Longest patterns first, so "opioid models" wins over "opioid model".
+    for wrong in sorted(corrections, key=len, reverse=True):
+        right = corrections[wrong]
+        pattern = re.compile(r"\b" + re.escape(wrong) + r"\b", re.IGNORECASE)
+
+        def _sub(match, replacement=right):
+            found = match.group(0)
+            if found[:1].isupper() and replacement[:1].islower():
+                return replacement[:1].upper() + replacement[1:]
+            return replacement
+
+        text, n = pattern.subn(_sub, text)
+        total += n
+
+    return text, total
 
 
 # ---------------------------------------------------------------------------
@@ -150,6 +222,13 @@ def _transcribe_faster_whisper(
     if language:
         kwargs["language"] = language
 
+    # Prime the decoder with domain vocabulary so jargon and proper nouns
+    # are far less likely to be mangled in the first place.
+    initial_prompt = get_initial_prompt()
+    if initial_prompt:
+        kwargs["initial_prompt"] = initial_prompt
+        print(f"  [vocab] Priming decoder with domain vocabulary")
+
     segments, info = model.transcribe(str(audio_path), **kwargs)
 
     full_text_parts = []
@@ -162,11 +241,17 @@ def _transcribe_faster_whisper(
 
     full_text = "\n".join(full_text_parts)
 
+    # Patch any domain terms the decoder still got wrong.
+    full_text, fixes = apply_corrections(full_text)
+    if fixes:
+        print(f"  [vocab] Applied {fixes} vocabulary corrections")
+
     # Write transcript
     with open(transcript_path, "w", encoding="utf-8") as f:
         f.write(full_text)
 
     meta = {
+        "vocabulary_corrections": fixes,
         "language": info.language if hasattr(info, "language") else (language or "unknown"),
         "duration": info.duration if hasattr(info, "duration") else 0,
         "segments_count": segment_count,
@@ -205,15 +290,25 @@ def _transcribe_openai_whisper(
     if language:
         kwargs["language"] = language
 
+    initial_prompt = get_initial_prompt()
+    if initial_prompt:
+        kwargs["initial_prompt"] = initial_prompt
+        print(f"  [vocab] Priming decoder with domain vocabulary")
+
     print(f"  [transcribing] This may take a while...")
     result = model.transcribe(str(audio_path), **kwargs)
 
     full_text = result.get("text", "")
 
+    full_text, fixes = apply_corrections(full_text)
+    if fixes:
+        print(f"  [vocab] Applied {fixes} vocabulary corrections")
+
     with open(transcript_path, "w", encoding="utf-8") as f:
         f.write(full_text)
 
     meta = {
+        "vocabulary_corrections": fixes,
         "language": result.get("language", language or "unknown"),
         "duration": 0,
         "segments_count": len(result.get("segments", [])),
@@ -253,6 +348,12 @@ def _transcribe_whisper_cpp(
     if language:
         cmd.extend(["-l", language])
 
+    initial_prompt = get_initial_prompt()
+    if initial_prompt:
+        # whisper.cpp caps the prompt, so send a trimmed version.
+        cmd.extend(["--prompt", initial_prompt[:900]])
+        print(f"  [vocab] Priming decoder with domain vocabulary")
+
     print(f"  [transcribing] Running whisper.cpp...")
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=3600)
 
@@ -267,7 +368,20 @@ def _transcribe_whisper_cpp(
         if alt.exists():
             alt.rename(transcript_path)
 
-    meta = {"language": language or "unknown", "duration": 0, "segments_count": 0}
+    fixes = 0
+    if transcript_path.exists():
+        text = transcript_path.read_text(encoding="utf-8", errors="replace")
+        corrected, fixes = apply_corrections(text)
+        if fixes:
+            transcript_path.write_text(corrected, encoding="utf-8")
+            print(f"  [vocab] Applied {fixes} vocabulary corrections")
+
+    meta = {
+        "vocabulary_corrections": fixes,
+        "language": language or "unknown",
+        "duration": 0,
+        "segments_count": 0,
+    }
     return transcript_path, meta
 
 

@@ -6,7 +6,7 @@ user-invocable: true
 disable-model-invocation: true
 metadata:
   author: 0xrabbidfly
-  version: "1.1.0"
+  version: "1.3.0"
 ---
 
 # Podcast → Transcript → Obsidian
@@ -65,8 +65,10 @@ python .github/skills/podcast-to-obsidian/scripts/pipeline.py --keep-audio
 # List all tracked shows
 python .github/skills/podcast-to-obsidian/scripts/pipeline.py --list-shows
 
-# Transcription model selection (default: base)
-python .github/skills/podcast-to-obsidian/scripts/pipeline.py --model large-v3
+# Transcription model selection (default: large-v3)
+# Use --model base only when speed matters more than accuracy; it garbles
+# proper nouns badly and those errors propagate into the generated note.
+python .github/skills/podcast-to-obsidian/scripts/pipeline.py --model base
 
 # Retry failed episodes
 python .github/skills/podcast-to-obsidian/scripts/pipeline.py --retry-failed
@@ -105,7 +107,38 @@ Spotify MCP (`SpotifyGetInfo`) **does not support episode URIs** — it returns
 
 ### Step 6 — GENERATE: Structured Note from Transcript
 
-This step is **manual** — the agent reads the transcript and writes the note.
+**This step is automatic.** `step_generate_notes()` resolves a summary in this
+order and writes the note itself:
+
+1. A pre-generated summary at `.work/summaries/<transcript-stem>.json`, if the
+   orchestrator wrote one
+2. Otherwise `generate_ai_summary()` — Claude CLI first, then the OpenAI API
+   (`OPENAI_API_KEY`)
+3. If neither is available the episode is **failed, not skeleton-written** —
+   pass `--no-ai` explicitly if you actually want a template-only note
+
+The pipeline then writes the note to the vault and updates the manifest. A
+normal run needs no agent intervention.
+
+#### When an agent IS in the loop
+
+An orchestrating agent adds value by **auditing the generated note against the
+transcript**, not by regenerating it. Do not write a second note — the manifest
+is already marked `completed` and the vault file already exists. Instead:
+
+1. Read the generated note and the full transcript
+2. Check the back third of the episode specifically — summaries reliably
+   under-cover the final segments
+3. Verify speaker attribution on quotes (small models produce bare or wrong
+   first names)
+4. Verify `[[People/...]]` links resolve to real people, not homophones
+5. Patch gaps in place with targeted edits
+
+Alternatively, pre-generate the summary yourself into
+`.work/summaries/<transcript-stem>.json` **before** running the pipeline, and
+it will be used verbatim.
+
+#### Writing a note by hand (fallback only)
 
 1. Read the full transcript from `.work/transcripts/<YYYY-MM-DD> - <Title>.txt`
 2. Identify speakers, key themes, and structure
@@ -179,6 +212,71 @@ with a more specific URL if needed.
 | `--no-ai` | Skip AI summary and intentionally write a template-only skeleton note |
 | `--keep-audio` | Don't purge the .mp3 after success |
 
+## New Releases Only
+
+**The pipeline never walks backwards into a show's archive.** Backfill is a
+deliberate manual act, never something a scheduled run starts doing on its own.
+
+Two gates apply together during detection:
+
+| Gate | Source | Purpose |
+|------|--------|---------|
+| **Release watermark** | `shows.<id>.latest_published` in the manifest | Newest publish date successfully processed. Anything at or below it is historical, even if it never reached the manifest |
+| **Age cutoff** | `max_age_days` (default 30) | An episode from three months ago is still historical even if it is technically "newer than" a stale watermark |
+
+The watermark advances **only on `status: completed`** — a failed episode must
+not raise the bar, or its retry would be filtered out as historical next run.
+
+Episodes with **no publish date** in the feed are skipped while gating is
+active: recency can't be established, so they can't be confirmed as new
+releases. (Undated entries previously bypassed every gate silently.)
+
+### Drawing a line in the sand
+
+```powershell
+# Everything currently in every feed becomes historical.
+# Only genuinely future releases are auto-fetched from here on.
+python .../pipeline.py --set-watermark today
+
+# Or per show, or to a specific date
+python .../pipeline.py --set-watermark 2026-07-18 --show "Bankless"
+```
+
+`--set-watermark` never *lowers* an existing watermark unless `--force` is
+given, so it can't silently re-open a backlog you already closed.
+
+### Manual backfill
+
+```powershell
+# Consider episodes published on or after a date, ignoring the watermark
+python .../pipeline.py --backfill-since 2026-06-01 --show "Bankless"
+
+# Target one specific episode
+python .../pipeline.py --backfill-since 2026-06-01 --episode "Nasdaq"
+
+# Everything in the detection window, no date gate at all
+python .../pipeline.py --ignore-watermark --show "Naval" --max-episodes 1
+```
+
+Backfill still respects `max_episodes`, so a large archive drains in
+controlled batches rather than all at once.
+
+### Adopting this on an existing manifest
+
+```powershell
+# Set each show's watermark from its newest COMPLETED episode
+python .../pipeline.py --seed-watermarks
+```
+
+Use this when a manifest predates watermarks. It reprocesses nothing — it just
+records where each show had already got to. Shows with no completed episodes
+fall back to `max_age_days` on their first run.
+
+| Config key | Default | Effect |
+|-----------|---------|--------|
+| `only_new_releases` | `true` | Master switch. Set `false` to disable both gates |
+| `max_age_days` | 30 | Hard ceiling on episode age. `0` disables the age gate (watermark still applies) |
+
 ## Manifest
 
 Persistent JSON file tracking all processed episodes.
@@ -192,6 +290,7 @@ Persistent JSON file tracking all processed episodes.
 - If not → process and append
 - Manifest updated ONLY after successful Obsidian write
 - Supports manual RSS-only entries (no Spotify ID required)
+- Each show carries `latest_published`, the release watermark (see **New Releases Only**). It advances only on `completed`, never on `failed`, and never moves backwards
 
 ## Obsidian Note Structure
 
@@ -286,6 +385,24 @@ add new depth and perspective.
 <collapsible full transcript>
 ```
 
+## Working Directory
+
+**`work_dir` resolves against `SKILL_DIR`, not the current working directory
+or the repo root.** With the default `.work`, everything lives under:
+
+```
+.github/skills/podcast-to-obsidian/.work/
+├── audio/         # .mp3 (+ .part during download), purged after success
+├── transcripts/   # raw .txt from whisper
+├── summaries/     # optional pre-generated summary JSON (see Step 6)
+├── notes/         # intermediate .final.md build artifacts
+└── logs/          # timestamped run logs, newest 30 retained
+```
+
+Running `python .../pipeline.py` from the repo root does **not** create
+`<repo>/.work` — look under the skill directory. This has cost debugging time
+more than once.
+
 ## Configuration
 
 Edit `scripts/config.json`:
@@ -295,11 +412,36 @@ Edit `scripts/config.json`:
 | `vault_path` | (auto-detect) | Path to Obsidian vault |
 | `podcasts_folder` | `Podcasts` | Vault subfolder for notes |
 | `transcripts_folder` | `transcripts` | Subfolder for raw transcripts |
-| `whisper_model` | `base` | faster-whisper model size |
+| `whisper_model` | `large-v3` | faster-whisper model size. `base` is materially worse on proper nouns — see Known Issues |
 | `whisper_device` | `auto` | `cpu`, `cuda`, or `auto` |
-| `max_episodes` | 5 | Max new episodes per show per run |
+| `max_episodes` | 5 | Max new episodes **processed** per show per run |
+| `detection_window` | 50 | Feed entries **scanned** for new episodes. Independent of `max_episodes` — keep it comfortably larger than a show's per-run publish rate |
 | `audio_format` | `mp3` | Expected audio format |
 | `note_template` | `default` | Note template name |
+
+### Transcription vocabulary
+
+`config/vocabulary.json` holds domain terms and is applied two ways:
+
+- **`initial_prompt`** primes the Whisper decoder toward correct spellings
+  (prevention). Add recurring hosts, guests, companies, and jargon here.
+- **`corrections`** are word-boundary, case-insensitive replacements applied to
+  the finished transcript (cure). Keep entries **phrase-scoped** — a bare
+  single word like `opioid` or `England` must never be replaced, because both
+  have legitimate uses in the same episodes.
+
+Terms too ambiguous to auto-correct are parked under `_risky_not_applied` as
+documentation rather than silently guessed at.
+
+## Run Logs
+
+Every invocation tees stdout **and** stderr to
+`.work/logs/<YYYYMMDD-HHMMSS>.log`, including tracebacks, and prints the path
+on exit. This is independent of shell redirection, so scheduled and detached
+runs always leave a debuggable artifact. The newest 30 logs are kept.
+
+Download progress renders as a live bar only when stdout is a TTY; redirected
+output gets one line per 10% instead, which keeps logs small and readable.
 
 ## Spotify MCP Setup
 
@@ -351,8 +493,9 @@ Restart VS Code after configuration.
 | Spotify MCP `SpotifyGetInfo` does not support episode URIs | **P0** | Use `fetch_webpage` on the Spotify episode URL to scrape metadata |
 | `obsidian.com create` with stdin-piped content silently produces 0-byte files (RC 0, says "Overwrote") | **P0** | Write directly to vault filesystem via `Path.write_text()`, then verify with `obsidian.com file`. The Python wrapper `obsidian.py` also fails because its `run()` uses `stdin=subprocess.DEVNULL`. |
 | `--dry-run` still downloads audio and runs transcription | **P1** | Use `--check-only` for true no-side-effects preview. `--dry-run` only skips vault write (Step 7). |
-| AI summarization unavailable during a normal run | **P1** | The pipeline now fails that episode instead of silently writing a template-only note; install Claude CLI or explicitly pass `--no-ai` only if you truly want a skeleton note |
+| AI summarization unavailable during a normal run | **P1** | The pipeline fails that episode instead of silently writing a template-only note; install Claude CLI or set `OPENAI_API_KEY`. Pass `--no-ai` only if you truly want a skeleton note |
 | Pipeline downloads all new episodes per show, not just the target | **P1** | Use `--episode "title substring"` to filter, or `--max-episodes 1` |
+| Small Whisper models mangle domain jargon and proper nouns | **P1** | Default model is now `large-v3`. `base` produced "opioid models" for "open-weight models" throughout an entire episode, which then propagated into the generated note. Extend `config/vocabulary.json` for show-specific names |
 | Pipeline may exit with code 1 during large batch downloads | **P2** | Re-run with `--retry-failed` or `--transcribe-only` if audio already downloaded |
 
 ## CLI Flag Reference
@@ -368,6 +511,11 @@ Restart VS Code after configuration.
 | `--model <size>` | Sets whisper model (base/large-v3) | — |
 | `--retry-failed` | Re-processes failed episodes | Already-completed episodes |
 | `--keep-audio` | Keeps .mp3 files after successful run | Cleanup step |
+| `--set-watermark <date\|today>` | Forces the release watermark, then exits | Everything else — it's a maintenance command |
+| `--seed-watermarks` | Seeds watermarks from newest completed episode, then exits | Everything else |
+| `--backfill-since <date>` | Manual backfill from a date floor | The watermark gate |
+| `--ignore-watermark` | Manual backfill, no date gate at all | Both recency gates |
+| `--force` | Lets `--set-watermark` lower a watermark | The safety check |
 | `--url <URL>` | One-off mode via yt-dlp (X/YouTube/Vimeo/…) | RSS detection, manifest |
 | `--clips-folder <name>` | Vault subfolder for URL-mode notes (default `Clips`) | — |
 | `--show-name <label>` | Override URL-mode source folder | Auto-derived `Platform — @handle` |

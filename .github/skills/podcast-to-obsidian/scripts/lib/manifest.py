@@ -258,6 +258,65 @@ class Manifest:
         if error:
             episodes[episode_id]["error"] = error
 
+        # Advance the release watermark only on success.  A failed episode
+        # must not raise the bar, or a retry would be filtered out as
+        # "historical" on the next run.
+        if status == "completed" and published:
+            self.advance_watermark(show_id, published)
+
+    # ------------------------------------------------------------------
+    # Release watermark
+    #
+    # The watermark is the publish date of the newest episode successfully
+    # processed for a show.  Detection ignores anything at or below it, so
+    # the pipeline only ever picks up genuinely new releases and never walks
+    # backwards into a show's archive.  Backfill is a deliberate manual act
+    # (see seed_watermarks / --backfill-since).
+    # ------------------------------------------------------------------
+
+    def get_watermark(self, show_id: str) -> str:
+        """Newest published date processed for a show ('' if none)."""
+        show = self._data.get("shows", {}).get(show_id, {})
+        return show.get("latest_published", "") or ""
+
+    def advance_watermark(self, show_id: str, published: str) -> bool:
+        """Raise the watermark if `published` is newer.  Never lowers it.
+
+        Returns True if the watermark moved.
+        """
+        if not published:
+            return False
+        shows = self._data.setdefault("shows", {})
+        show = shows.setdefault(show_id, {"name": show_id, "rss_url": "", "episodes": {}})
+        current = show.get("latest_published", "") or ""
+        # ISO dates (YYYY-MM-DD) compare correctly as strings.
+        if published > current:
+            show["latest_published"] = published
+            return True
+        return False
+
+    def seed_watermarks(self) -> Dict[str, str]:
+        """Set each show's watermark from its newest completed episode.
+
+        Used to adopt watermark behaviour on an existing manifest without
+        reprocessing everything already in the vault.  Returns
+        {show_id: watermark} for shows that were seeded.
+        """
+        seeded = {}
+        for show_id, show in self._data.get("shows", {}).items():
+            if show.get("latest_published"):
+                continue  # already seeded; don't disturb it
+            dates = [
+                ep.get("published", "")
+                for ep in show.get("episodes", {}).values()
+                if ep.get("status") == "completed" and ep.get("published")
+            ]
+            if dates:
+                newest = max(dates)
+                show["latest_published"] = newest
+                seeded[show_id] = newest
+        return seeded
+
     def get_new_episodes(self, show_id: str, candidate_ids: List[str]) -> List[str]:
         """Filter candidate episode IDs to only those not yet processed."""
         show = self._data.get("shows", {}).get(show_id, {})

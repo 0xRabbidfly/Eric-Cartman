@@ -50,7 +50,8 @@ def download_audio(
     # Partial download support
     tmp_path = output_path.with_suffix(output_path.suffix + ".part")
 
-    print(f"  [download] {audio_url[:80]}...")
+    print(f"  [download] {audio_url[:80]}...", flush=True)
+    reset_progress()
     req = urllib.request.Request(
         audio_url,
         headers={
@@ -77,7 +78,9 @@ def download_audio(
         # Move tmp to final
         tmp_path.replace(output_path)
         size_mb = output_path.stat().st_size / (1024 * 1024)
-        print(f"\n  [done] {output_path.name} ({size_mb:.1f} MB)")
+        # Only the TTY progress bar leaves the cursor mid-line.
+        lead = "\n" if _is_tty() else ""
+        print(f"{lead}  [done] {output_path.name} ({size_mb:.1f} MB)", flush=True)
         return output_path
 
     except Exception:
@@ -109,18 +112,66 @@ def _safe_filename(name: str) -> str:
     return safe
 
 
+def _is_tty() -> bool:
+    """True only when stdout is an interactive terminal.
+
+    When output is redirected to a file or captured by an orchestrator,
+    carriage-return progress bars produce tens of thousands of useless
+    characters on a single line.  Callers use this to fall back to
+    periodic one-line updates instead.
+    """
+    try:
+        return bool(sys.stdout.isatty())
+    except Exception:
+        return False
+
+
+# Tracks the last milestone printed in non-TTY mode, per download.
+_last_milestone = -1
+
+
+def reset_progress() -> None:
+    """Reset non-TTY progress state.  Call before each new download."""
+    global _last_milestone
+    _last_milestone = -1
+
+
 def _print_progress(downloaded: int, total: int) -> None:
-    """Print download progress bar."""
+    """Report download progress.
+
+    Interactive terminals get a live progress bar.  Non-interactive
+    output (log files, scheduled runs) gets one line per 10% instead,
+    keeping logs readable and small.
+    """
+    global _last_milestone
+
+    if _is_tty():
+        if total > 0:
+            pct = (downloaded / total) * 100
+            bar_len = 30
+            filled = int(bar_len * downloaded / total)
+            bar = "█" * filled + "░" * (bar_len - filled)
+            mb_down = downloaded / (1024 * 1024)
+            mb_total = total / (1024 * 1024)
+            sys.stdout.write(f"\r  [{bar}] {pct:5.1f}% ({mb_down:.1f}/{mb_total:.1f} MB)")
+            sys.stdout.flush()
+        else:
+            mb_down = downloaded / (1024 * 1024)
+            sys.stdout.write(f"\r  [downloading] {mb_down:.1f} MB")
+            sys.stdout.flush()
+        return
+
+    # Non-TTY: emit at most one line per 10% (or per 50 MB if size unknown).
+    mb_down = downloaded / (1024 * 1024)
     if total > 0:
-        pct = (downloaded / total) * 100
-        bar_len = 30
-        filled = int(bar_len * downloaded / total)
-        bar = "█" * filled + "░" * (bar_len - filled)
-        mb_down = downloaded / (1024 * 1024)
-        mb_total = total / (1024 * 1024)
-        sys.stdout.write(f"\r  [{bar}] {pct:5.1f}% ({mb_down:.1f}/{mb_total:.1f} MB)")
-        sys.stdout.flush()
+        milestone = int((downloaded / total) * 10)
+        if milestone > _last_milestone:
+            _last_milestone = milestone
+            mb_total = total / (1024 * 1024)
+            pct = (downloaded / total) * 100
+            print(f"  [download] {pct:5.1f}% ({mb_down:.1f}/{mb_total:.1f} MB)", flush=True)
     else:
-        mb_down = downloaded / (1024 * 1024)
-        sys.stdout.write(f"\r  [downloading] {mb_down:.1f} MB")
-        sys.stdout.flush()
+        milestone = int(mb_down // 50)
+        if milestone > _last_milestone:
+            _last_milestone = milestone
+            print(f"  [download] {mb_down:.1f} MB", flush=True)
