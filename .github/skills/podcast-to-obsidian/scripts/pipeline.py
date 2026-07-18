@@ -26,7 +26,7 @@ import os
 import re
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -48,6 +48,92 @@ CONFIG_FILE = SCRIPT_DIR / "config.json"
 # Add script dir to path for local imports
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
+
+
+# ---------------------------------------------------------------------------
+# Run logging
+#
+# Unattended runs (scheduled tasks, detached processes) previously left no
+# artifact to debug from -- if the caller's shell redirection buffered or the
+# session died, the run was invisible.  Every run now tees stdout/stderr to
+# .work/logs/<timestamp>.log regardless of how the process was launched.
+# ---------------------------------------------------------------------------
+
+_LOG_RETENTION = 30  # keep the most recent N run logs
+
+
+class _Tee:
+    """Write to the original stream and a log file simultaneously."""
+
+    def __init__(self, stream, log_handle):
+        self._stream = stream
+        self._log = log_handle
+
+    def write(self, data):
+        try:
+            self._stream.write(data)
+        except Exception:
+            pass
+        try:
+            self._log.write(data)
+            self._log.flush()
+        except Exception:
+            pass
+        return len(data)
+
+    def flush(self):
+        for target in (self._stream, self._log):
+            try:
+                target.flush()
+            except Exception:
+                pass
+
+    def isatty(self):
+        # Delegate so downstream progress rendering still detects a real
+        # terminal when one is present.
+        try:
+            return self._stream.isatty()
+        except Exception:
+            return False
+
+    def __getattr__(self, name):
+        return getattr(self._stream, name)
+
+
+def _prune_old_logs(log_dir: Path, keep: int = _LOG_RETENTION) -> None:
+    """Delete all but the most recent `keep` run logs."""
+    try:
+        logs = sorted(log_dir.glob("*.log"), key=lambda p: p.stat().st_mtime, reverse=True)
+        for stale in logs[keep:]:
+            stale.unlink(missing_ok=True)
+    except Exception:
+        pass  # logging must never break the run
+
+
+def _start_run_log() -> Optional[Path]:
+    """Tee stdout/stderr to a timestamped file under .work/logs/.
+
+    Returns the log path, or None if logging could not be set up (in which
+    case the run continues normally with console output only).
+    """
+    try:
+        config = load_config()
+        work_dir = SKILL_DIR / config.get("work_dir", ".work")
+        log_dir = work_dir / "logs"
+        log_dir.mkdir(parents=True, exist_ok=True)
+
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+        log_path = log_dir / f"{stamp}.log"
+
+        handle = open(log_path, "w", encoding="utf-8", buffering=1)
+        sys.stdout = _Tee(sys.stdout, handle)
+        sys.stderr = _Tee(sys.stderr, handle)
+
+        _prune_old_logs(log_dir)
+        return log_path
+    except Exception as e:
+        print(f"  [warn] Could not open run log: {e}")
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -146,10 +232,13 @@ def load_config() -> Dict[str, Any]:
         "vault_path": "",
         "podcasts_folder": "Podcasts",
         "transcripts_folder": "transcripts",
-        "whisper_model": "base",
+        "whisper_model": "large-v3",
         "whisper_device": "auto",
         "whisper_language": None,
         "max_episodes": 5,
+        "detection_window": 50,
+        "only_new_releases": True,
+        "max_age_days": 30,
         "audio_format": "mp3",
         "note_template": "default",
         "work_dir": ".work",
@@ -213,23 +302,99 @@ def step_detect_episodes(
         )
 
         try:
-            episodes = parse_feed(rss_url, max_episodes=config.get("max_episodes", 5) * 2)
-            print(f"  [found] {len(episodes)} episodes in feed")
+            # Detection window is deliberately decoupled from max_episodes.
+            # Previously this was `max_episodes * 2`, which meant --max-episodes 1
+            # only ever looked at the 2 most recent entries -- if a show published
+            # several episodes between runs, the older ones fell outside the window
+            # and were never detected, on this run or any later one.
+            window = config.get("detection_window", 50)
+            episodes = parse_feed(rss_url, max_episodes=window)
+            print(f"  [found] {len(episodes)} episodes in feed (newest {window})")
+
+            # Recency gate: only genuinely new releases, never the archive.
+            #
+            # The watermark is the newest publish date already processed for
+            # this show.  Anything at or below it is historical by definition
+            # and is skipped even if it never made it into the manifest --
+            # backfill is a deliberate manual act, not something a scheduled
+            # run should ever start doing on its own.
+            only_new = config.get("only_new_releases", True)
+            max_age_days = config.get("max_age_days", 30)
+            backfill_since = config.get("backfill_since", "")
+
+            watermark = ""
+            age_cutoff = ""
+            if backfill_since:
+                # Explicit manual backfill: a date floor replaces both gates.
+                age_cutoff = backfill_since
+            elif only_new:
+                # Both gates apply together.  The watermark stops re-processing
+                # and the age cutoff stops the archive: an episode from three
+                # months ago that was never picked up is still historical, even
+                # though it is technically "newer than" a stale watermark.
+                watermark = manifest.get_watermark(show_id)
+                if max_age_days:
+                    age_cutoff = (
+                        datetime.now(timezone.utc) - timedelta(days=max_age_days)
+                    ).strftime("%Y-%m-%d")
+
+            gating = bool(watermark or age_cutoff)
 
             # Filter to new episodes only (match by key, rss_guid, or
             # title+published so Spotify-keyed entries aren't reprocessed)
             new = []
+            skipped_historical = 0
+            skipped_undated = 0
             for ep in episodes:
-                if not manifest.is_processed(show_id, ep.id, title=ep.title, published=ep.published):
-                    new.append(ep)
-                    ep.show_name = show_name
+                if manifest.is_processed(show_id, ep.id, title=ep.title, published=ep.published):
+                    continue
+                if gating and not ep.published:
+                    # No publish date means recency cannot be established, so
+                    # it cannot be confirmed as a new release.  Skipping is the
+                    # safe default -- otherwise undated feed entries silently
+                    # bypass every gate and drag in the whole back catalogue.
+                    skipped_undated += 1
+                    continue
+                if watermark and ep.published <= watermark:
+                    skipped_historical += 1
+                    continue
+                if age_cutoff and ep.published < age_cutoff:
+                    skipped_historical += 1
+                    continue
+                new.append(ep)
+                ep.show_name = show_name
+
+            if skipped_historical:
+                gates = []
+                if watermark:
+                    gates.append(f"newer than {watermark}")
+                if age_cutoff:
+                    label = "on/after" if backfill_since else f"within {max_age_days}d —"
+                    gates.append(f"published {label} {age_cutoff}")
+                print(
+                    f"  [recency] {skipped_historical} older episodes skipped "
+                    f"(taking only releases {' and '.join(gates)})"
+                )
+            if skipped_undated:
+                print(
+                    f"  [recency] {skipped_undated} episodes skipped — no publish date "
+                    f"in feed, cannot confirm as new releases"
+                )
 
             if new:
-                # Respect max_episodes limit
+                # Respect max_episodes limit (processing cap, not detection cap)
                 max_ep = config.get("max_episodes", 5)
+                found_count = len(new)
                 new = new[:max_ep]
                 new_episodes[show_id] = new
-                print(f"  [new] {len(new)} new episodes to process")
+                if found_count > len(new):
+                    print(
+                        f"  [new] {found_count} new episodes detected, "
+                        f"processing {len(new)} (max_episodes={max_ep}); "
+                        f"{found_count - len(new)} deferred to a later run"
+                    )
+                else:
+                    print(f"  [new] {len(new)} new episodes to process")
             else:
                 print(f"  [uptodate] No new episodes")
 
@@ -272,7 +437,7 @@ def step_download(
 def step_transcribe(
     downloaded: List[Tuple[Episode, Path]],
     work_dir: Path,
-    model: str = "base",
+    model: str = "large-v3",
     device: str = "auto",
     language: Optional[str] = None,
 ) -> List[Tuple[Episode, Path, Path, dict]]:
@@ -834,7 +999,7 @@ def run_url_pipeline(args: argparse.Namespace) -> None:
     transcribed = step_transcribe(
         downloaded=[(episode, clip.audio_path)],
         work_dir=work_dir,
-        model=config.get("whisper_model", "base"),
+        model=config.get("whisper_model", "large-v3"),
         device=config.get("whisper_device", "auto"),
         language=config.get("whisper_language"),
     )
@@ -908,8 +1073,11 @@ def _inject_source_url(note_content: str, source_url: str) -> str:
     if "source_url:" in note_content:
         return note_content
     pattern = re.compile(r"^(source: podcast-to-obsidian)$", re.MULTILINE)
-    replacement = f'\\1\nsource_url: "{source_url}"'
-    return pattern.sub(replacement, note_content, count=1)
+    # Single-quoted YAML: no backslash escaping (the Obsidian CLI writer strips
+    # backslash escapes from content). Only ' needs doubling. Function
+    # replacement so re.sub does not reinterpret the URL.
+    safe = "'" + str(source_url).replace("'", "''") + "'"
+    return pattern.sub(lambda m: f"{m.group(1)}\nsource_url: {safe}", note_content, count=1)
 
 
 # ---------------------------------------------------------------------------
@@ -935,6 +1103,17 @@ def run_pipeline(args: argparse.Namespace) -> None:
         config["whisper_device"] = args.device
     if args.max_episodes is not None:
         config["max_episodes"] = args.max_episodes
+
+    # Manual backfill overrides.  Default behaviour is new releases only;
+    # reaching into a show's archive must always be an explicit request.
+    if getattr(args, "ignore_watermark", False):
+        config["only_new_releases"] = False
+        config["max_age_days"] = 0
+        print("\n  [backfill] Watermark ignored — considering all episodes in window")
+    elif getattr(args, "backfill_since", None):
+        config["only_new_releases"] = False
+        config["backfill_since"] = args.backfill_since
+        print(f"\n  [backfill] Considering episodes published on or after {args.backfill_since}")
 
     # Work directory
     work_dir = SKILL_DIR / config.get("work_dir", ".work")
@@ -997,7 +1176,7 @@ def run_pipeline(args: argparse.Namespace) -> None:
         transcribed = step_transcribe(
             downloaded=downloaded,
             work_dir=work_dir,
-            model=config.get("whisper_model", "base"),
+            model=config.get("whisper_model", "large-v3"),
             device=config.get("whisper_device", "auto"),
             language=config.get("whisper_language"),
         )
@@ -1099,6 +1278,95 @@ def cmd_add_show(args: argparse.Namespace) -> None:
     print(f"\n✓ Show '{name}' added. Run the pipeline to process episodes.")
 
 
+def cmd_seed_watermarks(args: argparse.Namespace) -> None:
+    """Seed each show's release watermark from its newest completed episode.
+
+    Lets an existing manifest adopt new-releases-only detection without the
+    pipeline suddenly discovering (and reprocessing) a show's back catalogue.
+    """
+    manifest = Manifest(CONFIG_DIR / "podcast-manifest.json")
+
+    print("\n=== Seed Release Watermarks ===\n")
+
+    existing = {
+        show_id: show.get("latest_published")
+        for show_id, show in manifest._data.get("shows", {}).items()
+        if show.get("latest_published")
+    }
+    seeded = manifest.seed_watermarks()
+
+    for show_id, watermark in sorted(seeded.items()):
+        print(f"  [seed] {show_id}: {watermark}")
+    for show_id, watermark in sorted(existing.items()):
+        print(f"  [keep] {show_id}: {watermark} (already set)")
+
+    unseeded = [
+        show_id
+        for show_id, show in manifest._data.get("shows", {}).items()
+        if not show.get("latest_published")
+    ]
+    for show_id in sorted(unseeded):
+        print(f"  [none] {show_id}: no completed episodes — will use max_age_days on first run")
+
+    if seeded:
+        manifest.save()
+        print(f"\n✓ Seeded {len(seeded)} shows. Episodes at or before each watermark "
+              f"will no longer be auto-detected.")
+    else:
+        print("\n✓ Nothing to seed — all shows already have a watermark.")
+
+
+def cmd_set_watermark(args: argparse.Namespace) -> None:
+    """Force the release watermark for every show (or one) to a given date.
+
+    `--set-watermark today` draws a line in the sand: everything currently in
+    every feed becomes historical, and only genuinely future releases are
+    auto-fetched.  Backfill stays available via --backfill-since.
+    """
+    raw = (args.set_watermark or "").strip().lower()
+    if raw in ("today", "now"):
+        target = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    else:
+        target = args.set_watermark.strip()
+        try:
+            datetime.strptime(target, "%Y-%m-%d")
+        except ValueError:
+            print(f"\n✗ Invalid date '{target}'. Use YYYY-MM-DD or 'today'.")
+            return
+
+    manifest = Manifest(CONFIG_DIR / "podcast-manifest.json")
+    shows = manifest._data.get("shows", {})
+
+    print(f"\n=== Set Release Watermark → {target} ===\n")
+
+    changed = 0
+    for show_id, show in sorted(shows.items()):
+        if args.show:
+            needle = args.show.lower()
+            if needle not in show_id.lower() and needle not in show.get("name", "").lower():
+                continue
+
+        current = show.get("latest_published", "") or ""
+        if current and target < current and not args.force:
+            print(f"  [keep] {show_id}: {current} (would lower to {target}; use --force)")
+            continue
+        if current == target:
+            print(f"  [same] {show_id}: {target}")
+            continue
+
+        show["latest_published"] = target
+        changed += 1
+        print(f"  [set]  {show_id}: {current or '(none)'} → {target}")
+
+    if changed:
+        manifest.save()
+        print(f"\n✓ Watermark set on {changed} shows. Episodes published on or before "
+              f"{target} will no longer be auto-detected.")
+        print("  Backfill manually with: --backfill-since YYYY-MM-DD [--show \"Name\"]")
+    else:
+        print("\n✓ No changes made.")
+
+
 def cmd_list_shows(args: argparse.Namespace) -> None:
     """List all tracked shows."""
     manifest = Manifest(CONFIG_DIR / "podcast-manifest.json")
@@ -1198,22 +1466,58 @@ def main() -> None:
                         help="Retry failed episodes")
     parser.add_argument("--keep-audio", action="store_true",
                         help="Don't purge .mp3 files after successful run")
+    parser.add_argument("--backfill-since", type=str, default=None, metavar="YYYY-MM-DD",
+                        help="Manual backfill: also consider episodes published on or "
+                             "after this date, ignoring the release watermark. "
+                             "Combine with --show and --episode to target precisely.")
+    parser.add_argument("--ignore-watermark", action="store_true",
+                        help="Manual backfill: consider every episode in the detection "
+                             "window regardless of publish date. Use with care.")
+    parser.add_argument("--seed-watermarks", action="store_true",
+                        help="Set each show's release watermark from its newest completed "
+                             "episode, then exit. Adopts new-releases-only behaviour on an "
+                             "existing manifest without reprocessing anything.")
+    parser.add_argument("--set-watermark", type=str, default=None, metavar="YYYY-MM-DD|today",
+                        help="Force the release watermark for every show (or just --show X) "
+                             "to a date, then exit. '--set-watermark today' draws a line in "
+                             "the sand: nothing currently in any feed is auto-fetched again, "
+                             "only future releases. Never lowers an existing watermark unless "
+                             "--force is given.")
+    parser.add_argument("--force", action="store_true",
+                        help="Allow --set-watermark to lower an existing watermark")
 
     args = parser.parse_args()
 
-    # Route to subcommands
-    if args.add_show:
-        if not args.name or not args.rss:
-            parser.error("--add-show requires --name and --rss")
-        cmd_add_show(args)
-    elif args.list_shows:
-        cmd_list_shows(args)
-    elif args.retry_failed:
-        cmd_retry_failed(args)
-    elif args.url:
-        run_url_pipeline(args)
-    else:
-        run_pipeline(args)
+    # Tee all output to .work/logs/<timestamp>.log before doing any work, so
+    # unattended and detached runs always leave a debuggable artifact.
+    log_path = _start_run_log()
+
+    try:
+        # Route to subcommands
+        if args.add_show:
+            if not args.name or not args.rss:
+                parser.error("--add-show requires --name and --rss")
+            cmd_add_show(args)
+        elif args.seed_watermarks:
+            cmd_seed_watermarks(args)
+        elif args.set_watermark:
+            cmd_set_watermark(args)
+        elif args.list_shows:
+            cmd_list_shows(args)
+        elif args.retry_failed:
+            cmd_retry_failed(args)
+        elif args.url:
+            run_url_pipeline(args)
+        else:
+            run_pipeline(args)
+    except Exception:
+        # Make sure the traceback reaches the log file, not just the console.
+        import traceback
+        traceback.print_exc()
+        raise
+    finally:
+        if log_path:
+            print(f"\n  [log] {log_path}")
 
 
 if __name__ == "__main__":

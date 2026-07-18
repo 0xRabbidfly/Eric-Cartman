@@ -1,0 +1,51 @@
+{
+  "_comment": "Domain vocabulary for transcription. 'initial_prompt' primes Whisper toward correct spellings (prevention). 'corrections' are applied to the finished transcript (cure). Keep corrections PHRASE-SCOPED: single common words like 'opioid' or 'England' must never be replaced bare, because they have legitimate uses.",
+
+  "initial_prompt": "A technology podcast discussing AI research and industry news. Recurring names and terms: Peter Diamandis, Dave Blundin, Salim Ismail, Alex Wissner-Gross, Ramin Hasani, Liquid AI, Mira Murati, Thinking Machines Lab, Demis Hassabis, DeepMind, Sam Altman, Elon Musk, Alex Karp, Palantir, Andrej Karpathy, Daniela Rus, MIT CSAIL, Anthropic, OpenAI, Nvidia, Anduril, Palmer Luckey. Technical terms: open-weight models, mixture of experts, fine-tuning, reinforcement fine-tuning, RFT, recursive self-improvement, Chinchilla scaling laws, quantization, ternary quantization, transformer architecture, state space models, Mamba, liquid neural networks, C. elegans, small language models, SLM, AGI, ASI, longevity escape velocity.",
+
+  "corrections": {
+    "opioid model": "open-weight model",
+    "opioid models": "open-weight models",
+    "opioid weight": "open weight",
+    "the opioid leaderboards": "the open-weight leaderboards",
+
+    "Mira Maradi": "Mira Murati",
+    "Mira Murad": "Mira Murati",
+    "Rameen Hassani": "Ramin Hasani",
+    "Ramine Hassani": "Ramin Hasani",
+    "Remeen": "Ramin",
+    "Rameen": "Ramin",
+    "Ramine": "Ramin",
+    "Demis Hassab": "Demis Hassabis",
+    "Demis Hassabah": "Demis Hassabis",
+    "Alex Carp": "Alex Karp",
+    "Alex listener grows": "Alex Wissner-Gross",
+    "Alex Wisner Gross": "Alex Wissner-Gross",
+    "Daniela Rousse": "Daniela Rus",
+    "Daniela Ruth": "Daniela Rus",
+    "Palmer lucky": "Palmer Luckey",
+    "Matthias Leckner": "Matthias Lechner",
+
+    "sea elegans": "C. elegans",
+    "see elegance": "C. elegans",
+    "the sea elegance": "C. elegans",
+    "seasale": "CSAIL",
+    "sea sale": "CSAIL",
+    "C cell at MIT": "CSAIL at MIT",
+    "chinchila": "Chinchilla",
+    "Neematron": "Nemotron",
+    "turnery quantization": "ternary quantization",
+    "turnery and one bit": "ternary and one-bit",
+    "Finra": "FINRA",
+    "androly": "Anduril",
+    "organizational seniority": "organizational singularity"
+  },
+
+  "_risky_not_applied": {
+    "_note": "Observed mistranscriptions that are NOT auto-corrected because the wrong form is also a legitimate word or the right form is uncertain. Fix these by hand or extend initial_prompt.",
+    "England / Ingline": "Almost certainly 'Inkling' (the Thinking Machines model), but 'England' appeared legitimately in the same episode (football talk).",
+    "Gwen": "Likely 'Qwen' (Alibaba model), but Gwen is a real name.",
+    "WICO / Weco": "Startup name uncertain from audio alone; verify against the source before adding.",
+    "Mythos / mythos": "May be a model codename or the ordinary noun."
+  }
+}

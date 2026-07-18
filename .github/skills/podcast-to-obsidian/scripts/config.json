@@ -2,10 +2,13 @@
     "vault_path": "",
     "podcasts_folder": "Podcasts",
     "transcripts_folder": "transcripts",
-    "whisper_model": "base",
+    "whisper_model": "large-v3",
     "whisper_device": "auto",
     "whisper_language": null,
     "max_episodes": 5,
+    "detection_window": 50,
+    "only_new_releases": true,
+    "max_age_days": 30,
     "audio_format": "mp3",
     "note_template": "default",
     "work_dir": ".work",
@@ -24,12 +27,12 @@
         "lex-fridman-podcast": {
             "name": "Lex Fridman Podcast",
             "rss_url": "https://lexfridman.com/feed/podcast/",
-            "enabled": true
+            "enabled": false
         },
         "bankless": {
             "name": "Bankless",
             "rss_url": "https://feeds.flightcast.com/p83fuj0y0u58o82l41xei7zo.xml",
-            "enabled": true
+            "enabled": false
         },
         "limitless": {
             "name": "Limitless",
@@ -39,7 +42,7 @@
         "the-pomp-podcast": {
             "name": "The Pomp Podcast",
             "rss_url": "https://anchor.fm/s/b4841110/podcast/rss",
-            "enabled": true
+            "enabled": false
         },
         "moonshots-with-peter-diamandis": {
             "name": "Moonshots with Peter Diamandis",
@@ -74,7 +77,7 @@
         "the-joe-rogan-experience": {
             "name": "The Joe Rogan Experience",
             "rss_url": "https://feeds.megaphone.fm/GLT1412515089",
-            "enabled": true
+            "enabled": false
         }
     },
     "spotify": {
