@@ -18,7 +18,7 @@ $taskXml = @"
   <Triggers>
     <TimeTrigger>
       <Repetition>
-        <Interval>PT5M</Interval>
+        <Interval>PT1H</Interval>
         <StopAtDurationEnd>false</StopAtDurationEnd>
       </Repetition>
       <StartBoundary>2025-01-01T00:00:00</StartBoundary>
@@ -81,3 +81,4 @@ try {
 }
 
 Write-Host "Done! Resilience setup complete."
+
