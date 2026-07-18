@@ -71,6 +71,45 @@ python .github/skills/obsidian/scripts/obsidian.py read --path "Research/Library
 python .github/skills/obsidian/scripts/obsidian.py info
 ```
 
+### CLI subcommands (beyond create/append/prepend/read)
+
+The wrapper's command-line surface mirrors the Python API. Reads print to
+stdout; mutations print `OK` (or `FAIL: ...` + exit 1). Flags: `--path`/`--file`
+to target, plus per-command flags below.
+
+```powershell
+# Move / rename / delete (move auto-updates wikilinks AND creates the
+# destination folder if it is missing — see gotcha below)
+python .github/skills/obsidian/scripts/obsidian.py move   --path "A/note.md" --to "B/note.md"
+python .github/skills/obsidian/scripts/obsidian.py rename --path "A/note.md" --name "New Name"
+python .github/skills/obsidian/scripts/obsidian.py delete --path "A/note.md" --permanent
+
+# List / query
+python .github/skills/obsidian/scripts/obsidian.py folders --folder "Research/Library"
+python .github/skills/obsidian/scripts/obsidian.py files   --folder "Research/Library" --ext md
+python .github/skills/obsidian/scripts/obsidian.py tags
+python .github/skills/obsidian/scripts/obsidian.py tag       --name keep
+python .github/skills/obsidian/scripts/obsidian.py backlinks --path "A/note.md"
+python .github/skills/obsidian/scripts/obsidian.py links     --path "A/note.md"
+python .github/skills/obsidian/scripts/obsidian.py tasks     --path "A/note.md"
+python .github/skills/obsidian/scripts/obsidian.py outline   --path "A/note.md"
+
+# Frontmatter properties
+python .github/skills/obsidian/scripts/obsidian.py property-read   --path "A/note.md" --name status
+python .github/skills/obsidian/scripts/obsidian.py property-set    --path "A/note.md" --name status --value published
+python .github/skills/obsidian/scripts/obsidian.py property-remove --path "A/note.md" --name draft
+
+# Escape hatch — pass ANY Obsidian CLI command straight through as key=value
+python .github/skills/obsidian/scripts/obsidian.py raw folder "path=Research/Library" info=files
+```
+
+> **Gotcha — no mkdir.** The Obsidian CLI (bundled inside the Obsidian desktop
+> app as `Obsidian.com`, not a separate install) has **no folder-create
+> command**, and `move` is a raw filesystem rename that fails with `ENOENT`
+> when the destination folder does not exist. The wrapper's `move` now seeds a
+> missing destination folder automatically (`ensure_folder`: create + delete a
+> throwaway note). To pre-create a folder yourself, call `ob.ensure_folder("Path/To/Folder")`.
+
 ```powershell
 # ═══ SIMPLE — python -c one-liner (only for short content without special chars) ═══
 python -c "import sys; sys.path.insert(0,'.github/skills/obsidian/scripts'); from obsidian import Obsidian; ob=Obsidian(); print(ob.create(path='Research/Library/my-note.md', content='# Title\n\nBody text').text)"
@@ -129,10 +168,11 @@ ob.read(path="Notes/Recipe.md")              # read by path; returns plain strin
 ob.create("Trip to Paris", content="# Paris", template="Travel")
 ob.append("Recipe", "## New Section")
 ob.prepend("Recipe", "**Updated 2026-02-23**")
-ob.move("Recipe", to="Archive/Recipe.md")
+ob.move("Recipe", to="Archive/Recipe.md")    # auto-creates dest folder if missing
 ob.rename("Recipe", name="Old Recipe")
 ob.delete("Scratch Note")
 ob.file_info("Recipe")                       # size, dates, path
+ob.ensure_folder("Archive/2026")             # mkdir (CLI has none) — idempotent
 
 # --- Search ---
 ob.search("meeting notes")                   # vault-wide search

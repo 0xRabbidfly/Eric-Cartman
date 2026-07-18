@@ -75,6 +75,63 @@ def _find_obsidian_binary() -> str:
 
 
 # ---------------------------------------------------------------------------
+# Vault path discovery (for direct-filesystem writes)
+# ---------------------------------------------------------------------------
+
+
+def _resolve_vault_path(vault_name: Optional[str] = None) -> Optional[Path]:
+    """Locate the vault's folder on disk, for direct-filesystem writes.
+
+    Note writes go straight to disk (Obsidian's file watcher reloads them)
+    because the Obsidian 1.13.x CLI write path is unreliable — it crashes or
+    times out on real note content. Resolution order:
+
+    1. ``OBSIDIAN_VAULT_PATH`` / ``VAULT_PATH`` env override.
+    2. Obsidian's own registry ``obsidian.json`` (``%APPDATA%/obsidian`` on
+       Windows, the Application Support / ``~/.config`` equivalents elsewhere),
+       preferring a vault whose folder name matches ``vault_name``, then the
+       currently-open vault, then the most recently used.
+
+    Returns None if nothing resolves (callers fall back to the CLI).
+    """
+    env = os.environ.get("OBSIDIAN_VAULT_PATH") or os.environ.get("VAULT_PATH")
+    if env and Path(env).is_dir():
+        return Path(env)
+
+    cfg_dirs = []
+    appdata = os.environ.get("APPDATA")
+    if appdata:
+        cfg_dirs.append(Path(appdata) / "obsidian")
+    home = Path.home()
+    cfg_dirs.append(home / "Library" / "Application Support" / "obsidian")  # macOS
+    cfg_dirs.append(home / ".config" / "obsidian")                          # Linux
+
+    for cfg_dir in cfg_dirs:
+        cfg = cfg_dir / "obsidian.json"
+        if not cfg.exists():
+            continue
+        try:
+            data = json.loads(cfg.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            continue
+        rows = []
+        for meta in (data.get("vaults") or {}).values():
+            p = meta.get("path")
+            if p and Path(p).is_dir():
+                rows.append((bool(meta.get("open")), meta.get("ts", 0), Path(p)))
+        if not rows:
+            continue
+        if vault_name:
+            for _open, _ts, p in rows:
+                if p.name == vault_name:
+                    return p
+        rows.sort(key=lambda r: (r[0], r[1]), reverse=True)
+        return rows[0][2]
+
+    return None
+
+
+# ---------------------------------------------------------------------------
 # Result types
 # ---------------------------------------------------------------------------
 
@@ -83,9 +140,9 @@ def _find_obsidian_binary() -> str:
 class CLIResult:
     """Raw result from an Obsidian CLI call."""
 
-    stdout: str
-    stderr: str
-    returncode: int
+    stdout: str = ""
+    stderr: str = ""
+    returncode: int = 0
     command: List[str] = field(default_factory=list)
 
     @property
@@ -114,6 +171,34 @@ class CLIResult:
 
 
 # ---------------------------------------------------------------------------
+# Content escaping for the CLI transport
+# ---------------------------------------------------------------------------
+
+
+def _escape_cli_content(value: Any) -> str:
+    r"""Escape a ``content`` value for the Obsidian CLI's argv → JSON transport.
+
+    The CLI (``obsidian.com``) forwards its arguments to the running app as a
+    JSON array. As of Obsidian 1.13.x it no longer escapes raw control
+    characters in that argument, so a ``content`` value containing literal
+    newlines/tabs produces invalid JSON and the write crashes in the main
+    process (``SyntaxError: Unexpected token ...``).
+
+    The CLI documents that content should use ``\n``/``\t`` escapes ("Use \n
+    for newline, \t for tab in content values") and un-escapes exactly those on
+    the way in — it does NOT collapse ``\\`` back to ``\``. So we escape only
+    the control characters that break the JSON transport (newline, CR, tab) and
+    leave backslashes untouched (``obsidian.com`` already escapes ``\`` and
+    ``"`` correctly when building the JSON; only raw control chars are the bug).
+    Escaping backslashes here would double them on disk.
+    """
+    s = str(value)
+    s = s.replace("\r\n", "\\n").replace("\r", "\\n").replace("\n", "\\n")
+    s = s.replace("\t", "\\t")
+    return s
+
+
+# ---------------------------------------------------------------------------
 # Main class
 # ---------------------------------------------------------------------------
 
@@ -131,6 +216,7 @@ class Obsidian:
         self._vault = vault
         self._timeout = timeout
         self._binary = _find_obsidian_binary()
+        self._vault_path = _resolve_vault_path(vault)
 
     # ------------------------------------------------------------------
     # Low-level runner
@@ -161,6 +247,8 @@ class Obsidian:
             if value is True:
                 cmd.append(key)
             else:
+                if key == "content":
+                    value = _escape_cli_content(value)
                 cmd.append(f"{key}={value}")
 
         try:
@@ -191,10 +279,43 @@ class Obsidian:
     # Files and folders
     # ------------------------------------------------------------------
 
+    def _disk_path(self, *, path: Optional[str] = None, file: Optional[str] = None) -> Optional[Path]:
+        """Resolve a vault-relative path or note name to an absolute Path.
+
+        Returns None when the vault folder is unknown so callers fall back to
+        the CLI. Path-based lookups append ``.md`` (the CLI coerces non-.md
+        create targets to ``.md``); name-based lookups search the vault.
+        """
+        if self._vault_path is None:
+            return None
+        if path:
+            rel = path.replace("\\", "/")
+            if not rel.lower().endswith(".md"):
+                rel += ".md"
+            return self._vault_path / rel
+        if file:
+            stem = Path(file).stem
+            direct = self._vault_path / f"{stem}.md"
+            if direct.exists():
+                return direct
+            for p in self._vault_path.rglob(f"{stem}.md"):
+                if not any(part in {".trash", ".obsidian", ".git"} for part in p.parts):
+                    return p
+        return None
+
     def read(self, file: Optional[str] = None, *, path: Optional[str] = None) -> str:
-        """Read a file's contents. Returns the text."""
-        r = self.run("read", file=file, path=path)
-        return r.text
+        """Read a file's contents. Returns the text.
+
+        Reads from disk directly when the vault path is known (fast, and works
+        even when the app is busy/unresponsive); falls back to the CLI.
+        """
+        target = self._disk_path(path=path, file=file)
+        if target is not None and target.exists():
+            try:
+                return target.read_text(encoding="utf-8")
+            except OSError:
+                pass
+        return self.run("read", file=file, path=path).text
 
     def create(
         self,
@@ -206,7 +327,24 @@ class Obsidian:
         overwrite: bool = False,
         open: bool = False,
     ) -> CLIResult:
-        """Create a new note."""
+        """Create (or overwrite) a note.
+
+        Writes directly to disk — Obsidian's file watcher reloads the change —
+        because the 1.13.x CLI write path is unreliable on real note content.
+        Falls back to the CLI for name/template-based creation or when the
+        vault folder can't be resolved.
+        """
+        if path and template is None:
+            target = self._disk_path(path=path)
+            if target is not None:
+                if target.exists() and not overwrite:
+                    return CLIResult(stderr=f"File exists (overwrite=False): {path}", returncode=1)
+                try:
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    target.write_text(content or "", encoding="utf-8", newline="")
+                    return CLIResult(stdout=f"Created: {path}")
+                except OSError as exc:
+                    return CLIResult(stderr=f"Direct write failed: {exc}", returncode=1)
         return self.run(
             "create",
             name=name,
@@ -225,7 +363,16 @@ class Obsidian:
         path: Optional[str] = None,
         inline: bool = False,
     ) -> CLIResult:
-        """Append content to a file."""
+        """Append content to a file (direct disk write; CLI fallback)."""
+        target = self._disk_path(path=path, file=file)
+        if target is not None and target.exists():
+            try:
+                existing = target.read_text(encoding="utf-8")
+                sep = "" if (inline or not existing or existing.endswith("\n")) else "\n"
+                target.write_text(existing + sep + content, encoding="utf-8", newline="")
+                return CLIResult(stdout=f"Appended: {path or file}")
+            except OSError as exc:
+                return CLIResult(stderr=f"Direct append failed: {exc}", returncode=1)
         return self.run("append", content=content, file=file, path=path, inline=inline or None)
 
     def prepend(
@@ -236,12 +383,73 @@ class Obsidian:
         path: Optional[str] = None,
         inline: bool = False,
     ) -> CLIResult:
-        """Prepend content after frontmatter."""
+        """Prepend content after frontmatter (direct disk write; CLI fallback)."""
+        target = self._disk_path(path=path, file=file)
+        if target is not None and target.exists():
+            try:
+                existing = target.read_text(encoding="utf-8")
+                body = content if inline else content.rstrip("\n") + "\n"
+                insert_at = 0
+                if existing.startswith("---\n") or existing.startswith("---\r\n"):
+                    end = existing.find("\n---", 3)
+                    if end != -1:
+                        nl = existing.find("\n", end + 1)
+                        if nl != -1:
+                            insert_at = nl + 1
+                new = existing[:insert_at] + body + existing[insert_at:]
+                target.write_text(new, encoding="utf-8", newline="")
+                return CLIResult(stdout=f"Prepended: {path or file}")
+            except OSError as exc:
+                return CLIResult(stderr=f"Direct prepend failed: {exc}", returncode=1)
         return self.run("prepend", content=content, file=file, path=path, inline=inline or None)
 
-    def move(self, file: Optional[str] = None, *, path: Optional[str] = None, to: str) -> CLIResult:
-        """Move or rename a file. Auto-updates internal links."""
-        return self.run("move", file=file, path=path, to=to)
+    def move(
+        self,
+        file: Optional[str] = None,
+        *,
+        path: Optional[str] = None,
+        to: str,
+        make_dirs: bool = True,
+    ) -> CLIResult:
+        """Move or rename a file. Auto-updates internal links.
+
+        The Obsidian CLI has no mkdir, and ``move`` is a raw filesystem rename
+        that fails with ENOENT when the destination folder does not exist.
+        With ``make_dirs=True`` (default) we seed the destination folder first
+        (see :meth:`ensure_folder`) and retry the move once.
+        """
+        r = self.run("move", file=file, path=path, to=to)
+        if make_dirs and to and self._is_missing_dir_error(r):
+            parent = to.replace("\\", "/").rsplit("/", 1)
+            if len(parent) == 2:
+                self.ensure_folder(parent[0])
+                r = self.run("move", file=file, path=path, to=to)
+        return r
+
+    @staticmethod
+    def _is_missing_dir_error(r: CLIResult) -> bool:
+        """True if a call failed because a target folder was missing.
+
+        The CLI returns exit code 0 even on this error, so ``r.ok`` is not
+        reliable here — the ENOENT text is the only signal.
+        """
+        blob = f"{r.stdout} {r.stderr}".lower()
+        return "enoent" in blob or "no such file or directory" in blob
+
+    def ensure_folder(self, folder: str) -> None:
+        """Ensure a vault folder exists (idempotent).
+
+        The Obsidian CLI exposes no folder-create command, but ``create`` makes
+        any missing parent folders. So we seed the folder with a throwaway note
+        and immediately delete it. ``folder`` is a vault-relative folder path
+        with no filename (e.g. ``Research/Library/10 Crypto, Tokenomics``).
+        """
+        folder = folder.replace("\\", "/").strip("/")
+        if not folder:
+            return
+        seed = f"{folder}/_obsidian_mkdir_tmp.md"
+        self.run("create", path=seed, content="mkdir")
+        self.run("delete", path=seed, permanent=True)
 
     def rename(self, file: Optional[str] = None, *, path: Optional[str] = None, name: str) -> CLIResult:
         """Rename a file (preserving extension). Auto-updates internal links."""
@@ -684,23 +892,58 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(
         description="Obsidian CLI wrapper — pipe-friendly vault operations.",
-        epilog="Content is read from stdin when --content is omitted.",
+        epilog=(
+            "Content actions (create/append/prepend) read from stdin when "
+            "--content is omitted. Use 'raw <cmd> key=value ...' to pass any "
+            "Obsidian CLI command straight through."
+        ),
     )
-    parser.add_argument("action", choices=["create", "append", "prepend", "read", "info", "search", "search-context"],
-                        help="Vault operation to perform.")
+    parser.add_argument(
+        "action",
+        help=(
+            "Content: create, append, prepend. Read/list: read, info, search, "
+            "search-context, files, folders, tags, tag, backlinks, links, orphans, "
+            "tasks, properties, property-read, outline. Mutate: move, rename, "
+            "delete, property-set, property-remove. Escape hatch: raw."
+        ),
+    )
     parser.add_argument("--path", required=False, help="Vault-relative path (e.g. Research/Library/note.md).")
     parser.add_argument("--file", required=False, help="File name (Obsidian title match).")
     parser.add_argument("--vault", required=False, help="Target vault name.")
     parser.add_argument("--content", required=False, help="Inline content (if omitted, reads stdin).")
+    parser.add_argument("--to", required=False, help="Destination path for move (missing folders are created).")
+    parser.add_argument("--name", required=False, help="New name (rename) or property/tag name.")
+    parser.add_argument("--value", required=False, help="Value for property-set.")
     parser.add_argument("--query", required=False, help="Search query (for search/search-context actions).")
     parser.add_argument("--limit", required=False, type=int, help="Result limit for search actions.")
+    parser.add_argument("--folder", required=False, help="Folder filter for files/folders.")
+    parser.add_argument("--ext", required=False, help="Extension filter for files.")
     parser.add_argument("--format", required=False, choices=["text", "json"], default="text",
-                        help="Output format for search actions.")
+                        help="Output format for search/tags/etc.")
     parser.add_argument("--overwrite", action="store_true", help="Overwrite existing file on create.")
+    parser.add_argument("--permanent", action="store_true", help="Permanent delete (skip trash).")
     parser.add_argument("--template", required=False, help="Template name for create.")
+    parser.add_argument("rest", nargs="*", help="For 'raw': <command> [key=value ...].")
 
     args = parser.parse_args()
     ob = Obsidian(vault=args.vault)
+    action = args.action
+
+    def _emit(result: Union[CLIResult, str]) -> None:
+        """Print a result and exit with the right code.
+
+        Some mutating CLI commands (move/delete) return exit 0 even on error,
+        so an "Error:" text prefix is also treated as failure.
+        """
+        if isinstance(result, str):
+            print(result)
+            sys.exit(0)
+        text = result.text
+        if text.startswith("Error:") or not result.ok:
+            print(f"FAIL: {result.stderr or text}", file=sys.stderr)
+            sys.exit(1)
+        print(text if text else "OK")
+        sys.exit(0)
 
     if args.action == "info":
         print(ob.vault_info())
@@ -729,6 +972,67 @@ if __name__ == "__main__":
 
         print(f"FAIL: {r.stderr}", file=sys.stderr)
         sys.exit(1)
+
+    # --- Escape hatch: pass any CLI command straight through -------------
+    if action == "raw":
+        if not args.rest:
+            parser.error("'raw' needs a command, e.g. raw move path=A.md to=B/A.md")
+        cmd, *toks = args.rest
+        kwargs: Dict[str, Any] = {}
+        for tok in toks:
+            key, sep, val = tok.partition("=")
+            kwargs[key] = val if sep else True
+        _emit(ob.run(cmd, **kwargs))
+
+    # --- Read/list actions that print text -------------------------------
+    readers = {
+        "files": lambda: ob.files(folder=args.folder, ext=args.ext),
+        "folders": lambda: ob.folders(folder=args.folder),
+        "tags": lambda: ob.tags(format=args.format),
+        "backlinks": lambda: ob.backlinks(file=args.file, path=args.path),
+        "links": lambda: ob.links(file=args.file, path=args.path),
+        "orphans": lambda: ob.orphans(),
+        "tasks": lambda: ob.tasks(file=args.file, path=args.path),
+        "properties": lambda: ob.properties(file=args.file, path=args.path),
+        "outline": lambda: ob.outline(file=args.file, path=args.path),
+    }
+    if action in readers:
+        _emit(readers[action]())
+
+    if action == "tag":
+        name = args.name or args.query
+        if not name:
+            parser.error("'tag' needs --name (the tag, without #).")
+        _emit(ob.tag_info(name))
+
+    if action == "property-read":
+        if not args.name:
+            parser.error("'property-read' needs --name.")
+        _emit(ob.property_read(args.name, file=args.file, path=args.path))
+
+    # --- Mutating actions ------------------------------------------------
+    if action == "move":
+        if not args.to:
+            parser.error("'move' needs --to (destination path).")
+        _emit(ob.move(file=args.file, path=args.path, to=args.to))
+
+    if action == "rename":
+        if not args.name:
+            parser.error("'rename' needs --name (new file name).")
+        _emit(ob.rename(file=args.file, path=args.path, name=args.name))
+
+    if action == "delete":
+        _emit(ob.delete(file=args.file, path=args.path, permanent=args.permanent))
+
+    if action == "property-set":
+        if not args.name or args.value is None:
+            parser.error("'property-set' needs --name and --value.")
+        _emit(ob.property_set(args.name, args.value, file=args.file, path=args.path))
+
+    if action == "property-remove":
+        if not args.name:
+            parser.error("'property-remove' needs --name.")
+        _emit(ob.property_remove(args.name, file=args.file, path=args.path))
 
     # For create/append/prepend — get content from --content or stdin
     content = args.content
