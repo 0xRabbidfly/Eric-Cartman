@@ -515,4 +515,22 @@ def _extract_frontmatter_tags(fm: str) -> List[str]:
         m = re.match(r"^\s*tags\s*:\s*(.*)$", line)
         if not m:
             i += 1
-         
+            continue
+        rest = m.group(1).strip()
+        if rest.startswith("[") and rest.endswith("]"):
+            inner = rest[1:-1]
+            tags += [t.strip().strip("\"'") for t in inner.split(",") if t.strip()]
+        elif rest:
+            tags += [t.strip().strip("\"'") for t in rest.split() if t.strip()]
+        else:
+            # block list — collect indented `- value` lines
+            i += 1
+            while i < len(lines) and re.match(r"^\s+-\s+", lines[i]):
+                v = lines[i].split("-", 1)[1].strip().strip("\"'")
+                if v:
+                    tags.append(v)
+                i += 1
+            continue
+        i += 1
+    # Normalize: strip leading '#' if user wrote `#foo`
+    return [t.lstrip("#") for t in tags if t]
