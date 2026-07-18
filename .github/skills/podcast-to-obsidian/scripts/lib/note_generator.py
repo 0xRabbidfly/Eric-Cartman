@@ -29,6 +29,26 @@ except ImportError:
 
 
 # ---------------------------------------------------------------------------
+# YAML helpers
+# ---------------------------------------------------------------------------
+
+def _yaml_str(value: Any) -> str:
+    """Return a YAML-safe single-quoted scalar (quotes included).
+
+    Single-quoted YAML needs no backslash escaping: an embedded double quote is
+    literal, and only ``'`` is escaped (by doubling). This is deliberate — notes
+    are written through the Obsidian CLI, which interprets backslash escapes
+    (``\\n``, ``\\t``, ``\\"``) in content values and would strip the escaping
+    from a double-quoted scalar, recorrupting titles like
+    ``Creator of Claude Code: "At Anthropic ..."``. Newlines/tabs are flattened.
+    """
+    s = str(value)
+    for ws in ("\r\n", "\n", "\r", "\t"):
+        s = s.replace(ws, " ")
+    return "'" + s.replace("'", "''") + "'"
+
+
+# ---------------------------------------------------------------------------
 # Note template
 # ---------------------------------------------------------------------------
 
@@ -36,10 +56,10 @@ NOTE_TEMPLATE = """\
 ---
 tags: [podcast, {show_slug}{extra_tags}]
 type: podcast-note
-show: "{show_name}"
-episode: "{episode_title}"
+show: {show_name_yaml}
+episode: {episode_title_yaml}
 published: {published}
-duration: "{duration}"
+duration: {duration_yaml}
 source: podcast-to-obsidian
 created: {created}
 ---
@@ -87,7 +107,7 @@ SHOW_INDEX_TEMPLATE = """\
 ---
 tags: [podcast, {show_slug}, index]
 type: podcast-index
-show: "{show_name}"
+show: {show_name_yaml}
 source: podcast-to-obsidian
 ---
 
@@ -145,9 +165,12 @@ def generate_note(
         show_slug=show_slug,
         extra_tags=extra_tags,
         show_name=show_name,
+        show_name_yaml=_yaml_str(show_name),
         episode_title=episode_title,
+        episode_title_yaml=_yaml_str(episode_title),
         published=published,
         duration=duration,
+        duration_yaml=_yaml_str(duration),
         created=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         tldr=tldr,
         key_ideas=key_ideas,
@@ -178,6 +201,7 @@ def generate_show_index(show_name: str, episodes: List[Dict[str, str]]) -> str:
     return SHOW_INDEX_TEMPLATE.format(
         show_slug=show_slug,
         show_name=show_name,
+        show_name_yaml=_yaml_str(show_name),
         episode_list="\n".join(lines) if lines else "_No episodes processed yet._",
     )
 
