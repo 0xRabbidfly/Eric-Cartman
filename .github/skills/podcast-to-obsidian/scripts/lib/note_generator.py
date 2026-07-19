@@ -48,6 +48,30 @@ def _yaml_str(value: Any) -> str:
     return "'" + s.replace("'", "''") + "'"
 
 
+def _loads_llm_json(text: str) -> Dict[str, Any]:
+    """Parse a JSON object out of an LLM response, repairing common glitches.
+
+    Handles: surrounding prose / markdown code fences, and trailing commas
+    before ``}`` or ``]`` — the usual cause of "Expecting property name
+    enclosed in double quotes". Raises ``json.JSONDecodeError`` if it still
+    can't parse after repair.
+    """
+    s = (text or "").strip()
+    if s.startswith("```"):
+        nl = s.find("\n")
+        s = s[nl + 1:] if nl != -1 else s
+    if s.endswith("```"):
+        s = s[: s.rfind("```")]
+    s = s.strip()
+    # Narrow to the outermost {...} object if the model added prose around it.
+    start, end = s.find("{"), s.rfind("}")
+    if start != -1 and end > start:
+        s = s[start:end + 1]
+    # Drop trailing commas before a closing brace/bracket.
+    s = re.sub(r",(\s*[}\]])", r"\1", s)
+    return json.loads(s)
+
+
 # ---------------------------------------------------------------------------
 # Note template
 # ---------------------------------------------------------------------------
@@ -301,17 +325,7 @@ def _generate_summary_claude_cli(
                 print(f"  [warn] {result.stderr.strip()[:200]}")
             return None
 
-        output = result.stdout.strip()
-
-        # Strip markdown code fences if present
-        if output.startswith("```"):
-            first_nl = output.index("\n") if "\n" in output else len(output)
-            output = output[first_nl + 1:]
-        if output.endswith("```"):
-            output = output[: output.rfind("```")]
-        output = output.strip()
-
-        summary = json.loads(output)
+        summary = _loads_llm_json(result.stdout)
         print("  [ai] Summary generated successfully via Claude CLI")
         return summary
 
@@ -385,7 +399,7 @@ def _generate_summary_openai(
             result = json.loads(resp.read().decode("utf-8"))
 
         content = result["choices"][0]["message"]["content"]
-        summary = json.loads(content)
+        summary = _loads_llm_json(content)
         print("  [ai] Summary generated successfully via OpenAI API")
         return summary
 

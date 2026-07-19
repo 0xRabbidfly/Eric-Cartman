@@ -85,6 +85,32 @@ def apply_corrections(text: str) -> Tuple[str, int]:
 
 
 # ---------------------------------------------------------------------------
+# CUDA detection (no torch dependency)
+# ---------------------------------------------------------------------------
+
+def _detect_cuda_device() -> Tuple[str, str]:
+    """Detect CUDA availability without depending on PyTorch.
+
+    Tries to load a faster-whisper model on CUDA directly. If that works,
+    returns ('cuda', 'float16'). Otherwise falls back to ('cpu', 'int8').
+
+    This avoids the 2 GB torch install just for a one-line CUDA check.
+    """
+    try:
+        from faster_whisper import WhisperModel
+        # Load the smallest model to test CUDA — takes <1s and <100 MB
+        _test = WhisperModel("tiny", device="cuda", compute_type="float16")
+        del _test
+        print("  [device] CUDA detected via faster-whisper probe")
+        return "cuda", "float16"
+    except Exception:
+        pass
+
+    print("  [device] CUDA not available, falling back to CPU")
+    return "cpu", "int8"
+
+
+# ---------------------------------------------------------------------------
 # Engine detection
 # ---------------------------------------------------------------------------
 
@@ -199,15 +225,9 @@ def _transcribe_faster_whisper(
     """Transcribe using faster-whisper."""
     from faster_whisper import WhisperModel
 
-    # Device selection
+    # Device selection — detect CUDA via ctypes (no torch dependency)
     if device == "auto":
-        try:
-            import torch
-            compute_type = "float16" if torch.cuda.is_available() else "int8"
-            device = "cuda" if torch.cuda.is_available() else "cpu"
-        except ImportError:
-            device = "cpu"
-            compute_type = "int8"
+        device, compute_type = _detect_cuda_device()
     elif device == "cuda":
         compute_type = "float16"
     else:
@@ -277,11 +297,7 @@ def _transcribe_openai_whisper(
     import whisper
 
     if device == "auto":
-        try:
-            import torch
-            device = "cuda" if torch.cuda.is_available() else "cpu"
-        except ImportError:
-            device = "cpu"
+        device, _ = _detect_cuda_device()
 
     print(f"  [model] Loading {model_name} on {device}...")
     model = whisper.load_model(model_name, device=device)
