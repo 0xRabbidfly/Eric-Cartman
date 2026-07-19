@@ -32,9 +32,36 @@
           "note_path": "Podcasts/Raoul Pal The Journey Man/2026-02-24 - Why the Nasdaq Could Surge Again.md",
           "processed_at": "2026-06-25T00:00:00Z",
           "status": "completed"
+        },
+        "rp-skip-1": {
+          "title": "The AI Revolution: How to Invest",
+          "published": "2026-07-16",
+          "audio_url": "",
+          "transcript_path": "",
+          "note_path": "",
+          "processed_at": "2026-07-19T00:00:00Z",
+          "status": "skipped"
+        },
+        "rp-skip-2": {
+          "title": "Prediction Markets, AI and the Future of Finance",
+          "published": "2026-07-02",
+          "audio_url": "",
+          "transcript_path": "",
+          "note_path": "",
+          "processed_at": "2026-07-19T00:00:00Z",
+          "status": "skipped"
+        },
+        "rp-skip-3": {
+          "title": "Drinks with Raoul: June 25, 2026",
+          "published": "2026-07-01",
+          "audio_url": "",
+          "transcript_path": "",
+          "note_path": "",
+          "processed_at": "2026-07-19T00:00:00Z",
+          "status": "skipped"
         }
       },
-      "latest_published": "2026-03-19"
+      "latest_published": "2026-07-16"
     },
     "lex-fridman-podcast": {
       "name": "Lex Fridman Podcast",
@@ -272,9 +299,18 @@
           "note_path": "Podcasts/The Pragmatic Engineer/2026-03-04 - Building Claude Code with Boris Cherny.md",
           "processed_at": "2026-03-05T04:07:03.501020+00:00",
           "status": "completed"
+        },
+        "tpe-context-engineering-dex-horthy-2026": {
+          "title": "Context engineering with Dex Horthy",
+          "published": "2026-07-15",
+          "audio_url": "",
+          "transcript_path": "Podcasts/The Pragmatic Engineer/transcripts/2026-07-15 - Context engineering with Dex Horthy.md",
+          "note_path": "Podcasts/The Pragmatic Engineer/2026-07-15 - Context engineering with Dex Horthy.md",
+          "processed_at": "2026-07-19T00:00:00Z",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-03-04"
+      "latest_published": "2026-07-15"
     },
     "naval": {
       "name": "Naval",
@@ -298,9 +334,18 @@
           "note_path": "Podcasts/Naval/2026-04-28 - A Return to Code.md",
           "processed_at": "2026-04-30T15:34:25.779708+00:00",
           "status": "completed"
+        },
+        "naval-live-in-the-future-2026": {
+          "title": "Live in the Future",
+          "published": "2026-07-02",
+          "audio_url": "",
+          "transcript_path": "Podcasts/Naval/transcripts/2026-07-02 - Live in the Future.md",
+          "note_path": "Podcasts/Naval/2026-07-02 - Live in the Future.md",
+          "processed_at": "2026-07-19T00:00:00Z",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-04-28"
+      "latest_published": "2026-07-02"
     },
     "no-priors": {
       "name": "No Priors: Artificial Intelligence | Technology | Startups",
@@ -315,9 +360,18 @@
           "note_path": "Podcasts/No Priors Artificial Intelligence  Technology  Startups/2026-03-20 - Andrej Karpathy on Code Agents, AutoResearch, and the Loopy Era of AI.md",
           "processed_at": "2026-03-22T11:14:25.034445+00:00",
           "status": "completed"
+        },
+        "32e4b7a0-7118-11f1-a100-bf8895cb33ba": {
+          "title": "Really Big Test-Time Compute in AI Changes Benchmarks, Safety and Research with OpenAI Research Scientist Noam Brown",
+          "published": "2026-06-26",
+          "audio_url": "https://traffic.megaphone.fm/PDP3897457969.mp3",
+          "transcript_path": "Podcasts/No Priors Artificial Intelligence  Technology  Startups/transcripts/2026-06-26 - Really Big Test-Time Compute in AI Changes Benchmarks, Safety and Research with OpenAI Research Scientist Noam Brown.md",
+          "note_path": "Podcasts/No Priors Artificial Intelligence  Technology  Startups/2026-06-26 - Really Big Test-Time Compute in AI Changes Benchmarks, Safety and Research with OpenAI Research Scientist Noam Brown.md",
+          "processed_at": "2026-07-19T12:28:50.171389+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-03-20"
+      "latest_published": "2026-06-26"
     },
     "cgi-conversations": {
       "name": "CGI Conversations",
