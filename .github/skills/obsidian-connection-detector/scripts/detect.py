@@ -8,14 +8,19 @@ Outputs to Research/connections.json inside the vault.
 
 import argparse
 import glob
+import io
 import json
 import os
 import re
 import sys
+import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
-import requests
+# Force UTF-8 on Windows
+if sys.platform == "win32":
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -23,6 +28,7 @@ import requests
 
 VAULT_PATH = Path(r"C:\Users\nuno_\Documents\Obsidian Vault")
 LIBRARY_DIR = VAULT_PATH / "Research" / "Library"
+PODCASTS_DIR = VAULT_PATH / "Podcasts"
 CONNECTIONS_FILE = VAULT_PATH / "Research" / "connections.json"
 XAI_API_URL = "https://api.x.ai/v1/chat/completions"
 MODEL = "grok-4.3"
@@ -166,15 +172,22 @@ def extract_keywords(text: str) -> set:
 # ---------------------------------------------------------------------------
 
 def find_library_notes() -> list[Path]:
-    """Find all markdown files in the Library directory."""
-    if not LIBRARY_DIR.exists():
+    """Find all markdown files in the Library and Podcasts directories."""
+    notes = []
+    if LIBRARY_DIR.exists():
+        notes.extend(LIBRARY_DIR.rglob("*.md"))
+    else:
         print(f"WARNING: Library directory not found: {LIBRARY_DIR}")
-        return []
-    return sorted(LIBRARY_DIR.rglob("*.md"))
+    if PODCASTS_DIR.exists():
+        # Include podcast notes but skip transcript files and show indexes
+        for p in PODCASTS_DIR.rglob("*.md"):
+            if "/transcripts/" not in str(p).replace("\\", "/") and p.stat().st_size > 2000:
+                notes.append(p)
+    return sorted(notes)
 
 
 def find_recent_notes(n: int) -> list[Path]:
-    """Find the N most recently modified notes in Library."""
+    """Find the N most recently modified notes in Library + Podcasts."""
     notes = find_library_notes()
     notes.sort(key=lambda p: p.stat().st_mtime, reverse=True)
     return notes[:n]
@@ -252,16 +265,20 @@ Return JSON only, no other text: {{"relationship": "supports|contradicts|extends
     }
 
     try:
-        resp = requests.post(XAI_API_URL, headers=headers, json=payload, timeout=60)
-        resp.raise_for_status()
-        content = resp.json()["choices"][0]["message"]["content"].strip()
+        data = json.dumps(payload).encode("utf-8")
+        req = urllib.request.Request(
+            XAI_API_URL, data=data, headers=headers, method="POST"
+        )
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            body = json.loads(resp.read().decode("utf-8"))
+        content = body["choices"][0]["message"]["content"].strip()
         # Strip markdown code fences if present
         if content.startswith("```"):
             content = re.sub(r"^```(?:json)?\s*", "", content)
             content = re.sub(r"\s*```$", "", content)
         result = json.loads(content)
         return result
-    except (requests.RequestException, json.JSONDecodeError, KeyError, IndexError) as e:
+    except (urllib.error.URLError, json.JSONDecodeError, KeyError, IndexError) as e:
         print(f"  WARNING: API call failed: {e}")
         return None
 
