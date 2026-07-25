@@ -429,8 +429,6 @@ status: unread
 supersedes: "[[old-note-slug]]"  # only if Step 2.5 found a supersession
 ---
 
-# {title}
-
 **Author**: {author}
 **Published**: {date}
 **Views**: {views if known}

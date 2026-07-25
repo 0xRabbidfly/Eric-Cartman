@@ -24,6 +24,49 @@ from typing import List, Optional, Tuple
 
 CLAUDE_CLI = r"C:\Users\nuno_\.local\bin\claude.exe"
 
+# Canonical tags used across the vault — prefer these over inventing new ones
+CANONICAL_TAGS = [
+    "agents", "agents/harnesses", "skills", "claude-code", "mcp",
+    "sdlc", "agentic-workflows", "workflow-design", "evals", "rag",
+    "knowledge-systems", "frontier-models", "open-source",
+    "context-engineering", "prompt-engineering",
+]
+
+# Folder routing table: topic keywords → numbered subfolder
+FOLDER_ROUTING = {
+    "01 Agent Harnesses & Architecture": [
+        "harness", "orchestration", "control plane", "architecture",
+        "agent", "runtime", "agentic",
+    ],
+    "02 Skills, IDEs & Agent Tooling": [
+        "skill", "copilot", "claude-code", "ide", "hook", "mcp", "tooling",
+        "cursor", "vscode",
+    ],
+    "03 Evals, Reliability & Control": [
+        "eval", "reliability", "governance", "testing", "review", "control",
+        "benchmark",
+    ],
+    "04 SDLC, Workflow & Strategy": [
+        "sdlc", "workflow", "strategy", "consulting", "product", "api",
+        "devops", "ci/cd",
+    ],
+    "05 Knowledge, RAG & Memory": [
+        "rag", "retrieval", "knowledge", "obsidian", "memory", "second brain",
+        "embedding",
+    ],
+    "06 Cryptography": [
+        "cryptography", "post-quantum", "blockchain", "zero-knowledge",
+        "encryption",
+    ],
+    "07 Macrotrends & Futures": [
+        "space", "off-world", "megatrend", "future", "civilizational",
+    ],
+    "08 Org Design & AI Transformation": [
+        "org design", "corporate transformation", "management", "hierarchy",
+        "organizational",
+    ],
+}
+
 # Load vault_v2 from the same directory (avoids 'lib' package name clash
 # with last30days when loaded via importlib from run.py)
 _VAULT_V2_PATH = Path(__file__).resolve().parent / "vault_v2.py"
@@ -186,7 +229,7 @@ Return a JSON object:
 
 RULES:
 - slug: lowercase, hyphens only, 3-6 words max
-- tags: lowercase, hyphens in multi-word tags, 4-6 tags, topically relevant
+- tags: lowercase, hyphens in multi-word tags, 4-6 tags. PREFER these canonical tags when relevant: {', '.join(CANONICAL_TAGS)}. Only invent a new tag if none of these fit.
 - key_insights: 2-4 specific insights (not generic platitudes)
 - actionable_takeaways: 1-3 concrete takeaways a developer could act on
 - source: detect from URL (x.com→x, reddit.com→reddit, github.com→github, else→article)
@@ -208,6 +251,63 @@ RULES:
     except Exception as e:
         print(f"  [warn] LLM enrichment failed: {e}")
         return None
+
+
+# ---------------------------------------------------------------------------
+# Folder routing
+# ---------------------------------------------------------------------------
+
+
+def _route_to_subfolder(tags: list, title: str, topic_slug: str) -> str:
+    """Pick the best numbered subfolder based on tags, title, and topic.
+
+    Returns the folder name (e.g. '01 Agent Harnesses & Architecture').
+    Falls back to '01 Agent Harnesses & Architecture' if nothing matches.
+    """
+    search_text = " ".join(tags + [title, topic_slug]).lower()
+    best_folder = None
+    best_score = 0
+    for folder, keywords in FOLDER_ROUTING.items():
+        score = sum(1 for kw in keywords if kw in search_text)
+        if score > best_score:
+            best_score = score
+            best_folder = folder
+    return best_folder or "01 Agent Harnesses & Architecture"
+
+
+# ---------------------------------------------------------------------------
+# Related notes generation
+# ---------------------------------------------------------------------------
+
+
+def _generate_related_links(tags: list, title: str) -> str:
+    """Generate 2-3 wikilinks to related concepts based on tags and title."""
+    related = []
+    # Map tags to likely related concept notes
+    tag_to_concept = {
+        "agents": "AI Agent Architecture",
+        "agents/harnesses": "Agent Harness Design",
+        "skills": "Skill System Design",
+        "claude-code": "Claude Code Workflows",
+        "mcp": "Model Context Protocol",
+        "sdlc": "AI-Augmented SDLC",
+        "agentic-workflows": "Agentic Workflow Patterns",
+        "workflow-design": "Workflow Design Patterns",
+        "evals": "Evaluation Frameworks",
+        "rag": "RAG Architecture",
+        "knowledge-systems": "Knowledge Management Systems",
+        "frontier-models": "Frontier Model Capabilities",
+        "open-source": "Open Source AI Ecosystem",
+        "context-engineering": "Context Engineering",
+        "prompt-engineering": "Prompt Engineering Patterns",
+    }
+    for tag in tags:
+        if tag in tag_to_concept and len(related) < 3:
+            related.append(f"[[{tag_to_concept[tag]}]]")
+    # If we have fewer than 2, add a generic one from title words
+    if len(related) < 2:
+        related.append("[[Research Library]]")
+    return " · ".join(related[:3])
 
 
 # ---------------------------------------------------------------------------
@@ -235,8 +335,6 @@ def _render_enriched_note(enrichment: dict, item: dict) -> str:
         f"topic: {item['topic_slug']}",
         "status: unread",
         "---",
-        "",
-        f"# {title}",
         "",
         f"> **Author**: {author}",
         f"> **Source**: [{item['url']}]({item['url']})",
@@ -266,6 +364,11 @@ def _render_enriched_note(enrichment: dict, item: dict) -> str:
     if relevance:
         lines.extend(["## Relevance", "", relevance, ""])
 
+    # Related section with wikilinks
+    tags = enrichment.get("tags", [item["topic_slug"]])
+    related_links = _generate_related_links(tags, title)
+    lines.extend(["## Related", "", related_links, ""])
+
     lines.extend(["## My Notes", "", "", ""])
 
     return "\n".join(lines)
@@ -284,14 +387,16 @@ def _render_basic_note(item: dict) -> str:
         "status: unread",
         "---",
         "",
-        f"# {item['title']}",
-        "",
         f"> **Link**: [{item['title']}]({item['url']})",
         f"> **Found**: {item['date_found']}",
         "",
         "## Summary",
         "",
         item.get("summary", ""),
+        "",
+        "## Related",
+        "",
+        _generate_related_links([item["topic_slug"]], item["title"]),
         "",
         "## My Notes",
         "",
@@ -374,18 +479,26 @@ def promote_items(
             if enrichment:
                 slug = enrichment.get("slug", _slugify(item["title"]))
                 note_content = _render_enriched_note(enrichment, item)
+                tags = enrichment.get("tags", [item["topic_slug"]])
+                title = enrichment.get("title", item["title"])
             else:
                 # Claude CLI failed — fall back to basic note
                 slug = _slugify(item["title"])
                 note_content = _render_basic_note(item)
+                tags = [item["topic_slug"]]
+                title = item["title"]
 
-            # Pick a unique path in the library folder
-            lib_path = f"{library_folder}/{slug}.md"
+            # Route to the correct numbered subfolder based on topic
+            subfolder = _route_to_subfolder(tags, title, item["topic_slug"])
+            target_folder = f"{library_folder}/{subfolder}"
+
+            # Pick a unique path in the routed subfolder
+            lib_path = f"{target_folder}/{slug}.md"
             if vault.file_exists(lib_path):
                 i = 2
-                while vault.file_exists(f"{library_folder}/{slug}-{i}.md"):
+                while vault.file_exists(f"{target_folder}/{slug}-{i}.md"):
                     i += 1
-                lib_path = f"{library_folder}/{slug}-{i}.md"
+                lib_path = f"{target_folder}/{slug}-{i}.md"
 
             vault.write_file(lib_path, note_content)
             item["library_path"] = lib_path

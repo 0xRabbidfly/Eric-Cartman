@@ -2,6 +2,7 @@
 """obsidian-vault-lint-cowork - Cowork-native fork of the weekly vault maintenance pipeline."""
 import argparse
 import io
+import os
 import shutil
 import subprocess
 import sys
@@ -21,6 +22,7 @@ from fixes import apply_fixes
 from connections import discover_connections, format_connections_report, apply_connection_proposals
 from moc import reorganize_moc, format_moc_proposals
 from recommend import recommend_reading, format_recommendations, render_report_section
+from rename_tags import process_file, RENAME_MAP
 
 
 def main():
@@ -58,6 +60,27 @@ def main():
 
     if args.phase is None or args.phase == 2:
         print("\n=== Phase 2: Autonomous Fixes ===")
+
+        # Pre-pass: normalize tags via rename_tags before other fixes
+        print("  [tags] Running tag rename pass...")
+        tag_renames_total = 0
+        tag_files_changed = 0
+        vault_dir = str(ob.vault_path)
+        for root, dirs, files in os.walk(vault_dir):
+            dirs[:] = [d for d in dirs if not d.startswith('.')]
+            for f in files:
+                if not f.endswith('.md'):
+                    continue
+                fpath = os.path.join(root, f)
+                fm_changes, inline_changes = process_file(
+                    fpath, RENAME_MAP, apply_changes=not args.dry_run
+                )
+                if fm_changes + inline_changes > 0:
+                    tag_files_changed += 1
+                    tag_renames_total += fm_changes + inline_changes
+        verb = "Would rename" if args.dry_run else "Renamed"
+        print(f"  [tags] {verb} {tag_renames_total} tags across {tag_files_changed} files")
+
         if inv is None:
             inv = collect_inventory(stale_days=args.stale_days, verbose=args.verbose)
         fix_result = apply_fixes(inv, dry_run=args.dry_run, verbose=args.verbose)
@@ -102,14 +125,8 @@ def main():
         print("\n=== Phase 5: Reading Recommendations ===")
         rec_result = recommend_reading(verbose=args.verbose)
         _print_recommendations(rec_result)
-        if rec_result.recommendations:
-            path = f"{LOG_FOLDER}/vault-lint-{run_date}-reading.md"
-            content = format_recommendations(rec_result, run_date)
-            if not args.dry_run:
-                ob.create(path=path, content=content, overwrite=True)
-                print(f"[lint] Reading recommendations written to: {path}")
-            else:
-                print(f"[lint] [DRY RUN] {len(rec_result.recommendations)} recommendations - not written")
+        # Reading recommendations are included in the main lint report (Phase 6)
+        # but no longer written as a standalone file.
         if args.phase == 5:
             return
 

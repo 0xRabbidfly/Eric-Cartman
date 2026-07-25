@@ -273,21 +273,74 @@ Rules:
 
 
 # ---------------------------------------------------------------------------
-# Claude CLI summary (uses Pro account — no API key needed)
+# xAI API key loading
 # ---------------------------------------------------------------------------
 
-def _generate_summary_claude_cli(
+def _load_xai_api_key() -> Optional[str]:
+    """Load XAI_API_KEY from environment, skill .env, or global config.
+
+    Checks in order:
+    1. XAI_API_KEY environment variable
+    2. Skill-level .env (podcast-to-obsidian/.env)
+    3. Global config (~/.config/last30days/.env)
+    """
+    key = os.environ.get("XAI_API_KEY", "")
+    if key:
+        return key
+    # Check skill-level .env
+    skill_env = Path(__file__).resolve().parents[2] / ".env"
+    for env_path in [skill_env, Path.home() / ".config" / "last30days" / ".env"]:
+        if env_path.exists():
+            try:
+                for line in env_path.read_text(encoding="utf-8").splitlines():
+                    line = line.strip()
+                    if line.startswith("XAI_API_KEY="):
+                        val = line.split("=", 1)[1].strip().strip('"').strip("'")
+                        if val:
+                            return val
+            except Exception:
+                pass
+    return None
+
+
+# ---------------------------------------------------------------------------
+# xAI API summary (replaces Claude CLI)
+# ---------------------------------------------------------------------------
+
+def _call_xai_chat(api_key: str, model: str, prompt: str, max_tokens: int = 4096) -> Optional[str]:
+    """Call xAI chat completions API directly. Returns content text or None."""
+    import urllib.request
+    payload = json.dumps({
+        "model": model,
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": max_tokens,
+        "temperature": 0.3,
+    }).encode("utf-8")
+
+    req = urllib.request.Request(
+        "https://api.x.ai/v1/chat/completions",
+        data=payload,
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+    )
+    with urllib.request.urlopen(req, timeout=180) as resp:
+        data = json.loads(resp.read().decode("utf-8"))
+
+    return data.get("choices", [{}])[0].get("message", {}).get("content", "")
+
+
+def _generate_summary_xai(
     transcript_text: str,
     episode_title: str = "",
     show_name: str = "",
-    model: str = "sonnet",
+    model: str = "grok-4.3",
 ) -> Optional[Dict[str, Any]]:
-    """Generate summary using Claude CLI (Pro account, no API credits)."""
-    import shutil
-    import subprocess
-
-    claude_bin = shutil.which("claude")
-    if not claude_bin:
+    """Generate summary using xAI API (Grok)."""
+    api_key = _load_xai_api_key()
+    if not api_key:
+        print("  [warn] No XAI_API_KEY found — cannot generate summary via xAI")
         return None
 
     # Truncate transcript if too long
@@ -308,35 +361,22 @@ def _generate_summary_claude_cli(
     )
 
     try:
-        print(f"  [ai] Generating summary with Claude CLI ({model})...")
-        result = subprocess.run(
-            [claude_bin, '--print', '--output-format', 'text',
-             '--input-format', 'text', '--model', model],
-            input=prompt,
-            capture_output=True,
-            text=True,
-            timeout=300,
-            encoding='utf-8',
-        )
+        print(f"  [ai] Generating summary with xAI API ({model})...")
+        content = _call_xai_chat(api_key, model, prompt, max_tokens=4096)
 
-        if result.returncode != 0:
-            print(f"  [warn] Claude CLI exited with code {result.returncode}")
-            if result.stderr:
-                print(f"  [warn] {result.stderr.strip()[:200]}")
+        if not content:
+            print("  [warn] xAI API returned empty response")
             return None
 
-        summary = _loads_llm_json(result.stdout)
-        print("  [ai] Summary generated successfully via Claude CLI")
+        summary = _loads_llm_json(content)
+        print("  [ai] Summary generated successfully via xAI API")
         return summary
 
-    except subprocess.TimeoutExpired:
-        print("  [warn] Claude CLI timed out after 5 minutes")
-        return None
     except json.JSONDecodeError as e:
-        print(f"  [warn] Claude CLI returned invalid JSON: {e}")
+        print(f"  [warn] xAI API returned invalid JSON: {e}")
         return None
     except Exception as e:
-        print(f"  [warn] Claude CLI failed: {e}")
+        print(f"  [warn] xAI API summary failed: {e}")
         return None
 
 
@@ -420,14 +460,15 @@ def generate_ai_summary(
     model: str = "gpt-4o-mini",
     base_url: str = "https://api.openai.com/v1",
 ) -> Optional[Dict[str, Any]]:
-    """Generate a structured summary. Tries Claude CLI first, then OpenAI API.
+    """Generate a structured summary. Tries xAI API first, then OpenAI API.
 
     Returns:
         Parsed summary dict, or None on failure.
     """
-    # 1. Try Claude CLI (Pro account — no API key needed)
-    summary = _generate_summary_claude_cli(
+    # 1. Try xAI API (Grok — primary backend)
+    summary = _generate_summary_xai(
         transcript_text, episode_title, show_name,
+        model="grok-4.3",
     )
     if summary:
         return summary
@@ -441,7 +482,7 @@ def generate_ai_summary(
         return summary
 
     print("  [warn] No AI backend available")
-    print("  [hint] Claude CLI is tried first. OpenAI-compatible API is only a secondary fallback when configured.")
+    print("  [hint] Set XAI_API_KEY in .env for xAI/Grok. OpenAI-compatible API is a secondary fallback.")
     return None
 
 
