@@ -811,6 +811,7 @@ def main():
         help="Report status (default: draft)",
     )
     parser.add_argument("--slug", help="Override the report filename slug")
+    parser.add_argument("--thesis-id", help="Thesis ID from thesis tracker (for provenance tracking)")
     parser.add_argument(
         "--max-sources", type=int, default=20,
         help="Maximum source notes to include (default: 20)",
