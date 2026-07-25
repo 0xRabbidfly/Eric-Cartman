@@ -382,19 +382,12 @@ def step_detect_episodes(
                 )
 
             if new:
-                # Respect max_episodes limit (processing cap, not detection cap)
-                max_ep = config.get("max_episodes", 5)
-                found_count = len(new)
-                new = new[:max_ep]
+                # max_episodes is applied later in run_pipeline, AFTER any
+                # --episode title filter -- truncating here (before the
+                # filter runs) could drop the very episode --episode was
+                # asked to target, if it wasn't among the newest max_ep.
                 new_episodes[show_id] = new
-                if found_count > len(new):
-                    print(
-                        f"  [new] {found_count} new episodes detected, "
-                        f"processing {len(new)} (max_episodes={max_ep}); "
-                        f"{found_count - len(new)} deferred to a later run"
-                    )
-                else:
-                    print(f"  [new] {len(new)} new episodes to process")
+                print(f"  [new] {len(new)} new episodes to process")
             else:
                 print(f"  [uptodate] No new episodes")
 
@@ -802,13 +795,20 @@ def step_write_to_vault(
 
 def step_cleanup(
     work_dir: Path,
-    written_episodes: List[Any],
+    written_episodes: Optional[List[str]] = None,
     keep_audio: bool = False,
 ) -> None:
     """Purge audio files and intermediate build artifacts after a successful run.
 
     Audio files are large (100+ MB) and not needed once the transcript exists.
     Intermediate .md files (pre-transcript) are superseded by .final.md.
+
+    written_episodes: audio filename stems (Path.stem, no extension) handled
+    THIS run. When provided, only those .mp3 files are purged -- otherwise a
+    multi-invocation batch (e.g. one `--show`/`--episode` filtered run per
+    episode) would delete audio for episodes queued but not yet processed,
+    forcing an unplanned re-download. Pass None only when the caller has
+    no way to scope the audio dir to a single run (e.g. legacy callers).
     """
     print("\n=== Cleanup ===")
     audio_dir = work_dir / "audio"
@@ -817,7 +817,10 @@ def step_cleanup(
     freed_mb = 0.0
 
     if not keep_audio and audio_dir.exists():
+        stems = set(written_episodes) if written_episodes is not None else None
         for mp3 in audio_dir.glob("*.mp3"):
+            if stems is not None and mp3.stem not in stems:
+                continue
             size_mb = mp3.stat().st_size / (1024 * 1024)
             try:
                 mp3.unlink()
@@ -1061,7 +1064,7 @@ def run_url_pipeline(args: argparse.Namespace) -> None:
 
     # --- Cleanup ---
     if written > 0:
-        step_cleanup(work_dir=work_dir, written_episodes=[], keep_audio=args.keep_audio)
+        step_cleanup(work_dir=work_dir, written_episodes=[clip.audio_path.stem], keep_audio=args.keep_audio)
 
     print(f"\n{'='*60}")
     print(f"  URL Pipeline Complete — {written}/{len(notes)} note(s) written")
@@ -1146,6 +1149,20 @@ def run_pipeline(args: argparse.Namespace) -> None:
         print(f"\n  --episode filter: {total_after}/{total_before} episodes match '{args.episode}'")
         new_episodes = filtered
 
+    # --- Processing cap (per show) ---
+    # Applied here, after --episode filtering, so a targeted title match is
+    # never dropped by an unrelated cap on how many *other* new episodes a
+    # show turned up this run.
+    max_ep = config.get("max_episodes", 5)
+    for show_id, episodes in list(new_episodes.items()):
+        if len(episodes) > max_ep:
+            deferred = len(episodes) - max_ep
+            new_episodes[show_id] = episodes[:max_ep]
+            print(
+                f"  [cap] {show_id}: processing {max_ep}/{len(episodes)} "
+                f"(max_episodes={max_ep}); {deferred} deferred to a later run"
+            )
+
     # --- Check-only mode ---
     if args.check_only:
         print("\n=== New Episodes Available ===\n")
@@ -1159,7 +1176,21 @@ def run_pipeline(args: argparse.Namespace) -> None:
 
     # --- Process each show's episodes ---
     total_written = 0
+    global_episodes_processed = 0
+    global_max = getattr(args, "global_max_episodes", None)
+    transcribed_stems: List[str] = []
     for show_id, episodes in new_episodes.items():
+        # Global cap: stop processing across all shows once we hit the limit
+        if global_max is not None and global_episodes_processed >= global_max:
+            print(f"\n  [global-cap] Reached --global-max-episodes={global_max}, stopping")
+            break
+
+        # Trim this show's episode list if global cap would be exceeded
+        if global_max is not None:
+            remaining = global_max - global_episodes_processed
+            if len(episodes) > remaining:
+                print(f"  [global-cap] Trimming {show_id} from {len(episodes)} to {remaining} episodes")
+                episodes = episodes[:remaining]
         show_data = manifest.get_show(show_id)
         show_name = show_data["name"] if show_data else show_id
         print(f"\n{'='*60}")
@@ -1183,6 +1214,11 @@ def run_pipeline(args: argparse.Namespace) -> None:
         if not transcribed:
             print(f"  [skip] No transcriptions completed for {show_name}")
             continue
+
+        # Audio is safe to purge once transcribed, regardless of whether
+        # note generation/vault write later succeeds for this episode --
+        # the transcript is already durably on disk.
+        transcribed_stems.extend(audio_path.stem for _ep, audio_path, _tp, _meta in transcribed)
 
         # --- Transcribe-only mode: print paths and stop ---
         if args.transcribe_only:
@@ -1217,12 +1253,13 @@ def run_pipeline(args: argparse.Namespace) -> None:
             dry_run=args.dry_run,
         )
         total_written += written
+        global_episodes_processed += len(episodes)
 
     # --- Cleanup ---
     if total_written > 0 and not args.dry_run:
         step_cleanup(
             work_dir=work_dir,
-            written_episodes=[],
+            written_episodes=transcribed_stems,
             keep_audio=args.keep_audio,
         )
 
@@ -1442,6 +1479,8 @@ def main() -> None:
                         help="Max episodes to process per show (overrides config)")
     parser.add_argument("--episode", type=str, default=None,
                         help="Filter to episodes matching this title substring (case-insensitive)")
+    parser.add_argument("--global-max-episodes", type=int, default=None,
+                        help="Max total episodes to process across ALL shows (default: no limit)")
 
     # URL mode (one-off clips via yt-dlp — bypasses RSS + manifest)
     parser.add_argument("--url", type=str, default=None,
