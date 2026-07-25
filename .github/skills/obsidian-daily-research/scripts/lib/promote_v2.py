@@ -258,11 +258,95 @@ RULES:
 # ---------------------------------------------------------------------------
 
 
-def _route_to_subfolder(tags: list, title: str, topic_slug: str) -> str:
+def _get_next_folder_number(config: dict) -> int:
+    """Find the next available folder number by scanning existing Library folders."""
+    library_folder = config.get("library_folder", "Research/Library")
+    try:
+        existing = vault._scan_folder_recursive(library_folder)
+        # Extract folder numbers from paths like "Research/Library/01 Agent Harnesses..."
+        numbers = set()
+        for path in existing:
+            parts = path.replace("\\", "/").split("/")
+            for part in parts:
+                m = re.match(r'^(\d{2})\s', part)
+                if m:
+                    numbers.add(int(m.group(1)))
+        return max(numbers, default=10) + 1
+    except Exception:
+        return 11  # safe default after existing 01-10
+
+
+def _create_dynamic_folder_and_moc(topic_name: str, config: dict) -> str:
+    """Create a new numbered folder and stub MOC for an unrecognized topic.
+
+    Returns the new folder name (e.g. '11 Sports & Athletics').
+    Also updates the Master MOC with the new section.
+    """
+    next_num = _get_next_folder_number(config)
+    folder_name = f"{next_num:02d} {topic_name}"
+    library_folder = config.get("library_folder", "Research/Library")
+
+    # Create the subfolder (writing a placeholder ensures it exists)
+    folder_path = f"{library_folder}/{folder_name}"
+
+    # Create a stub Topic MOC
+    moc_content = (
+        f"---\n"
+        f"type: moc\n"
+        f"status: active\n"
+        f"---\n\n"
+        f"Parent: [[🗺️ MOC - Research Library]]\n\n"
+        f"## {topic_name}\n\n"
+        f"*Notes will be added here as content is promoted.*\n\n"
+        f"*Last updated: {datetime.now().strftime('%Y-%m-%d')}*\n"
+    )
+    moc_path = f"{library_folder}/00 MOC/📍 MOC - {topic_name}.md"
+    try:
+        vault.write_file(moc_path, moc_content)
+        print(f"  [promote] Created new Topic MOC: {moc_path}")
+    except Exception as e:
+        print(f"  [promote] Warning: could not create Topic MOC: {e}")
+
+    # Add to Master MOC
+    try:
+        master_moc_path = f"{library_folder}/00 MOC/🗺️ MOC - Research Library.md"
+        master = vault.read_file(master_moc_path)
+        if master and folder_name not in master:
+            # Add new section before the Topic MOCs section or at the end
+            new_section = (
+                f"\n## {folder_name}\n\n"
+                f"See: [[📍 MOC - {topic_name}]] — 0 notes\n"
+            )
+            # Insert before "## Topic MOCs" if it exists
+            if "## Topic MOCs" in master:
+                master = master.replace("## Topic MOCs", f"{new_section}\n## Topic MOCs")
+            else:
+                master += new_section
+            # Add to Topic MOCs list
+            topic_moc_entry = f"- [[📍 MOC - {topic_name}]] — {folder_name}"
+            if "## Topic MOCs" in master and topic_moc_entry not in master:
+                master = master.replace(
+                    "## Topic MOCs\n",
+                    f"## Topic MOCs\n\n{topic_moc_entry}\n"
+                )
+            vault.write_file(master_moc_path, master)
+            print(f"  [promote] Added {folder_name} to Master MOC")
+    except Exception as e:
+        print(f"  [promote] Warning: could not update Master MOC: {e}")
+
+    # Add to FOLDER_ROUTING so subsequent calls in the same run use it
+    FOLDER_ROUTING[folder_name] = [w.lower() for w in topic_name.split()]
+
+    print(f"  [promote] Created new topic folder: {folder_name}")
+    return folder_name
+
+
+def _route_to_subfolder(tags: list, title: str, topic_slug: str, config: dict = None) -> str:
     """Pick the best numbered subfolder based on tags, title, and topic.
 
     Returns the folder name (e.g. '01 Agent Harnesses & Architecture').
-    Falls back to '01 Agent Harnesses & Architecture' if nothing matches.
+    If nothing matches and config is provided, creates a new dynamic folder
+    based on the most prominent unrecognized tag/topic.
     """
     search_text = " ".join(tags + [title, topic_slug]).lower()
     best_folder = None
@@ -272,7 +356,18 @@ def _route_to_subfolder(tags: list, title: str, topic_slug: str) -> str:
         if score > best_score:
             best_score = score
             best_folder = folder
-    return best_folder or "01 Agent Harnesses & Architecture"
+
+    if best_folder:
+        return best_folder
+
+    # No match — create a dynamic folder if config is available
+    if config and tags:
+        # Use the first non-canonical tag as the topic name, or the topic_slug
+        novel_tags = [t for t in tags if t not in CANONICAL_TAGS]
+        topic_name = novel_tags[0].replace("-", " ").replace("/", " & ").title() if novel_tags else topic_slug.replace("-", " ").title()
+        return _create_dynamic_folder_and_moc(topic_name, config)
+
+    return "01 Agent Harnesses & Architecture"
 
 
 # ---------------------------------------------------------------------------
@@ -489,7 +584,7 @@ def promote_items(
                 title = item["title"]
 
             # Route to the correct numbered subfolder based on topic
-            subfolder = _route_to_subfolder(tags, title, item["topic_slug"])
+            subfolder = _route_to_subfolder(tags, title, item["topic_slug"], config=config)
             target_folder = f"{library_folder}/{subfolder}"
 
             # Pick a unique path in the routed subfolder
