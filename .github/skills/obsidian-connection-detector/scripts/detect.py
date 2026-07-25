@@ -221,11 +221,14 @@ def find_candidates(source_path: Path, source_text: str) -> list[Path]:
         keyword_overlap = source_keywords & candidate_keywords
         overlap_ratio = len(keyword_overlap) / max(len(source_keywords), 1)
 
-        # Include if tags overlap or significant keyword overlap
-        if tag_overlap or overlap_ratio > 0.15:
-            candidates.append(note_path)
+        # Score by tag overlap + keyword overlap
+        score = len(tag_overlap) * 3 + overlap_ratio * 10
+        if score > 2:
+            candidates.append((score, note_path))
 
-    return candidates
+    # Sort by relevance, cap at 10 to keep API costs reasonable
+    candidates.sort(key=lambda x: x[0], reverse=True)
+    return [path for _, path in candidates[:10]]
 
 
 # ---------------------------------------------------------------------------
