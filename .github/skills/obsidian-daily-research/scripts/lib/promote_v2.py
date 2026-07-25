@@ -519,6 +519,34 @@ def _slugify(title: str) -> str:
 # ---------------------------------------------------------------------------
 
 
+def _run_connection_detector(note_path: str):
+    """Run the connection detector on a newly created note (best-effort).
+
+    Calls the obsidian-connection-detector skill's detect.py in a subprocess.
+    Failures are logged but never block the promotion pipeline.
+    """
+    detector_script = Path(__file__).resolve().parents[3] / "obsidian-connection-detector" / "scripts" / "detect.py"
+    if not detector_script.exists():
+        return
+    try:
+        import subprocess as _sp
+        print(f"  [connections] Scanning for connections...")
+        result = _sp.run(
+            ["python", str(detector_script), "--note", note_path, "--no-section"],
+            capture_output=True, text=True, encoding="utf-8", timeout=120,
+            env={**dict(__import__("os").environ), "PYTHONIOENCODING": "utf-8"},
+        )
+        # Extract summary from output
+        for line in result.stdout.strip().split("\n"):
+            if "new connections" in line.lower() or "connection detection complete" in line.lower():
+                print(f"  [connections] {line.strip()}")
+                break
+        if result.returncode != 0 and result.stderr:
+            print(f"  [connections] Warning: {result.stderr[:200]}")
+    except Exception as e:
+        print(f"  [connections] Skipped ({e})")
+
+
 def promote_items(
     config: dict,
     *,
@@ -598,6 +626,9 @@ def promote_items(
             vault.write_file(lib_path, note_content)
             item["library_path"] = lib_path
             print(f"  [promote] Created {lib_path}")
+
+            # Run connection detector on the new note (non-blocking, best-effort)
+            _run_connection_detector(lib_path)
 
             # Replace #keep with #kept in the daily
             content = content.replace(
