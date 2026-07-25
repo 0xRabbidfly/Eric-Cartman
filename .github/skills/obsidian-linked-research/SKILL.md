@@ -741,6 +741,20 @@ current. The master MOC remains authoritative for canonical tags and library-wid
 python -c "import sys; sys.path.insert(0,'.github/skills/obsidian/scripts'); from obsidian import Obsidian; ob=Obsidian(); ob.open('Research/Library/{library_bucket}/{slug}')"
 ```
 
+### Step 6.5 — Detect Connections
+
+After writing the note and updating MOCs, run the connection detector to classify
+relationships between the new note and existing vault content:
+
+```powershell
+python .github/skills/obsidian-connection-detector/scripts/detect.py --note "Research/Library/{library_bucket}/{slug}.md" --no-section
+```
+
+This is best-effort — if it fails or is unavailable, continue to Step 7. The detector
+will classify relationships (supports, contradicts, extends, bridges) and write to
+`Research/connections.json`. The thesis tracker will pick up new connections on its
+next run and flag emerging theses.
+
 ### Step 7 — Confirm
 
 Report to the user:
@@ -751,6 +765,7 @@ Report to the user:
 - **Thesis drift results**: how many notes were compared, any supersessions or conflicts
 - If a supersession occurred: which old note was marked superseded
 - If a conflict was found: path to the synthesis note
+- **Connections found**: how many and what types (supports/contradicts/extends/bridges)
 - Obsidian link: `obsidian://open?vault=Obsidian%20Vault&file=Research%2FLibrary%2F{library_bucket_urlencoded}%2F{slug}`
 
 ### Step 8 — Reflection (composable)
