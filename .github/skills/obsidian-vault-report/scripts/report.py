@@ -46,7 +46,7 @@ if sys.platform == "win32":
 # ---------------------------------------------------------------------------
 
 XAI_CHAT_URL = "https://api.x.ai/v1/chat/completions"
-XAI_MODEL = os.environ.get("XAI_MODEL", "grok-4-0724")
+XAI_MODEL = os.environ.get("XAI_MODEL", "grok-4.3")
 DEBUG = os.environ.get("VAULT_REPORT_DEBUG", "").lower() in (
     "1", "true", "yes",
 )
