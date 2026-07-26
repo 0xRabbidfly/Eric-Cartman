@@ -49,7 +49,7 @@ ENV_FILE = CONFIG_DIR / ".env"
 XAI_API_URL = "https://api.x.ai/v1/chat/completions"
 XAI_MODEL = "grok-4.3"
 
-PASS_NAMES = ["trend", "thesis", "blindspot", "bridge", "zeitgeist", "action", "predict"]
+PASS_NAMES = ["trend", "thesis", "blindspot", "bridge", "zeitgeist", "action", "predict", "cost"]
 
 
 # ---------------------------------------------------------------------------
@@ -822,6 +822,128 @@ def synthesize_one_thing(api_key: str, sections: dict) -> str:
     )
 
 
+# ---------------------------------------------------------------------------
+# Pass 8: Cost Tracking
+# ---------------------------------------------------------------------------
+
+COST_LEDGER_PATH = VAULT_PATH / "Research" / "Reports" / "weekly-costs.md"
+USD_TO_CAD = 1.37  # approximate; updated manually if needed
+
+
+def track_weekly_costs(vault: dict, today: str) -> str:
+    """Parse costs from daily research notes and sum the week's total."""
+    cost_re = re.compile(r"\*\*\$(\d+\.\d+)\*\*")
+    week_start = datetime.strptime(today, "%Y-%m-%d") - timedelta(days=7)
+
+    # 1. Daily research pipeline costs (from daily notes)
+    research_cost = 0.0
+    research_days = 0
+    for note in vault.get("dailies", []):
+        try:
+            text = note["path"].read_text(encoding="utf-8", errors="replace")
+            # Only count notes from this week
+            # Extract date from frontmatter via regex
+            date_match = re.search(r'^date:\s*(\d{4}-\d{2}-\d{2})', text, re.MULTILINE)
+            note_date = date_match.group(1) if date_match else ""
+            if note_date and datetime.strptime(note_date, "%Y-%m-%d") > week_start:
+                match = cost_re.search(text[:500])  # cost is near the top
+                if match:
+                    research_cost += float(match.group(1))
+                    research_days += 1
+        except (ValueError, OSError):
+            continue
+
+    # 2. Weekly brain cost (this run — estimate from API calls)
+    # 5 API calls × ~$0.01 each for grok-4.3
+    brain_cost = 0.05
+
+    # 3. Connection detector costs (estimate from connections.json timestamps)
+    connections_file = VAULT_PATH / "Research" / "connections.json"
+    connection_cost = 0.0
+    if connections_file.exists():
+        try:
+            data = json.loads(connections_file.read_text(encoding="utf-8"))
+            recent = [c for c in data.get("connections", [])
+                      if c.get("detected_at", "") > week_start.strftime("%Y-%m-%d")]
+            connection_cost = len(recent) * 0.01  # ~$0.01 per classification call
+        except (json.JSONDecodeError, OSError):
+            pass
+
+    # 4. Vault report costs (check Reports/ for files this week)
+    report_cost = 0.0
+    reports_dir = VAULT_PATH / "Research" / "Reports"
+    if reports_dir.exists():
+        for f in reports_dir.glob("*.md"):
+            try:
+                if f.stat().st_mtime > week_start.timestamp() and "weekly-brain" not in f.name and "weekly-costs" not in f.name:
+                    report_cost += 0.15  # ~$0.15 per synthesis report
+            except OSError:
+                pass
+
+    total_usd = research_cost + brain_cost + connection_cost + report_cost
+    total_cad = total_usd * USD_TO_CAD
+
+    breakdown = []
+    if research_cost > 0:
+        breakdown.append(f"Research ${research_cost:.2f} ({research_days}d)")
+    if brain_cost > 0:
+        breakdown.append(f"Brain ${brain_cost:.2f}")
+    if connection_cost > 0:
+        breakdown.append(f"Connections ${connection_cost:.2f}")
+    if report_cost > 0:
+        breakdown.append(f"Reports ${report_cost:.2f}")
+
+    summary = f"**${total_usd:.2f} USD / ${total_cad:.2f} CAD** — {' · '.join(breakdown)}"
+    print(f"  Weekly cost: ${total_usd:.2f} USD (${total_cad:.2f} CAD)")
+
+    # Store parsed values for the ledger
+    track_weekly_costs._last = {
+        "usd": total_usd,
+        "cad": total_cad,
+        "breakdown": " · ".join(breakdown),
+    }
+
+    return summary
+
+
+track_weekly_costs._last = None
+
+
+def append_cost_ledger(today: str, cost_section: str):
+    """Append a row to the weekly-costs.md ledger note."""
+    data = track_weekly_costs._last
+    if not data:
+        return
+
+    # Create the file with headers if it doesn't exist
+    if not COST_LEDGER_PATH.exists():
+        COST_LEDGER_PATH.parent.mkdir(parents=True, exist_ok=True)
+        header = (
+            "---\n"
+            "type: cost-tracker\n"
+            "tags: [cost-tracker, weekly]\n"
+            "status: published\n"
+            "---\n\n"
+            "# Weekly Cost Ledger\n\n"
+            "> Automated cost tracking for the Obsidian knowledge system.\n"
+            "> Updated every Sunday by the weekly brain digest.\n\n"
+            "| Week | USD | CAD | Breakdown |\n"
+            "|------|-----|-----|-----------|\n"
+        )
+        COST_LEDGER_PATH.write_text(header, encoding="utf-8")
+        print(f"  Created cost ledger: {COST_LEDGER_PATH}")
+
+    # Append the row
+    row = f"| {today} | ${data['usd']:.2f} | ${data['cad']:.2f} | {data['breakdown']} |\n"
+    with open(COST_LEDGER_PATH, "a", encoding="utf-8") as f:
+        f.write(row)
+    print(f"  Appended cost row to ledger: ${data['usd']:.2f} USD")
+
+
+# ---------------------------------------------------------------------------
+# Report rendering
+# ---------------------------------------------------------------------------
+
 def build_report(date_str: str, sections: dict, one_thing: str, vault: dict) -> str:
     """Assemble the final markdown report."""
     total_notes = len(vault["all_notes"])
@@ -885,6 +1007,10 @@ def build_report_part2(sections: dict, vault: dict) -> str:
 
 {sections.get('predict', '_Skipped._')}
 
+## Weekly Cost 💰
+
+{sections.get('cost', '_Skipped._')}
+
 ---
 
 > Generated from {total_notes} vault notes, {connections_count} connections, {theses_count} tracked theses.
@@ -937,7 +1063,11 @@ def main():
     new_predictions = []
 
     for pass_name in passes_to_run:
-        func = PASS_FUNCS[pass_name]
+        if pass_name == "cost":
+            continue  # handled separately after other passes
+        func = PASS_FUNCS.get(pass_name)
+        if not func:
+            continue
         try:
             result = func(vault, api_key)
             # pass_predict returns a tuple (text, predictions_list)
@@ -961,6 +1091,16 @@ def main():
     elif len(sections) == 1:
         one_thing = list(sections.values())[0][:300]
 
+    # Pass 8: Cost Tracking
+    run_all = not args.single_pass
+    if "cost" in passes_to_run or run_all:
+        print("\n[Pass 8/8] Cost Tracking...")
+        try:
+            cost_summary = track_weekly_costs(vault, today)
+            sections["cost"] = cost_summary
+        except Exception as e:
+            print(f"  ERROR in cost tracking: {e}", file=sys.stderr)
+
     # Build report
     report = build_report(today, sections, one_thing, vault)
     report += build_report_part2(sections, vault)
@@ -983,6 +1123,13 @@ def main():
             with open(PREDICTIONS_FILE, "w", encoding="utf-8") as f:
                 json.dump(all_predictions, f, indent=2, ensure_ascii=False)
             print(f"  Added {len(new_predictions)} predictions to {PREDICTIONS_FILE}")
+
+        # Append cost row to weekly-costs.md ledger
+        if "cost" in sections:
+            try:
+                append_cost_ledger(today, sections["cost"])
+            except Exception as e:
+                print(f"  ERROR appending cost ledger: {e}", file=sys.stderr)
 
     print(f"\n=== Done. {len(sections)} passes completed. ===")
 

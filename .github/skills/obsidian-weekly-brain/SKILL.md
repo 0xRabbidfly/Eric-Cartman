@@ -60,3 +60,14 @@ python brain.py --weeks 2          # Lookback window (default 4)
 - Python 3.10+
 - xAI API key in `~/.config/last30days/.env` (as `XAI_API_KEY`)
 - No pip dependencies (stdlib only)
+
+## Step N: Reflection (composable)
+
+Invoke the `skill-reflection` skill with the following context:
+
+- **Calling skill**: `obsidian-weekly-brain`
+- **SKILL.md path**: `.github/skills/obsidian-weekly-brain/SKILL.md`
+- **Steps completed**: list each pass with pass/fail/skipped + cost data
+- **Friction notes**: any workarounds, retries, unexpected errors, or manual interventions
+
+The reflection skill will analyze the run and produce improvement recommendations.
