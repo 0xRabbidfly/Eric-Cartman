@@ -47,3 +47,14 @@ python scripts/tracker.py --auto-report
 - **obsidian-connection-detector** feeds data in via `connections.json`
 - Tracker can trigger **obsidian-vault-report** for auto-synthesis
 - Weekly lint can call `tracker.py --status` to include thesis status in the report
+
+## Step N: Reflection (composable)
+
+Invoke the `skill-reflection` skill with the following context:
+
+- **Calling skill**: `obsidian-thesis-tracker`
+- **SKILL.md path**: `.github/skills/obsidian-thesis-tracker/SKILL.md`
+- **Steps completed**: list each step with pass/fail/skipped
+- **Friction notes**: any workarounds, retries, unexpected errors, or manual interventions
+
+The reflection skill will analyze the run and produce improvement recommendations.

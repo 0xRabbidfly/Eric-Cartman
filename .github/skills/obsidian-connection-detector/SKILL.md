@@ -44,3 +44,14 @@ python scripts/detect.py --scan-all
 
 This skill feeds data into **obsidian-thesis-tracker**, which clusters connections
 into emerging theses and can auto-generate reports.
+
+## Step N: Reflection (composable)
+
+Invoke the `skill-reflection` skill with the following context:
+
+- **Calling skill**: `obsidian-connection-detector`
+- **SKILL.md path**: `.github/skills/obsidian-connection-detector/SKILL.md`
+- **Steps completed**: list each step with pass/fail/skipped
+- **Friction notes**: any workarounds, retries, unexpected errors, or manual interventions
+
+The reflection skill will analyze the run and produce improvement recommendations.

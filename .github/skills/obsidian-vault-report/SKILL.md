@@ -111,3 +111,14 @@ What the vault does NOT cover that would strengthen this analysis.
 - **obsidian-connection-detector** — detects relationships between notes
 - **obsidian-thesis-tracker** — auto-triggers reports when evidence accumulates
 - **obsidian-linked-research** — imports external content (this skill synthesizes internal content)
+
+## Step N: Reflection (composable)
+
+Invoke the `skill-reflection` skill with the following context:
+
+- **Calling skill**: `obsidian-vault-report`
+- **SKILL.md path**: `.github/skills/obsidian-vault-report/SKILL.md`
+- **Steps completed**: list each step with pass/fail/skipped
+- **Friction notes**: any workarounds, retries, unexpected errors, or manual interventions
+
+The reflection skill will analyze the run and produce improvement recommendations.
