@@ -110,9 +110,45 @@
           "note_path": "Podcasts/Limitless/2026-07-17 - THIS WEEK IN AI Kimi K3, OpenAI's Alexa, Grok Stealing Code, Thinking Machines.md",
           "processed_at": "2026-07-18T13:06:19.126199+00:00",
           "status": "completed"
+        },
+        "671a1063-d231-41fa-90c3-28cbdf156c66": {
+          "title": "AI Bubble Update: Kimi K3 Sends China into Chaos",
+          "published": "2026-07-21",
+          "audio_url": "https://media.transistor.fm/98cf9a35/99e3cac5.mp3",
+          "transcript_path": "Podcasts/Limitless/transcripts/2026-07-21 - AI Bubble Update Kimi K3 Sends China into Chaos.md",
+          "note_path": "Podcasts/Limitless/2026-07-21 - AI Bubble Update Kimi K3 Sends China into Chaos.md",
+          "processed_at": "2026-07-22T06:31:33.689098+00:00",
+          "status": "completed"
+        },
+        "2545a864-dd91-4026-93bf-0de2d572975d": {
+          "title": "Elon Will Handle the Energy Bottleneck Himself: Buys APR Energy for $1B",
+          "published": "2026-07-22",
+          "audio_url": "https://media.transistor.fm/f6221720/8d8a96a3.mp3",
+          "transcript_path": "Podcasts/Limitless/transcripts/2026-07-22 - Elon Will Handle the Energy Bottleneck Himself Buys APR Energy for $1B.md",
+          "note_path": "Podcasts/Limitless/2026-07-22 - Elon Will Handle the Energy Bottleneck Himself Buys APR Energy for $1B.md",
+          "processed_at": "2026-07-23T06:19:20.691631+00:00",
+          "status": "completed"
+        },
+        "34ed27ac-166b-4eea-8d43-3d0657333224": {
+          "title": "A Prototype GPT-6 Broke Out of Confinement: Is AI Alignment Possible?",
+          "published": "2026-07-23",
+          "audio_url": "https://media.transistor.fm/1a86c77e/af0f9489.mp3",
+          "transcript_path": "Podcasts/Limitless/transcripts/2026-07-23 - A Prototype GPT-6 Broke Out of Confinement Is AI Alignment Possible.md",
+          "note_path": "Podcasts/Limitless/2026-07-23 - A Prototype GPT-6 Broke Out of Confinement Is AI Alignment Possible.md",
+          "processed_at": "2026-07-24T06:21:41.681104+00:00",
+          "status": "completed"
+        },
+        "aab6bf5e-5ba8-4b66-9053-e8e5718fdbe4": {
+          "title": "THIS WEEK IN AI: NVIDIA Dominates Google | America vs Open Source | Tesla Starlink V5",
+          "published": "2026-07-24",
+          "audio_url": "https://media.transistor.fm/7fa832d8/3afc6670.mp3",
+          "transcript_path": "Podcasts/Limitless/transcripts/2026-07-24 - THIS WEEK IN AI NVIDIA Dominates Google  America vs Open Source  Tesla Starlink V5.md",
+          "note_path": "Podcasts/Limitless/2026-07-24 - THIS WEEK IN AI NVIDIA Dominates Google  America vs Open Source  Tesla Starlink V5.md",
+          "processed_at": "2026-07-25T06:13:24.856369+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-07-17"
+      "latest_published": "2026-07-24"
     },
     "the-pomp-podcast": {
       "name": "The Pomp Podcast",
@@ -253,9 +289,27 @@
           "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-07-17 - Mira Murati's 975B Open Model, Ramin Hasani on Post-Transformer AI, and Demis' AI FINRA  EP 271.md",
           "processed_at": "2026-07-18T11:20:36.540998+00:00",
           "status": "completed"
+        },
+        "6efd6a6c-82e2-11f1-afce-5b8fb8a769ad": {
+          "title": "Urgent Update- AI Sputnik Moment: Kimi K3 Released w/ Emad Mostaque | Ep. 272",
+          "published": "2026-07-19",
+          "audio_url": "https://traffic.megaphone.fm/DVVTS5184984820.mp3",
+          "transcript_path": "Podcasts/Moonshots with Peter Diamandis/transcripts/2026-07-19 - Urgent Update- AI Sputnik Moment Kimi K3 Released w Emad Mostaque  Ep. 272.md",
+          "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-07-19 - Urgent Update- AI Sputnik Moment Kimi K3 Released w Emad Mostaque  Ep. 272.md",
+          "processed_at": "2026-07-21T06:43:28.598544+00:00",
+          "status": "completed"
+        },
+        "853cb356-878c-11f1-90e7-57fefd1be231": {
+          "title": "The Hugging Face Breach, Moonshot AI Valued at $20B, and Living to 1,759 Years Old | EP #273",
+          "published": "2026-07-24",
+          "audio_url": "https://traffic.megaphone.fm/DVVTS3160133299.mp3",
+          "transcript_path": "Podcasts/Moonshots with Peter Diamandis/transcripts/2026-07-24 - The Hugging Face Breach, Moonshot AI Valued at $20B, and Living to 1,759 Years Old  EP 273.md",
+          "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-07-24 - The Hugging Face Breach, Moonshot AI Valued at $20B, and Living to 1,759 Years Old  EP 273.md",
+          "processed_at": "2026-07-25T06:36:11.587769+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-07-17"
+      "latest_published": "2026-07-24"
     },
     "dwarkesh-podcast": {
       "name": "Dwarkesh Podcast",
@@ -369,9 +423,18 @@
           "note_path": "Podcasts/No Priors/2026-06-26 - Really Big Test-Time Compute in AI Changes Benchmarks, Safety and Research with OpenAI Research Scientist Noam Brown.md",
           "processed_at": "2026-07-19T12:28:50.171389+00:00",
           "status": "completed"
+        },
+        "67540c92-8640-11f1-8f2a-e322343e668d": {
+          "title": "Building an Autonomous Delivery Experience with DoorDash Co-Founders Andy Fang and Stanley Tang",
+          "published": "2026-07-23",
+          "audio_url": "https://traffic.megaphone.fm/PDP3380514610.mp3",
+          "transcript_path": "Podcasts/No Priors Artificial Intelligence  Technology  Startups/transcripts/2026-07-23 - Building an Autonomous Delivery Experience with DoorDash Co-Founders Andy Fang and Stanley Tang.md",
+          "note_path": "Podcasts/No Priors Artificial Intelligence  Technology  Startups/2026-07-23 - Building an Autonomous Delivery Experience with DoorDash Co-Founders Andy Fang and Stanley Tang.md",
+          "processed_at": "2026-07-24T06:33:20.186294+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-06-26"
+      "latest_published": "2026-07-23"
     },
     "cgi-conversations": {
       "name": "CGI Conversations",
@@ -431,9 +494,45 @@
           "note_path": "Podcasts/The a16z Podcast/2026-04-03 - Marc Andreessen on AI Winters and Agent Breakthroughs.md",
           "processed_at": "2026-04-14T00:00:00Z",
           "status": "completed"
+        },
+        "b66c28c5-98aa-4273-b6c7-d1b94071eb78": {
+          "title": "Hugging Face's CEO on Open Source AI, Model Routing, and the Future of Competition",
+          "published": "2026-07-20",
+          "audio_url": "https://mgln.ai/e/1344/afp-848985-injected.calisto.simplecastaudio.com/3f86df7b-51c6-4101-88a2-550dba782de8/episodes/8d484c2c-9bfb-4dbf-8019-9b1c8750d33c/audio/128/default.mp3?aid=rss_feed&awCollectionId=3f86df7b-51c6-4101-88a2-550dba782de8&awEpisodeId=8d484c2c-9bfb-4dbf-8019-9b1c8750d33c&feed=JGE3yC0V",
+          "transcript_path": "Podcasts/The a16z Podcast/transcripts/2026-07-20 - Hugging Face's CEO on Open Source AI, Model Routing, and the Future of Competition.md",
+          "note_path": "Podcasts/The a16z Podcast/2026-07-20 - Hugging Face's CEO on Open Source AI, Model Routing, and the Future of Competition.md",
+          "processed_at": "2026-07-21T06:50:09.319714+00:00",
+          "status": "completed"
+        },
+        "f9e79358-7a88-4c94-b097-0699d7971e72": {
+          "title": "Why Physical AI Is the Next Frontier | Applied Intuition",
+          "published": "2026-07-21",
+          "audio_url": "https://mgln.ai/e/1344/afp-848985-injected.calisto.simplecastaudio.com/3f86df7b-51c6-4101-88a2-550dba782de8/episodes/6addce00-a7d2-4302-848f-6d96ff487d8c/audio/128/default.mp3?aid=rss_feed&awCollectionId=3f86df7b-51c6-4101-88a2-550dba782de8&awEpisodeId=6addce00-a7d2-4302-848f-6d96ff487d8c&feed=JGE3yC0V",
+          "transcript_path": "Podcasts/The a16z Podcast/transcripts/2026-07-21 - Why Physical AI Is the Next Frontier  Applied Intuition.md",
+          "note_path": "Podcasts/The a16z Podcast/2026-07-21 - Why Physical AI Is the Next Frontier  Applied Intuition.md",
+          "processed_at": "2026-07-22T06:50:40.987542+00:00",
+          "status": "completed"
+        },
+        "9635840c-a1ca-4251-b090-a854c6a64f7b": {
+          "title": "Sriram Krishnan on Open Source AI's Biggest Week Yet",
+          "published": "2026-07-24",
+          "audio_url": "https://mgln.ai/e/1344/afp-848985-injected.calisto.simplecastaudio.com/3f86df7b-51c6-4101-88a2-550dba782de8/episodes/8788edcc-da22-4a36-8656-36c04ca2458f/audio/128/default.mp3?aid=rss_feed&awCollectionId=3f86df7b-51c6-4101-88a2-550dba782de8&awEpisodeId=8788edcc-da22-4a36-8656-36c04ca2458f&feed=JGE3yC0V",
+          "transcript_path": "Podcasts/The a16z Podcast/transcripts/2026-07-24 - Sriram Krishnan on Open Source AI's Biggest Week Yet.md",
+          "note_path": "Podcasts/The a16z Podcast/2026-07-24 - Sriram Krishnan on Open Source AI's Biggest Week Yet.md",
+          "processed_at": "2026-07-26T06:26:35.845660+00:00",
+          "status": "completed"
+        },
+        "492cb9ec-1d6a-418d-97a4-c21669cc0a1e": {
+          "title": "Building the Physical AI Stack | Travis Kalanick on TBPN",
+          "published": "2026-07-23",
+          "audio_url": "https://mgln.ai/e/1344/afp-848985-injected.calisto.simplecastaudio.com/3f86df7b-51c6-4101-88a2-550dba782de8/episodes/c0548882-482c-45e3-b1c5-bff8f17399f5/audio/128/default.mp3?aid=rss_feed&awCollectionId=3f86df7b-51c6-4101-88a2-550dba782de8&awEpisodeId=c0548882-482c-45e3-b1c5-bff8f17399f5&feed=JGE3yC0V",
+          "transcript_path": "Podcasts/The a16z Podcast/transcripts/2026-07-23 - Building the Physical AI Stack  Travis Kalanick on TBPN.md",
+          "note_path": "Podcasts/The a16z Podcast/2026-07-23 - Building the Physical AI Stack  Travis Kalanick on TBPN.md",
+          "processed_at": "2026-07-26T06:26:35.900779+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-04-08"
+      "latest_published": "2026-07-24"
     },
     "the-joe-rogan-experience": {
       "name": "The Joe Rogan Experience",
