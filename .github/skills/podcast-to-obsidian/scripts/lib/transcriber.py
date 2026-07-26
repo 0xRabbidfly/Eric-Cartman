@@ -25,6 +25,46 @@ from typing import Optional, Tuple
 # Both live in config/vocabulary.json so they can be tuned without code edits.
 # ---------------------------------------------------------------------------
 
+def _register_cuda_dll_dirs() -> None:
+    """Preload nvidia-cublas-cu12's DLLs so ctranslate2 can find cuBLAS.
+
+    ctranslate2's own __init__.py only registers its own package directory
+    and preloads DLLs bundled there (e.g. cudnn64_9.dll) -- it does NOT
+    know about the separate nvidia-cublas-cu12 pip package, so
+    cublas64_12.dll is never preloaded. Registering the directory alone
+    via os.add_dll_directory is *not* sufficient: ctranslate2's own
+    internal load of cublas64_12.dll still fails with "Library
+    cublas64_12.dll is not found or cannot be loaded" even with the
+    directory registered. What works is preloading the DLLs into the
+    process via ctypes.CDLL first (mirroring exactly what ctranslate2
+    does for its own bundled DLLs) -- once already loaded, ctranslate2's
+    internal lookup just gets a handle to the loaded module.
+
+    cublas64_12.dll is loaded lazily on the first CUDA matmul, not at
+    WhisperModel construction time, so a construct-only CUDA probe can
+    pass even when this whole preload step is missing, and the failure
+    only surfaces deep into a real transcription run. Safe to call more
+    than once.
+    """
+    if sys.platform != "win32":
+        return
+    try:
+        import ctypes
+        import importlib.util
+        spec = importlib.util.find_spec("nvidia.cublas")
+        if spec and spec.submodule_search_locations:
+            for loc in spec.submodule_search_locations:
+                bin_dir = os.path.join(loc, "bin")
+                if os.path.isdir(bin_dir):
+                    os.add_dll_directory(bin_dir)
+                    for name in ("cublasLt64_12.dll", "cublas64_12.dll"):
+                        dll_path = os.path.join(bin_dir, name)
+                        if os.path.isfile(dll_path):
+                            ctypes.CDLL(dll_path)
+    except Exception:
+        pass
+
+
 _VOCAB_CACHE: Optional[dict] = None
 
 
@@ -97,9 +137,17 @@ def _detect_cuda_device() -> Tuple[str, str]:
     This avoids the 2 GB torch install just for a one-line CUDA check.
     """
     try:
+        import numpy as np
+        _register_cuda_dll_dirs()
         from faster_whisper import WhisperModel
-        # Load the smallest model to test CUDA — takes <1s and <100 MB
+        # Load the smallest model and run one real inference step on a
+        # second of silence -- the WhisperModel constructor alone doesn't
+        # touch cublas64_12.dll (that's lazy-loaded on first matmul), so a
+        # construct-only probe can pass while a real transcription run
+        # still fails later on the same missing DLL.
         _test = WhisperModel("tiny", device="cuda", compute_type="float16")
+        silence = np.zeros(16000, dtype=np.float32)
+        list(_test.transcribe(silence, vad_filter=False)[0])
         del _test
         print("  [device] CUDA detected via faster-whisper probe")
         return "cuda", "float16"
@@ -223,6 +271,7 @@ def _transcribe_faster_whisper(
     language: Optional[str],
 ) -> Tuple[Path, dict]:
     """Transcribe using faster-whisper."""
+    _register_cuda_dll_dirs()
     from faster_whisper import WhisperModel
 
     # Device selection — detect CUDA via ctypes (no torch dependency)
