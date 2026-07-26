@@ -6,7 +6,7 @@ user-invocable: true
 disable-model-invocation: false
 metadata:
   author: 0xrabbidfly
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 # Skill Reflection (Composable)
@@ -164,6 +164,46 @@ Before categorizing, walk through these prompts to surface friction that the cal
 
 Add any findings to the friction list alongside what the caller already reported.
 
+### 2.5 Goal Achievement & Ontological Drift Check
+
+Before analyzing friction, evaluate whether the skill achieved its **stated purpose**. Read the calling skill's `description` field and `## Purpose` section from its SKILL.md, then answer:
+
+1. **Goal achieved?** — Did the run produce the output the skill's purpose describes? A skill can run flawlessly (all steps PASS) but still miss its stated goal — e.g., a research skill that creates notes but stops surfacing insights, or a digest that reports data but stops being actionable.
+
+2. **Ontological drift?** — Has the skill's actual behavior diverged from its stated purpose over time? Signs of drift:
+   - The skill does things its Purpose section doesn't mention
+   - The skill no longer does things its Purpose section promises
+   - The skill's output format has evolved away from its template
+   - Steps were added/removed informally without updating the Purpose
+   - The skill is being used for a different job than it was designed for
+
+3. **Value opportunities** — Given what the skill actually does and what the vault needs, are there ways to increase its value?
+   - Could it produce a higher-quality output with a small change?
+   - Is it doing work that another skill duplicates?
+   - Could it feed data to another skill that it currently doesn't?
+   - Is there a user need it's close to meeting but not quite?
+   - Could it reduce manual follow-up work?
+
+Add findings to the reflection output as a new section:
+
+```
+Goal assessment:
+  Purpose achieved: [yes | partial | no]
+  Drift detected: [none | minor | significant]
+  Drift details: <what changed vs stated purpose>
+  
+Value opportunities:
+  V1. <opportunity description>
+      Impact: [high | medium | low]
+      Effort: [trivial | small | medium]
+  V2. ...
+```
+
+**Priority rules for drift:**
+- Significant drift where the skill is doing the wrong job → P0
+- Minor drift where output format or scope crept → P1
+- Value opportunities → P2 unless they address existing user friction
+
 ### 3. Categorize Friction
 
 Classify each friction point into one of these **generic categories**:
@@ -228,6 +268,15 @@ Friction encountered:
     Evidence: <supporting signal if available>
     Confidence: <high | medium | low>
      → Recommendation: <specific change to SKILL.md>
+
+Goal assessment:
+  Purpose achieved: [yes | partial | no]
+  Drift detected: [none | minor | significant]
+  Drift details: <what changed vs stated purpose, or "aligned" if no drift>
+
+Value opportunities:
+  V1. <opportunity> — Impact: <high|medium|low>, Effort: <trivial|small|medium>
+  V2. ...
 
 Prioritized recommendations for <skill-name>/SKILL.md:
   R1. (P0 - breaking)  <change needed to prevent failure next time>
@@ -348,9 +397,18 @@ If a run completed cleanly with no friction:
 
 Run summary: Steps 1-N completed | all passed
 Friction points: 0
+
+Goal assessment:
+  Purpose achieved: [yes | partial | no]
+  Drift detected: [none | minor | significant]
+  Drift details: <assessment even on clean runs>
+
+Value opportunities:
+  V1. <any opportunities spotted, or "none — skill is delivering full value">
+
 Repeat friction: none
 
-✅ Clean run — no recommendations.
+✅ Clean run — no friction recommendations.
 Skill is working as documented.
 ---
 ```
