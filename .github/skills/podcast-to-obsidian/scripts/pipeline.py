@@ -19,6 +19,7 @@ Usage:
 """
 
 import argparse
+import gc
 import importlib.util
 import io
 import json
@@ -1010,6 +1011,15 @@ def run_url_pipeline(args: argparse.Namespace) -> None:
         print("\n[error] Transcription produced no output.")
         return
 
+    # CUDA cleanup safety net (mirrors the one in run_pipeline)
+    gc.collect()
+    try:
+        import torch
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+    except (ImportError, Exception):
+        pass
+
     if args.transcribe_only:
         print("\n=== Transcript ready ===")
         for ep, audio_path, transcript_path, meta in transcribed:
@@ -1219,6 +1229,18 @@ def run_pipeline(args: argparse.Namespace) -> None:
         # note generation/vault write later succeeds for this episode --
         # the transcript is already durably on disk.
         transcribed_stems.extend(audio_path.stem for _ep, audio_path, _tp, _meta in transcribed)
+
+        # --- CUDA cleanup safety net ---
+        # The per-model cleanup in transcriber.py is the primary defence,
+        # but run a pipeline-level sweep as well to catch anything that
+        # leaked across multiple episodes in a single step_transcribe batch.
+        gc.collect()
+        try:
+            import torch
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+        except (ImportError, Exception):
+            pass
 
         # --- Transcribe-only mode: print paths and stop ---
         if args.transcribe_only:
@@ -1524,6 +1546,10 @@ def main() -> None:
                              "--force is given.")
     parser.add_argument("--force", action="store_true",
                         help="Allow --set-watermark to lower an existing watermark")
+    parser.add_argument("--add-corrections", type=str, default=None,
+                        metavar='"wrong1=right1,wrong2=right2"',
+                        help="Append vocabulary corrections to the glossary. "
+                             "Format: comma-separated wrong=right pairs.")
 
     args = parser.parse_args()
 
@@ -1533,7 +1559,25 @@ def main() -> None:
 
     try:
         # Route to subcommands
-        if args.add_show:
+        if args.add_corrections:
+            # Parse "wrong1=right1,wrong2=right2" into a dict
+            pairs = {}
+            for pair in args.add_corrections.split(","):
+                pair = pair.strip()
+                if "=" not in pair:
+                    parser.error(f"Invalid correction pair (missing '='): {pair!r}")
+                wrong, right = pair.split("=", 1)
+                wrong, right = wrong.strip(), right.strip()
+                if wrong and right:
+                    pairs[wrong] = right
+            if pairs:
+                transcriber = _get_transcriber()
+                added = transcriber.add_corrections(pairs)
+                print(f"Done: {added} new corrections added, {len(pairs) - added} already existed.")
+            else:
+                print("No valid correction pairs provided.")
+            return
+        elif args.add_show:
             if not args.name or not args.rss:
                 parser.error("--add-show requires --name and --rss")
             cmd_add_show(args)

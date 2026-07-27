@@ -1,7 +1,7 @@
 {
   "_comment": "Domain vocabulary for transcription. 'initial_prompt' primes Whisper toward correct spellings (prevention). 'corrections' are applied to the finished transcript (cure). Keep corrections PHRASE-SCOPED: single common words like 'opioid' or 'England' must never be replaced bare, because they have legitimate uses.",
 
-  "initial_prompt": "A technology podcast discussing AI research and industry news. Recurring names and terms: Peter Diamandis, Dave Blundin, Salim Ismail, Alex Wissner-Gross, Ramin Hasani, Liquid AI, Mira Murati, Thinking Machines Lab, Demis Hassabis, DeepMind, Sam Altman, Elon Musk, Alex Karp, Palantir, Andrej Karpathy, Daniela Rus, MIT CSAIL, Anthropic, OpenAI, Nvidia, Anduril, Palmer Luckey. Technical terms: open-weight models, mixture of experts, fine-tuning, reinforcement fine-tuning, RFT, recursive self-improvement, Chinchilla scaling laws, quantization, ternary quantization, transformer architecture, state space models, Mamba, liquid neural networks, C. elegans, small language models, SLM, AGI, ASI, longevity escape velocity.",
+  "initial_prompt": "A technology podcast discussing AI research and industry news. Recurring names and terms: Peter Diamandis, Dave Blundin, Salim Ismail, Alex Wissner-Gross, Ramin Hasani, Liquid AI, Mira Murati, Thinking Machines Lab, Demis Hassabis, DeepMind, Sam Altman, Elon Musk, Alex Karp, Palantir, Andrej Karpathy, Daniela Rus, MIT CSAIL, Anthropic, OpenAI, Nvidia, Anduril, Palmer Luckey, Ion Stoica, Aaron Levie, Qasar Younis, Scott Bessent, Michael Kratsios, Unitree, Delangue, Vera Rubin. Technical terms: open-weight models, mixture of experts, fine-tuning, reinforcement fine-tuning, RFT, recursive self-improvement, Chinchilla scaling laws, quantization, ternary quantization, transformer architecture, state space models, Mamba, liquid neural networks, C. elegans, small language models, SLM, AGI, ASI, longevity escape velocity.",
 
   "corrections": {
     "opioid model": "open-weight model",
@@ -38,7 +38,20 @@
     "turnery and one bit": "ternary and one-bit",
     "Finra": "FINRA",
     "androly": "Anduril",
-    "organizational seniority": "organizational singularity"
+    "organizational seniority": "organizational singularity",
+
+    "Amthropic": "Anthropic",
+    "Entropiq": "Anthropic",
+    "Unitary": "Unitree",
+    "Jan Stojka": "Ion Stoica",
+    "Aaron Levy": "Aaron Levie",
+    "Kasser Younis": "Qasar Younis",
+    "Scott Besant": "Scott Bessent",
+    "Michael Kratios": "Michael Kratsios",
+    "Mira Marotti": "Mira Murati",
+    "listener grows": "Wissner-Gross",
+    "DeLong": "Delangue",
+    "Vero Rubin": "Vera Rubin"
   },
 
   "_risky_not_applied": {
