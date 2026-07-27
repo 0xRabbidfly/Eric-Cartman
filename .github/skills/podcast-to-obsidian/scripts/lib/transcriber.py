@@ -4,6 +4,7 @@ Wraps faster-whisper for local GPU/CPU transcription of podcast audio.
 Falls back to whisper.cpp CLI if faster-whisper is not available.
 """
 
+import gc
 import json
 import os
 import re
@@ -122,6 +123,36 @@ def apply_corrections(text: str) -> Tuple[str, int]:
         total += n
 
     return text, total
+
+
+def add_corrections(new_corrections: dict) -> int:
+    """Append new corrections to the vocabulary glossary.
+
+    Args:
+        new_corrections: dict of {"wrong": "right"} pairs
+
+    Returns:
+        Number of new corrections added.
+    """
+    vocab = _load_vocabulary()
+    existing = vocab.get("corrections", {})
+    added = 0
+    for wrong, right in new_corrections.items():
+        if wrong not in existing:
+            existing[wrong] = right
+            added += 1
+    if added:
+        vocab["corrections"] = existing
+        # Write back
+        skill_dir = Path(__file__).resolve().parents[2]
+        vocab_path = skill_dir / "config" / "vocabulary.json"
+        with open(vocab_path, "w", encoding="utf-8") as f:
+            json.dump(vocab, f, indent=2, ensure_ascii=False)
+        # Invalidate cache
+        global _VOCAB_CACHE
+        _VOCAB_CACHE = None
+        print(f"  [vocab] Added {added} new corrections to glossary")
+    return added
 
 
 # ---------------------------------------------------------------------------
@@ -310,6 +341,29 @@ def _transcribe_faster_whisper(
 
     full_text = "\n".join(full_text_parts)
 
+    # Extract metadata from model info before cleanup
+    detected_language = info.language if hasattr(info, "language") else (language or "unknown")
+    detected_duration = info.duration if hasattr(info, "duration") else 0
+
+    # --- Explicit CUDA/model cleanup (prevents post-transcription crash) ---
+    # The whisper model holds GPU memory via ctranslate2.  If cleanup happens
+    # lazily during garbage collection after this function returns, the CUDA
+    # teardown can corrupt Python state and crash the pipeline before note
+    # generation starts.  Force synchronous cleanup while in a known-good state.
+    print("  [cleanup] Releasing whisper model and CUDA memory...")
+    del segments, info, model
+    gc.collect()
+    try:
+        import torch
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            torch.cuda.synchronize()
+            print("  [cleanup] CUDA memory freed via torch")
+    except ImportError:
+        pass  # torch not installed; ctranslate2 manages its own CUDA context
+    except Exception as e:
+        print(f"  [cleanup] CUDA cleanup warning (non-fatal): {e}")
+
     # Patch any domain terms the decoder still got wrong.
     full_text, fixes = apply_corrections(full_text)
     if fixes:
@@ -321,8 +375,8 @@ def _transcribe_faster_whisper(
 
     meta = {
         "vocabulary_corrections": fixes,
-        "language": info.language if hasattr(info, "language") else (language or "unknown"),
-        "duration": info.duration if hasattr(info, "duration") else 0,
+        "language": detected_language,
+        "duration": detected_duration,
         "segments_count": segment_count,
     }
 
