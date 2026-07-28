@@ -19,7 +19,6 @@ Usage:
 """
 
 import argparse
-import gc
 import importlib.util
 import io
 import json
@@ -1011,15 +1010,6 @@ def run_url_pipeline(args: argparse.Namespace) -> None:
         print("\n[error] Transcription produced no output.")
         return
 
-    # CUDA cleanup safety net (mirrors the one in run_pipeline)
-    gc.collect()
-    try:
-        import torch
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-    except (ImportError, Exception):
-        pass
-
     if args.transcribe_only:
         print("\n=== Transcript ready ===")
         for ep, audio_path, transcript_path, meta in transcribed:
@@ -1229,18 +1219,6 @@ def run_pipeline(args: argparse.Namespace) -> None:
         # note generation/vault write later succeeds for this episode --
         # the transcript is already durably on disk.
         transcribed_stems.extend(audio_path.stem for _ep, audio_path, _tp, _meta in transcribed)
-
-        # --- CUDA cleanup safety net ---
-        # The per-model cleanup in transcriber.py is the primary defence,
-        # but run a pipeline-level sweep as well to catch anything that
-        # leaked across multiple episodes in a single step_transcribe batch.
-        gc.collect()
-        try:
-            import torch
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
-        except (ImportError, Exception):
-            pass
 
         # --- Transcribe-only mode: print paths and stop ---
         if args.transcribe_only:
