@@ -307,9 +307,18 @@
           "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-07-24 - The Hugging Face Breach, Moonshot AI Valued at $20B, and Living to 1,759 Years Old  EP 273.md",
           "processed_at": "2026-07-25T06:36:11.587769+00:00",
           "status": "completed"
+        },
+        "4843b8b0-8628-11f1-93b2-cbaeafb4528b": {
+          "title": "Jared Isaacman: NASA's Moon Base by 2028, Optimus Robots on the Moon, The Truth About UFOs | Ep #274",
+          "published": "2026-07-27",
+          "audio_url": "https://traffic.megaphone.fm/DVVTS1596453089.mp3",
+          "transcript_path": "Podcasts/Moonshots with Peter Diamandis/transcripts/2026-07-27 - Jared Isaacman NASA's Moon Base by 2028, Optimus Robots on the Moon, The Truth About UFOs  Ep 274.md",
+          "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-07-27 - Jared Isaacman NASA's Moon Base by 2028, Optimus Robots on the Moon, The Truth About UFOs  Ep 274.md",
+          "processed_at": "2026-07-28T10:58:01.304141+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-07-24"
+      "latest_published": "2026-07-27"
     },
     "dwarkesh-podcast": {
       "name": "Dwarkesh Podcast",
@@ -530,9 +539,18 @@
           "note_path": "Podcasts/The a16z Podcast/2026-07-23 - Building the Physical AI Stack  Travis Kalanick on TBPN.md",
           "processed_at": "2026-07-26T06:26:35.900779+00:00",
           "status": "completed"
+        },
+        "02440efc-676f-4d2e-aa2b-6695e80e7d47": {
+          "title": "Ben Horowitz: The Fight Over Open Source AI",
+          "published": "2026-07-26",
+          "audio_url": "https://mgln.ai/e/1344/afp-848985-injected.calisto.simplecastaudio.com/3f86df7b-51c6-4101-88a2-550dba782de8/episodes/a06277c7-6617-4cbf-b37d-94f9516c033c/audio/128/default.mp3?aid=rss_feed&awCollectionId=3f86df7b-51c6-4101-88a2-550dba782de8&awEpisodeId=a06277c7-6617-4cbf-b37d-94f9516c033c&feed=JGE3yC0V",
+          "transcript_path": "Podcasts/The a16z Podcast/transcripts/2026-07-26 - Ben Horowitz The Fight Over Open Source AI.md",
+          "note_path": "Podcasts/The a16z Podcast/2026-07-26 - Ben Horowitz The Fight Over Open Source AI.md",
+          "processed_at": "2026-07-27T06:16:11.069065+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-07-24"
+      "latest_published": "2026-07-26"
     },
     "the-joe-rogan-experience": {
       "name": "The Joe Rogan Experience",

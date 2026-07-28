@@ -4,13 +4,13 @@ Wraps faster-whisper for local GPU/CPU transcription of podcast audio.
 Falls back to whisper.cpp CLI if faster-whisper is not available.
 """
 
-import gc
 import json
 import os
 import re
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from typing import Optional, Tuple
 
@@ -301,87 +301,127 @@ def _transcribe_faster_whisper(
     device: str,
     language: Optional[str],
 ) -> Tuple[Path, dict]:
-    """Transcribe using faster-whisper."""
-    _register_cuda_dll_dirs()
-    from faster_whisper import WhisperModel
+    """Transcribe using faster-whisper in an isolated subprocess.
 
-    # Device selection — detect CUDA via ctypes (no torch dependency)
-    if device == "auto":
-        device, compute_type = _detect_cuda_device()
-    elif device == "cuda":
-        compute_type = "float16"
-    else:
-        compute_type = "int8"
+    Spawns transcribe_worker.py as a separate process.  When the worker
+    exits, the OS reclaims all CUDA memory automatically -- no manual
+    gc.collect / empty_cache dance required, and a CUDA crash in the
+    worker cannot kill the parent pipeline.
+    """
+    worker_script = Path(__file__).with_name("transcribe_worker.py")
+    if not worker_script.exists():
+        raise FileNotFoundError(
+            f"Worker script not found: {worker_script}\n"
+            "Expected transcribe_worker.py alongside transcriber.py."
+        )
 
-    print(f"  [model] Loading {model_name} on {device} ({compute_type})...")
-    model = WhisperModel(model_name, device=device, compute_type=compute_type)
+    # Build subprocess command
+    cmd = [sys.executable, str(worker_script)]
+    cmd.extend(["--audio", str(audio_path)])
+    cmd.extend(["--output", str(transcript_path)])
+    cmd.extend(["--model", model_name])
 
-    print(f"  [transcribing] This may take a while...")
-    segments_list = []
-    kwargs = {}
     if language:
-        kwargs["language"] = language
+        cmd.extend(["--language", language])
 
-    # Prime the decoder with domain vocabulary so jargon and proper nouns
-    # are far less likely to be mangled in the first place.
+    # Prime the decoder with domain vocabulary
     initial_prompt = get_initial_prompt()
     if initial_prompt:
-        kwargs["initial_prompt"] = initial_prompt
+        cmd.extend(["--initial-prompt", initial_prompt])
         print(f"  [vocab] Priming decoder with domain vocabulary")
 
-    segments, info = model.transcribe(str(audio_path), **kwargs)
+    # Extract corrections dict and pass as temp JSON file
+    corrections_tmp = None
+    vocab = _load_vocabulary()
+    corrections = vocab.get("corrections") or {}
+    if corrections:
+        try:
+            corrections_tmp = tempfile.NamedTemporaryFile(
+                mode="w", suffix=".json", delete=False, encoding="utf-8",
+            )
+            json.dump(corrections, corrections_tmp)
+            corrections_tmp.close()
+            cmd.extend(["--corrections-json", corrections_tmp.name])
+        except Exception as e:
+            print(f"  [warn] Could not write corrections temp file: {e}")
+            corrections_tmp = None
 
-    full_text_parts = []
-    segment_count = 0
-    for segment in segments:
-        full_text_parts.append(segment.text.strip())
-        segment_count += 1
-        if segment_count % 50 == 0:
-            print(f"  [progress] {segment_count} segments...")
+    # Spawn worker subprocess
+    env = os.environ.copy()
+    env["PYTHONIOENCODING"] = "utf-8"
 
-    full_text = "\n".join(full_text_parts)
+    print(f"  [transcribe] Spawning worker subprocess...")
+    print(f"  [transcribe] model={model_name}, audio={audio_path.name}")
 
-    # Extract metadata from model info before cleanup
-    detected_language = info.language if hasattr(info, "language") else (language or "unknown")
-    detected_duration = info.duration if hasattr(info, "duration") else 0
-
-    # --- Explicit CUDA/model cleanup (prevents post-transcription crash) ---
-    # The whisper model holds GPU memory via ctranslate2.  If cleanup happens
-    # lazily during garbage collection after this function returns, the CUDA
-    # teardown can corrupt Python state and crash the pipeline before note
-    # generation starts.  Force synchronous cleanup while in a known-good state.
-    print("  [cleanup] Releasing whisper model and CUDA memory...")
-    del segments, info, model
-    gc.collect()
     try:
-        import torch
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-            torch.cuda.synchronize()
-            print("  [cleanup] CUDA memory freed via torch")
-    except ImportError:
-        pass  # torch not installed; ctranslate2 manages its own CUDA context
-    except Exception as e:
-        print(f"  [cleanup] CUDA cleanup warning (non-fatal): {e}")
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=1800,  # 30 minutes
+            env=env,
+        )
 
-    # Patch any domain terms the decoder still got wrong.
-    full_text, fixes = apply_corrections(full_text)
-    if fixes:
-        print(f"  [vocab] Applied {fixes} vocabulary corrections")
+        # Relay worker stdout (progress messages)
+        if result.stdout:
+            for line in result.stdout.splitlines():
+                if not line.startswith("__META__"):
+                    print(f"  {line}")
 
-    # Write transcript
-    with open(transcript_path, "w", encoding="utf-8") as f:
-        f.write(full_text)
+        # Parse metadata from __META__ markers
+        meta = {
+            "language": language or "unknown",
+            "duration": 0,
+            "segments_count": 0,
+            "vocabulary_corrections": 0,
+        }
+        if result.stdout:
+            m = re.search(r"__META__(.+?)__META__", result.stdout)
+            if m:
+                try:
+                    meta = json.loads(m.group(1))
+                except json.JSONDecodeError:
+                    print("  [warn] Could not parse worker metadata")
 
-    meta = {
-        "vocabulary_corrections": fixes,
-        "language": detected_language,
-        "duration": detected_duration,
-        "segments_count": segment_count,
-    }
+        if result.returncode != 0:
+            # Worker crashed -- check if transcript was written before crash
+            if transcript_path.exists() and transcript_path.stat().st_size > 0:
+                print(f"  [warn] Worker exited with code {result.returncode}, "
+                      f"but transcript was written successfully")
+                if result.stderr:
+                    # Print last few lines of stderr for diagnostics
+                    err_lines = result.stderr.strip().splitlines()[-5:]
+                    for line in err_lines:
+                        print(f"  [worker-stderr] {line}")
+            else:
+                stderr_msg = result.stderr.strip() if result.stderr else "no stderr"
+                raise RuntimeError(
+                    f"Transcription worker failed (exit code {result.returncode}):\n"
+                    f"{stderr_msg}"
+                )
+
+    except subprocess.TimeoutExpired:
+        # Check if transcript was partially written
+        if transcript_path.exists() and transcript_path.stat().st_size > 0:
+            print("  [warn] Worker timed out after 30 min, but transcript file exists")
+            meta = {
+                "language": language or "unknown",
+                "duration": 0,
+                "segments_count": 0,
+                "vocabulary_corrections": 0,
+            }
+        else:
+            raise RuntimeError("Transcription worker timed out after 30 minutes")
+    finally:
+        # Clean up temp corrections file
+        if corrections_tmp:
+            try:
+                os.unlink(corrections_tmp.name)
+            except OSError:
+                pass
 
     size_kb = transcript_path.stat().st_size / 1024
-    print(f"  [done] {transcript_path.name} ({size_kb:.1f} KB, {segment_count} segments)")
+    print(f"  [done] {transcript_path.name} ({size_kb:.1f} KB)")
     return transcript_path, meta
 
 
