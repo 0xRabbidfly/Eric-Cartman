@@ -1,0 +1,27 @@
+{
+  "_comment": [
+    "Browser launch profile for all Playwright MCP browser skills (zehrs-grocery, used-car-search, rbc-banking).",
+    "Do NOT add JS 'stealth' init scripts here. Patching navigator.webdriver / navigator.plugins from",
+    "an init script is itself a detection signal — Akamai Bot Manager blocks on it (verified: real Chrome",
+    "+ JS patch = 403, real Chrome + native flags below = 200 on zehrs.ca).",
+    "Automation must be suppressed natively via ignoreDefaultArgs + disable-blink-features, not in JS."
+  ],
+  "browser": {
+    "browserName": "chromium",
+    "userDataDir": "C:/Playwright-Chrome-Profile",
+    "launchOptions": {
+      "channel": "chrome",
+      "headless": false,
+      "args": [
+        "--disable-blink-features=AutomationControlled",
+        "--start-maximized"
+      ],
+      "ignoreDefaultArgs": [
+        "--enable-automation"
+      ]
+    },
+    "contextOptions": {
+      "viewport": null
+    }
+  }
+}

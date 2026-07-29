@@ -1,0 +1,26 @@
+{
+  "_comment": [
+    "Same launch profile as .claude/playwright-browser-config.json but with the RBC-dedicated",
+    "user data dir, so banking sessions stay separate from the shopping profile.",
+    "Do NOT add JS 'stealth' init scripts — patching navigator from an init script is a",
+    "detection signal, not a defence. Automation is suppressed natively below."
+  ],
+  "browser": {
+    "browserName": "chromium",
+    "userDataDir": "C:/RBC-Browser-Chrome",
+    "launchOptions": {
+      "channel": "chrome",
+      "headless": false,
+      "args": [
+        "--disable-blink-features=AutomationControlled",
+        "--start-maximized"
+      ],
+      "ignoreDefaultArgs": [
+        "--enable-automation"
+      ]
+    },
+    "contextOptions": {
+      "viewport": null
+    }
+  }
+}

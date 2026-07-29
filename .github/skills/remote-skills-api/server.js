@@ -400,10 +400,19 @@ const STDIO_BROWSER_SKILLS = new Set(['rbc-banking']);
 // On-demand Playwright MCP server management
 const PLAYWRIGHT_PORT = 3939;
 const PLAYWRIGHT_CLI = path.join(PROJECT_DIR, '.claude', 'skills', 'rbc-banking', 'node_modules', '@playwright', 'mcp', 'cli.js');
-const STEALTH_INIT = path.join(PROJECT_DIR, '.claude', 'skills', 'rbc-banking', 'stealth-init.js');
+// Browser launch profile: real Chrome channel + native automation suppression.
+// See the _comment in that file — JS-based stealth init scripts are a detection
+// signal, not a defence, and must not be reintroduced.
+const BROWSER_CONFIG = path.join(PROJECT_DIR, '.claude', 'playwright-browser-config.json');
 let playwrightProc = null;
 let playwrightIdleTimer = null;
-const PLAYWRIGHT_IDLE_MS = 5 * 60 * 1000; // Kill after 5 min of inactivity
+// Kill after inactivity. This is a human-in-the-loop budget, not just a resource
+// cap: browser skills pause mid-run to ask the user for a 2FA/SMS code, and the
+// browser must still be alive when they reply. 5 min was too tight — a slow reply
+// killed the session and forced a fresh login and a new code. Overridable via env.
+const PLAYWRIGHT_IDLE_MS = process.env.PLAYWRIGHT_IDLE_MS
+  ? parseInt(process.env.PLAYWRIGHT_IDLE_MS, 10)
+  : 30 * 60 * 1000;
 
 function isPlaywrightRunning() {
   return playwrightProc && !playwrightProc.killed;
@@ -451,9 +460,7 @@ async function ensurePlaywright(retryCount = 0) {
   playwrightProc = spawn('node', [
     PLAYWRIGHT_CLI,
     '--port', String(PLAYWRIGHT_PORT),
-    '--no-sandbox',
-    '--user-data-dir', 'C:/Playwright-Profile',
-    '--init-script', STEALTH_INIT.replace(/\\/g, '/'),
+    '--config', BROWSER_CONFIG.replace(/\\/g, '/'),
     '--shared-browser-context',
   ], {
     cwd: PROJECT_DIR,
