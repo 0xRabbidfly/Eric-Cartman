@@ -409,7 +409,32 @@ function isPlaywrightRunning() {
   return playwrightProc && !playwrightProc.killed;
 }
 
-async function ensurePlaywright() {
+async function killStalePlaywright() {
+  // Kill any process holding port 3939 before starting a new one
+  try {
+    const { execSync } = require('child_process');
+    const out = execSync(`netstat -ano | findstr ":${PLAYWRIGHT_PORT}.*LISTENING"`, { encoding: 'utf8', timeout: 5000 });
+    const lines = out.trim().split('\n');
+    for (const line of lines) {
+      const pid = line.trim().split(/\s+/).pop();
+      if (pid && pid !== '0') {
+        console.log(`[Playwright] Killing stale process on port ${PLAYWRIGHT_PORT} (PID ${pid})`);
+        try { execSync(`taskkill /PID ${pid} /F`, { timeout: 5000 }); } catch {}
+      }
+    }
+    // Brief pause for port release
+    await new Promise(r => setTimeout(r, 1000));
+  } catch {
+    // No process on the port — good
+  }
+}
+
+async function ensurePlaywright(retryCount = 0) {
+  const MAX_RETRIES = 2;
+  const STARTUP_TIMEOUT_MS = 30000; // 30s instead of 10s
+  const POLL_INTERVAL_MS = 500;
+  const MAX_POLLS = STARTUP_TIMEOUT_MS / POLL_INTERVAL_MS;
+
   if (isPlaywrightRunning()) {
     resetPlaywrightIdleTimer();
     return true;
@@ -418,7 +443,11 @@ async function ensurePlaywright() {
     console.error('[Playwright] CLI not found at', PLAYWRIGHT_CLI);
     return false;
   }
-  console.log('[Playwright] Starting on-demand server on port', PLAYWRIGHT_PORT);
+
+  // Kill any stale process holding the port
+  await killStalePlaywright();
+
+  console.log(`[Playwright] Starting on-demand server on port ${PLAYWRIGHT_PORT}${retryCount ? ` (retry ${retryCount})` : ''}`);
   playwrightProc = spawn('node', [
     PLAYWRIGHT_CLI,
     '--port', String(PLAYWRIGHT_PORT),
@@ -443,9 +472,9 @@ async function ensurePlaywright() {
     console.log(`[Playwright] Server exited (code ${code})`);
     playwrightProc = null;
   });
-  // Wait for it to be ready
-  for (let i = 0; i < 20; i++) {
-    await new Promise(r => setTimeout(r, 500));
+  // Wait for it to be ready (30s timeout, was 10s)
+  for (let i = 0; i < MAX_POLLS; i++) {
+    await new Promise(r => setTimeout(r, POLL_INTERVAL_MS));
     try {
       const res = await fetch(`http://localhost:${PLAYWRIGHT_PORT}/mcp`, { method: 'OPTIONS' });
       if (res.ok || res.status === 405 || res.status === 400) {
@@ -455,8 +484,15 @@ async function ensurePlaywright() {
       }
     } catch {}
   }
-  console.error('[Playwright] Server failed to start within 10s');
+  console.error(`[Playwright] Server failed to start within ${STARTUP_TIMEOUT_MS / 1000}s`);
   stopPlaywright();
+
+  // Retry once after cleanup
+  if (retryCount < MAX_RETRIES) {
+    console.log(`[Playwright] Retrying in 5s... (attempt ${retryCount + 2}/${MAX_RETRIES + 1})`);
+    await new Promise(r => setTimeout(r, 5000));
+    return ensurePlaywright(retryCount + 1);
+  }
   return false;
 }
 
