@@ -382,6 +382,7 @@ def _parse_pipeline_md(path: Path) -> dict:
         "topics": [],
         "must_follow_accounts": [],
         "discovery_accounts": [],
+        "auto_capture_accounts": [],
     }
 
     if not path.exists():
@@ -409,6 +410,8 @@ def _parse_pipeline_md(path: Path) -> dict:
                     section = "discovery"
                 elif "setting" in header:
                     section = "settings"
+                elif "auto" in header and "capture" in header:
+                    section = "auto-capture"
                 else:
                     section = None
                 continue
@@ -488,6 +491,10 @@ def _parse_pipeline_md(path: Path) -> dict:
                         "handle": rest.strip(),
                         "label": rest.strip(),
                     })
+
+            elif section == "auto-capture" and line.startswith("- @"):
+                handle = line[3:].strip()
+                config["auto_capture_accounts"].append(handle.lower())
 
     return config
 
@@ -984,6 +991,70 @@ def _filter_must_follow_substance(items: list) -> list:
             continue
         filtered.append(item)
     return filtered
+
+
+# ---------------------------------------------------------------------------
+# Auto-capture: run linked-research on article URLs from specified accounts
+# ---------------------------------------------------------------------------
+
+# Domains that indicate a real article (not just a tweet link)
+_ARTICLE_DOMAINS = [
+    "anthropic.com", "openai.com", "blog.", "substack.com", "arxiv.org",
+    "github.com", "huggingface.co", "deepmind.google", "medium.com",
+    "notion.site", "dev.to", "latent.space", "cursor.com", "docs.",
+]
+
+
+def auto_capture_articles(must_follow_results: list, config: dict):
+    """Check must-follow tweets from auto-capture accounts for article URLs.
+
+    If a tweet contains an article URL, spawn the linked-research skill
+    to create a Research Library note automatically.
+    """
+    auto_accounts = set(config.get("auto_capture_accounts", []))
+    if not auto_accounts:
+        return
+
+    linked_research_script = SKILL_DIR.parent / "obsidian-linked-research"
+    if not linked_research_script.exists():
+        return
+
+    captured = 0
+    for result in must_follow_results:
+        handle = result.get("handle", "").lstrip("@").lower()
+        if handle not in auto_accounts:
+            continue
+
+        for item in result.get("items", []):
+            text = item.text if hasattr(item, "text") else ""
+            # Extract URLs from the tweet text
+            urls = re.findall(r'https?://\S+', text)
+            for url in urls:
+                # Skip X/Twitter links (those are just tweet references)
+                if "x.com/" in url or "twitter.com/" in url:
+                    continue
+                # Check if it's an article domain
+                url_lower = url.lower()
+                if any(domain in url_lower for domain in _ARTICLE_DOMAINS):
+                    print(f"  [auto-capture] @{handle}: {url[:80]}")
+                    try:
+                        # Run linked-research via subprocess (best-effort)
+                        result_proc = subprocess.run(
+                            [CLAUDE_CLI, "--print", "-p",
+                             f"Run the obsidian-linked-research skill for this URL: {url}"],
+                            capture_output=True, text=True, encoding="utf-8",
+                            timeout=180,
+                        )
+                        if result_proc.returncode == 0:
+                            captured += 1
+                            print(f"  [auto-capture] Captured: {url[:60]}")
+                        else:
+                            print(f"  [auto-capture] Failed: {result_proc.stderr[:100]}")
+                    except Exception as e:
+                        print(f"  [auto-capture] Error: {e}")
+
+    if captured:
+        print(f"[auto-capture] Captured {captured} article(s) from auto-capture accounts")
 
 
 def run_must_follow_scan(
@@ -2960,6 +3031,13 @@ def main():
             )
             mf_total = sum(len(r["items"]) for r in must_follow_results)
             print(f"[must-follow] Captured {mf_total} tweets from {len(mf_accounts)} accounts")
+
+            # Auto-capture articles from designated accounts
+            if config.get("auto_capture_accounts"):
+                try:
+                    auto_capture_articles(must_follow_results, config)
+                except Exception as e:
+                    print(f"[auto-capture] Error ({e}) — continuing")
         except Exception as e:
             print(f"[heal] Must-follow scan failed ({e}) — continuing without it")
 
