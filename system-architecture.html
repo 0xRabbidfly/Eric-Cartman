@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Obsidian Knowledge System Architecture</title>
+<style>
+  body { font-family: system-ui, -apple-system, sans-serif; max-width: 760px; margin: 20px auto; padding: 0 16px; background: #0d1117; color: #c9d1d9; }
+  .sys-card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 10px 14px; margin: 4px; display: inline-block; vertical-align: top; }
+  .sys-card-accent { background: #1c1e2e; border: 1.5px solid #6366f1; border-radius: 8px; padding: 10px 14px; margin: 4px; display: inline-block; vertical-align: top; }
+  .sys-title { font-size: 12px; font-weight: 700; margin: 0; color: #e6edf3; }
+  .sys-sub { font-size: 10px; color: #8b949e; margin: 2px 0 0; }
+  .sys-trigger { font-size: 9px; color: #6366f1; font-style: italic; margin: 2px 0 0; }
+  .layer-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #8b949e; margin: 22px 0 8px; padding-bottom: 4px; border-bottom: 1px solid #30363d; }
+  .layer-label-accent { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #6366f1; margin: 22px 0 8px; padding-bottom: 4px; border-bottom: 1.5px dashed #6366f1; }
+  .flow-row { display: flex; flex-wrap: wrap; gap: 4px; align-items: stretch; }
+  .arrow-down { text-align: center; color: #30363d; font-size: 16px; margin: 6px 0; }
+  .arrow-down-accent { text-align: center; color: #6366f1; font-size: 16px; margin: 6px 0; }
+  .vault-section { background: #1c1e2e; border: 1px solid #6366f1; border-radius: 8px; padding: 8px 12px; flex: 1; min-width: 100px; margin: 3px; }
+  .vault-label { font-size: 11px; font-weight: 700; color: #e6edf3; }
+  .vault-stat { font-size: 9px; color: #8b949e; }
+  .heal-card { background: #161b22; border: 1px solid #30363d; border-radius: 6px; padding: 6px 10px; flex: 1; min-width: 80px; margin: 3px; }
+  .heal-title { font-size: 10px; font-weight: 600; color: #e6edf3; }
+  .heal-sub { font-size: 9px; color: #8b949e; }
+  .legend-box { background: #161b22; border: 1px solid #30363d; border-radius: 6px; padding: 10px 14px; margin-top: 16px; font-size: 9px; color: #8b949e; line-height: 1.7; }
+  .page-title { font-size: 20px; font-weight: 700; color: #e6edf3; margin-bottom: 4px; }
+  .page-date { font-size: 11px; color: #8b949e; margin-bottom: 16px; }
+  .pill { font-size: 9px; background: #0d1117; border-radius: 4px; padding: 3px 8px; border: 1px solid #6366f1; color: #a5b4fc; display: inline-block; margin: 2px; }
+  .connector { display: flex; align-items: center; color: #6366f1; font-size: 20px; padding: 0 4px; }
+</style>
+</head>
+<body>
+
+<div class="page-title">Obsidian Knowledge System</div>
+<div class="page-date">Architecture · Updated 2026-07-25</div>
+
+<!-- SOURCES -->
+<div class="layer-label">External Sources</div>
+<div class="flow-row">
+  <div class="sys-card" style="flex:1; min-width: 70px; text-align:center;">
+    <p class="sys-title">Gmail</p>
+    <p class="sys-sub">Newsletters</p>
+  </div>
+  <div class="sys-card" style="flex:1; min-width: 70px; text-align:center;">
+    <p class="sys-title">X / Twitter</p>
+    <p class="sys-sub">AI accounts</p>
+  </div>
+  <div class="sys-card" style="flex:1; min-width: 70px; text-align:center;">
+    <p class="sys-title">Google News</p>
+    <p class="sys-sub">RSS feeds</p>
+  </div>
+  <div class="sys-card" style="flex:1; min-width: 70px; text-align:center;">
+    <p class="sys-title">Podcasts</p>
+    <p class="sys-sub">8 RSS feeds</p>
+  </div>
+  <div class="sys-card" style="flex:1; min-width: 70px; text-align:center;">
+    <p class="sys-title">URLs</p>
+    <p class="sys-sub">Manual links</p>
+  </div>
+</div>
+
+<div class="arrow-down">▼ ▼ ▼ ▼ ▼</div>
+
+<!-- INGESTION -->
+<div class="layer-label">Ingestion Pipelines</div>
+<div class="flow-row">
+  <div class="sys-card" style="flex:1; min-width: 140px;">
+    <p class="sys-title">Gmail Briefing</p>
+    <p class="sys-sub">Daily 6am · Cowork</p>
+    <p class="sys-trigger">→ linked-research skill</p>
+  </div>
+  <div class="sys-card" style="flex:1; min-width: 140px;">
+    <p class="sys-title">Daily Research</p>
+    <p class="sys-sub">Daily 1am · Windows</p>
+    <p class="sys-trigger">xAI grok-4.3 · self-healing</p>
+  </div>
+  <div class="sys-card" style="flex:1; min-width: 140px;">
+    <p class="sys-title">Podcast Pipeline</p>
+    <p class="sys-sub">Daily 2am · Cowork</p>
+    <p class="sys-trigger">RTX 5070 GPU · max 2/day</p>
+  </div>
+  <div class="sys-card" style="flex:1; min-width: 140px;">
+    <p class="sys-title">Linked Research</p>
+    <p class="sys-sub">On demand · Skill</p>
+    <p class="sys-trigger">URL → structured note</p>
+  </div>
+</div>
+
+<div class="arrow-down">▼ ▼ ▼ ▼</div>
+
+<!-- SKILLS -->
+<div class="layer-label">Processing Skills (Eric-Cartman)</div>
+<div class="flow-row">
+  <div class="sys-card" style="min-width: 90px;">
+    <p class="sys-title">obsidian</p>
+    <p class="sys-sub">Base vault I/O</p>
+  </div>
+  <div class="sys-card" style="min-width: 90px;">
+    <p class="sys-title">promote_v2</p>
+    <p class="sys-sub">#keep → Library</p>
+    <p class="sys-trigger">Tags · Routing · MOC</p>
+  </div>
+  <div class="sys-card" style="min-width: 90px;">
+    <p class="sys-title">vault-linker</p>
+    <p class="sys-sub">URL → note</p>
+  </div>
+  <div class="sys-card" style="min-width: 90px;">
+    <p class="sys-title">podcast-to-obs</p>
+    <p class="sys-sub">v1.3.0 · CUDA</p>
+  </div>
+  <div class="sys-card" style="min-width: 90px;">
+    <p class="sys-title">vault-lint</p>
+    <p class="sys-sub">Sun 7am</p>
+    <p class="sys-trigger">Tags · MOC · rename</p>
+  </div>
+</div>
+
+<div class="arrow-down">▼ ▼ ▼</div>
+
+<!-- VAULT -->
+<div class="layer-label">Obsidian Vault</div>
+<div class="flow-row">
+  <div class="vault-section">
+    <p class="vault-label">Research/Library</p>
+    <p class="vault-stat">193 notes · 10 folders</p>
+    <p class="vault-stat">Canonical tags · MOCs</p>
+  </div>
+  <div class="vault-section">
+    <p class="vault-label">Research/Dailies</p>
+    <p class="vault-stat">146 daily scans</p>
+    <p class="vault-stat">POW · News · X feed</p>
+  </div>
+  <div class="vault-section">
+    <p class="vault-label">Podcasts</p>
+    <p class="vault-stat">56 eps · 8 shows</p>
+    <p class="vault-stat">GPU transcribed</p>
+  </div>
+  <div class="vault-section">
+    <p class="vault-label">Reports</p>
+    <p class="vault-stat">9 documents</p>
+    <p class="vault-stat">Auto + manual</p>
+  </div>
+  <div class="vault-section">
+    <p class="vault-label">MOCs</p>
+    <p class="vault-stat">5 topic + master</p>
+    <p class="vault-stat">Dynamic creation</p>
+  </div>
+</div>
+
+<div class="arrow-down-accent">⟱ auto-triggered ⟱</div>
+
+<!-- METABOLISM -->
+<div class="layer-label-accent">Knowledge Metabolism</div>
+<div class="flow-row" style="align-items: center;">
+  <div class="sys-card-accent" style="flex:1; min-width: 140px;">
+    <p class="sys-title">Connection Detector</p>
+    <p class="sys-sub">On every note creation</p>
+    <p class="sys-trigger">supports · contradicts · extends · bridges</p>
+    <p class="sys-sub" style="margin-top:4px;">→ connections.json</p>
+  </div>
+  <div class="connector">→</div>
+  <div class="sys-card-accent" style="flex:1; min-width: 140px;">
+    <p class="sys-title">Thesis Tracker</p>
+    <p class="sys-sub">Clusters connections</p>
+    <p class="sys-trigger">emerging → mature → report</p>
+    <p class="sys-sub" style="margin-top:4px;">→ theses.json</p>
+  </div>
+  <div class="connector">→</div>
+  <div class="sys-card-accent" style="flex:1; min-width: 140px;">
+    <p class="sys-title">Vault Report</p>
+    <p class="sys-sub">Auto or manual trigger</p>
+    <p class="sys-trigger">Corpus → synthesis → Reports/</p>
+  </div>
+</div>
+
+<div class="arrow-down-accent">⟱</div>
+
+<!-- WEEKLY BRAIN -->
+<div class="layer-label-accent">Weekly Intelligence</div>
+<div style="margin: 0 4px;">
+  <div class="sys-card-accent" style="width: 100%; box-sizing: border-box;">
+    <p class="sys-title" style="font-size: 13px;">Weekly Brain Digest · Sundays 8am · 7 passes · 5 API calls</p>
+    <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px;">
+      <span class="pill">📈 Trends</span>
+      <span class="pill">🧬 Thesis Health</span>
+      <span class="pill">🔍 Blindspots</span>
+      <span class="pill">🌉 Bridges</span>
+      <span class="pill">🌊 Zeitgeist</span>
+      <span class="pill">✅ Actions</span>
+      <span class="pill">🔮 Predictions</span>
+    </div>
+  </div>
+</div>
+
+<!-- SELF HEALING -->
+<div class="layer-label">Self-Healing Infrastructure</div>
+<div class="flow-row">
+  <div class="heal-card">
+    <p class="heal-title">Step Fallback</p>
+    <p class="heal-sub">Retry + degrade</p>
+  </div>
+  <div class="heal-card">
+    <p class="heal-title">Validation</p>
+    <p class="heal-sub">Post-write repair</p>
+  </div>
+  <div class="heal-card">
+    <p class="heal-title">Drift Detection</p>
+    <p class="heal-sub">7-day health ⚠️</p>
+  </div>
+  <div class="heal-card">
+    <p class="heal-title">Auto-Repair</p>
+    <p class="heal-sub">Model + config</p>
+  </div>
+  <div class="heal-card">
+    <p class="heal-title">Healthcheck</p>
+    <p class="heal-sub">Port 3838 hourly</p>
+  </div>
+</div>
+
+<!-- ACCESS -->
+<div class="layer-label">Access Layer</div>
+<div class="flow-row">
+  <div class="sys-card" style="flex:1; min-width: 140px; text-align:center;">
+    <p class="sys-title">Remote Skills API</p>
+    <p class="sys-sub">Port 3838 · Tailscale Funnel</p>
+  </div>
+  <div class="sys-card" style="flex:1; min-width: 140px; text-align:center;">
+    <p class="sys-title">Cowork / Dispatch</p>
+    <p class="sys-sub">Mobile + Desktop</p>
+  </div>
+  <div class="sys-card" style="flex:1; min-width: 140px; text-align:center;">
+    <p class="sys-title">Obsidian App</p>
+    <p class="sys-sub">Direct vault access</p>
+  </div>
+</div>
+
+<div class="legend-box">
+  <strong style="color:#e6edf3;">Schedule:</strong> Research 1am · Podcast 2am · Gmail 6am · Lint Sun 7am · Brain Sun 8am · Healthcheck hourly<br>
+  <strong style="color:#e6edf3;">APIs:</strong> xAI grok-4.3 (scan, synthesis, classification) · GPU: RTX 5070 (whisper large-v3)<br>
+  <strong style="color:#e6edf3;">Vault:</strong> 395 notes · 10 connections · 1 tracked thesis · 45 podcast episodes<br>
+  <strong style="color:#e6edf3;">Repo:</strong> github.com/0xRabbidfly/Eric-Cartman · 15+ skills
+</div>
+
+</body>
+</html>
