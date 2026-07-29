@@ -46,6 +46,7 @@
 - @trq212 - Thariq (solo)
 - @DarioAmodei — Dario Amodei (solo)
 - @AnthropicAI — Anthropic
+- @claudedevs — ClaudeDevs (solo)
 
 ## OpenAI
 
@@ -84,3 +85,12 @@
 - depth: scan
 - prominent_ai_min_likes: 500
 - xai_model: auto
+
+# Auto-Capture Accounts
+
+> Tweets from these accounts that contain article/blog URLs are automatically
+> captured as Research Library notes via the obsidian-linked-research skill.
+> No #keep tag needed — articles are ingested immediately.
+> Format: `- @handle`
+
+- @claudedevs
