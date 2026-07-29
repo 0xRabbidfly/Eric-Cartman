@@ -146,9 +146,18 @@
           "note_path": "Podcasts/Limitless/2026-07-24 - THIS WEEK IN AI NVIDIA Dominates Google  America vs Open Source  Tesla Starlink V5.md",
           "processed_at": "2026-07-25T06:13:24.856369+00:00",
           "status": "completed"
+        },
+        "4b77ae3d-b6f6-4bec-ad67-4288055cd625": {
+          "title": "Why Claude Opus 5 is Our Favorite AI Model (For Now)",
+          "published": "2026-07-28",
+          "audio_url": "https://media.transistor.fm/4bb58065/1c9a74cc.mp3",
+          "transcript_path": "Podcasts/Limitless/transcripts/2026-07-28 - Why Claude Opus 5 is Our Favorite AI Model (For Now).md",
+          "note_path": "Podcasts/Limitless/2026-07-28 - Why Claude Opus 5 is Our Favorite AI Model (For Now).md",
+          "processed_at": "2026-07-29T06:09:09.584203+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-07-24"
+      "latest_published": "2026-07-28"
     },
     "the-pomp-podcast": {
       "name": "The Pomp Podcast",
@@ -548,9 +557,18 @@
           "note_path": "Podcasts/The a16z Podcast/2026-07-26 - Ben Horowitz The Fight Over Open Source AI.md",
           "processed_at": "2026-07-27T06:16:11.069065+00:00",
           "status": "completed"
+        },
+        "df73b893-d213-4168-a6fb-8c845e831df9": {
+          "title": "Fei-Fei Li on Spatial Intelligence and Robotics",
+          "published": "2026-07-28",
+          "audio_url": "https://mgln.ai/e/1344/afp-848985-injected.calisto.simplecastaudio.com/3f86df7b-51c6-4101-88a2-550dba782de8/episodes/e2a3c643-334f-47f6-a6e0-d9124f6786a3/audio/128/default.mp3?aid=rss_feed&awCollectionId=3f86df7b-51c6-4101-88a2-550dba782de8&awEpisodeId=e2a3c643-334f-47f6-a6e0-d9124f6786a3&feed=JGE3yC0V",
+          "transcript_path": "Podcasts/The a16z Podcast/transcripts/2026-07-28 - Fei-Fei Li on Spatial Intelligence and Robotics.md",
+          "note_path": "Podcasts/The a16z Podcast/2026-07-28 - Fei-Fei Li on Spatial Intelligence and Robotics.md",
+          "processed_at": "2026-07-28T11:04:11.171413+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-07-26"
+      "latest_published": "2026-07-28"
     },
     "the-joe-rogan-experience": {
       "name": "The Joe Rogan Experience",
