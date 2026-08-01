@@ -289,8 +289,11 @@ def pass_trend(vault: dict, api_key: str) -> str:
     now = datetime.now()
 
     # Build tag frequency per week for the last 8 weeks
+    # Exclude dailies: they all share the same 5 tags (agents, skills, models,
+    # sdd, sdlc), drowning out the more specific Library/Podcast tags.
+    trend_notes = vault["library"] + vault["podcasts"]
     week_tags: dict[str, Counter] = defaultdict(Counter)
-    for note in vault["all_notes"]:
+    for note in trend_notes:
         if not note["date"] or note["date"] < vault["cutoff_8w"]:
             continue
         wk = week_key(note["date"])
@@ -325,10 +328,11 @@ def pass_trend(vault: dict, api_key: str) -> str:
     top_trends = tag_scores[:5]
 
     # Convergent discovery: topics appearing in 3+ independent sources within 2 weeks
+    # Exclude dailies — they all tag the same 5 topics so every daily adds noise
     convergent = []
     two_weeks_ago = now - timedelta(weeks=2)
     tag_sources: dict[str, set] = defaultdict(set)
-    for note in vault["all_notes"]:
+    for note in trend_notes:
         if not note["date"] or note["date"] < two_weeks_ago:
             continue
         src = note["source"] or note["name"]
@@ -377,23 +381,44 @@ def pass_thesis(vault: dict, api_key: str) -> str:
         thesis_name = thesis.get("name", thesis.get("title", thesis_id))
         thesis_tags = thesis.get("tags", [])
 
+        # Gather this thesis's note paths and embedded connections
+        thesis_notes = set(thesis.get("notes", []))
+        thesis_conns = thesis.get("connections", [])
+
         # Count supporting vs contradicting connections
         supporting = 0
         contradicting = 0
         latest_support_date = None
 
+        # Use the thesis's own curated connection list for counts
+        if thesis_conns:
+            for conn in thesis_conns:
+                rel = conn.get("relationship", conn.get("type", "")).lower()
+                if "contradict" in rel or "against" in rel or "challenge" in rel:
+                    contradicting += 1
+                else:
+                    supporting += 1
+
+        # Match vault connections by thesis notes for dates (and counts
+        # as fallback when the thesis has no embedded connections)
         for conn in connections:
-            conn_thesis = conn.get("thesis_id", conn.get("thesis", ""))
-            if str(conn_thesis) != str(thesis_id) and conn_thesis != thesis_name:
+            conn_source = conn.get("source", "")
+            conn_target = conn.get("target", "")
+            if conn_source not in thesis_notes and conn_target not in thesis_notes:
                 continue
             rel = conn.get("relationship", conn.get("type", "")).lower()
-            conn_date_str = conn.get("date", conn.get("created", ""))
-            conn_date = parse_date(conn_date_str)
+            conn_date_str = conn.get("detected_at", conn.get("date", conn.get("created", "")))
+            conn_date = parse_date(conn_date_str[:10]) if conn_date_str else None
 
-            if "contradict" in rel or "against" in rel or "challenge" in rel:
-                contradicting += 1
-            else:
-                supporting += 1
+            if not thesis_conns:
+                # Fallback: count from vault connections
+                if "contradict" in rel or "against" in rel or "challenge" in rel:
+                    contradicting += 1
+                else:
+                    supporting += 1
+
+            # Track latest supporting evidence date
+            if not ("contradict" in rel or "against" in rel or "challenge" in rel):
                 if conn_date and (latest_support_date is None or conn_date > latest_support_date):
                     latest_support_date = conn_date
 
@@ -454,12 +479,40 @@ def pass_blindspot(vault: dict, api_key: str) -> str:
 
     # 2. Consumption-to-synthesis ratio
     # Count daily note mentions of topics vs Library notes covering them
+    # Noise filters for 2-word phrase extraction
+    _NOISE_WORDS = {"https", "http", "com", "www", "org", "net", "io", "tokens"}
+    _BOILERPLATE_PHRASES = {
+        "daily research", "today pow", "pipeline cost", "api calls",
+        "feedback insights", "efficiency recommendations", "reading list",
+        "research feed", "promote library",
+    }
+    _STOPWORDS = {
+        "this", "that", "with", "from", "have", "been", "were", "they",
+        "their", "them", "will", "would", "could", "should", "about",
+        "which", "when", "what", "where", "there", "here", "than",
+        "then", "also", "into", "more", "some", "such", "each",
+        "only", "other", "over", "most", "very", "just", "like",
+        "does", "done", "make", "made", "being", "after", "before",
+    }
+
     daily_topic_mentions: Counter = Counter()
     for note in dailies:
         # Extract 2-word phrases from the body as rough topic indicators
-        words = re.findall(r"[a-zA-Z]{3,}", note["body"][:2000])
+        # Both words must be 4+ chars to filter out short noise words
+        words = re.findall(r"[a-zA-Z]{4,}", note["body"][:2000])
         for i in range(len(words) - 1):
-            phrase = f"{words[i].lower()} {words[i+1].lower()}"
+            w1 = words[i].lower()
+            w2 = words[i + 1].lower()
+            # Skip URL fragments
+            if w1 in _NOISE_WORDS or w2 in _NOISE_WORDS:
+                continue
+            phrase = f"{w1} {w2}"
+            # Skip pipeline boilerplate phrases
+            if phrase in _BOILERPLATE_PHRASES:
+                continue
+            # Skip if both words are common English stopwords
+            if w1 in _STOPWORDS and w2 in _STOPWORDS:
+                continue
             daily_topic_mentions[phrase] += 1
 
     library_topic_coverage: Counter = Counter()
