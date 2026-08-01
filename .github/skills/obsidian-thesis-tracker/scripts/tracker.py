@@ -250,6 +250,7 @@ Respond with just the thesis statement, nothing else."""
             {"role": "user", "content": prompt},
         ],
         "temperature": 0.4,
+        "reasoning_effort": "high",
     }
 
     try:

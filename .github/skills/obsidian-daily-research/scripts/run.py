@@ -816,13 +816,14 @@ SYNTHESIS_MODEL = "claude-sonnet-4-6"  # kept as fallback reference
 CLAUDE_CLI = r"C:\Users\nuno_\.local\bin\claude.exe"  # kept as fallback reference
 
 
-def _call_xai_chat(api_key: str, model: str, prompt: str, max_tokens: int = 4096) -> tuple[str, dict | None]:
+def _call_xai_chat(api_key: str, model: str, prompt: str, max_tokens: int = 4096, effort: str = "medium") -> tuple[str, dict | None]:
     """Call xAI chat completions API directly. Returns (content_text, usage_dict)."""
     payload = json.dumps({
         "model": model,
         "messages": [{"role": "user", "content": prompt}],
         "max_tokens": max_tokens,
         "temperature": 0.3,
+        "reasoning_effort": effort,
     }).encode("utf-8")
 
     req = urllib.request.Request(
@@ -930,7 +931,7 @@ RULES:
     last_error = None
     for attempt in range(max_retries + 1):
         try:
-            content, usage = _call_xai_chat(api_key, model, prompt, max_tokens=4096)
+            content, usage = _call_xai_chat(api_key, model, prompt, max_tokens=4096, effort="medium")
             if tracker and usage:
                 tracker.record("Synthesis", model, usage)
             if not content:
@@ -2361,7 +2362,7 @@ def _score_news_with_llm(items: list, api_key: str = "", model: str = "grok-4.5"
     )
 
     try:
-        content, _usage = _call_xai_chat(api_key, model, prompt, max_tokens=2048)
+        content, _usage = _call_xai_chat(api_key, model, prompt, max_tokens=2048, effort="low")
         content = content.strip()
         content = re.sub(r"^```(?:json)?\s*", "", content)
         content = re.sub(r"\s*```$", "", content)

@@ -93,7 +93,7 @@ def get_api_key() -> str:
     return key
 
 
-def xai_chat(api_key: str, system_prompt: str, user_prompt: str) -> str:
+def xai_chat(api_key: str, system_prompt: str, user_prompt: str, effort: str = "medium") -> str:
     """Call xAI chat completions API and return the assistant message content."""
     payload = json.dumps({
         "model": XAI_MODEL,
@@ -102,6 +102,7 @@ def xai_chat(api_key: str, system_prompt: str, user_prompt: str) -> str:
             {"role": "user", "content": user_prompt},
         ],
         "temperature": 0.4,
+        "reasoning_effort": effort,
     }).encode("utf-8")
 
     req = urllib.request.Request(
@@ -584,7 +585,7 @@ def pass_bridge(vault: dict, api_key: str) -> str:
         f"Bridges:\n{json.dumps(bridge_data, indent=2)}"
     )
 
-    result = xai_chat(api_key, "You are a research analyst identifying cross-domain insights.", prompt)
+    result = xai_chat(api_key, "You are a research analyst identifying cross-domain insights.", prompt, effort="high")
     return result + "\n"
 
 
@@ -639,6 +640,7 @@ def pass_zeitgeist(vault: dict, api_key: str) -> str:
         api_key,
         "You are an intellectual trends analyst synthesizing research notes into a zeitgeist narrative.",
         prompt,
+        effort="high",
     )
     return result + "\n"
 
@@ -702,6 +704,7 @@ def pass_action(vault: dict, api_key: str) -> str:
         api_key,
         "You are a research advisor turning data convergence into actionable weekly recommendations.",
         prompt,
+        effort="medium",
     )
     return result + "\n"
 
@@ -744,6 +747,7 @@ def pass_predict(vault: dict, api_key: str) -> str:
         api_key,
         "You are a prediction extractor. Return only valid JSON arrays.",
         prompt,
+        effort="medium",
     )
 
     # Parse predictions from xAI response
@@ -822,6 +826,7 @@ def synthesize_one_thing(api_key: str, sections: dict) -> str:
         api_key,
         "You are a research advisor distilling complex analysis into one key takeaway.",
         prompt,
+        effort="high",
     )
 
 
@@ -928,7 +933,7 @@ Pick the top 5 most valuable accounts to follow. For each, return:
 Format as a numbered markdown list. Skip any handles that look like bots, brands with no original content, or generic news accounts."""
 
     try:
-        result = xai_chat(api_key, "You are a research assistant recommending high-signal X accounts.", prompt)
+        result = xai_chat(api_key, "You are a research assistant recommending high-signal X accounts.", prompt, effort="medium")
     except Exception as e:
         print(f"  ERROR: {e}", file=sys.stderr)
         result = "_Could not evaluate candidates._"

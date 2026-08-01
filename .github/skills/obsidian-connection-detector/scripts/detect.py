@@ -265,6 +265,7 @@ Return JSON only, no other text: {{"relationship": "supports|contradicts|extends
             {"role": "user", "content": prompt},
         ],
         "temperature": 0.3,
+        "reasoning_effort": "low",
     }
 
     try:
