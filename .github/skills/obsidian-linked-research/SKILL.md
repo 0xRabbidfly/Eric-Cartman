@@ -28,6 +28,24 @@ no external LLM API call needed for the intelligence step.
 
 Vault writes go through the **obsidian** skill (composable CLI wrapper).
 
+## Always-Capture Sources
+
+The following sources bypass quality filters and are **always captured** as
+research notes when encountered — in email, X, or any other ingestion pipeline.
+These are high-signal sources that publish in digest/roundup format but contain
+original analysis worth preserving.
+
+| Source | Email / Handle | Why |
+|--------|---------------|-----|
+| AINews / Latent Space | `swyx@substack.com`, `latentspace`, `@swyx` | Daily AI industry analysis with original commentary, curated signal |
+
+When a calling skill (e.g., gmail-daily-briefing) encounters content from an
+always-capture source, it should invoke this skill regardless of whether the
+content looks like a "newsletter digest" or "roundup." The quality filter
+exclusion for digests does NOT apply to always-capture sources.
+
+To add more sources, append rows to the table above.
+
 ## When to Use
 
 | Trigger | Example |
