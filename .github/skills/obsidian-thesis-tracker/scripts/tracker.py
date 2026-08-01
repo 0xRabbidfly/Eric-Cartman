@@ -28,6 +28,8 @@ XAI_API_URL = "https://api.x.ai/v1/chat/completions"
 MODEL = "grok-4.5"
 EVIDENCE_THRESHOLD = 5  # connections needed for "mature" status
 
+CLAUDE_CLI = r"C:\Users\nuno_\.local\bin\claude.exe"
+
 VAULT_REPORT_SCRIPT = Path(
     r"Z:\Projects\Eric-Cartman\.github\skills\obsidian-vault-report\scripts\report.py"
 )
@@ -239,6 +241,24 @@ Relationships:
 
 Respond with just the thesis statement, nothing else."""
 
+    # Try Claude CLI first (free on Max)
+    try:
+        import subprocess
+        system = "You are a research analyst. Generate concise thesis statements."
+        combined = f"{system}\n\n{prompt}"
+        result = subprocess.run(
+            [CLAUDE_CLI, "--print", "-p", combined],
+            capture_output=True, text=True, encoding="utf-8", timeout=120,
+        )
+        content = result.stdout.strip()
+        if content and "Failed to authenticate" not in content:
+            print("  [claude] Thesis statement generated")
+            return content
+        print(f"  [claude-cli] Failed, falling back to xAI: {result.stderr[:100]}")
+    except Exception as e:
+        print(f"  [claude-cli] Error ({e}), falling back to xAI")
+
+    # Fall back to xAI API
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
@@ -256,6 +276,7 @@ Respond with just the thesis statement, nothing else."""
     try:
         resp = requests.post(XAI_API_URL, headers=headers, json=payload, timeout=60)
         resp.raise_for_status()
+        print("  [xai-fallback] Thesis statement generated")
         return resp.json()["choices"][0]["message"]["content"].strip()
     except (requests.RequestException, KeyError, IndexError) as e:
         print(f"  WARNING: Thesis generation failed: {e}")

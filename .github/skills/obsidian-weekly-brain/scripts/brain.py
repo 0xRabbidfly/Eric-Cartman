@@ -49,6 +49,8 @@ ENV_FILE = CONFIG_DIR / ".env"
 XAI_API_URL = "https://api.x.ai/v1/chat/completions"
 XAI_MODEL = "grok-4.5"
 
+CLAUDE_CLI = r"C:\Users\nuno_\.local\bin\claude.exe"
+
 PASS_NAMES = ["trend", "thesis", "blindspot", "bridge", "zeitgeist", "action", "predict", "discover", "cost"]
 
 # Path to the daily research pipeline config (for must-follow list)
@@ -119,6 +121,25 @@ def xai_chat(api_key: str, system_prompt: str, user_prompt: str, effort: str = "
     with urllib.request.urlopen(req, context=ctx, timeout=120) as resp:
         data = json.loads(resp.read().decode("utf-8"))
     return data["choices"][0]["message"]["content"]
+
+
+def claude_chat(system_prompt: str, user_prompt: str) -> str | None:
+    """Call Claude via CLI (Max subscription, free). Returns None on failure."""
+    import subprocess
+    combined = f"{system_prompt}\n\n{user_prompt}" if system_prompt else user_prompt
+    try:
+        result = subprocess.run(
+            [CLAUDE_CLI, "--print", "-p", combined],
+            capture_output=True, text=True, encoding="utf-8", timeout=120,
+        )
+        content = result.stdout.strip()
+        if content and "Failed to authenticate" not in content:
+            print("  [claude] OK")
+            return content
+        print(f"  [claude-cli] Failed, falling back to xAI: {result.stderr[:100]}")
+    except Exception as e:
+        print(f"  [claude-cli] Error ({e}), falling back to xAI")
+    return None
 
 
 def parse_frontmatter(text: str) -> dict:
@@ -585,7 +606,11 @@ def pass_bridge(vault: dict, api_key: str) -> str:
         f"Bridges:\n{json.dumps(bridge_data, indent=2)}"
     )
 
-    result = xai_chat(api_key, "You are a research analyst identifying cross-domain insights.", prompt, effort="high")
+    result = claude_chat("You are a research analyst identifying cross-domain insights.", prompt)
+    if result is None:
+        result = xai_chat(api_key, "You are a research analyst identifying cross-domain insights.", prompt, effort="high")
+    else:
+        print("  [claude] Used for bridge synthesis")
     return result + "\n"
 
 
@@ -636,12 +661,19 @@ def pass_zeitgeist(vault: dict, api_key: str) -> str:
         + "\n".join(note_summaries)
     )
 
-    result = xai_chat(
-        api_key,
+    result = claude_chat(
         "You are an intellectual trends analyst synthesizing research notes into a zeitgeist narrative.",
         prompt,
-        effort="high",
     )
+    if result is None:
+        result = xai_chat(
+            api_key,
+            "You are an intellectual trends analyst synthesizing research notes into a zeitgeist narrative.",
+            prompt,
+            effort="high",
+        )
+    else:
+        print("  [claude] Used for zeitgeist synthesis")
     return result + "\n"
 
 
@@ -700,12 +732,19 @@ def pass_action(vault: dict, api_key: str) -> str:
         f"Convergence data:\n{convergence_data}"
     )
 
-    result = xai_chat(
-        api_key,
+    result = claude_chat(
         "You are a research advisor turning data convergence into actionable weekly recommendations.",
         prompt,
-        effort="medium",
     )
+    if result is None:
+        result = xai_chat(
+            api_key,
+            "You are a research advisor turning data convergence into actionable weekly recommendations.",
+            prompt,
+            effort="medium",
+        )
+    else:
+        print("  [claude] Used for action synthesis")
     return result + "\n"
 
 
@@ -743,12 +782,19 @@ def pass_predict(vault: dict, api_key: str) -> str:
         f"Notes:\n" + "\n".join(note_content)
     )
 
-    raw = xai_chat(
-        api_key,
+    raw = claude_chat(
         "You are a prediction extractor. Return only valid JSON arrays.",
         prompt,
-        effort="medium",
     )
+    if raw is None:
+        raw = xai_chat(
+            api_key,
+            "You are a prediction extractor. Return only valid JSON arrays.",
+            prompt,
+            effort="medium",
+        )
+    else:
+        print("  [claude] Used for prediction extraction")
 
     # Parse predictions from xAI response
     new_predictions = []
@@ -822,12 +868,20 @@ def synthesize_one_thing(api_key: str, sections: dict) -> str:
         f"{combined}"
     )
 
-    return xai_chat(
-        api_key,
+    result = claude_chat(
         "You are a research advisor distilling complex analysis into one key takeaway.",
         prompt,
-        effort="high",
     )
+    if result is None:
+        result = xai_chat(
+            api_key,
+            "You are a research advisor distilling complex analysis into one key takeaway.",
+            prompt,
+            effort="high",
+        )
+    else:
+        print("  [claude] Used for One Thing synthesis")
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -933,7 +987,11 @@ Pick the top 5 most valuable accounts to follow. For each, return:
 Format as a numbered markdown list. Skip any handles that look like bots, brands with no original content, or generic news accounts."""
 
     try:
-        result = xai_chat(api_key, "You are a research assistant recommending high-signal X accounts.", prompt, effort="medium")
+        result = claude_chat("You are a research assistant recommending high-signal X accounts.", prompt)
+        if result is None:
+            result = xai_chat(api_key, "You are a research assistant recommending high-signal X accounts.", prompt, effort="medium")
+        else:
+            print("  [claude] Used for account discovery")
     except Exception as e:
         print(f"  ERROR: {e}", file=sys.stderr)
         result = "_Could not evaluate candidates._"

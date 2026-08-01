@@ -66,6 +66,8 @@ promote = _load_local_module("dr_promote", _local_lib / "promote_v2.py")
 # Feedback file path (relative to vault)
 FEEDBACK_FILE = SCRIPT_DIR / "feedback.json"
 
+CLAUDE_CLI = r"C:\Users\nuno_\.local\bin\claude.exe"
+
 
 # ---------------------------------------------------------------------------
 # Model auto-resolution — query xAI API for latest available models
@@ -927,6 +929,26 @@ RULES:
 - If a topic had no results, say "Quiet day for this topic"
 - Output ONLY valid JSON, no prose before or after"""
 
+    # Try Claude CLI first (free on Max)
+    try:
+        print("[synth] Trying Claude CLI...")
+        result = subprocess.run(
+            [CLAUDE_CLI, "--print", "-p", prompt],
+            capture_output=True, text=True, encoding="utf-8", timeout=120,
+        )
+        content = result.stdout.strip()
+        if content and "Failed to authenticate" not in content:
+            parsed = _extract_json_object(content)
+            if parsed and "briefing" in parsed:
+                print("[synth] [claude] Synthesis complete")
+                return parsed
+            print(f"[synth] [claude] Response not valid JSON, falling back to xAI")
+        else:
+            print(f"[synth] [claude-cli] Failed ({result.stderr[:100]}), falling back to xAI")
+    except Exception as e:
+        print(f"[synth] [claude-cli] Error ({e}), falling back to xAI")
+
+    # Fall back to xAI API with retries
     max_retries = 2
     last_error = None
     for attempt in range(max_retries + 1):
@@ -937,10 +959,10 @@ RULES:
             if not content:
                 last_error = "empty response from API"
                 if attempt < max_retries:
-                    print(f"[synth] Attempt {attempt+1} failed: no output, retrying...")
+                    print(f"[synth] [xai-fallback] Attempt {attempt+1} failed: no output, retrying...")
                     continue
                 return {"briefing": f"Synthesis failed after {max_retries+1} attempts: {last_error}", "topics": [], "error": last_error}
-            print(f"[synth] xAI synthesis done (attempt {attempt+1})")
+            print(f"[synth] [xai-fallback] xAI synthesis done (attempt {attempt+1})")
             parsed = _extract_json_object(content)
             if parsed and "briefing" in parsed:
                 return parsed
@@ -948,13 +970,13 @@ RULES:
             preview = content[:200].replace('\n', '\\n')
             last_error = f"Could not extract valid JSON from output ({len(content)} chars): {preview}"
             if attempt < max_retries:
-                print(f"[synth] Attempt {attempt+1} failed: {last_error}, retrying...")
+                print(f"[synth] [xai-fallback] Attempt {attempt+1} failed: {last_error}, retrying...")
                 continue
             return {"briefing": f"Synthesis failed: {last_error}", "topics": [], "error": last_error}
         except Exception as e:
             last_error = str(e)
             if attempt < max_retries:
-                print(f"[synth] Attempt {attempt+1} failed: {e}, retrying...")
+                print(f"[synth] [xai-fallback] Attempt {attempt+1} failed: {e}, retrying...")
                 continue
     return {"briefing": f"Synthesis failed after {max_retries+1} attempts: {last_error}", "topics": [], "error": last_error}
 
@@ -2361,12 +2383,11 @@ def _score_news_with_llm(items: list, api_key: str = "", model: str = "grok-4.5"
         "Items:\n" + "\n".join(item_lines)
     )
 
-    try:
-        content, _usage = _call_xai_chat(api_key, model, prompt, max_tokens=2048, effort="low")
+    def _parse_news_rankings(content: str) -> list:
+        """Parse JSON array of news rankings from LLM output."""
         content = content.strip()
         content = re.sub(r"^```(?:json)?\s*", "", content)
         content = re.sub(r"\s*```$", "", content)
-        # Robust extraction: find the JSON array
         first_bracket = content.find('[')
         last_bracket = content.rfind(']')
         if first_bracket >= 0 and last_bracket > first_bracket:
@@ -2374,15 +2395,38 @@ def _score_news_with_llm(items: list, api_key: str = "", model: str = "grok-4.5"
         rankings = json.loads(content)
         scored = []
         for r in rankings[:10]:
-            idx = r.get("index", 0) - 1  # 1-based → 0-based
+            idx = r.get("index", 0) - 1
             if 0 <= idx < len(items):
-                item = dict(items[idx])
-                item["llm_score"] = r.get("score", 0)
+                item_copy = dict(items[idx])
+                item_copy["llm_score"] = r.get("score", 0)
                 also = r.get("also_covered_by", [])
                 if also:
-                    item["also_covered_by"] = also
-                scored.append(item)
+                    item_copy["also_covered_by"] = also
+                scored.append(item_copy)
         return sorted(scored, key=lambda x: x.get("llm_score", 0), reverse=True)
+
+    # Try Claude CLI first (free on Max)
+    try:
+        result = subprocess.run(
+            [CLAUDE_CLI, "--print", "-p", prompt],
+            capture_output=True, text=True, encoding="utf-8", timeout=120,
+        )
+        content = result.stdout.strip()
+        if content and "Failed to authenticate" not in content:
+            scored = _parse_news_rankings(content)
+            if scored:
+                print(f"  [news] [claude] Scored {len(scored)} articles")
+                return scored
+    except Exception:
+        pass
+
+    # Fall back to xAI API
+    try:
+        content, _usage = _call_xai_chat(api_key, model, prompt, max_tokens=2048, effort="low")
+        scored = _parse_news_rankings(content)
+        if scored:
+            print(f"  [news] [xai-fallback] Scored {len(scored)} articles")
+        return scored
     except Exception as e:
         print(f"  [news] LLM scoring failed: {e}")
         return items[:10]
