@@ -49,7 +49,10 @@ ENV_FILE = CONFIG_DIR / ".env"
 XAI_API_URL = "https://api.x.ai/v1/chat/completions"
 XAI_MODEL = "grok-4.3"
 
-PASS_NAMES = ["trend", "thesis", "blindspot", "bridge", "zeitgeist", "action", "predict", "cost"]
+PASS_NAMES = ["trend", "thesis", "blindspot", "bridge", "zeitgeist", "action", "predict", "discover", "cost"]
+
+# Path to the daily research pipeline config (for must-follow list)
+PIPELINE_MD = Path(r"Z:\Projects\Eric-Cartman\.github\skills\obsidian-daily-research\pipeline.md")
 
 
 # ---------------------------------------------------------------------------
@@ -830,6 +833,115 @@ COST_LEDGER_PATH = VAULT_PATH / "Research" / "Reports" / "weekly-costs.md"
 USD_TO_CAD = 1.37  # approximate; updated manually if needed
 
 
+# ---------------------------------------------------------------------------
+# Pass 8: Account Discovery
+# ---------------------------------------------------------------------------
+
+def _load_must_follow_handles() -> set:
+    """Read pipeline.md and extract current must-follow handles."""
+    handles = set()
+    if not PIPELINE_MD.exists():
+        return handles
+    try:
+        text = PIPELINE_MD.read_text(encoding="utf-8")
+        for line in text.split("\n"):
+            line = line.strip()
+            if line.startswith("- @"):
+                handle = line[3:].split(" ")[0].split("—")[0].split("–")[0].split("-")[0].strip()
+                if handle:
+                    handles.add(handle.lower())
+    except Exception:
+        pass
+    return handles
+
+
+def _extract_handles_from_text(text: str) -> list:
+    """Extract @handles from note text."""
+    return re.findall(r'@(\w{2,30})', text)
+
+
+def pass_discover(vault: dict, api_key: str) -> str:
+    """Discover new X accounts worth following based on vault activity."""
+    print("\n[Pass 8/9] Account Discovery...")
+
+    # Load current must-follow list
+    followed = _load_must_follow_handles()
+    print(f"  Currently following {len(followed)} accounts")
+
+    # Extract all @handles from recent notes (dailies + library + podcasts)
+    handle_mentions: Counter = Counter()
+    handle_sources: dict = defaultdict(set)  # handle -> set of source note slugs
+    handle_sample: dict = {}  # handle -> sample context
+
+    for note in vault["recent"]:
+        text = note["text"]
+        handles = _extract_handles_from_text(text)
+        slug = note["path"].stem
+
+        for h in handles:
+            h_lower = h.lower()
+            # Skip already-followed, self-references, and common non-person handles
+            if h_lower in followed or h_lower in {"x", "com", "ai", "the", "http", "https", "www"}:
+                continue
+            handle_mentions[h_lower] += 1
+            handle_sources[h_lower].add(slug)
+            if h_lower not in handle_sample:
+                # Grab surrounding context
+                idx = text.lower().find(f"@{h_lower}")
+                if idx >= 0:
+                    start = max(0, idx - 40)
+                    end = min(len(text), idx + 80)
+                    handle_sample[h_lower] = text[start:end].replace("\n", " ").strip()
+
+    if not handle_mentions:
+        return "_No new handles discovered in recent notes._\n"
+
+    # Filter: must appear in 2+ distinct notes
+    candidates = [
+        (handle, count, handle_sources[handle])
+        for handle, count in handle_mentions.most_common(30)
+        if len(handle_sources[handle]) >= 2 and count >= 3
+    ]
+
+    if not candidates:
+        return "_No handles met the recurrence threshold (2+ notes, 3+ mentions) this week._\n"
+
+    # Use xAI to evaluate top candidates for relevance
+    candidate_text = "\n".join(
+        f"- @{h}: mentioned {c}x across {len(s)} notes. Sample: \"{handle_sample.get(h, 'N/A')[:100]}\""
+        for h, c, s in candidates[:15]
+    )
+
+    prompt = f"""You are recommending X/Twitter accounts for an AI practitioner to follow.
+Their research interests: AI agents, skills, SDLC transformation, frontier models, MCP, crypto/DeFi, space economy.
+
+These handles appeared repeatedly in their research vault this week but they don't currently follow them:
+
+{candidate_text}
+
+Pick the top 5 most valuable accounts to follow. For each, return:
+1. @handle
+2. One-line description of who they are (if recognizable)
+3. Why they're relevant to this researcher's interests
+4. Suggested group: Thought Leaders / Lab / Tool Builder / Researcher / Media
+
+Format as a numbered markdown list. Skip any handles that look like bots, brands with no original content, or generic news accounts."""
+
+    try:
+        result = xai_chat(api_key, "You are a research assistant recommending high-signal X accounts.", prompt)
+    except Exception as e:
+        print(f"  ERROR: {e}", file=sys.stderr)
+        result = "_Could not evaluate candidates._"
+
+    # Build the output with pipeline.md-ready lines
+    output = result + "\n\n"
+    output += "**To add to must-follow** (paste into `pipeline.md` under the appropriate group):\n\n"
+    for h, c, s in candidates[:5]:
+        output += f"```\n- @{h} — [description] (solo)\n```\n"
+
+    return output
+
+
 def track_weekly_costs(vault: dict, today: str) -> str:
     """Parse costs from daily research notes and sum the week's total."""
     cost_re = re.compile(r"\*\*\$(\d+\.\d+)\*\*")
@@ -1007,6 +1119,10 @@ def build_report_part2(sections: dict, vault: dict) -> str:
 
 {sections.get('predict', '_Skipped._')}
 
+## Discover 🔭
+
+{sections.get('discover', '_Skipped._')}
+
 ## Weekly Cost 💰
 
 {sections.get('cost', '_Skipped._')}
@@ -1030,6 +1146,7 @@ PASS_FUNCS = {
     "zeitgeist": pass_zeitgeist,
     "action": pass_action,
     "predict": pass_predict,
+    "discover": pass_discover,
 }
 
 
