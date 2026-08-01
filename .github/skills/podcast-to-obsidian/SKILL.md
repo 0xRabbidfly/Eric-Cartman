@@ -88,7 +88,7 @@ python .github/skills/podcast-to-obsidian/scripts/pipeline.py --url "https://you
 3. CONFIRM   → Show user what's new, ask which to process
 4. DOWNLOAD  → Fetch audio via RSS <enclosure> URL → .work/audio/
 5. TRANSCRIBE → faster-whisper (local GPU/CPU) → .work/transcripts/
-6. GENERATE  → Agent reads transcript + writes structured note (see below)
+6. GENERATE  → AI summary (Claude CLI / OpenAI) + structured note (automatic)
 7. WRITE     → Obsidian skill pipes note to vault
 8. MANIFEST  → Update manifest only after successful write
 9. CLEANUP   → Purge .mp3 audio files + intermediate build artifacts
@@ -493,7 +493,7 @@ Restart VS Code after configuration.
 | Spotify MCP `SpotifyGetInfo` does not support episode URIs | **P0** | Use `fetch_webpage` on the Spotify episode URL to scrape metadata |
 | `obsidian.com create` with stdin-piped content silently produces 0-byte files (RC 0, says "Overwrote") | **P0** | Write directly to vault filesystem via `Path.write_text()`, then verify with `obsidian.com file`. The Python wrapper `obsidian.py` also fails because its `run()` uses `stdin=subprocess.DEVNULL`. |
 | `--dry-run` still downloads audio and runs transcription | **P1** | Use `--check-only` for true no-side-effects preview. `--dry-run` only skips vault write (Step 7). |
-| AI summarization unavailable during a normal run | **P1** | The pipeline fails that episode instead of silently writing a template-only note; install Claude CLI or set `OPENAI_API_KEY`. Pass `--no-ai` only if you truly want a skeleton note |
+| AI summarization fails when neither Claude CLI nor OpenAI API is configured | **P1** | The pipeline fails that episode instead of silently writing a template-only note; install Claude CLI or set `OPENAI_API_KEY`. Pass `--no-ai` only if you truly want a skeleton note |
 | Pipeline downloads all new episodes per show, not just the target | **P1** | Use `--episode "title substring"` to filter, or `--max-episodes 1` |
 | Small Whisper models mangle domain jargon and proper nouns | **P1** | Default model is now `large-v3`. `base` produced "opioid models" for "open-weight models" throughout an entire episode, which then propagated into the generated note. Extend `config/vocabulary.json` for show-specific names |
 | Pipeline may exit with code 1 during large batch downloads | **P2** | Re-run with `--retry-failed` or `--transcribe-only` if audio already downloaded |
@@ -508,6 +508,7 @@ Restart VS Code after configuration.
 | `--episode "text"` | Filters to episodes matching title substring | Other episodes |
 | `--show "Name"` | Filters to a single show | Other shows |
 | `--max-episodes N` | Limits episodes per show | Episodes beyond N |
+| `--global-max-episodes N` | Caps total episodes processed across ALL shows | Episodes beyond N globally |
 | `--model <size>` | Sets whisper model (base/large-v3) | — |
 | `--retry-failed` | Re-processes failed episodes | Already-completed episodes |
 | `--keep-audio` | Keeps .mp3 files after successful run | Cleanup step |
