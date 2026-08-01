@@ -58,7 +58,12 @@ Eric Cartman is a **meta-prompt library** — a portable scaffold of agentic dev
 ## Change Hygiene
 - Keep changes focused on the requested task.
 - Do not reformat unrelated files.
-- Whenever a skill is added, deleted, or modified, update README.md to keep the public skill catalog and descriptions in sync.
+- **README rule**: any change to the skill set — add, remove, rename, or a shift in what a skill does — updates **both** READMEs in the same commit, never as a follow-up:
+  - `README.md` (root) — the Complete Skill Index table, the Repository Structure tree, and the numbered deep-dive section if the skill has one (renumber the rest when inserting or deleting).
+  - `.github/skills/README.md` — the grouped index table.
+  - Sweep for stale references to a removed or renamed skill: `## Related Skills` sections in other `SKILL.md` files, the meta-skills list in this file, and the icon map in `.github/skills/remote-skills-api/ui.html`.
+  - Structural changes count too: new or removed directories under `.github/` or `.claude/`, or a change in what is gitignored, means the tree and its trailing note are updated.
+  - Verify against the filesystem (`ls .github/skills/`), not from memory. Both files drifted badly once because this was treated as optional — the index listed six skills that never existed while omitting ten real ones.
 - When a skill is added, deleted, or modified, also review `.github/skills/remote-skills-api/` and update it if the change affects remote discovery, invocation, examples, or user-facing behavior.
 - Test skills by invoking them before marking complete.
 
