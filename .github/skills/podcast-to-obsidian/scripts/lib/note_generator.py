@@ -315,6 +315,7 @@ def _call_xai_chat(api_key: str, model: str, prompt: str, max_tokens: int = 4096
         "messages": [{"role": "user", "content": prompt}],
         "max_tokens": max_tokens,
         "temperature": 0.3,
+        "reasoning_effort": "medium",
     }).encode("utf-8")
 
     req = urllib.request.Request(

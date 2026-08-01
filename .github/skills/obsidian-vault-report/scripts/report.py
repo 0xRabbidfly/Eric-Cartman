@@ -272,6 +272,7 @@ def _call_xai_chat(
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
         ],
+        "reasoning_effort": "high",
     }
     resp = _http_request("POST", XAI_CHAT_URL, headers=headers, json_data=payload)
 
