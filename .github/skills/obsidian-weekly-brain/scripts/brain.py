@@ -755,20 +755,29 @@ def pass_zeitgeist(vault: dict, api_key: str) -> str:
 def pass_action(vault: dict, api_key: str) -> str:
     """Find convergence points and classify actions."""
     print("\n[Pass 6/7] Actionable Insights...")
-    recent = vault["recent"]
+    # Use Library + Podcast notes only (dailies have identical tags that drown signal)
+    recent_quality = [
+        n for n in vault["recent"]
+        if "Research/Dailies" not in str(n["path"])
+    ]
 
-    if not recent:
-        return "_No recent notes to derive actionable insights._\n"
+    if not recent_quality:
+        return "_No recent Library/Podcast notes to derive actionable insights._\n"
 
     # Find convergence points: tags where 3+ notes from different sources agree
     tag_source_notes: dict[str, list] = defaultdict(list)
-    for note in recent:
+    for note in recent_quality:
         src = note["source"] or note["name"]
+        body = note["body"]
+        # Skip frontmatter area for snippet
+        pow_idx = body.find("## ")
+        if pow_idx > 0:
+            body = body[pow_idx:]
         for tag in note["tags"]:
             tag_source_notes[tag].append({
                 "source": src,
                 "name": note["name"],
-                "snippet": note["body"][:150].replace("\n", " ").strip(),
+                "snippet": body[:200].replace("\n", " ").strip(),
             })
 
     convergent_tags = []
