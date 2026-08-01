@@ -687,12 +687,23 @@ def pass_zeitgeist(vault: dict, api_key: str) -> str:
     if not recent_2w:
         return "_No notes from the last 2 weeks to generate a zeitgeist._\n"
 
-    # Collect summaries from recent notes
+    # Collect summaries from recent notes — prioritize Library/Podcast content
     note_summaries = []
     for note in recent_2w[:80]:  # Cap to avoid token overflow
-        snippet = note["body"][:200].replace("\n", " ").strip()
+        body = note["body"]
+        # For dailies, skip to actual content (past cost headers)
+        if "Research/Dailies" in str(note["path"]):
+            pow_idx = body.find("## Today's POW")
+            if pow_idx > 0:
+                body = body[pow_idx:]
+            else:
+                body = body[500:]
+            snippet = body[:300].replace("\n", " ").strip()
+        else:
+            # Library/Podcast notes — grab more content (higher value)
+            snippet = body[:500].replace("\n", " ").strip()
         tags_str = ", ".join(note["tags"][:5]) if note["tags"] else "untagged"
-        source = note["source"] or "unknown"
+        source = note["source"] or note["name"]
         note_summaries.append(f"- [{tags_str}] ({source}): {snippet}")
 
     # Also find topics that were hot 4 weeks ago but disappeared
