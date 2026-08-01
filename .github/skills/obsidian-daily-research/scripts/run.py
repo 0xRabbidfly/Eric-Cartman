@@ -115,12 +115,21 @@ def resolve_xai_model(api_key: str, preferred: str = "grok-4-1-fast") -> str:
 
         # Pick the best model:
         # 1. Prefer non-reasoning variants (cheaper, faster for search tasks)
-        # 2. Among remaining, prefer shorter names (e.g. grok-4.3 over grok-4.20-0309-reasoning)
-        # 3. Sort by version number descending
+        # 2. Sort by version number descending (extract numeric version from name)
+        # 3. Among same version, prefer shorter names (simpler = more stable)
         non_reasoning = [m for m in grok_models if "reasoning" not in m and "multi-agent" not in m]
         candidates = non_reasoning if non_reasoning else grok_models
-        # Sort: higher version first, shorter name preferred for ties
-        candidates.sort(key=lambda m: (m.split("-")[0] if "-" in m else m, -len(m)), reverse=True)
+
+        def _version_key(model_id: str) -> tuple:
+            """Extract version number for sorting. grok-4.5 → (4, 5), grok-4.20-0309 → (4, 20)."""
+            match = re.search(r'grok-(\d+)\.?(\d+)?', model_id)
+            if match:
+                major = int(match.group(1))
+                minor = int(match.group(2)) if match.group(2) else 0
+                return (major, minor, -len(model_id))
+            return (0, 0, -len(model_id))
+
+        candidates.sort(key=_version_key, reverse=True)
         chosen = candidates[0]
         print(f"[model] Configured model '{preferred}' not found. Available text models: {grok_models}")
         print(f"[model] Selected '{chosen}'")
@@ -859,7 +868,7 @@ def synthesize_all(
     to_date: str,
     tracker: TokenTracker | None = None,
     api_key: str = "",
-    model: str = "grok-4.3",
+    model: str = "grok-4.5",
 ) -> dict:
     """Single batched synthesis call across all topics using Claude CLI (Max account)."""
 
@@ -2328,7 +2337,7 @@ def _fetch_google_news_topic(query: str, max_items: int = 10, max_age_days: int 
         return []
 
 
-def _score_news_with_llm(items: list, api_key: str = "", model: str = "grok-4.3") -> list:
+def _score_news_with_llm(items: list, api_key: str = "", model: str = "grok-4.5") -> list:
     """Use xAI API to score, deduplicate, and select top 10 news items for relevance."""
     if not items:
         return []
@@ -2386,7 +2395,7 @@ _GENERAL_AI_QUERIES = [
 ]
 
 
-def fetch_google_news(topics: list, config: dict, api_key: str = "", model: str = "grok-4.3") -> list:
+def fetch_google_news(topics: list, config: dict, api_key: str = "", model: str = "grok-4.5") -> list:
     """Fetch Google News RSS across all topics, LLM-score, return top 10.
 
     Only includes articles from the last 7 days.  If topic-specific queries
@@ -3120,7 +3129,7 @@ def main():
         if "pow_failed" in validation_issues and total_items > 0:
             print("[validate] Attempting synthesis repair with fallback model...")
             # Try a different model variant
-            fallback_models = ["grok-4.20-0309-non-reasoning", "grok-4.3", resolved_xai]
+            fallback_models = ["grok-4.20-0309-non-reasoning", "grok-4.5", resolved_xai]
             # Remove the model we already tried
             fallback_models = [m for m in fallback_models if m != resolved_xai]
             for fb_model in fallback_models[:2]:

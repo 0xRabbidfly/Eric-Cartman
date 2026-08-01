@@ -25,7 +25,7 @@ VAULT_PATH = Path(r"C:\Users\nuno_\Documents\Obsidian Vault")
 CONNECTIONS_FILE = VAULT_PATH / "Research" / "connections.json"
 THESES_FILE = VAULT_PATH / "Research" / "theses.json"
 XAI_API_URL = "https://api.x.ai/v1/chat/completions"
-MODEL = "grok-4.3"
+MODEL = "grok-4.5"
 EVIDENCE_THRESHOLD = 5  # connections needed for "mature" status
 
 VAULT_REPORT_SCRIPT = Path(

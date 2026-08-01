@@ -31,7 +31,7 @@ LIBRARY_DIR = VAULT_PATH / "Research" / "Library"
 PODCASTS_DIR = VAULT_PATH / "Podcasts"
 CONNECTIONS_FILE = VAULT_PATH / "Research" / "connections.json"
 XAI_API_URL = "https://api.x.ai/v1/chat/completions"
-MODEL = "grok-4.3"
+MODEL = "grok-4.5"
 CONFIDENCE_THRESHOLD = 0.6
 
 
