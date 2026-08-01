@@ -34,6 +34,8 @@ XAI_API_URL = "https://api.x.ai/v1/chat/completions"
 MODEL = "grok-4.5"
 CONFIDENCE_THRESHOLD = 0.6
 
+CLAUDE_CLI = r"C:\Users\nuno_\.local\bin\claude.exe"
+
 
 # ---------------------------------------------------------------------------
 # API Key loading
@@ -235,10 +237,33 @@ def find_candidates(source_path: Path, source_text: str) -> list[Path]:
 # xAI API classification
 # ---------------------------------------------------------------------------
 
+def _claude_classify(prompt: str) -> dict | None:
+    """Call Claude CLI to classify a note relationship. Returns dict or None."""
+    import subprocess
+    combined = "You are a research assistant that classifies relationships between notes. Respond with valid JSON only.\n\n" + prompt
+    try:
+        result = subprocess.run(
+            [CLAUDE_CLI, "--print", "-p", combined],
+            capture_output=True, text=True, encoding="utf-8", timeout=120,
+        )
+        content = result.stdout.strip()
+        if not content or "Failed to authenticate" in content:
+            return None
+        # Strip markdown code fences if present
+        if content.startswith("```"):
+            content = re.sub(r"^```(?:json)?\s*", "", content)
+            content = re.sub(r"\s*```$", "", content)
+        parsed = json.loads(content)
+        print("[claude] ", end="")
+        return parsed
+    except Exception:
+        return None
+
+
 def classify_relationship(
     api_key: str, title_a: str, summary_a: str, title_b: str, summary_b: str
 ) -> dict | None:
-    """Call xAI API to classify the relationship between two notes."""
+    """Call Claude CLI (then xAI fallback) to classify the relationship between two notes."""
     prompt = f"""Given these two notes, classify their relationship:
 
 Note A: {title_a} — {summary_a}
@@ -254,6 +279,13 @@ Classify as one of:
 
 Return JSON only, no other text: {{"relationship": "supports|contradicts|extends|bridges|unrelated", "confidence": 0.0-1.0, "explanation": "one sentence"}}"""
 
+    # Try Claude CLI first (free on Max)
+    claude_result = _claude_classify(prompt)
+    if claude_result:
+        return claude_result
+
+    # Fall back to xAI API
+    print("[xai-fallback] ", end="")
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",

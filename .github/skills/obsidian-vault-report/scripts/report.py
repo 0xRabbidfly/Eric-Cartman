@@ -47,6 +47,8 @@ if sys.platform == "win32":
 
 XAI_CHAT_URL = "https://api.x.ai/v1/chat/completions"
 XAI_MODEL = os.environ.get("XAI_MODEL", "grok-4.5")
+
+CLAUDE_CLI = r"C:\Users\nuno_\.local\bin\claude.exe"
 DEBUG = os.environ.get("VAULT_REPORT_DEBUG", "").lower() in (
     "1", "true", "yes",
 )
@@ -280,6 +282,28 @@ def _call_xai_chat(
     if not choices:
         raise HTTPError("No choices in xAI response")
     return choices[0].get("message", {}).get("content", "")
+
+
+def _call_claude_chat(
+    system_prompt: str,
+    user_prompt: str,
+) -> Optional[str]:
+    """Call Claude via CLI (Max subscription, free). Returns content or None."""
+    import subprocess
+    combined = f"{system_prompt}\n\n{user_prompt}" if system_prompt else user_prompt
+    try:
+        result = subprocess.run(
+            [CLAUDE_CLI, "--print", "-p", combined],
+            capture_output=True, text=True, encoding="utf-8", timeout=120,
+        )
+        content = result.stdout.strip()
+        if content and "Failed to authenticate" not in content:
+            _log("[claude] Synthesis OK")
+            return content
+        _log(f"[claude-cli] Failed, falling back to xAI: {result.stderr[:100]}")
+    except Exception as e:
+        _log(f"[claude-cli] Error ({e}), falling back to xAI")
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -598,7 +622,7 @@ def synthesize_report(
     notes: List[Dict[str, Any]],
     focus: str = "full",
 ) -> str:
-    """Call xAI to synthesize the report body from matched notes."""
+    """Call Claude CLI (then xAI fallback) to synthesize the report body from matched notes."""
     focus_desc = FOCUS_DESCRIPTIONS.get(focus, FOCUS_DESCRIPTIONS["full"])
     source_summaries = _build_source_summaries(notes)
 
@@ -609,9 +633,20 @@ def synthesize_report(
         source_summaries=source_summaries,
     )
 
-    _log(f"Calling xAI for synthesis ({len(notes)} sources, focus={focus})")
+    _log(f"Attempting Claude CLI for synthesis ({len(notes)} sources, focus={focus})")
     _log(f"User prompt length: {len(user_prompt)} chars")
 
+    # Try Claude CLI first (free on Max)
+    result = _call_claude_chat(
+        system_prompt=SYNTHESIS_SYSTEM_PROMPT,
+        user_prompt=user_prompt,
+    )
+    if result:
+        print("[vault-report] [claude] Synthesis complete", file=sys.stderr)
+        return result
+
+    # Fall back to xAI API
+    print("[vault-report] [xai-fallback] Using xAI API for synthesis", file=sys.stderr)
     return _call_xai_chat(
         api_key=api_key,
         system_prompt=SYNTHESIS_SYSTEM_PROMPT,

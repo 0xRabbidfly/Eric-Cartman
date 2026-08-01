@@ -27,6 +27,8 @@ try:
 except ImportError:
     pass
 
+CLAUDE_CLI = r"C:\Users\nuno_\.local\bin\claude.exe"
+
 
 # ---------------------------------------------------------------------------
 # YAML helpers
@@ -453,6 +455,54 @@ def _generate_summary_openai(
 # Unified summary entrypoint
 # ---------------------------------------------------------------------------
 
+def _generate_summary_claude(
+    transcript_text: str,
+    episode_title: str = "",
+    show_name: str = "",
+) -> Optional[Dict[str, Any]]:
+    """Generate summary using Claude CLI (Max subscription, free)."""
+    import subprocess
+
+    # Truncate transcript if too long
+    words = transcript_text.split()
+    if len(words) > 12000:
+        transcript_text = " ".join(words[:12000])
+        truncation_note = f" (truncated to 12k of {len(words)} words)"
+    else:
+        truncation_note = ""
+
+    prompt = (
+        f"{SUMMARIZE_SYSTEM_PROMPT}\n\n"
+        f"---\n\n"
+        f"Podcast: {show_name} — {episode_title}{truncation_note}\n\n"
+        f"Transcript:\n\n{transcript_text}\n\n"
+        f"---\n\n"
+        f"Respond with ONLY valid JSON. No markdown code fences, no explanation."
+    )
+
+    try:
+        print(f"  [ai] Generating summary with Claude CLI...")
+        result = subprocess.run(
+            [CLAUDE_CLI, "--print", "-p", prompt],
+            capture_output=True, text=True, encoding="utf-8", timeout=120,
+        )
+        content = result.stdout.strip()
+        if not content or "Failed to authenticate" in content:
+            print(f"  [claude-cli] Failed: {result.stderr[:100]}")
+            return None
+
+        summary = _loads_llm_json(content)
+        print("  [ai] [claude] Summary generated successfully")
+        return summary
+
+    except json.JSONDecodeError as e:
+        print(f"  [warn] Claude CLI returned invalid JSON: {e}")
+        return None
+    except Exception as e:
+        print(f"  [warn] Claude CLI summary failed: {e}")
+        return None
+
+
 def generate_ai_summary(
     transcript_text: str,
     episode_title: str = "",
@@ -461,12 +511,19 @@ def generate_ai_summary(
     model: str = "gpt-4o-mini",
     base_url: str = "https://api.openai.com/v1",
 ) -> Optional[Dict[str, Any]]:
-    """Generate a structured summary. Tries xAI API first, then OpenAI API.
+    """Generate a structured summary. Tries Claude CLI first, then xAI, then OpenAI.
 
     Returns:
         Parsed summary dict, or None on failure.
     """
-    # 1. Try xAI API (Grok — primary backend)
+    # 1. Try Claude CLI (Max subscription, free)
+    summary = _generate_summary_claude(
+        transcript_text, episode_title, show_name,
+    )
+    if summary:
+        return summary
+
+    # 2. Try xAI API (Grok — primary backend)
     summary = _generate_summary_xai(
         transcript_text, episode_title, show_name,
         model="grok-4.5",
@@ -474,7 +531,7 @@ def generate_ai_summary(
     if summary:
         return summary
 
-    # 2. Fall back to OpenAI API
+    # 3. Fall back to OpenAI API
     summary = _generate_summary_openai(
         transcript_text, episode_title, show_name,
         api_key=api_key, model=model, base_url=base_url,
@@ -483,7 +540,7 @@ def generate_ai_summary(
         return summary
 
     print("  [warn] No AI backend available")
-    print("  [hint] Set XAI_API_KEY in .env for xAI/Grok. OpenAI-compatible API is a secondary fallback.")
+    print("  [hint] Claude CLI (Max), xAI API, or OpenAI API are all unavailable.")
     return None
 
 
