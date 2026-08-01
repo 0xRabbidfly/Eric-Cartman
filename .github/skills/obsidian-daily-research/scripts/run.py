@@ -1277,6 +1277,7 @@ def run_prominent_ai_scan(
     to_date: str,
     seen_urls: set,
     tracker: TokenTracker | None = None,
+    vault_only_urls: set | None = None,
 ) -> list:
     """Run a single broad X search for high-engagement AI tweets.
 
@@ -1362,10 +1363,13 @@ def run_prominent_ai_scan(
                 continue
             final.append(item)
 
-        # Dedup against vault
+        # Dedup against vault history only (not this run's topic/must-follow URLs).
+        # Prominent Voices surfaces WHO is talking — a tweet found by topic scan
+        # should still appear here if from a prominent voice.
+        dedup_set = vault_only_urls if vault_only_urls is not None else seen_urls
         final = [
             item for item in final
-            if item.url not in seen_urls
+            if item.url not in dedup_set
         ]
 
         print(f"-> {len(final)} high-signal tweets")
@@ -2999,6 +3003,9 @@ def main():
     seen_urls, seen_titles = vault.load_seen_dedup(config)
     print(f"[dedup] Found {len(seen_urls)} seen URLs, {len(seen_titles)} seen titles")
 
+    # Save vault-only URLs before scanning adds to the set (used by prominent AI dedup)
+    vault_only_urls = set(seen_urls)
+
     # Date range: last 7 days for daily scan (not 30)
     from vendor.last30days import dates
     from_date, _ = dates.get_date_range(7)
@@ -3104,6 +3111,7 @@ def main():
                 config, l30_config, prom_from_date, to_date,
                 seen_urls,
                 tracker=tracker,
+                vault_only_urls=vault_only_urls,
             )
             # Add to seen_urls so synthesis doesn't double-count
             for item in prominent_results:
