@@ -31,10 +31,8 @@ weigh complexity cost against improvement magnitude. A 2% pass-rate bump that
 adds 40 lines of edge-case rules? Probably not worth it. A 2% bump from deleting
 redundant steps? Definitely keep. A flat score but 30% fewer instructions? Keep.
 
-This skill is the control plane. It does not replace `skill-creator` or
-`session-skill-forge`.
+This skill is the control plane. It does not replace `skill-creator`.
 
-- Use `session-skill-forge` to turn a known workflow into a first draft.
 - Use `skill-creator` to help generate prompts, assertions, and benchmark runs.
 - Use `skill-autoresearch` when you want the full hill-climbing loop around one
   target skill.
@@ -337,12 +335,10 @@ Create a new skill for research-note scoring, but do it with a Karpathy-style ke
 ```
 
 ```text
-Run skill-autoresearch on session-skill-forge and tell me which instruction changes actually improve the eval prompts.
+Run skill-autoresearch on obsidian-linked-research and tell me which instruction changes actually improve the eval prompts.
 ```
 
 ## Related Skills
 
 - `skill-creator` — prompt, assertion, and benchmark generation
-- `session-skill-forge` — first-draft skill extraction from a workflow
 - `skill-reflection` — capture friction discovered during the loop
-- `session-learning` — convert repeated loop lessons into durable repo guidance

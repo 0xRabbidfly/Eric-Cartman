@@ -545,7 +545,6 @@ Restart VS Code after configuration.
 - **obsidian** — Vault operations (composed — required)
 - **obsidian-vault-digest** — Query vault for prior podcast knowledge
 - **obsidian-vault-linker** — Link podcast notes to related content
-- **session-log** — Capture pipeline run outcomes
 
 ### Step N: Reflection (composable)
 

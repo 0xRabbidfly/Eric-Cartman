@@ -103,9 +103,6 @@ Do NOT defer to end of session. Fix skills while they're breaking.
 
 ## Meta-Skills (Self-Improvement)
 The library includes skills that improve its own context:
-- `session_context_optimizer` — Audit and compress instruction files
-- `session-context-audit` — Lighter health check for context drift
-- `session-learning` — Extract patterns from sessions into persistent rules
 - `skill-reflection` — After-action review any skill can invoke **mid-run or post-run**; triggers Agent Memory capture
 - `repo-state-sync` — Keep onboarding context fresh
 - `obsidian` (Agent Memory) — Long-term memory store; agents save insights autonomously to `Agent Memories/` in the vault
