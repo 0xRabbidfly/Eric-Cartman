@@ -59,9 +59,18 @@
           "note_path": "",
           "processed_at": "2026-07-19T00:00:00Z",
           "status": "skipped"
+        },
+        "41af63a8-8acb-11f1-aecc-97df7544b5fc": {
+          "title": "The Universal Code",
+          "published": "2026-07-30",
+          "audio_url": "https://www.podtrac.com/pts/redirect.mp3/chrt.fm/track/1B146C/pscrb.fm/rss/p/traffic.megaphone.fm/ADV8867448122.mp3",
+          "transcript_path": "Podcasts/Raoul Pal The Journey Man/transcripts/2026-07-30 - The Universal Code.md",
+          "note_path": "Podcasts/Raoul Pal The Journey Man/2026-07-30 - The Universal Code.md",
+          "processed_at": "2026-07-31T06:11:25.835357+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-07-16"
+      "latest_published": "2026-07-30"
     },
     "lex-fridman-podcast": {
       "name": "Lex Fridman Podcast",
@@ -155,9 +164,36 @@
           "note_path": "Podcasts/Limitless/2026-07-28 - Why Claude Opus 5 is Our Favorite AI Model (For Now).md",
           "processed_at": "2026-07-29T06:09:09.584203+00:00",
           "status": "completed"
+        },
+        "808eef66-d12f-4c6a-bd3d-16ca83ebd05c": {
+          "title": "SpaceX Stock Crashed. Starship Flight 13 Didn't.",
+          "published": "2026-07-29",
+          "audio_url": "https://media.transistor.fm/d67bf7cf/7baa083e.mp3",
+          "transcript_path": "Podcasts/Limitless/transcripts/2026-07-29 - SpaceX Stock Crashed. Starship Flight 13 Didn't.md",
+          "note_path": "Podcasts/Limitless/2026-07-29 - SpaceX Stock Crashed. Starship Flight 13 Didn't.md",
+          "processed_at": "2026-07-30T06:08:46.550908+00:00",
+          "status": "completed"
+        },
+        "57a1e5ff-f528-4dd7-b767-f257d2b209ff": {
+          "title": "The Memory Selloff: Record Profits, Collapsing Stocks",
+          "published": "2026-07-30",
+          "audio_url": "https://media.transistor.fm/4c3d7734/6137a356.mp3",
+          "transcript_path": "Podcasts/Limitless/transcripts/2026-07-30 - The Memory Selloff Record Profits, Collapsing Stocks.md",
+          "note_path": "Podcasts/Limitless/2026-07-30 - The Memory Selloff Record Profits, Collapsing Stocks.md",
+          "processed_at": "2026-07-31T06:14:51.201218+00:00",
+          "status": "completed"
+        },
+        "59e09445-461a-472e-a309-0bdd7b7df445": {
+          "title": "THIS WEEK IN AI: Leopold's Fund Collapses, Nvidia Backs Ilya, Slowing Down AI",
+          "published": "2026-07-31",
+          "audio_url": "https://media.transistor.fm/9f3ffde6/63fdb270.mp3",
+          "transcript_path": "Podcasts/Limitless/transcripts/2026-07-31 - THIS WEEK IN AI Leopold's Fund Collapses, Nvidia Backs Ilya, Slowing Down AI.md",
+          "note_path": "Podcasts/Limitless/2026-07-31 - THIS WEEK IN AI Leopold's Fund Collapses, Nvidia Backs Ilya, Slowing Down AI.md",
+          "processed_at": "2026-08-01T06:08:32.576880+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-07-28"
+      "latest_published": "2026-07-31"
     },
     "the-pomp-podcast": {
       "name": "The Pomp Podcast",
@@ -325,9 +361,18 @@
           "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-07-27 - Jared Isaacman NASA's Moon Base by 2028, Optimus Robots on the Moon, The Truth About UFOs  Ep 274.md",
           "processed_at": "2026-07-28T10:58:01.304141+00:00",
           "status": "completed"
+        },
+        "95a67002-8b5f-11f1-9f7c-c32c9aae640c": {
+          "title": "Dario vs Jensen on Open Weights, OpenAI & Anthropic in DC, Xi Exports AI to Global South | EP #275",
+          "published": "2026-07-29",
+          "audio_url": "https://traffic.megaphone.fm/DVVTS5256572721.mp3",
+          "transcript_path": "Podcasts/Moonshots with Peter Diamandis/transcripts/2026-07-29 - Dario vs Jensen on Open Weights, OpenAI & Anthropic in DC, Xi Exports AI to Global South  EP 275.md",
+          "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-07-29 - Dario vs Jensen on Open Weights, OpenAI & Anthropic in DC, Xi Exports AI to Global South  EP 275.md",
+          "processed_at": "2026-07-30T06:22:16.266730+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-07-27"
+      "latest_published": "2026-07-29"
     },
     "dwarkesh-podcast": {
       "name": "Dwarkesh Podcast",
@@ -380,9 +425,18 @@
           "note_path": "Podcasts/The Pragmatic Engineer/2026-07-15 - Context engineering with Dex Horthy.md",
           "processed_at": "2026-07-19T00:00:00Z",
           "status": "completed"
+        },
+        "substack:post:208490793": {
+          "title": "Formal methods with Hillel Wayne",
+          "published": "2026-07-29",
+          "audio_url": "https://api.substack.com/feed/podcast/208490793/f31ef801d61096f61c3c947eedfb56d2.mp3",
+          "transcript_path": "Podcasts/The Pragmatic Engineer/transcripts/2026-07-29 - Formal methods with Hillel Wayne.md",
+          "note_path": "Podcasts/The Pragmatic Engineer/2026-07-29 - Formal methods with Hillel Wayne.md",
+          "processed_at": "2026-08-01T06:19:22.057449+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-07-15"
+      "latest_published": "2026-07-29"
     },
     "naval": {
       "name": "Naval",

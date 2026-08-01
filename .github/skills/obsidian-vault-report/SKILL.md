@@ -103,7 +103,7 @@ What the vault does NOT cover that would strengthen this analysis.
 ## Dependencies
 
 - Composes with **obsidian** skill for vault search and I/O
-- Uses xAI API (grok-4.3) for synthesis if needed, but the agent should do most of the analysis itself
+- Uses xAI API (grok-4.5) for synthesis if needed, but the agent should do most of the analysis itself
 - Reports folder: `Research/Reports/`
 
 ## Related Skills

@@ -38,7 +38,7 @@ python scripts/tracker.py --auto-report
 
 - Vault path: `C:\Users\nuno_\Documents\Obsidian Vault`
 - xAI API key: loaded from env var `XAI_API_KEY` or `~/.config/last30days/.env`
-- Model: `grok-4.3`
+- Model: `grok-4.5`
 - Input: `Research/connections.json` (from obsidian-connection-detector)
 - Output: `Research/theses.json`
 

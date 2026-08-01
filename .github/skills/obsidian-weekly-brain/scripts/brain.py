@@ -47,7 +47,7 @@ CONFIG_DIR = Path.home() / ".config" / "last30days"
 ENV_FILE = CONFIG_DIR / ".env"
 
 XAI_API_URL = "https://api.x.ai/v1/chat/completions"
-XAI_MODEL = "grok-4.3"
+XAI_MODEL = "grok-4.5"
 
 PASS_NAMES = ["trend", "thesis", "blindspot", "bridge", "zeitgeist", "action", "predict", "discover", "cost"]
 
@@ -966,7 +966,7 @@ def track_weekly_costs(vault: dict, today: str) -> str:
             continue
 
     # 2. Weekly brain cost (this run — estimate from API calls)
-    # 5 API calls × ~$0.01 each for grok-4.3
+    # 5 API calls × ~$0.01 each for grok-4.5
     brain_cost = 0.05
 
     # 3. Connection detector costs (estimate from connections.json timestamps)

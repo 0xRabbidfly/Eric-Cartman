@@ -335,7 +335,7 @@ def _generate_summary_xai(
     transcript_text: str,
     episode_title: str = "",
     show_name: str = "",
-    model: str = "grok-4.3",
+    model: str = "grok-4.5",
 ) -> Optional[Dict[str, Any]]:
     """Generate summary using xAI API (Grok)."""
     api_key = _load_xai_api_key()
@@ -468,7 +468,7 @@ def generate_ai_summary(
     # 1. Try xAI API (Grok — primary backend)
     summary = _generate_summary_xai(
         transcript_text, episode_title, show_name,
-        model="grok-4.3",
+        model="grok-4.5",
     )
     if summary:
         return summary
