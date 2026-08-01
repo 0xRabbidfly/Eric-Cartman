@@ -169,6 +169,45 @@ def extract_keywords(text: str) -> set:
     return words - stopwords
 
 
+def extract_entity_links(text: str) -> list[str]:
+    """Extract People/Topics/Companies wikilinks and convert to searchable terms.
+
+    [[People/Dario Amodei]] → "Dario Amodei"
+    [[Topics/Agent Harness Architecture]] → "Agent Harness Architecture"
+    [[Companies/Anthropic]] → "Anthropic"
+    """
+    links = re.findall(
+        r'\[\[(?:People|Topics|Companies)/([^\]|]+?)(?:\|[^\]]+?)?\]\]', text
+    )
+    return [link.strip() for link in links]
+
+
+def extract_podcast_content(text: str) -> str:
+    """Extract focused content from podcast notes for keyword matching.
+
+    Uses Key Ideas and Deep Dives sections, skipping quotes and
+    wikilink sections which are noisy for keyword matching.
+    Falls back to first 500 chars if no sections found.
+    """
+    body = strip_frontmatter(text)
+
+    # Find Key Ideas section start (handles optional emoji prefix)
+    start_match = re.search(r'^##\s+.*Key Ideas', body, re.MULTILINE)
+    if not start_match:
+        return body[:500]
+
+    # Find end boundary: Actionable, Key Quotes, People & Topics, or Transcript
+    after_start = body[start_match.end():]
+    end_match = re.search(
+        r'^##\s+.*(?:Actionable|Key Quotes|People\s*[&]\s*Topics|Transcript)',
+        after_start, re.MULTILINE,
+    )
+
+    if end_match:
+        return body[start_match.start():start_match.end() + end_match.start()].strip()
+    return body[start_match.start():].strip()
+
+
 # ---------------------------------------------------------------------------
 # Vault scanning
 # ---------------------------------------------------------------------------
@@ -199,7 +238,16 @@ def find_candidates(source_path: Path, source_text: str) -> list[Path]:
     """Find candidate notes that might relate to the source note."""
     source_meta = extract_frontmatter(source_text)
     source_tags = set(source_meta.get("tags", []))
-    source_keywords = extract_keywords(source_text)
+
+    # For podcast notes, use focused content and extract entity links
+    is_podcast = "Podcasts" in source_path.parts
+    if is_podcast:
+        focused_text = extract_podcast_content(source_text)
+        source_keywords = extract_keywords(focused_text)
+        source_entities = extract_entity_links(source_text)
+    else:
+        source_keywords = extract_keywords(source_text)
+        source_entities = []
 
     candidates = []
     all_notes = find_library_notes()
@@ -223,8 +271,24 @@ def find_candidates(source_path: Path, source_text: str) -> list[Path]:
         keyword_overlap = source_keywords & candidate_keywords
         overlap_ratio = len(keyword_overlap) / max(len(source_keywords), 1)
 
-        # Score by tag overlap + keyword overlap
-        score = len(tag_overlap) * 3 + overlap_ratio * 10
+        # Entity matching (podcast → library bridge)
+        entity_matches = 0
+        if source_entities:
+            cand_title_lower = extract_title(candidate_text).lower()
+            cand_body_lower = strip_frontmatter(candidate_text).lower()
+            cand_tag_str = " ".join(candidate_tags).lower()
+            cand_author = candidate_meta.get("author", "").strip("\"'").lower()
+            for entity in source_entities:
+                entity_lower = entity.lower()
+                entity_words = [w for w in entity_lower.split() if len(w) > 3]
+                if (entity_lower in cand_title_lower
+                        or entity_lower in cand_author
+                        or entity_lower in cand_body_lower
+                        or any(w in cand_tag_str for w in entity_words)):
+                    entity_matches += 1
+
+        # Score by tag overlap + keyword overlap + entity matches
+        score = len(tag_overlap) * 3 + overlap_ratio * 10 + entity_matches * 5
         if score > 2:
             candidates.append((score, note_path))
 
