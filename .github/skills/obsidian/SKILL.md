@@ -24,7 +24,7 @@ reimplementing filesystem reads/writes.
 
 > **This skill is the SOLE interface for all vault operations.**
 > Do NOT create temporary Python scripts, helper files, or intermediary modules.
-> Do NOT route vault writes through other skills (e.g. obsidian-daily-research, session-log).
+> Do NOT route vault writes through other skills (e.g. obsidian-daily-research, podcast-to-obsidian).
 > Instead, call the wrapper **directly inline** in the terminal.
 
 ### How to call (correct)
@@ -431,7 +431,6 @@ Any skill that produces substantial analytical or research output should save a 
 | Trigger | Example |
 |---------|---------|
 | **Research synthesis completed** | `visual-explainer` generates an HTML strategy framework |
-| **Deep analysis produced** | `insights-report` generates cross-session analysis |
 | **Obsidian-linked research output** | `obsidian-linked-research` produces a comprehensive summary |
 | **Any "deep thought" skill output** | User asks for analysis that produces multi-section structured output |
 
@@ -579,16 +578,6 @@ ob.daily_append(formatted_content)
 
 # Promote #keep items
 ob.property_set("promoted", "true", file="2026-02-23")
-```
-
-### From session-log
-```python
-ob = Obsidian()
-ob.create(
-    f"Session {date}",
-    content=session_markdown,
-    path=f"Sessions/{date}.md"
-)
 ```
 
 ### From content-research-writer

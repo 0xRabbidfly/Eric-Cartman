@@ -138,94 +138,7 @@ node .github/skills/health-audit/count-tokens.js
 
 ---
 
-### 5. 📚 Session Learning
-
-**Extract reusable patterns from coding sessions to build institutional knowledge.**
-
-Analyzes completed coding sessions to identify patterns worth capturing as persistent instructions or skills. Turns one-time solutions into reusable knowledge.
-
-**Use When:**
-- At the end of long coding sessions (30+ minutes)
-- After solving tricky debugging problems
-- When you corrected the AI multiple times on the same issue
-- After discovering framework quirks or workarounds
-- When establishing new project conventions
-
-**What It Extracts:**
-- **Error Resolutions** — How specific errors were diagnosed and fixed
-- **User Corrections** — Patterns where you corrected the AI's approach
-- **Workarounds** — Solutions to framework/library quirks
-- **Debugging Techniques** — Effective debugging patterns
-- **Project Conventions** — New conventions established during the session
-
-**Output Locations:**
-| Pattern Type | Saved To |
-|--------------|----------|
-| Quick rules | `copilot-instructions.md` |
-| File-specific rules | `instructions/*.instructions.md` |
-| Complex workflows | `skills/*/SKILL.md` |
-
-```
-📍 Location: .github/skills/session-learning/
-```
-
----
-
-### 6. 🗒️ Session Log
-
-**Capture session insights and metrics for later analysis.**
-
-Logs checkpoint snapshots and end-of-session summaries into `.github/sessions/` so other skills can analyze what happened over time.
-
-**3 Modes of Usage:**
-- **Checkpoint** — `/session-log checkpoint` auto-extracts recent insights/challenges/metrics
-- **End** — `/session-log end` generates a comprehensive session report
-- **Message** — `/session-log "..."` logs a specific note (auto-categorized)
-
-**Use When:**
-- You want lightweight logging during a long session
-- You want a structured end-of-session summary for later reference
-- You want to build a dataset for process improvement over time
-- You want to capture friction points and successful workflows as you go
-
-**Invocation:**
-```
-/session-log checkpoint
-/session-log "Hit 39 TypeScript errors in auth module"
-/session-log end
-```
-
-```
-📍 Location: .github/skills/session-log/
-```
-
----
-
-### 7. 📈 Insights Report
-
-**Generate a comprehensive cross-session insights report from your session logs.**
-
-Analyzes everything in `.github/sessions/` to surface patterns (what’s working, what’s causing friction, and what to change next). Useful for retrospectives, onboarding, and tightening project conventions.
-
-**Use When:**
-- Weekly/monthly retrospectives
-- Preparing to improve team workflows and developer guidance
-- Identifying recurring issues across multiple sessions
-- Summarizing progress across multiple workstreams
-
-**Invocation:**
-```
-/insights-report
-/insights-report --from 2026-02-01 --to 2026-02-09
-```
-
-```
-📍 Location: .github/skills/insights-report/
-```
-
----
-
-### 8. 🎭 Eric Cartman Agent
+### 5. 🎭 Eric Cartman Agent
 
 **A Cartman-flavored project guide for codebase exploration.**
 
@@ -257,7 +170,7 @@ Combines the teaching methodology of the Project Guide skill with Eric Cartman's
 
 ---
 
-### 9. 🛠️ Skill Creator
+### 6. 🛠️ Skill Creator
 
 **Create new skills, improve existing ones, and measure whether they actually work.**
 
@@ -291,7 +204,7 @@ Provides an end-to-end workflow for skill authoring: capture intent, draft the `
 
 ---
 
-### 10. 🔍 Last 30 Days Research
+### 7. 🔍 Last 30 Days Research
 
 **Research any topic across Reddit, X, and the web from the last 30 days.**
 
@@ -335,7 +248,7 @@ The GitHub Copilot version saves a full `report.md` to your local share folder:
 
 ---
 
-### 11. ✍️ Content Research Writer
+### 8. ✍️ Content Research Writer
 
 **Your AI writing partner for research-backed content creation.**
 
@@ -370,7 +283,7 @@ Acts as a collaborative writing partner — helps with outlining, research, cita
 
 ---
 
-### 12. 🔄 Doc-Sync-All
+### 9. 🔄 Doc-Sync-All
 
 **Comprehensive documentation synchronization across all project artifacts.**
 
@@ -400,7 +313,7 @@ Scans local git changes and propagates updates to ALL design docs, task lists, s
 
 ---
 
-### 13. 🎨 Project Infographic
+### 10. 🎨 Project Infographic
 
 **Generate polished HTML infographics for sprint demos and stakeholder presentations.**
 
@@ -432,7 +345,7 @@ Scans the codebase and design docs, then produces a beautiful single-page HTML i
 
 ---
 
-### 14. 🔃 Repo State Sync
+### 11. 🔃 Repo State Sync
 
 **Keep your Session Onboarding section current with actual codebase state.**
 
@@ -461,7 +374,7 @@ Suggests running when it notices discrepancies between docs and reality (chunk c
 
 ---
 
-### 15. 🪞 Skill Reflection
+### 12. 🪞 Skill Reflection
 
 **Composable after-action review that any skill can invoke at the end of its workflow.**
 
@@ -510,7 +423,7 @@ Invoke the `skill-reflection` skill with:
 
 ---
 
-### 16. 📡 Daily Research Pipeline
+### 13. 📡 Daily Research Pipeline
 
 **Automated daily AI research pipeline that writes to your Obsidian vault.**
 
@@ -556,7 +469,7 @@ python .github/skills/obsidian-daily-research/scripts/run.py --promote-only
 
 ---
 
-### 17. 📓 Obsidian Vault Operations
+### 14. 📓 Obsidian Vault Operations
 
 **Composable wrapper for Obsidian CLI — the sole interface for all vault operations.**
 
@@ -599,7 +512,72 @@ Body content here.
 
 ---
 
-### 18. 🔍 Obsidian Vault Digest
+### 15. 🔗 Obsidian Linked Research
+
+**Turn any URL into a structured research note in your vault.**
+
+Fetches a URL, summarizes it, checks for thesis drift against existing notes, and files the result into the numbered `Research/Library/` taxonomy — using the master Research Library MOC as the source of truth for tags, folder routing, and freshness updates. X/Twitter URLs get rich extraction via xAI's `x_search` (engagement stats, thread context); everything else uses plain-text HTTP fetch. The agent does the summarizing, so no external LLM call is needed for the intelligence step.
+
+**Use When:**
+- You share a URL and want it captured — "research this: https://..."
+- User says "save this article", "obsidian research", "save this tweet"
+- You're bookmarking something to actually read later, with a summary attached
+
+**Key Behaviors:**
+| Behavior | Description |
+|----------|-------------|
+| MOC-Driven Routing | Reads the master Library MOC to pick the right subfolder and tag vocabulary |
+| Always-Capture Sources | A whitelist (e.g. AINews / Latent Space) bypasses the digest quality filter |
+| Thesis Drift Check | Compares new material against existing notes before writing |
+| Composable Writes | All vault writes route through the `obsidian` skill |
+
+**Invocation:**
+```
+/obsidian-linked-research https://example.com/article
+research this: https://x.com/...
+```
+
+```
+📍 Location: .github/skills/obsidian-linked-research/
+```
+
+---
+
+### 16. 🎙️ Podcast to Obsidian
+
+**Podcast → transcript → structured Obsidian note, fully local.**
+
+Detects new episodes via Spotify MCP, downloads audio from RSS enclosures, transcribes locally with faster-whisper, and writes structured notes with summaries, key ideas, quotes, and backlinks. A manifest tracks processed episodes so nothing gets transcribed twice. A `--url` mode transcribes any single X/YouTube/Vimeo video via yt-dlp, no manifest or RSS involved.
+
+**Use When:**
+- User says "podcast to obsidian", "check new episodes", "transcribe podcast"
+- Registering a new show to track, or listing tracked shows
+- One-off transcription of a web video
+
+**Prerequisites:**
+- Spotify MCP (detection mode only), Obsidian with CLI enabled, Python 3.10+
+- `pip install faster-whisper feedparser`, plus `yt-dlp` + `ffmpeg` on PATH for `--url` mode
+
+**Invocation:**
+```powershell
+# Full pipeline — detect, download, transcribe, write to vault
+python .github/skills/podcast-to-obsidian/scripts/pipeline.py
+
+# Detection only
+python .github/skills/podcast-to-obsidian/scripts/pipeline.py --check-only
+
+# Single show, or a one-off web video
+python .github/skills/podcast-to-obsidian/scripts/pipeline.py --show "Show Name"
+python .github/skills/podcast-to-obsidian/scripts/pipeline.py --url https://...
+```
+
+```
+📍 Location: .github/skills/podcast-to-obsidian/
+```
+
+---
+
+### 17. 🔍 Obsidian Vault Digest
 
 **Ask your vault what you already know about any topic.**
 
@@ -627,7 +605,7 @@ Searches your entire Obsidian vault for everything related to a topic, reads the
 
 ---
 
-### 19. 🔗 Obsidian Vault Linker
+### 18. 🔗 Obsidian Vault Linker
 
 **Surface hidden connections and missing links across your knowledge base.**
 
@@ -660,95 +638,7 @@ Analyzes the vault's link graph to find orphaned notes, missing bidirectional li
 
 ---
 
-### 20. 🔬 Session Context Audit
-
-**Lint your AI's operating instructions for health and coherence.**
-
-A lightweight diagnostic that checks freshness, contradictions, coverage gaps, and redundancy across all context files the AI reads at startup. Think of it as a linter for your AI's instructions.
-
-**Use When:**
-- The AI keeps making the same mistake despite instructions
-- After merging a large PR that changed project conventions
-- Monthly hygiene (takes ~2 minutes)
-- After running `session-learning` several times
-- User says "audit my context", "why do you keep getting this wrong?"
-
-**Automated Checks:**
-| Check | What It Catches |
-|-------|----------------|
-| Freshness | Files older than 30/90 days |
-| Contradictions | Conflicting rules across files |
-| Coverage Gaps | Areas used heavily but not documented |
-| Redundancy | Same rule duplicated in multiple files |
-| Token Budget | Files exceeding recommended size limits |
-
-```
-📍 Location: .github/skills/session-context-audit/
-```
-
----
-
-### 21. ⚒️ Session Skill Forge
-
-**Turn any productive workflow into a reusable, callable skill.**
-
-After completing a multi-step workflow, this skill extracts it into a permanent SKILL.md — complete with triggers, steps, decision points, and quality criteria. The skill that creates other skills.
-
-**Use When:**
-- You just completed a multi-step workflow that worked well
-- You find yourself repeating the same sequence across sessions
-- You want to formalize a process before you forget the steps
-- User says "make this a skill", "save this workflow", "forge a skill"
-
-**How It Differs from Session Learning:**
-| | Session Learning | Skill Forge |
-|-|-----------------|-------------|
-| Extracts | Rules and corrections (defensive) | Workflows and capabilities (generative) |
-| Output | Instructions / rules | Full SKILL.md with steps |
-| Purpose | "Don't do X again" | "Here's how to do Y every time" |
-
-**What It Generates:**
-- Complete `SKILL.md` with frontmatter, triggers, workflow steps
-- Helper scripts (if the workflow used code)
-- README registration update
-- Wiring into `copilot-instructions.md` skill list
-
-```
-📍 Location: .github/skills/session-skill-forge/
-```
-
----
-
-### 22. 🧹 Session Context Optimizer
-
-**Let the AI restructure its own context files for maximum efficiency.**
-
-Analyzes and restructures `.github/copilot-instructions.md`, scoped instructions, and skill manifests to reduce redundancy, resolve contradictions, and improve organization. The meta-optimization skill.
-
-**Use When:**
-- Context files feel bloated or contain redundant sections
-- You've been adding instructions for weeks without cleanup
-- After a major project phase change (old context no longer relevant)
-- Periodically (every 2–4 weeks) as context hygiene
-- User says "optimize your instructions", "clean up context", "meta-optimize"
-
-**What It Fixes:**
-| Issue | Action |
-|-------|--------|
-| Duplication | Consolidate to single authoritative location |
-| Contradiction | Resolve — keep intended behavior |
-| Staleness | Remove rules referencing removed packages |
-| Bloat | Compress verbose explanations into concise rules |
-| Poor hierarchy | Re-order by frequency of impact |
-| Scope mismatch | Move file-specific rules to `.instructions.md` |
-
-```
-📍 Location: .github/skills/session_context_optimizer/
-```
-
----
-
-### 23. 📱 Remote Skills API
+### 19. 📱 Remote Skills API
 
 **Access all your skills from your phone over Tailscale.**
 
@@ -784,7 +674,7 @@ npm start
 
 ---
 
-### 24. 🧪 Skill Autoresearch
+### 20. 🧪 Skill Autoresearch
 
 **Apply Karpathy-style autoresearch to skill creation and improvement.**
 
@@ -808,7 +698,6 @@ It is for measured skill iteration, not one-shot drafting.
 | keep / discard | promote / revert |
 
 **How It Fits:**
-- `session-skill-forge` creates the first draft from a workflow
 - `skill-creator` helps with prompts, assertions, and benchmark runs
 - `skill-autoresearch` controls the bounded hill-climbing loop around one target skill
 
@@ -818,55 +707,114 @@ It is for measured skill iteration, not one-shot drafting.
 
 ---
 
+## 📚 Complete Skill Index
+
+Every skill in `.github/skills/` (28 total). ⭐ marks the ones with a deep-dive section above.
+
+**Repo & Project Tooling**
+| Skill | Purpose |
+|-------|---------|
+| ⭐ `agentic-evaluator` | Score any repo's agentic development maturity (A–F grade) |
+| `branch-wrapup` | Pre-PR quality gate — build, types, lint, tests, security, conventional commit |
+| ⭐ `doc-sync-all` | Propagate code changes to every design doc, task list, and spec |
+| ⭐ `health-audit` | Validate frontmatter, cross-references, and token counts |
+| `owasp-security-review` | Quick-scan review against the OWASP Top 10:2025 |
+| ⭐ `project-guide` | Teaching-first codebase exploration companion |
+| ⭐ `project-infographic` | Generate HTML infographics for sprint demos |
+| ⭐ `project-scaffold` | Interactive wizard to scaffold agentic dev artifacts |
+| ⭐ `remote-skills-api` | Invoke any skill from your phone over Tailscale |
+| ⭐ `repo-state-sync` | Keep the onboarding section of `copilot-instructions.md` fresh |
+| `visual-explainer` | Self-contained HTML diagrams, diff reviews, plan audits, slide decks |
+
+**Research & Writing**
+| Skill | Purpose |
+|-------|---------|
+| ⭐ `content-research-writer` | Token-efficient writing partner with numbered citations |
+| ⭐ `last30days` | Research any topic from the last 30 days (Reddit + X + web) |
+
+**Obsidian & Knowledge Base**
+| Skill | Purpose |
+|-------|---------|
+| ⭐ `obsidian` | Composable vault wrapper — the sole interface every other vault skill uses |
+| `obsidian-connection-detector` | Detect and classify relationships between vault notes |
+| ⭐ `obsidian-daily-research` | Daily AI research pipeline → Obsidian vault |
+| ⭐ `obsidian-linked-research` | URL → summarized research note, routed by the master Library MOC |
+| `obsidian-thesis-tracker` | Track emerging theses and draft reports as evidence accumulates |
+| ⭐ `obsidian-vault-digest` | Synthesize everything the vault knows about a topic |
+| ⭐ `obsidian-vault-linker` | Find missing links, orphans, MOC gaps, and thematic clusters |
+| `obsidian-vault-lint` | Weekly vault maintenance — broken links, MOC coverage, section sorting |
+| `obsidian-vault-lint-cowork` | Cowork-native fork of `obsidian-vault-lint` |
+| `obsidian-vault-report` | Generate synthesis reports and strategy docs from the vault corpus |
+| `obsidian-weekly-brain` | Weekly digest — trends, thesis health, blindspots, cross-domain bridges |
+| ⭐ `podcast-to-obsidian` | Podcast → local transcription → structured Obsidian note |
+
+**Skill Authoring (Meta)**
+| Skill | Purpose |
+|-------|---------|
+| ⭐ `skill-autoresearch` | Bounded keep-or-revert experiment loop for improving one skill |
+| ⭐ `skill-creator` | Create, test, benchmark, and refine skills |
+| ⭐ `skill-reflection` | Composable after-action review any skill can invoke |
+
+---
+
 ## 📁 Repository Structure
 
 ```
 .github/
 ├── copilot-instructions.md     # Root AI instructions
-├── mcp.json                    # MCP server configuration
-├── skills/                     # Reusable AI skills (GitHub Copilot)
-│   ├── agentic-evaluator/      # ⭐ Score repo agentic maturity
-│   ├── branch-wrapup/          # ✅ Pre-PR quality gate
-│   ├── content-research-writer/ # ✍️ Writing partner
-│   ├── doc-sync-all/           # 🔄 Documentation sync
-│   ├── health-audit/           # 🩺 Artifact health checks
-│   ├── insights-report/        # 📈 Cross-session analysis
-│   ├── last30days/             # 🔍 Research (Copilot version)
-│   ├── obsidian/               # 📓 Vault operations (composable)
-│   ├── obsidian-daily-research/ # 📡 Daily AI research pipeline
-│   ├── obsidian-linked-research/ # 🔗 URL → research note using the master Library MOC
-│   ├── obsidian-vault-digest/  # 🔍 Vault topic synthesis
-│   ├── obsidian-vault-linker/  # 🔗 Missing links, MOC gaps, and graph health
-│   ├── owasp-security-review/  # 🔒 OWASP Top 10 security scan
-│   ├── podcast-to-obsidian/    # 🎙️ Podcast → transcript → Obsidian
-│   ├── project-guide/          # 🧭 Codebase exploration
-│   ├── project-infographic/    # 🎨 Sprint demo visuals
-│   ├── project-scaffold/       # 🏗️ Agentic scaffold wizard
-│   ├── remote-skills-api/      # 📱 Phone access over Tailscale
-│   ├── repo-state-sync/        # 🔃 Onboarding sync
-│   ├── session-context-audit/  # 🔬 Context file health check
-│   ├── session-learning/       # 📚 Pattern extraction
-│   ├── session-log/            # 🗒️ Session capture
-│   ├── session-skill-forge/    # ⚒️ Workflow → reusable skill
-│   ├── session_context_optimizer/ # 🧹 Meta-optimize AI context
-│   ├── skill-autoresearch/     # 🧪 Keep-or-revert skill improvement loops
-│   ├── skill-creator/          # 🛠️ Create, test, and refine skills
-│   ├── skill-reflection/       # 🪞 Composable after-action review
-│   └── visual-explainer/       # 🎨 HTML diagrams, diff reviews, slide decks
-├── agents/                     # Specialized agent configs
+├── agents/                     # Specialized agent personas
 │   ├── eric-cartman.md         # 🎭 Cartman-flavored project guide
 │   ├── portuguese-lawyer.md    # ⚖️ Portuguese legal advisor
 │   ├── ui-designer.md          # 🎨 UI design and Fluent UI patterns
 │   └── ux-designer.md          # 🧑‍💻 UX flows and information architecture
-└── instructions/               # File-pattern-specific rules
+├── references/                 # Shared reference docs
+│   └── brand-guidelines.md
+├── sessions/                   # Session notes and audit output
+└── skills/                     # Reusable AI skills (portable across IDEs)
+    ├── README.md               # Skill index + authoring conventions
+    ├── agentic-evaluator/      # ⭐ Score repo agentic maturity
+    ├── branch-wrapup/          # ✅ Pre-PR quality gate
+    ├── content-research-writer/ # ✍️ Writing partner
+    ├── doc-sync-all/           # 🔄 Documentation sync
+    ├── health-audit/           # 🩺 Artifact health checks
+    ├── last30days/             # 🔍 Research (Copilot version)
+    ├── obsidian/               # 📓 Vault operations (composable)
+    ├── obsidian-connection-detector/ # 🕸️ Note relationship detection
+    ├── obsidian-daily-research/ # 📡 Daily AI research pipeline
+    ├── obsidian-linked-research/ # 🔗 URL → research note via the master Library MOC
+    ├── obsidian-thesis-tracker/ # 🎯 Thesis tracking and draft reports
+    ├── obsidian-vault-digest/  # 🔍 Vault topic synthesis
+    ├── obsidian-vault-linker/  # 🔗 Missing links, MOC gaps, and graph health
+    ├── obsidian-vault-lint/    # 🧹 Weekly vault maintenance
+    ├── obsidian-vault-lint-cowork/ # 🧹 Cowork-native lint fork
+    ├── obsidian-vault-report/  # 📄 Corpus synthesis reports
+    ├── obsidian-weekly-brain/  # 🧠 Weekly intelligence digest
+    ├── owasp-security-review/  # 🔒 OWASP Top 10 security scan
+    ├── podcast-to-obsidian/    # 🎙️ Podcast → transcript → Obsidian
+    ├── project-guide/          # 🧭 Codebase exploration
+    ├── project-infographic/    # 🎨 Sprint demo visuals
+    ├── project-scaffold/       # 🏗️ Agentic scaffold wizard
+    ├── remote-skills-api/      # 📱 Phone access over Tailscale
+    ├── repo-state-sync/        # 🔃 Onboarding sync
+    ├── skill-autoresearch/     # 🧪 Keep-or-revert skill improvement loops
+    ├── skill-creator/          # 🛠️ Create, test, and refine skills
+    ├── skill-reflection/       # 🪞 Composable after-action review
+    └── visual-explainer/       # 🎨 HTML diagrams, diff reviews, slide decks
 
 .claude/
-├── CLAUDE.md                   # Claude Code root context (open-source)
-└── skills/                     # Personal/local Claude Code skills (gitignored)
+├── readme-mcp.md               # MCP setup notes for Claude Code
+├── playwright-*.json           # Browser automation configs
+└── skills/                     # Claude Code skills (shared subset)
+    ├── council/                # 🏛️ Multi-persona deliberation
+    ├── humanizer/              # 🧑 Strip AI tells from writing
+    ├── last30days/             # 🔍 Research (Claude Code version)
+    └── skill-creator/          # 🛠️ Create, test, and refine skills
 ```
 
-> **Note:** `.github/skills/` is the open-source portable scaffold (works with any AI IDE).
-> `.claude/` contains local-only config and personal skills — gitignored except `CLAUDE.md`.
+> **Note:** `.github/skills/` is the open-source portable scaffold — it works with any AI IDE.
+> `.claude/` holds Claude Code configuration and a second skill set, only part of which is
+> shared here. Local-only files — `CLAUDE.md`, `mcp.json`, and personal skills that touch
+> private accounts (banking, groceries, car search) — are gitignored and stay on the machine.
 
 ---
 

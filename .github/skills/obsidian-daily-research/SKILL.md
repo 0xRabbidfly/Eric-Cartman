@@ -198,4 +198,3 @@ The reflection skill will analyze the run and produce improvement recommendation
 
 - **obsidian** — Vault operations (composed — required)
 - **last30days** — Full deep research (use for `#deep-dive` tagged topics)
-- **session-log** — Capture coding session insights

@@ -221,5 +221,4 @@ Writing prep mode: I need to write about knowledge management. What's in my vaul
 - `obsidian-vault-linker` — Strengthens connections; vault-digest reads them
 - `content-research-writer` — Uses external sources; vault-digest uses internal ones
 - `obsidian-daily-research` — Captures new content; vault-digest synthesizes existing content
-- `session-skill-forge` — If you find yourself digesting the same topic often, forge a dedicated skill
 
