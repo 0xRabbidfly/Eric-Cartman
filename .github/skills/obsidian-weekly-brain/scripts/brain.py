@@ -497,9 +497,16 @@ def pass_blindspot(vault: dict, api_key: str) -> str:
 
     daily_topic_mentions: Counter = Counter()
     for note in dailies:
-        # Extract 2-word phrases from the body as rough topic indicators
+        # Skip pipeline metadata — only scan content below "## Today's POW"
+        body = note["body"]
+        pow_idx = body.find("## Today's POW")
+        if pow_idx > 0:
+            body = body[pow_idx:]
+        else:
+            body = body[500:]  # skip cost header area
+        # Extract 2-word phrases from content
         # Both words must be 4+ chars to filter out short noise words
-        words = re.findall(r"[a-zA-Z]{4,}", note["body"][:2000])
+        words = re.findall(r"[a-zA-Z]{4,}", body[:2000])
         for i in range(len(words) - 1):
             w1 = words[i].lower()
             w2 = words[i + 1].lower()
