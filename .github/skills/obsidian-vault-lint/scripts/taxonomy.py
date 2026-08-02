@@ -1,41 +1,32 @@
-"""Phase 2.5 — Backward Propagation: taxonomy drift repair + emergent cluster detection.
+"""Phase 3 — Taxonomy Repair: keeps library tags and folder placement canonical.
 
-Two modes that run every lint cycle:
-
-Mode A — Taxonomy Drift Repair:
-  - Reads the master MOC's canonical tag guidance and folder structure
+  - Reads the master MOC's canonical tag guidance
   - Compares each library note's tags and folder placement
   - Auto-applies tag normalization (case fixes, synonym merges)
-  - Proposes folder moves and tag additions for human review
+  - Proposes folder moves and flags orphaned tags for human review
 
-Mode B — Emergent Cluster Detection:
-  - Groups notes added in the last 30 days by shared tag combinations
-  - Proposes new MOC sections when 3+ recent notes share a tag combo
-    that doesn't have its own section yet
+Emergent topic detection is NOT done here — obsidian-weekly-brain (trend
+momentum + cross-domain bridges) and obsidian-thesis-tracker own that.
 """
 import re
 import sys
 from collections import defaultdict
 from dataclasses import dataclass, field
-from datetime import date, timedelta
-from difflib import SequenceMatcher
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Dict, List, Optional, Set
 
 _SCRIPT_DIR = Path(__file__).parent.resolve()
 _SKILLS_ROOT = _SCRIPT_DIR.parent.parent
 sys.path.insert(0, str(_SCRIPT_DIR))
 sys.path.insert(0, str(_SKILLS_ROOT / "obsidian" / "scripts"))
 from obsidian import Obsidian
-from inventory import MASTER_MOC_PATH, LIBRARY_FOLDER, _WIKILINK_RE, _SECTION_RE
+from inventory import MASTER_MOC_PATH, LIBRARY_FOLDER
 
 
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
 
-CLUSTER_WINDOW_DAYS = 30
-CLUSTER_MIN_NOTES = 3
 TAG_SIMILARITY_THRESHOLD = 0.8
 
 # Folder-to-tag routing table: canonical tags that map to each library bucket.
@@ -57,17 +48,13 @@ FOLDER_TAG_ROUTING = {
 # ---------------------------------------------------------------------------
 
 @dataclass
-class BackpropResult:
-    """Results from backward propagation analysis."""
-    # Mode A: Taxonomy drift
+class TaxonomyResult:
+    """Results from taxonomy repair analysis."""
     tag_fixes_applied: int = 0
     tag_fix_details: list = field(default_factory=list)       # [{note_path, old_tag, new_tag}]
     folder_move_proposals: list = field(default_factory=list)  # [{note_path, current_folder, suggested_folder, reason}]
     orphaned_tags: list = field(default_factory=list)          # [{note_path, tag}]
     missing_crosslinks: list = field(default_factory=list)     # [{note_path, suggested_link, reason}]
-
-    # Mode B: Emergent clusters
-    new_cluster_proposals: list = field(default_factory=list)  # [{tag_combo, note_count, note_paths, proposed_section}]
 
     # Summary
     changes: list = field(default_factory=list)                # [{type, detail}]
@@ -78,12 +65,12 @@ class BackpropResult:
 # Main entry point
 # ---------------------------------------------------------------------------
 
-def run_backprop(
+def run_taxonomy_repair(
     similar_tags: list,
     dry_run: bool = False,
     verbose: bool = False,
-) -> BackpropResult:
-    """Run backward propagation: taxonomy drift repair + emergent cluster detection.
+) -> TaxonomyResult:
+    """Run taxonomy repair over every library note.
 
     Args:
         similar_tags: List of similar tag pairs from Phase 1 inventory
@@ -92,36 +79,28 @@ def run_backprop(
         verbose: If True, print per-item detail.
 
     Returns:
-        BackpropResult with all findings and applied changes.
+        TaxonomyResult with all findings and applied changes.
     """
     ob = Obsidian()
-    result = BackpropResult()
+    result = TaxonomyResult()
 
-    # Read master MOC for canonical structure
+    # Read master MOC for the canonical tag list
     moc_content = ob.read(path=MASTER_MOC_PATH)
     canonical_tags = _extract_canonical_tags(moc_content)
-    moc_sections = _extract_moc_sections(moc_content)
 
     if verbose:
-        print(f"[backprop] Canonical tags from MOC: {len(canonical_tags)}")
-        print(f"[backprop] MOC sections: {len(moc_sections)}")
+        print(f"[taxonomy] Canonical tags from MOC: {len(canonical_tags)}")
 
     # Read all library notes' frontmatter
     library_notes = ob.files(folder=LIBRARY_FOLDER, ext="md").lines()
     content_notes = [n for n in library_notes if "/00 MOC/" not in n]
 
     if verbose:
-        print(f"[backprop] Library notes to analyze: {len(content_notes)}")
+        print(f"[taxonomy] Library notes to analyze: {len(content_notes)}")
 
-    # Mode A: Taxonomy drift repair
     _taxonomy_drift_repair(
         ob, result, content_notes, canonical_tags,
-        moc_sections, similar_tags, dry_run, verbose,
-    )
-
-    # Mode B: Emergent cluster detection
-    _emergent_cluster_detection(
-        ob, result, content_notes, moc_sections, verbose,
+        similar_tags, dry_run, verbose,
     )
 
     return result
@@ -129,7 +108,7 @@ def run_backprop(
 
 
 # ---------------------------------------------------------------------------
-# MOC parsing helpers
+# MOC parsing helper
 # ---------------------------------------------------------------------------
 
 def _extract_canonical_tags(moc_content: str) -> Set[str]:
@@ -155,29 +134,6 @@ def _extract_canonical_tags(moc_content: str) -> Set[str]:
     return canonical
 
 
-def _extract_moc_sections(moc_content: str) -> Dict[str, List[str]]:
-    """Extract MOC section headings and their wikilink entries.
-
-    Returns dict mapping section heading text -> list of slugs in that section.
-    """
-    sections: Dict[str, List[str]] = {}
-    current_section = None
-
-    for line in moc_content.splitlines():
-        m = _SECTION_RE.match(line)
-        if m:
-            current_section = m.group(2).strip()
-            sections[current_section] = []
-            continue
-        if current_section:
-            lm = _WIKILINK_RE.search(line)
-            if lm:
-                sections[current_section].append(lm.group(1).strip())
-
-    return sections
-
-
-
 # ---------------------------------------------------------------------------
 # Frontmatter parsing
 # ---------------------------------------------------------------------------
@@ -185,7 +141,6 @@ def _extract_moc_sections(moc_content: str) -> Dict[str, List[str]]:
 _FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---", re.DOTALL)
 _TAGS_RE = re.compile(r"^tags:\s*\[([^\]]*)\]", re.MULTILINE)
 _TAGS_LIST_RE = re.compile(r"^tags:\s*$", re.MULTILINE)
-_DATE_SAVED_RE = re.compile(r"^date_saved:\s*(\d{4}-\d{2}-\d{2})", re.MULTILINE)
 
 
 def _parse_frontmatter_tags(content: str) -> List[str]:
@@ -223,21 +178,6 @@ def _parse_frontmatter_tags(content: str) -> List[str]:
         return tags
 
     return []
-
-
-def _parse_date_saved(content: str) -> Optional[date]:
-    """Extract date_saved from frontmatter."""
-    fm_match = _FRONTMATTER_RE.match(content)
-    if not fm_match:
-        return None
-    m = _DATE_SAVED_RE.search(fm_match.group(1))
-    if m:
-        try:
-            return date.fromisoformat(m.group(1))
-        except ValueError:
-            return None
-    return None
-
 
 
 def _get_note_folder_number(note_path: str) -> Optional[str]:
@@ -281,15 +221,14 @@ def _suggest_folder_for_tags(tags: List[str]) -> Optional[str]:
 
 
 # ---------------------------------------------------------------------------
-# Mode A: Taxonomy Drift Repair
+# Taxonomy Drift Repair
 # ---------------------------------------------------------------------------
 
 def _taxonomy_drift_repair(
     ob: Obsidian,
-    result: BackpropResult,
+    result: TaxonomyResult,
     content_notes: List[str],
     canonical_tags: Set[str],
-    moc_sections: Dict[str, List[str]],
     similar_tags: list,
     dry_run: bool,
     verbose: bool,
@@ -309,16 +248,16 @@ def _taxonomy_drift_repair(
     synonym_map = _build_synonym_map(similar_tags, canonical_tags)
 
     if verbose and synonym_map:
-        print(f"[backprop] Synonym merge map: {len(synonym_map)} entries")
+        print(f"[taxonomy] Synonym merge map: {len(synonym_map)} entries")
         for old, new in list(synonym_map.items())[:5]:
-            print(f"[backprop]   '{old}' -> '{new}'")
+            print(f"[taxonomy]   '{old}' -> '{new}'")
 
     for note_path in content_notes:
         try:
             content = ob.read(path=note_path)
         except Exception as e:
             if verbose:
-                print(f"[backprop] Could not read {note_path}: {e}")
+                print(f"[taxonomy] Could not read {note_path}: {e}")
             continue
 
         if not content or not content.strip():
@@ -373,11 +312,11 @@ def _taxonomy_drift_repair(
                 try:
                     ob.create(path=note_path, content=new_content, overwrite=True)
                     if verbose:
-                        print(f"[backprop] Fixed tags in: {note_path}")
+                        print(f"[taxonomy] Fixed tags in: {note_path}")
                 except Exception as e:
-                    print(f"[backprop] ERROR writing tag fix to {note_path}: {e}", file=sys.stderr)
+                    print(f"[taxonomy] ERROR writing tag fix to {note_path}: {e}", file=sys.stderr)
             elif verbose:
-                print(f"[backprop] [DRY RUN] Would fix tags in: {note_path}")
+                print(f"[taxonomy] [DRY RUN] Would fix tags in: {note_path}")
 
         # Folder routing check
         final_tags = _parse_frontmatter_tags(new_content if note_modified else content)
@@ -397,7 +336,7 @@ def _taxonomy_drift_repair(
             })
             if verbose:
                 slug = note_path.rsplit("/", 1)[-1]
-                print(f"[backprop] Folder drift: {slug} ({current_folder} -> {suggested_folder})")
+                print(f"[taxonomy] Folder drift: {slug} ({current_folder} -> {suggested_folder})")
 
     # Build changes summary
     if result.tag_fixes_applied > 0:
@@ -483,131 +422,20 @@ def _replace_tag_in_frontmatter(content: str, old_tag: str, new_tag: str) -> str
 
 
 # ---------------------------------------------------------------------------
-# Mode B: Emergent Cluster Detection
-# ---------------------------------------------------------------------------
-
-def _emergent_cluster_detection(
-    ob: Obsidian,
-    result: BackpropResult,
-    content_notes: List[str],
-    moc_sections: Dict[str, List[str]],
-    verbose: bool,
-) -> None:
-    """Detect emergent topic clusters among recently added notes.
-
-    Looks at notes with date_saved within the last CLUSTER_WINDOW_DAYS.
-    Groups them by shared tag pairs/triples. If 3+ notes share a tag
-    combination not already represented by an existing MOC section,
-    proposes a new section.
-    """
-    cutoff = date.today() - timedelta(days=CLUSTER_WINDOW_DAYS)
-    recent_notes: List[dict] = []  # [{path, tags, date_saved}]
-
-    if verbose:
-        print(f"[backprop] Scanning for notes added since {cutoff.isoformat()}...")
-
-    for note_path in content_notes:
-        try:
-            content = ob.read(path=note_path)
-        except Exception:
-            continue
-
-        if not content or not content.strip():
-            continue
-
-        saved = _parse_date_saved(content)
-        if saved and saved >= cutoff:
-            tags = _parse_frontmatter_tags(content)
-            if tags:
-                recent_notes.append({
-                    "path": note_path,
-                    "tags": [t.lower() for t in tags],
-                    "date_saved": saved.isoformat(),
-                })
-
-    if verbose:
-        print(f"[backprop] Recent notes (last {CLUSTER_WINDOW_DAYS} days): {len(recent_notes)}")
-
-    if len(recent_notes) < CLUSTER_MIN_NOTES:
-        return
-
-    # Build tag-pair frequency map
-    tag_pair_notes: Dict[Tuple[str, ...], List[str]] = defaultdict(list)
-
-    for note in recent_notes:
-        sorted_tags = sorted(set(note["tags"]))
-        # Generate all pairs
-        for i in range(len(sorted_tags)):
-            for j in range(i + 1, len(sorted_tags)):
-                pair = (sorted_tags[i], sorted_tags[j])
-                tag_pair_notes[pair].append(note["path"])
-
-    # Existing MOC section names (lowercased for fuzzy matching)
-    existing_sections_lower = {s.lower() for s in moc_sections}
-
-    # Find clusters that meet the threshold
-    for tag_combo, note_paths in tag_pair_notes.items():
-        if len(note_paths) < CLUSTER_MIN_NOTES:
-            continue
-
-        # Check if any existing MOC section already covers this combo
-        combo_label = " + ".join(tag_combo)
-        if _section_covers_combo(tag_combo, existing_sections_lower):
-            continue
-
-        # Deduplicate note paths
-        unique_paths = list(dict.fromkeys(note_paths))
-
-        result.new_cluster_proposals.append({
-            "tag_combo": list(tag_combo),
-            "combo_label": combo_label,
-            "note_count": len(unique_paths),
-            "note_paths": unique_paths[:10],  # cap display at 10
-            "proposed_section": f"Topic: {combo_label.replace('+', '&').title()}",
-        })
-
-        if verbose:
-            print(f"[backprop] Emergent cluster: {combo_label} ({len(unique_paths)} notes)")
-
-    if result.new_cluster_proposals:
-        result.changes.append({
-            "type": "emergent_clusters",
-            "detail": f"Found {len(result.new_cluster_proposals)} emergent topic clusters "
-                      f"among {len(recent_notes)} recent notes",
-        })
-
-
-def _section_covers_combo(
-    tag_combo: Tuple[str, ...],
-    existing_sections_lower: Set[str],
-) -> bool:
-    """Check if any existing MOC section name contains all tags in the combo.
-
-    Uses substring matching: if a section heading contains both 'rag' and 'memory',
-    the combo ('memory', 'rag') is considered covered.
-    """
-    for section in existing_sections_lower:
-        if all(tag in section for tag in tag_combo):
-            return True
-    return False
-
-
-
-# ---------------------------------------------------------------------------
 # Report formatting
 # ---------------------------------------------------------------------------
 
-def format_backprop_report(result: BackpropResult, run_date: str) -> str:
-    """Format backward propagation results as a markdown proposals file.
+def format_taxonomy_report(result: TaxonomyResult, run_date: str) -> str:
+    """Format taxonomy repair results as a markdown proposals file.
 
     This file is written to Research/Logs/ for human review of folder moves
-    and cluster proposals.
+    and orphaned tags.
     """
     lines = [
-        f"# Vault Lint — Backward Propagation Proposals — {run_date}",
+        f"# Vault Lint — Taxonomy Repair Proposals — {run_date}",
         "",
         "> Review these proposals. Tag normalization has already been auto-applied.",
-        "> Folder moves and new MOC sections require manual approval.",
+        "> Folder moves require manual approval.",
         "",
     ]
 
@@ -646,25 +474,6 @@ def format_backprop_report(result: BackpropResult, run_date: str) -> str:
             suffix = f" (+{len(notes) - 3} more)" if len(notes) > 3 else ""
             lines.append(f"- `{tag}` — {note_list}{suffix}")
         lines.append("")
-
-    # Emergent cluster proposals
-    if result.new_cluster_proposals:
-        lines += [
-            f"## Emergent Cluster Proposals ({len(result.new_cluster_proposals)} clusters)",
-            "",
-            "> These tag combinations appear in 3+ recent notes but have no dedicated MOC section.",
-            "",
-        ]
-        for c in result.new_cluster_proposals:
-            lines += [
-                f"### {c['combo_label']} ({c['note_count']} notes)",
-                f"- **Proposed section**: {c['proposed_section']}",
-                f"- **Notes**:",
-            ]
-            for path in c["note_paths"]:
-                slug = path.rsplit("/", 1)[-1].replace(".md", "")
-                lines.append(f"  - [[{slug}]]")
-            lines.append("")
 
     # Tag fixes applied (informational, already done)
     if result.tag_fix_details:

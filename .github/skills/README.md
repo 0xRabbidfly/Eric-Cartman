@@ -38,7 +38,7 @@ Portable, reusable skills for AI coding assistants. Each skill lives in its own 
 | `obsidian-thesis-tracker` | Track emerging theses and draft reports as evidence accumulates |
 | `obsidian-vault-digest` | Synthesize Obsidian vault content into a briefing |
 | `obsidian-vault-linker` | Discover missing links, MOC gaps, and cluster opportunities |
-| `obsidian-vault-lint` | Weekly vault maintenance — broken links, MOC coverage, section sorting |
+| `obsidian-vault-lint` | Weekly vault structural maintenance — broken links, MOC coverage, section sorting, tag/folder taxonomy |
 | `obsidian-vault-lint-cowork` | Cowork-native fork of `obsidian-vault-lint` |
 | `obsidian-vault-report` | Generate synthesis reports and strategy docs from the vault corpus |
 | `obsidian-weekly-brain` | Weekly digest — trends, thesis health, blindspots, cross-domain bridges |

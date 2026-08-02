@@ -1,23 +1,26 @@
 #!/usr/bin/env python3
 """
-obsidian-vault-lint — Weekly vault maintenance pipeline.
+obsidian-vault-lint — Weekly vault structural maintenance.
 
 Phases:
-  1.   Inventory       (read-only, always runs)
-  2.   Fixes           (autonomous writes — safe, reversible)
-  2.5  Backprop        (taxonomy drift repair + emergent cluster detection)
-  3.   Connections     (LLM-assisted link discovery → approval-gated diff)
-  4.   MOC reorg       (autonomous + approval-gated proposals)
-  5.   Report          (standalone log in Research/Logs)
+  1.  Inventory        (read-only, always runs)
+  2.  Fixes            (autonomous writes — safe, reversible)
+  3.  Taxonomy repair  (tag normalization + folder move proposals)
+  4.  MOC reorg        (autonomous + approval-gated proposals)
+  5.  Report           (standalone log in Research/Logs)
+
+Semantic work — connection discovery, thesis clustering, emergent topic
+detection — is NOT done here. That belongs to the metabolism pipeline
+(obsidian-connection-detector -> obsidian-thesis-tracker ->
+obsidian-vault-report) and obsidian-weekly-brain. This skill only keeps the
+vault's structure clean.
 
 Usage:
     python scripts/lint.py                       # Full run (all phases)
     python scripts/lint.py --dry-run             # Preview, no writes
     python scripts/lint.py --phase 1             # Inventory only
     python scripts/lint.py --phase 2             # Fixes only
-    python scripts/lint.py --phase 2.5           # Backprop only
-    python scripts/lint.py --phase 3             # Connection discovery only
-    python scripts/lint.py --phase 3 --apply     # Apply approved connection proposals
+    python scripts/lint.py --phase 3             # Taxonomy repair only
     python scripts/lint.py --phase 4             # MOC reorg only
     python scripts/lint.py --verbose             # Verbose output
     python scripts/lint.py --stale-days 14       # Override stale threshold (default: 7)
@@ -42,8 +45,7 @@ sys.path.insert(0, str(SKILLS_ROOT / "obsidian" / "scripts"))
 from obsidian import Obsidian
 from inventory import collect_inventory, LOG_FOLDER
 from fixes import apply_fixes
-from backprop import run_backprop, format_backprop_report
-from connections import discover_connections, format_connections_report, apply_connection_proposals
+from taxonomy import run_taxonomy_repair, format_taxonomy_report
 from moc import reorganize_moc, format_moc_proposals
 
 GIT_EXE = r"C:\Program Files\Git\cmd\git.exe"
@@ -53,13 +55,11 @@ DEFAULT_VAULT_PATH = r"C:/Users/nuno_/Documents/Obsidian Vault"
 
 def main():
     parser = argparse.ArgumentParser(
-        description="obsidian-vault-lint — weekly vault maintenance",
+        description="obsidian-vault-lint — weekly vault structural maintenance",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("--phase", type=str, choices=["1", "2", "2.5", "3", "4"], metavar="N",
-                        help="Run a specific phase (1, 2, 2.5, 3, 4) only")
-    parser.add_argument("--apply", action="store_true",
-                        help="With --phase 3: apply the most recent connection proposals file")
+    parser.add_argument("--phase", type=str, choices=["1", "2", "3", "4"], metavar="N",
+                        help="Run a specific phase (1, 2, 3, 4) only")
     parser.add_argument("--dry-run", action="store_true",
                         help="Preview all changes without writing to vault")
     parser.add_argument("--verbose", action="store_true",
@@ -74,16 +74,10 @@ def main():
     if args.dry_run:
         print("[lint] DRY RUN — no changes will be written to vault")
 
-    # Special: --phase 3 --apply
-    if args.phase == "3" and args.apply:
-        _apply_connections(ob, run_date, dry_run=args.dry_run, verbose=args.verbose)
-        return
-
     inv = None
     fix_result = None
-    backprop_result = None
+    tax_result = None
     moc_result = None
-    conn_proposals = []
 
     # -- Phase 1: Inventory -------------------------------------------------------
     if args.phase is None or args.phase == "1":
@@ -103,44 +97,25 @@ def main():
         if args.phase == "2":
             return
 
-    # -- Phase 2.5: Backward Propagation ------------------------------------------
-    if args.phase is None or args.phase == "2.5":
-        print("\n=== Phase 2.5: Backward Propagation ===")
+    # -- Phase 3: Taxonomy Repair --------------------------------------------------
+    if args.phase is None or args.phase == "3":
+        print("\n=== Phase 3: Taxonomy Repair ===")
         if inv is None:
             inv = collect_inventory(stale_days=args.stale_days, verbose=args.verbose)
-        backprop_result = run_backprop(
+        tax_result = run_taxonomy_repair(
             similar_tags=inv.similar_tags,
             dry_run=args.dry_run,
             verbose=args.verbose,
         )
-        _print_backprop(backprop_result)
-        if backprop_result and _has_backprop_proposals(backprop_result):
-            path = f"{LOG_FOLDER}/vault-lint-{run_date}-backprop.md"
-            content = format_backprop_report(backprop_result, run_date)
+        _print_taxonomy(tax_result)
+        if tax_result and _has_taxonomy_proposals(tax_result):
+            path = f"{LOG_FOLDER}/vault-lint-{run_date}-taxonomy.md"
+            content = format_taxonomy_report(tax_result, run_date)
             if not args.dry_run:
                 ob.create(path=path, content=content, overwrite=True)
-                print(f"[lint] Backprop proposals written to: {path}")
+                print(f"[lint] Taxonomy proposals written to: {path}")
             else:
-                print(f"[lint] [DRY RUN] Backprop proposals — not written")
-        if args.phase == "2.5":
-            return
-
-    # -- Phase 3: Connection Discovery --------------------------------------------
-    if args.phase is None or args.phase == "3":
-        print("\n=== Phase 3: Connection Discovery ===")
-        if inv is None:
-            inv = collect_inventory(stale_days=args.stale_days)
-        conn_proposals = discover_connections(inv.orphans, dry_run=args.dry_run, verbose=args.verbose)
-        if conn_proposals:
-            path = f"{LOG_FOLDER}/vault-lint-{run_date}-connections.md"
-            content = format_connections_report(conn_proposals, run_date)
-            if not args.dry_run:
-                ob.create(path=path, content=content, overwrite=True)
-                print(f"[lint] Connection proposals written to: {path}")
-            else:
-                print(f"[lint] [DRY RUN] {len(conn_proposals)} proposals — not written")
-        else:
-            print("[lint] No connection proposals generated (no xAI key or no Library orphans)")
+                print(f"[lint] [DRY RUN] Taxonomy proposals — not written")
         if args.phase == "3":
             return
 
@@ -163,7 +138,7 @@ def main():
     # -- Phase 5: Report -----------------------------------------------------------
     if args.phase is None:
         print("\n=== Phase 5: Report ===")
-        report = _build_report(run_date, inv, fix_result, backprop_result, moc_result, conn_proposals)
+        report = _build_report(run_date, inv, fix_result, tax_result, moc_result)
         path = f"{LOG_FOLDER}/vault-lint-{run_date}.md"
         if not args.dry_run:
             ob.create(path=path, content=report, overwrite=True)
@@ -229,21 +204,6 @@ def _git_commit_vault(run_date: str):
 
 
 
-def _apply_connections(ob: Obsidian, run_date: str, dry_run: bool, verbose: bool):
-    """Apply the most recent connection proposal file."""
-    log_files = ob.files(folder=LOG_FOLDER, ext="md").lines()
-    proposal_files = sorted([f for f in log_files if "connections" in f])
-    if not proposal_files:
-        print("[lint] No connection proposal files found in Research/Logs")
-        return
-
-    latest = proposal_files[-1]
-    print(f"[lint] Applying proposals from: {latest}")
-    count = apply_connection_proposals(latest, dry_run=dry_run, verbose=verbose)
-    verb = "Would apply" if dry_run else "Applied"
-    print(f"[lint] {verb} connections to {count} notes")
-
-
 def _print_inventory(inv):
     print(f"  Orphans:              {inv.orphan_count}")
     print(f"  Library notes:        {inv.library_note_count}")
@@ -262,27 +222,24 @@ def _print_fixes(fix_result):
         print("  No changes needed")
 
 
-def _print_backprop(backprop_result):
-    if backprop_result.tag_fixes_applied:
-        print(f"  ✓ Tag normalization: {backprop_result.tag_fixes_applied} notes fixed "
-              f"({len(backprop_result.tag_fix_details)} individual tags)")
-    if backprop_result.orphaned_tags:
-        unique = len({t["tag"] for t in backprop_result.orphaned_tags})
+def _print_taxonomy(tax_result):
+    if tax_result.tag_fixes_applied:
+        print(f"  ✓ Tag normalization: {tax_result.tag_fixes_applied} notes fixed "
+              f"({len(tax_result.tag_fix_details)} individual tags)")
+    if tax_result.orphaned_tags:
+        unique = len({t["tag"] for t in tax_result.orphaned_tags})
         print(f"  ⚠ Orphaned tags: {unique} tags not in canonical list")
-    if backprop_result.folder_move_proposals:
-        print(f"  ⚠ Folder moves proposed: {len(backprop_result.folder_move_proposals)}")
-    if backprop_result.new_cluster_proposals:
-        print(f"  ⚠ Emergent clusters: {len(backprop_result.new_cluster_proposals)} new topic groupings")
-    if not backprop_result.changes:
-        print("  No taxonomy drift or clusters detected")
+    if tax_result.folder_move_proposals:
+        print(f"  ⚠ Folder moves proposed: {len(tax_result.folder_move_proposals)}")
+    if not tax_result.changes:
+        print("  No taxonomy drift detected")
 
 
-def _has_backprop_proposals(result) -> bool:
-    """Check if backprop result has any proposals worth writing to a file."""
+def _has_taxonomy_proposals(result) -> bool:
+    """Check if taxonomy repair produced any proposals worth writing to a file."""
     return bool(
         result.folder_move_proposals
         or result.orphaned_tags
-        or result.new_cluster_proposals
         or result.tag_fix_details
     )
 
@@ -299,7 +256,7 @@ def _print_moc(moc_result):
 
 
 
-def _build_report(run_date: str, inv, fix_result, backprop_result, moc_result, conn_proposals: list) -> str:
+def _build_report(run_date: str, inv, fix_result, tax_result, moc_result) -> str:
     lines = [
         f"# Vault Lint — {run_date}",
         "",
@@ -320,8 +277,8 @@ def _build_report(run_date: str, inv, fix_result, backprop_result, moc_result, c
     all_changes = []
     if fix_result:
         all_changes += [c["detail"] for c in fix_result.changes]
-    if backprop_result:
-        all_changes += [c["detail"] for c in backprop_result.changes]
+    if tax_result:
+        all_changes += [c["detail"] for c in tax_result.changes]
     if moc_result:
         all_changes += moc_result.changes
     if all_changes:
@@ -332,12 +289,9 @@ def _build_report(run_date: str, inv, fix_result, backprop_result, moc_result, c
 
     lines += ["", "## Pending Review"]
     pending = []
-    if backprop_result and _has_backprop_proposals(backprop_result):
-        bp_count = (len(backprop_result.folder_move_proposals)
-                    + len(backprop_result.new_cluster_proposals))
-        pending.append(f"- `vault-lint-{run_date}-backprop.md` ({bp_count} proposals)")
-    if conn_proposals:
-        pending.append(f"- `vault-lint-{run_date}-connections.md` ({len(conn_proposals)} proposed connections)")
+    if tax_result and _has_taxonomy_proposals(tax_result):
+        bp_count = len(tax_result.folder_move_proposals)
+        pending.append(f"- `vault-lint-{run_date}-taxonomy.md` ({bp_count} folder move proposals)")
     if moc_result and moc_result.topic_moc_proposals:
         pending.append(f"- `vault-lint-{run_date}-moc-proposals.md` ({len(moc_result.topic_moc_proposals)} Topic MOC candidates)")
     if pending:
@@ -350,20 +304,14 @@ def _build_report(run_date: str, inv, fix_result, backprop_result, moc_result, c
         for t in inv.similar_tags[:15]:
             lines.append(f"- `{t['t1']}` ↔ `{t['t2']}` ({t['ratio']:.0%} similar)")
 
-    # Backprop summary section
-    if backprop_result:
-        if backprop_result.tag_fix_details:
-            lines += ["", "## Backward Propagation — Tag Fixes Applied"]
-            for fix in backprop_result.tag_fix_details[:10]:
-                slug = fix["note_path"].rsplit("/", 1)[-1].replace(".md", "")
-                lines.append(f"- [[{slug}]]: `{fix['old_tag']}` → `{fix['new_tag']}`")
-            if len(backprop_result.tag_fix_details) > 10:
-                lines.append(f"- ... and {len(backprop_result.tag_fix_details) - 10} more")
-
-        if backprop_result.new_cluster_proposals:
-            lines += ["", "## Backward Propagation — Emergent Clusters"]
-            for c in backprop_result.new_cluster_proposals:
-                lines.append(f"- **{c['combo_label']}**: {c['note_count']} notes → proposed section: {c['proposed_section']}")
+    # Taxonomy repair summary
+    if tax_result and tax_result.tag_fix_details:
+        lines += ["", "## Taxonomy Repair — Tag Fixes Applied"]
+        for fix in tax_result.tag_fix_details[:10]:
+            slug = fix["note_path"].rsplit("/", 1)[-1].replace(".md", "")
+            lines.append(f"- [[{slug}]]: `{fix['old_tag']}` → `{fix['new_tag']}`")
+        if len(tax_result.tag_fix_details) > 10:
+            lines.append(f"- ... and {len(tax_result.tag_fix_details) - 10} more")
 
     return "\n".join(lines)
 
