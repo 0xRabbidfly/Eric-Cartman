@@ -742,7 +742,7 @@ Every skill in `.github/skills/` (28 total). ⭐ marks the ones with a deep-dive
 | `obsidian-thesis-tracker` | Track emerging theses and draft reports as evidence accumulates |
 | ⭐ `obsidian-vault-digest` | Synthesize everything the vault knows about a topic |
 | ⭐ `obsidian-vault-linker` | Find missing links, orphans, MOC gaps, and thematic clusters |
-| `obsidian-vault-lint` | Weekly vault maintenance — broken links, MOC coverage, section sorting |
+| `obsidian-vault-lint` | Weekly vault structural maintenance — broken links, MOC coverage, section sorting, tag/folder taxonomy |
 | `obsidian-vault-lint-cowork` | Cowork-native fork of `obsidian-vault-lint` |
 | `obsidian-vault-report` | Generate synthesis reports and strategy docs from the vault corpus |
 | `obsidian-weekly-brain` | Weekly digest — trends, thesis health, blindspots, cross-domain bridges |
@@ -785,7 +785,7 @@ Every skill in `.github/skills/` (28 total). ⭐ marks the ones with a deep-dive
     ├── obsidian-thesis-tracker/ # 🎯 Thesis tracking and draft reports
     ├── obsidian-vault-digest/  # 🔍 Vault topic synthesis
     ├── obsidian-vault-linker/  # 🔗 Missing links, MOC gaps, and graph health
-    ├── obsidian-vault-lint/    # 🧹 Weekly vault maintenance
+    ├── obsidian-vault-lint/    # 🧹 Weekly vault structural maintenance
     ├── obsidian-vault-lint-cowork/ # 🧹 Cowork-native lint fork
     ├── obsidian-vault-report/  # 📄 Corpus synthesis reports
     ├── obsidian-weekly-brain/  # 🧠 Weekly intelligence digest

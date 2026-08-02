@@ -832,7 +832,7 @@ If thesis drift was detected, additional outputs may include:
 |-------|-------------|
 | `obsidian` | Composable vault wrapper — used for all vault writes |
 | `obsidian-daily-research` | Automated daily pipeline — produces `Research/Dailies/` notes with `#keep` tags that get promoted to `Research/Library/` |
-| `obsidian-vault-lint` | Weekly maintenance — Phase 2.5 backward propagation detects taxonomy drift; thesis drift check complements it at ingest time |
+| `obsidian-vault-lint` | Weekly maintenance — Phase 3 taxonomy repair detects tag and folder drift; thesis drift check complements it at ingest time |
 | `last30days` | Research skill — shares xAI API patterns and keyring/env/config key cascade |
 | `content-research-writer` | Long-form writing partner — can use Library notes as sources |
 

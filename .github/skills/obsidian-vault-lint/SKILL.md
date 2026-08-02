@@ -1,12 +1,12 @@
 ---
 name: obsidian-vault-lint
-description: Weekly vault maintenance pipeline inspired by Karpathy's LLM Wiki approach. Cleans broken links, adds missing MOC entries, sorts sections, discovers orphan connections via xAI, repairs taxonomy drift, detects emergent topic clusters, and proposes Topic MOCs for oversized sections. Schedule weekly for a self-maintaining knowledge base.
-argument-hint: "--dry-run | --phase N | --phase 2.5 | --phase 3 --apply | --verbose"
+description: Weekly vault structural maintenance inspired by Karpathy's LLM Wiki approach. Cleans broken links, adds missing MOC entries, sorts sections, repairs taxonomy drift (tag case, synonym merges, folder routing), and proposes Topic MOCs for oversized sections. Structure only — semantic work belongs to the metabolism pipeline. Schedule weekly for a self-maintaining knowledge base.
+argument-hint: "--dry-run | --phase N | --verbose | --stale-days N"
 user-invocable: true
 disable-model-invocation: false
 metadata:
   author: 0xrabbidfly
-  version: "1.2.0"
+  version: "2.0.0"
 ---
 
 # obsidian-vault-lint
@@ -15,13 +15,21 @@ metadata:
 
 Weekly vault maintenance inspired by [Karpathy's LLM Wiki approach](https://x.com/karpathy) (~16M views, April 2026). Instead of RAG (re-reading raw docs every call), the LLM maintains a *compiled wiki* — incrementally building and cleaning a structured knowledge base.
 
-**Division of labor:**
-- **Autonomous (this skill):** broken link cleanup, MOC coverage, alphabetical sorting, dead-entry removal, tag normalization, synonym merging
-- **LLM-assisted (Phase 3):** semantic connection discovery for orphaned notes (approval-gated)
-- **Approval-gated (Phase 2.5):** folder move proposals, emergent cluster proposals
+**Scope: structure, not meaning.** This skill keeps the vault's skeleton clean — links resolve, the MOC matches the filesystem, tags are canonical, notes sit in the right folder. It does no semantic analysis. Anything that requires *reading* a note for what it argues is owned by the metabolism pipeline:
+
+| Semantic concern | Owner |
+|---|---|
+| Connections between notes (supports / contradicts / extends / bridges) | `obsidian-connection-detector` — runs on every note creation → `connections.json` |
+| Thesis clustering, contradiction resolution | `obsidian-thesis-tracker` → `theses.json` |
+| Emerging topics, rising tags, cross-domain bridges | `obsidian-weekly-brain` (trend momentum + bridges passes) |
+| Corpus synthesis into a report | `obsidian-vault-report` |
+
+**Division of labor within this skill:**
+- **Autonomous:** broken link cleanup, MOC coverage, alphabetical sorting, dead-entry removal, tag case normalization, synonym merging
+- **Approval-gated (Phase 3 + 4):** folder move proposals, orphaned tag flagging, Topic MOC candidates
 - **Human:** curation, judgment on conflicts, deciding what gets its own Topic MOC
 
-**Run time:** ~2-5 min for a 500-note vault. Phase 2.5 adds ~30s (frontmatter reads). Phase 3 adds ~1 min/5 orphans (xAI API calls).
+**Run time:** ~2-5 min for a 500-note vault. No API calls, no API key, no network — pure filesystem work.
 
 ---
 
@@ -32,11 +40,12 @@ Weekly vault maintenance inspired by [Karpathy's LLM Wiki approach](https://x.co
 - When vault-linker audit shows high orphan counts
 - When Master MOC feels stale or sections are unsorted
 - When tags have drifted (new synonyms, inconsistent casing)
-- When a flurry of recent notes suggests a new topic is emerging
+
+**Do not use this for:** "what's connected to what", "what topics are emerging", "what does my vault think". Those are `obsidian-connection-detector`, `obsidian-weekly-brain`, and `obsidian-vault-report` respectively.
 
 ---
 
-## Six Phases
+## Five Phases
 
 ### Phase 1 — Inventory (read-only, always runs)
 Collects vault health metrics:
@@ -57,23 +66,17 @@ Collects vault health metrics:
 
 All changes logged to the Phase 5 report. Use `--dry-run` to preview without writing.
 
-### Phase 2.5 — Backward Propagation (taxonomy drift + emergent clusters)
-
-Runs in two modes every cycle, between autonomous fixes and connection discovery.
-
-**Mode A — Taxonomy Drift Repair:**
+### Phase 3 — Taxonomy Repair (tag drift + folder routing)
 
 1. Reads the master MOC's `Canonical Tag Guidance` section to build the authoritative tag list
-2. Reads the master MOC's section structure to map folder names to topic headings
-3. For each note in `Research/Library/` (excluding `00 MOC/`):
+2. For each note in `Research/Library/` (excluding `00 MOC/`):
    - Reads frontmatter tags
    - Checks if any tags are NOT in the canonical list (flags as orphaned tags)
    - Checks if the note is in the wrong folder based on its tags (e.g., a note tagged `rag` sitting in folder `01` instead of `05`)
-   - Produces proposals: tag corrections, folder moves, orphaned tag warnings
-4. **Auto-applies** tag normalization:
+3. **Auto-applies** tag normalization:
    - Case fixes: `RAG` → `rag`, `AI-Agents` → `ai-agents`
    - Synonym merges: uses the similar_tags pairs from Phase 1 inventory (>80% similarity) where one tag is canonical and the other is not
-5. **Approval-gated** outputs (written to `Research/Logs/vault-lint-YYYY-MM-DD-backprop.md`):
+4. **Approval-gated** outputs (written to `Research/Logs/vault-lint-YYYY-MM-DD-taxonomy.md`):
    - Folder move proposals with reasoning
    - Orphaned tags not in the canonical list
    - Summary of auto-applied tag fixes
@@ -85,24 +88,7 @@ Runs in two modes every cycle, between autonomous fixes and connection discovery
 | Folder move proposals | | ✓ |
 | Orphaned tag flagging | | ✓ |
 
-**Mode B — Emergent Cluster Detection:**
-
-1. Looks at notes added in the last 30 days (by `date_saved` frontmatter)
-2. Groups them by shared tag pairs
-3. If 3+ recent notes share a tag combination that doesn't have its own MOC section heading, proposes creating one
-4. Output to the proposals file: "3 new notes about [topic] — propose new MOC section?"
-
-This catches organic topic growth: when several articles arrive about a new theme (e.g., "post-quantum + cryptography"), the system surfaces it before manual curation would notice.
-
-### Phase 3 — Connection Discovery (LLM-assisted, approval-gated)
-For the top-20 orphaned Library notes (batched 5 at a time):
-1. Searches vault for related notes via content search
-2. Calls xAI API to score semantic relevance (model: `grok-3`, configurable via `XAI_MODEL` env var)
-3. Outputs proposed `[[wikilinks]]` to `Research/Logs/vault-lint-YYYY-MM-DD-connections.md`
-
-Human reviews the file, then runs `--phase 3 --apply` to append links to each orphan's `## Related` section.
-
-**Requires:** `XAI_API_KEY` env var or `keyring automation/xai / api_key`
+Pure string/frontmatter work — no LLM call. Emergent topic detection used to live here and does not any more; `obsidian-weekly-brain` does it better over the whole corpus.
 
 ### Phase 4 — MOC Reorganization
 **Autonomous:**
@@ -114,7 +100,7 @@ Human reviews the file, then runs `--phase 3 --apply` to append links to each or
 - Output: `Research/Logs/vault-lint-YYYY-MM-DD-moc-proposals.md`
 
 ### Phase 5 — Report
-Writes `Research/Logs/vault-lint-YYYY-MM-DD.md` with health metrics, all changes, and links to approval-gated proposal files. Includes backward propagation summary (tag fixes applied, emergent clusters found).
+Writes `Research/Logs/vault-lint-YYYY-MM-DD.md` with health metrics, all changes, and links to approval-gated proposal files. Includes the taxonomy repair summary (tag fixes applied).
 
 After the report is written (non-dry-run full runs only), the script automatically commits all vault changes to git with message `vault-lint: automated maintenance {date}`.
 
@@ -123,7 +109,7 @@ After the report is written (non-dry-run full runs only), the script automatical
 ## CLI Usage
 
 ```bash
-# Full run (all 6 phases)
+# Full run (all 5 phases)
 python .github/skills/obsidian-vault-lint/scripts/lint.py
 
 # Dry run — preview all changes, nothing written
@@ -132,12 +118,8 @@ python .github/skills/obsidian-vault-lint/scripts/lint.py --dry-run
 # Run specific phase only
 python .github/skills/obsidian-vault-lint/scripts/lint.py --phase 1
 python .github/skills/obsidian-vault-lint/scripts/lint.py --phase 2
-python .github/skills/obsidian-vault-lint/scripts/lint.py --phase 2.5
 python .github/skills/obsidian-vault-lint/scripts/lint.py --phase 3
 python .github/skills/obsidian-vault-lint/scripts/lint.py --phase 4
-
-# Apply connection proposals after reviewing the diff file
-python .github/skills/obsidian-vault-lint/scripts/lint.py --phase 3 --apply
 
 # Verbose output (per-item detail)
 python .github/skills/obsidian-vault-lint/scripts/lint.py --verbose
@@ -228,15 +210,7 @@ Or register via the `/schedule` skill:
 
 ## Configuration
 
-| Env var | Default | Purpose |
-|---------|---------|---------|
-| `XAI_API_KEY` | keyring fallback | xAI API key for Phase 3 |
-| `XAI_MODEL` | `grok-3` | Model for connection scoring |
-
-**Keyring (preferred):**
-```bash
-python -c "import keyring; keyring.set_password('automation/xai', 'api_key', '<your-key>')"
-```
+None. No env vars, no API keys, no network access — every phase is local filesystem work against the vault.
 
 ---
 
@@ -264,8 +238,7 @@ LOG_FOLDER      = "Research/Logs"
     ├── lint.py        — main entry point (orchestrator)
     ├── inventory.py   — Phase 1: read-only vault health scan
     ├── fixes.py       — Phase 2: autonomous safe writes
-    ├── backprop.py    — Phase 2.5: taxonomy drift repair + emergent clusters
-    ├── connections.py — Phase 3: xAI-assisted link discovery
+    ├── taxonomy.py    — Phase 3: tag normalization + folder routing
     └── moc.py         — Phase 4: MOC dead-entry cleanup + proposals
 ```
 
@@ -276,8 +249,6 @@ LOG_FOLDER      = "Research/Logs"
 - Python 3.10+
 - `obsidian.py` from `.github/skills/obsidian/scripts/`
 - Obsidian 1.12+ running with CLI enabled
-- `keyring` (stdlib alternative: `XAI_API_KEY` env var) — Phase 3 only
-- xAI API key — Phase 3 only
 - Git (at `C:\Program Files\Git\cmd\git.exe`) — for auto-commit after full runs
 
 ---
@@ -287,9 +258,20 @@ LOG_FOLDER      = "Research/Logs"
 | File | Phase | Written when |
 |------|-------|-------------|
 | `Research/Logs/vault-lint-YYYY-MM-DD.md` | 5 | Always (full run) |
-| `Research/Logs/vault-lint-YYYY-MM-DD-backprop.md` | 2.5 | When tag fixes, folder moves, or clusters are found |
-| `Research/Logs/vault-lint-YYYY-MM-DD-connections.md` | 3 | When proposals exist |
+| `Research/Logs/vault-lint-YYYY-MM-DD-taxonomy.md` | 3 | When tag fixes, folder moves, or orphaned tags are found |
 | `Research/Logs/vault-lint-YYYY-MM-DD-moc-proposals.md` | 4 | When sections exceed 12 entries |
+
+---
+
+## Related Skills
+
+| Skill | Relationship |
+|-------|--------------|
+| `obsidian-connection-detector` | Owns semantic linking (was this skill's Phase 3 until v2.0.0) |
+| `obsidian-thesis-tracker` | Clusters those connections into theses |
+| `obsidian-weekly-brain` | Owns emergent topic / rising tag detection (was Phase 2.5 Mode B until v2.0.0) |
+| `obsidian-vault-linker` | Graph health audit — feeds the orphan counts this skill reports |
+| `obsidian-vault-lint-cowork` | Linux-sandbox fork; still carries the old phase layout |
 
 ---
 

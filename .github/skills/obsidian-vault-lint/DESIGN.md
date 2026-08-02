@@ -1,6 +1,6 @@
 # obsidian-vault-lint — Design Document
 
-> Status: draft — pending implementation
+> Status: implemented — v2.0.0
 > Informed by: Karpathy's LLM Wiki approach (April 2026, ~16M views on X)
 
 ---
@@ -25,6 +25,37 @@
 Five phases, two modes:
 - **Autonomous** — runs unattended, makes safe reversible changes
 - **Approval-gated** — produces a diff/proposal file for human review before applying
+
+---
+
+## v2.0.0 — Scope Split with the Metabolism Pipeline
+
+The original design gave the lint an LLM-assisted connection-discovery phase (Phase 3)
+and, later, an emergent-cluster detector (Phase 2.5 Mode B). Both were built before the
+metabolism pipeline existed. Once it did, they were the weaker duplicate:
+
+| Removed | Superseded by | Why the replacement wins |
+|---------|---------------|--------------------------|
+| Phase 3 — Connection Discovery (`connections.py`) | `obsidian-connection-detector` | Runs on *every note creation* instead of weekly; classifies each edge as supports/contradicts/extends/bridges instead of emitting an unlabelled `[[wikilink]]`; persists to `connections.json` where the thesis tracker can consume it. The lint version only ever looked at the top-20 orphans and required a manual `--phase 3 --apply` round trip. |
+| Phase 2.5 Mode B — Emergent Clusters | `obsidian-weekly-brain` (trend momentum + cross-domain bridges) | Reasons over the whole corpus with an LLM rather than counting shared tag *pairs* among the last 30 days of notes, and does not depend on `date_saved` frontmatter being present. |
+
+The resulting boundary is worth stating plainly, because it is what keeps the two
+systems from re-growing into each other:
+
+> **The lint touches structure. The metabolism pipeline touches meaning.**
+> If a decision requires reading a note for what it argues, it does not belong here.
+
+Practical consequences:
+- The lint no longer makes network calls and needs no xAI key. It cannot fail on a
+  rate limit, a model deprecation, or an expired credential.
+- Phase numbering is now contiguous: 2.5 became Phase 3, and Phases 4/5 kept their
+  numbers. `--phase 2.5` and `--apply` are gone.
+- The proposals file `vault-lint-YYYY-MM-DD-backprop.md` is now
+  `vault-lint-YYYY-MM-DD-taxonomy.md`. Older files stay as historical logs; nothing
+  reads them back.
+
+`obsidian-vault-lint-cowork` has not been re-split — it still carries the pre-2.0
+phase layout.
 
 ---
 
@@ -54,18 +85,22 @@ All changes are logged to the lint report. Supports `--dry-run` to preview witho
 
 ---
 
-## Phase 3 — Connection Discovery (LLM-assisted, produces diff for approval)
+## Phase 3 — Taxonomy Repair (autonomous fixes + proposals)
 
-For the top-20 orphaned Library notes:
+For every note in `Research/Library/` (excluding `00 MOC/`):
 
-1. `ob.search_context(note_title)` to find related notes by content
-2. Call xAI API (same key as `obsidian-daily-research`) to score semantic relevance:
-   > "Given this note's summary and these candidate notes, which 3 are most related and why?"
-3. Output proposed `[[wikilink]]` blocks to append to each orphan's "Related" section
+1. Read the master MOC's `Canonical Tag Guidance` section for the authoritative tag list
+2. Parse the note's frontmatter tags
+3. **Auto-apply** tag case normalization (`RAG` → `rag`) and synonym merges, using the
+   >0.8-similarity pairs from Phase 1 where exactly one side is canonical
+4. **Propose** a folder move when the note's tags score higher against a different
+   library bucket than the one it sits in
+5. **Flag** tags absent from the canonical list
 
-Output: `Research/Logs/vault-lint-YYYY-MM-DD-connections.md` (diff-style, human reviews before applying)
+Output: `Research/Logs/vault-lint-YYYY-MM-DD-taxonomy.md` (folder moves and orphaned tags
+for review; applied tag fixes listed for the record)
 
-Can also run standalone: `--phase 3 --apply` after review.
+No LLM call — pure frontmatter and string work.
 
 ---
 
@@ -101,7 +136,7 @@ Writes `Research/Logs/vault-lint-YYYY-MM-DD.md`:
 - [list of every write with note path + change type]
 
 ## Pending Review
-- vault-lint-YYYY-MM-DD-connections.md (16 proposed links)
+- vault-lint-YYYY-MM-DD-taxonomy.md (5 folder move proposals)
 - vault-lint-YYYY-MM-DD-moc-proposals.md (1 new Topic MOC candidate)
 ```
 
@@ -120,7 +155,7 @@ python scripts/lint.py --dry-run
 
 # Run specific phase only
 python scripts/lint.py --phase 1
-python scripts/lint.py --phase 3 --apply   # apply connection proposals after review
+python scripts/lint.py --phase 3   # taxonomy repair only
 
 # Verbose output
 python scripts/lint.py --verbose
@@ -140,17 +175,17 @@ Or add to `.github/skills/remote-skills-api/` routes so it can be triggered from
 
 ---
 
-## Files to Create
+## Files
 
 ```
 .github/skills/obsidian-vault-lint/
 ├── DESIGN.md          ← this file
-├── SKILL.md           ← to be written after implementation
+├── SKILL.md
 └── scripts/
     ├── lint.py        ← main entry point
     ├── inventory.py   ← Phase 1 (wraps existing audit scripts)
     ├── fixes.py       ← Phase 2 (autonomous writes)
-    ├── connections.py ← Phase 3 (LLM-assisted link discovery)
+    ├── taxonomy.py    ← Phase 3 (tag normalization + folder routing)
     └── moc.py         ← Phase 4 (MOC reorganization)
 ```
 
@@ -160,14 +195,16 @@ Or add to `.github/skills/remote-skills-api/` routes so it can be triggered from
 
 - Python 3.10+
 - `obsidian.py` (via `.github/skills/obsidian/scripts/obsidian.py`)
-- xAI API key (keyring: `automation/xai`, key: `api_key`) — Phase 3 only
 - Existing audit scripts in `obsidian-vault-linker/scripts/` for Phase 1 reuse
+
+No API keys and no network access as of v2.0.0.
 
 ---
 
 ## Open Questions
 
-1. Should Phase 3 LLM calls batch notes or process one at a time? (cost vs. latency)
-2. Threshold for "stale" Recently Added entries — 7 days or configurable?
-3. Should the report be appended to the daily note or always a standalone log?
-4. Conflict resolution: what if a note belongs in two MOC sections?
+1. Threshold for "stale" Recently Added entries — 7 days or configurable?
+2. Should the report be appended to the daily note or always a standalone log?
+3. Conflict resolution: what if a note belongs in two MOC sections?
+4. Should Phase 4's Topic MOC proposals defer to `obsidian-weekly-brain`'s topic
+   analysis, or is section size a purely structural signal that belongs here?
