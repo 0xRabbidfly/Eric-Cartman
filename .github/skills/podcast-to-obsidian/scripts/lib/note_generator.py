@@ -482,10 +482,18 @@ def _generate_summary_claude(
 
     try:
         print(f"  [ai] Generating summary with Claude CLI...")
-        result = subprocess.run(
-            [CLAUDE_CLI, "--print", "-p", prompt],
-            capture_output=True, text=True, encoding="utf-8", timeout=120,
-        )
+        # Write prompt to temp file to avoid Windows command-line length limit
+        import tempfile
+        tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".txt", encoding="utf-8", delete=False)
+        tmp.write(prompt)
+        tmp.close()
+        try:
+            result = subprocess.run(
+                [CLAUDE_CLI, "--print", "-p", f"Read and follow the instructions in {tmp.name}"],
+                capture_output=True, text=True, encoding="utf-8", timeout=180,
+            )
+        finally:
+            os.unlink(tmp.name)
         content = result.stdout.strip()
         if not content or "Failed to authenticate" in content:
             print(f"  [claude-cli] Failed: {result.stderr[:100]}")
