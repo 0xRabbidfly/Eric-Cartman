@@ -961,9 +961,14 @@ Produce a JSON daily briefing:
 RULES:
 - This is a DAILY briefing, not weekly. Use "today" language.
 - briefing: lead with the POW moment — the one thing that matters most
-- Weigh ALL the source sections, not just the topic scans — the lead story is
-  often in News headlines or Prominent voices rather than a topic scan.
-- lab_pulse_summary: focus on the 3 big labs (Anthropic, OpenAI, Google) + any notable from the others
+- briefing: draw from Topic scans, News headlines and Prominent voices. Do NOT
+  use the "Lab accounts" section for the briefing — those posts are covered by
+  lab_pulse_summary and must not appear in both.
+- lab_pulse_summary: use the "Lab accounts" section. Roll up what the providers
+  said or shipped in their own words — this is the ONLY place lab posts appear,
+  so name the specific releases, numbers and claims rather than gesturing at
+  them. Focus on Anthropic, OpenAI and Google, plus anything notable from the
+  others. If nothing notable, say so in one sentence.
 - Output ONLY valid JSON, no prose before or after"""
 
     # Try Claude CLI first (free on Max)
@@ -1348,11 +1353,16 @@ def run_prominent_ai_scan(
             )
         ]
 
-        # Also filter reply patterns from text
+        # Also filter reply patterns from text, and drop lab accounts — they
+        # have their own scan and their own rollup, so surfacing them here
+        # printed the same post twice in one note.
+        lab_handles = _lab_handle_set(config)
         final = []
         for item in high_signal:
             text = item.text.strip()
             if text.startswith("@") and not text.lower().startswith(f"@{item.author_handle.lower()}"):
+                continue
+            if item.author_handle.lower().lstrip("@") in lab_handles:
                 continue
             final.append(item)
 
@@ -2383,20 +2393,13 @@ def render_daily_note(
 
     # Lab Pulse — what the model providers said/shipped today
     lab_pulse_summary = synthesis.get("lab_pulse_summary", "")
-    if lab_pulse_summary or lab_pulse_items:
+    if lab_pulse_summary:
         lines.extend([
-            "## Lab Pulse \U0001f9ea",
+            "## Lab Pulse 🧪",
+            "",
+            lab_pulse_summary,
             "",
         ])
-        if lab_pulse_summary:
-            lines.extend([lab_pulse_summary, ""])
-        for item, topic, source in lab_pulse_items[:10]:
-            likes = item.engagement.likes if item.engagement and item.engagement.likes else 0
-            lines.append(
-                f"- [{_oneline(item.text, 110)}]({item.url}) "
-                f"— @{item.author_handle} · {likes}❤"
-            )
-        lines.append("")
 
     # Prominent AI Voices — high-engagement tweets from top AI minds (broad search)
     if prominent_results:
@@ -2505,14 +2508,30 @@ def render_daily_note(
     return "\n".join(lines)
 
 
+def _lab_handle_set(config: dict) -> set:
+    """Flat set of lowercased lab-account handles.
+
+    Lab accounts get their own scan and their own rollup, so they are excluded
+    everywhere else — a lab post should appear once, as prose, not repeated
+    across Prominent Voices and the Research Feed.
+    """
+    handles = set()
+    for hs in (config.get("quality_filters", {}).get("lab_accounts", {}) or {}).values():
+        handles.update(h.lower().lstrip("@") for h in hs)
+    return handles
+
+
 def _build_reading_list(topic_results: list, config: dict) -> list:
     """Build a merged, ranked reading list across all topics."""
     max_items = config.get("reading_list_max", 15)
     all_items = []
+    lab_handles = _lab_handle_set(config)
 
     for tr in topic_results:
         topic = tr["topic"]
         for item in tr["x_items"]:
+            if item.author_handle.lower().lstrip("@") in lab_handles:
+                continue  # covered by the Lab Pulse rollup
             all_items.append({
                 "title": _oneline(item.text, 80),
                 "url": item.url,
