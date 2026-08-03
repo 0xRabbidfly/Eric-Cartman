@@ -62,7 +62,6 @@ topics_mod = _load_local_module("dr_topics", _local_lib / "topics.py")
 vault = _load_local_module("dr_vault", _local_lib / "vault_v2.py")
 
 # Feedback file path (relative to vault)
-FEEDBACK_FILE = SCRIPT_DIR / "feedback.json"
 
 CLAUDE_CLI = r"C:\Users\nuno_\.local\bin\claude.exe"
 
@@ -1531,27 +1530,6 @@ def run_prominent_ai_scan(
 # Feedback Processing (#good / #bad tags)
 # ---------------------------------------------------------------------------
 
-def load_feedback(config: dict) -> dict:
-    """Load accumulated feedback from feedback.json."""
-    if FEEDBACK_FILE.exists():
-        try:
-            with open(FEEDBACK_FILE, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                for bucket in ("good", "bad"):
-                    for entry in data.get(bucket, []):
-                        entry["topic"] = _normalize_feedback_topic(entry.get("topic", ""))
-                return data
-        except (json.JSONDecodeError, OSError):
-            pass
-    return {"good": [], "bad": [], "stats": {"total_good": 0, "total_bad": 0}}
-
-
-def save_feedback(data: dict):
-    """Save feedback data to feedback.json."""
-    with open(FEEDBACK_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
-
-
 def _extract_reason(line: str, tag: str) -> str:
     """Extract the reason text after a #good/#bad tag.
 
@@ -1570,12 +1548,6 @@ def _extract_reason(line: str, tag: str) -> str:
     # Strip trailing markdown artifacts
     after = after.rstrip('|').strip()
     return after
-
-
-def _normalize_feedback_topic(topic: str) -> str:
-    """Normalize topic labels stored in feedback data."""
-    normalized = re.sub(r'\s+', ' ', (topic or '').strip())
-    return normalized or "unknown"
 
 
 def _extract_current_topic(lines: list[str], line_idx: int) -> str:
@@ -1599,110 +1571,6 @@ def _extract_current_topic(lines: list[str], line_idx: int) -> str:
             clean = re.sub(r'[\U0001f300-\U0001faff\u2600-\u27bf]+', '', header).strip()
             return clean
     return ""
-
-
-def process_feedback_tags(config: dict) -> dict:
-    """Scan dailies for #good / #bad tags and accumulate feedback.
-
-    Skips blockquote/instruction lines (starting with >).
-    Captures the reason text after the tag (e.g. '#bad it was a reply').
-    Identifies which topic section the tagged item belongs to.
-    Replaces #good → #good-noted, #bad → #bad-noted so items
-    aren't reprocessed. Returns summary of what was found.
-    """
-    vault._init_fs(config)  # ensure FS-direct I/O is enabled before bulk reads
-    fb_config = config.get("feedback_tags", {})
-    good_tag = fb_config.get("good_tag", "#good")
-    bad_tag = fb_config.get("bad_tag", "#bad")
-    suffix = fb_config.get("processed_tag_suffix", "-noted")
-
-    dailies_folder = config.get("dailies_folder", "Research/Dailies")
-    feedback_data = load_feedback(config)
-
-    new_good = []
-    new_bad = []
-
-    # Scan dailies for feedback tags (including year/month subfolders)
-    md_files = sorted(vault._scan_folder_recursive(dailies_folder))
-    for filepath in md_files:
-        text = vault.read_file(filepath)
-        if not text:
-            continue
-
-        has_good = good_tag in text and f"{good_tag}{suffix}" not in text.replace(good_tag + suffix, "")
-        has_bad = bad_tag in text and f"{bad_tag}{suffix}" not in text.replace(bad_tag + suffix, "")
-
-        if not has_good and not has_bad:
-            continue
-
-        lines = text.splitlines()
-        modified = False
-
-        for i, line in enumerate(lines):
-            stripped = line.strip()
-
-            # Skip already-processed lines
-            if f"{good_tag}{suffix}" in line or f"{bad_tag}{suffix}" in line:
-                continue
-
-            # Skip blockquote / instruction lines — these contain template
-            # text like '> Tag any item with #good or #bad to give feedback.'
-            if stripped.startswith(">"):
-                continue
-
-            # Skip YAML frontmatter lines
-            if stripped.startswith("---"):
-                continue
-
-            # Skip feedback helper text rendered by the report itself.
-            if re.search(r'why you tagged items\s+#(?:good|bad)', stripped, re.IGNORECASE):
-                continue
-
-            # Extract link info from the line
-            link_match = re.search(r'\[([^\]]+)\]\((https?://[^\)]+)\)', line)
-
-            if good_tag in line and f"{good_tag}{suffix}" not in line:
-                reason = _extract_reason(line, good_tag)
-                topic = _normalize_feedback_topic(_extract_current_topic(lines, i))
-                entry = {
-                    "date": _extract_date_from_path(filepath),
-                    "title": link_match.group(1) if link_match else _clean_title(line),
-                    "url": link_match.group(2) if link_match else "",
-                    "reason": reason,
-                    "topic": topic,
-                    "source_file": filepath,
-                }
-                new_good.append(entry)
-                lines[i] = line.replace(good_tag, f"{good_tag}{suffix}")
-                modified = True
-
-            if bad_tag in line and f"{bad_tag}{suffix}" not in line:
-                reason = _extract_reason(line, bad_tag)
-                topic = _normalize_feedback_topic(_extract_current_topic(lines, i))
-                entry = {
-                    "date": _extract_date_from_path(filepath),
-                    "title": link_match.group(1) if link_match else _clean_title(line),
-                    "url": link_match.group(2) if link_match else "",
-                    "reason": reason,
-                    "topic": topic,
-                    "source_file": filepath,
-                }
-                new_bad.append(entry)
-                lines[i] = line.replace(bad_tag, f"{bad_tag}{suffix}")
-                modified = True
-
-        if modified:
-            vault.write_file(filepath, "\n".join(lines))
-
-    # Accumulate
-    if new_good or new_bad:
-        feedback_data["good"].extend(new_good)
-        feedback_data["bad"].extend(new_bad)
-        feedback_data["stats"]["total_good"] += len(new_good)
-        feedback_data["stats"]["total_bad"] += len(new_bad)
-        save_feedback(feedback_data)
-
-    return {"new_good": len(new_good), "new_bad": len(new_bad), "data": feedback_data}
 
 
 def _clean_title(line: str) -> str:
@@ -1744,18 +1612,6 @@ _GOOD_REASON_BUCKETS = [
     ("insider",       [r"insider", r"first.?hand", r"from\s+(?:the\s+)?team", r"official", r"announcement"]),
     ("high-signal",   [r"signal", r"insight", r"important", r"breaking", r"major"]),
 ]
-
-
-def _classify_reason(reason: str, buckets: list[tuple[str, list[str]]]) -> str:
-    """Match a reason string against bucket patterns. Returns bucket name or 'unclassified'."""
-    if not reason:
-        return "unclassified"
-    reason_lower = reason.lower()
-    for bucket_name, patterns in buckets:
-        for pattern in patterns:
-            if re.search(pattern, reason_lower):
-                return bucket_name
-    return "unclassified"
 
 
 # ---------------------------------------------------------------------------
@@ -1841,25 +1697,28 @@ def detect_drift(config: dict, lookback_days: int = 30) -> list[dict]:
         return warnings
 
     # Check each metric for consecutive zeros (newest first)
+    # (key, label, legacy_key). Notes written before the section consolidation
+    # use the old names, so history is read through both.
     tracked_metrics = [
-        ("prominent_voices", "Prominent Voices"),
-        ("deep_dives", "Deep Dives"),
-        ("lab_pulse", "Lab Pulse"),
-        ("x_items", "Research Feed (X)"),
-        ("must_follow_tweets", "Must Follow"),
+        ("prominent_voices", "Prominent Voices", None),
+        ("lab_pulse", "Lab Pulse", None),
+        ("research_feed", "Research Feed", "x_items"),
+        ("news", "News", "news_items"),
     ]
-    for key, label in tracked_metrics:
+    for key, label, legacy in tracked_metrics:
         consecutive_zeros = 0
         for fm in metrics_history:
-            val = fm.get(key, -1)
+            val = fm.get(key, fm.get(legacy, -1) if legacy else -1)
             if isinstance(val, int) and val == 0:
                 consecutive_zeros += 1
             else:
                 break
         if consecutive_zeros >= 3:
+            def _val(fm):
+                return fm.get(key, fm.get(legacy, -1) if legacy else -1)
             last_nonzero = next(
                 (fm["_date"] for fm in metrics_history[consecutive_zeros:]
-                 if isinstance(fm.get(key), int) and fm.get(key) > 0),
+                 if isinstance(_val(fm), int) and _val(fm) > 0),
                 None,
             )
             if consecutive_zeros >= len(metrics_history):
@@ -1896,9 +1755,10 @@ def detect_drift(config: dict, lookback_days: int = 30) -> list[dict]:
 
     # Check for consistently low total items
     total_items = [
-        fm.get("x_items", 0) + fm.get("must_follow_tweets", 0) + fm.get("news_items", 0)
+        fm.get("research_feed", fm.get("x_items", 0)) + fm.get("lab_pulse", 0)
+        + fm.get("news", fm.get("news_items", 0))
         for fm in metrics_history[:5]
-        if isinstance(fm.get("x_items", 0), int)
+        if isinstance(fm.get("research_feed", fm.get("x_items", 0)), int)
     ]
     if total_items and all(t < 3 for t in total_items):
         warnings.append({
@@ -2438,18 +2298,19 @@ def render_daily_note(
     prominent_results: list = None,
     news_items: list = None,
     captured_articles: list = None,
-    feedback_summary: dict = None,
     tracker: TokenTracker | None = None,
     health_warnings: list[str] = None,
 ) -> str:
     """Render the full daily note markdown."""
-    topic_slugs = [tr["topic"].slug for tr in topic_results]
-    total_x = sum(len(tr["x_items"]) for tr in topic_results)
-
-    # Count must-follow tweets
-    mf_count = sum(len(r["items"]) for r in (must_follow_results or []))
+    # Build the research feed up front: frontmatter should describe the note as
+    # rendered, not the raw scan.
+    reading_list = _build_reading_list(topic_results, config)
     prom_count = len(prominent_results or [])
     news_count = len(news_items or [])
+
+    # Tag only the topics that actually put something in this note. Tagging every
+    # configured topic wrote tags for categories the note has no content for.
+    topic_slugs = sorted({item["topic_slug"] for item in reading_list})
 
     # Collect categorized items across all topics
     deep_dives = []
@@ -2494,12 +2355,12 @@ def render_daily_note(
         f"tags: [{', '.join(topic_slugs)}]",
         "status: unread",
         f"up: \"[[🤖 MOC - AI Agent Development]]\"",
-        f"x_items: {total_x}",
-        f"must_follow_tweets: {mf_count}",
-        f"prominent_voices: {prom_count}",
-        f"deep_dives: {len(deep_dives)}",
+        # One key per section that actually renders. `must_follow_tweets` and
+        # `deep_dives` were kept long after both sections were removed.
         f"lab_pulse: {len(lab_pulse_items)}",
-        f"news_items: {news_count}",
+        f"prominent_voices: {prom_count}",
+        f"news: {news_count}",
+        f"research_feed: {len(reading_list)}",
         f"captured_articles: {len(captured_articles or [])}",
     ]
     # Name what went to the Library so the note records the vault write itself,
@@ -2524,11 +2385,10 @@ def render_daily_note(
     # against what THIS run actually produced
     if health_warnings:
         _today_counts = {
-            "x_items": total_x,
-            "must_follow_tweets": mf_count,
+            "research_feed": len(reading_list),
             "prominent_voices": prom_count,
-            "deep_dives": len(deep_dives),
             "lab_pulse": len(lab_pulse_items),
+            "news": news_count,
         }
         _briefing = synthesis.get("briefing", "")
         _synth_ok = bool(_briefing) and "Synthesis failed" not in _briefing
@@ -2611,7 +2471,6 @@ def render_daily_note(
     # Research Feed — one merged list, ranked by weighted score.
     # List rather than a table: tables overflow horizontally on mobile Obsidian.
     deep_dive_urls = {getattr(i, "url", "") for i, _t, _s in deep_dives}
-    reading_list = _build_reading_list(topic_results, config)
     if reading_list:
         lines.extend([
             "---",
@@ -2638,27 +2497,12 @@ def render_daily_note(
             lines.append(f"> - [{c['title']}]({c['url']}){why}")
         lines.append("")
 
-    # Footer — compact tag instructions
-    lines.extend([
-        "---",
-        "",
-        "> **Tags:** `#good <reason>` / `#bad <reason>` → feedback loop",
-        "",
-    ])
+    lines.extend(["---", ""])
 
-    # Feedback stats if available
-    if feedback_summary and (feedback_summary.get("new_good") or feedback_summary.get("new_bad")):
-        stats = feedback_summary.get("data", {}).get("stats", {})
-        lines.extend([
-            f"> \U0001f4ca Feedback processed this run: "
-            f"+{feedback_summary['new_good']} good, -{feedback_summary['new_bad']} bad "
-            f"(lifetime: {stats.get('total_good', 0)} good, {stats.get('total_bad', 0)} bad)",
-            "",
-        ])
-
-    # (Feedback Insights section removed — it rendered ~110 chars of boilerplate
-    #  every day. Feedback is still collected and still drives scoring; it just
-    #  no longer takes up space in the note.)
+    # (The #good/#bad feedback loop was removed entirely. Once Feedback Insights
+    #  was cut, nothing consumed the collected tags — they accumulated in
+    #  feedback.json with no reader — so the footer was inviting work that
+    #  changed nothing.)
 
     # Efficiency recommendations — only render if there are actual issues
     if tracker and tracker.num_calls > 0:
@@ -2857,16 +2701,6 @@ def main():
     # (#keep → Library promote pass removed. Research/Library is still written by
     #  auto_capture_articles and still read for dedup — only the manual tag path
     #  is gone.)
-
-    # Process feedback tags (#good / #bad) from previous dailies
-    print("[feedback] Scanning for #good / #bad tags...")
-    feedback_summary = process_feedback_tags(config)
-    if feedback_summary["new_good"] or feedback_summary["new_bad"]:
-        print(f"[feedback] Logged +{feedback_summary['new_good']} good, -{feedback_summary['new_bad']} bad")
-    else:
-        print("[feedback] No new feedback tags found")
-
-    # Analyze accumulated feedback and generate proposals
 
     if not l30_config.get("XAI_API_KEY"):
         print("Error: No XAI_API_KEY found. Set it in ~/.config/last30days/.env", file=sys.stderr)
@@ -3099,7 +2933,6 @@ def main():
         must_follow_results=must_follow_results,
         prominent_results=prominent_results,
         news_items=news_items,
-        feedback_summary=feedback_summary,
         tracker=tracker,
         health_warnings=health_warnings,
         captured_articles=captured_articles,
@@ -3144,7 +2977,6 @@ def main():
                         must_follow_results=must_follow_results,
                         prominent_results=prominent_results,
                         news_items=news_items,
-                        feedback_summary=feedback_summary,
                         tracker=tracker,
                         health_warnings=health_warnings,
                     )
