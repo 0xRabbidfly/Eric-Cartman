@@ -2266,7 +2266,11 @@ def fetch_google_news(topics: list, config: dict, api_key: str = "", model: str 
         return True
 
     for topic in topics:
-        query = f"{topic.display_name} AI"
+        # Only append "AI" when the display name doesn't already say it, or
+        # topics like "Software development lifecycle & AI" search for
+        # "... & AI AI" and match badly.
+        name = topic.display_name
+        query = name if re.search(r"\bAI\b", name) else f"{name} AI"
         items = _fetch_google_news_topic(query, max_items=10, max_age_days=7)
         kept = [it for it in items if _accept(it)]
         all_items.extend(kept)
