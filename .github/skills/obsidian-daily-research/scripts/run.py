@@ -336,6 +336,10 @@ DEFAULT_QUALITY_FILTERS = {
     "lab_accounts": {},
 }
 
+# Group names in pipeline.md that mark an account as speaking for a lab.
+# Membership here is functional, not cosmetic: these accounts bypass the
+# engagement floor and are promoted into the daily note's Lab Pulse section.
+# A group name absent from this map is display-only.
 LAB_GROUP_MAP = {
     "anthropic": "anthropic",
     "openai": "openai",
@@ -343,6 +347,8 @@ LAB_GROUP_MAP = {
     "meta": "meta",
     "mistral": "mistral",
     "xai": "xai",
+    "spacexai": "xai",  # post-merger brand; same lab key so downstream is unchanged
+    "moonshot": "moonshot",
 }
 
 
