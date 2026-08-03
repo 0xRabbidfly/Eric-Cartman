@@ -1,6 +1,6 @@
 # Daily Research Pipeline
 
-Automated daily research pipeline that scans 5 topic tracks across Reddit and X, deduplicates against your Obsidian vault history, and writes a structured daily note with a reading list and per-topic breakdowns.
+Automated daily research pipeline that scans topic tracks on X, pulls Google News RSS, tracks frontier-lab accounts, deduplicates against your Obsidian vault history, and writes a mobile-friendly daily note.
 
 **Cost**: ~$0.05–0.15/day (~$3/month) using scan mode.
 
@@ -16,8 +16,6 @@ python .github/skills/obsidian-daily-research/scripts/run.py --topic agents
 # Preview without writing to vault
 python .github/skills/obsidian-daily-research/scripts/run.py --dry-run
 
-# Just promote #keep items to Library
-python .github/skills/obsidian-daily-research/scripts/run.py --promote-only
 
 # Show all seen URLs (dedup set)
 python .github/skills/obsidian-daily-research/scripts/run.py --show-dedup
@@ -45,47 +43,48 @@ python .github/skills/obsidian-daily-research/scripts/run.py --costs
 └──────────┬──────────────────────────────────────────┘
            │
            ▼
-  1. PROMOTE PASS     Scan previous dailies for #keep tags
-           │           → move to Research/Library/{topic}.md
-           ▼
-  2. VAULT DEDUP      Scan all dailies + library files
-           │           → extract every URL seen before (zero tokens)
-           ▼
-  3. MULTI-TOPIC      For each of 5 topics, run Reddit + X search
-     SCAN              in scan mode (gpt-4o-mini synthesis,
-           │           gpt-5.x Reddit, grok-4-1-fast X, 5-12 items each)
-           ▼
-  4. CROSS-DEDUP      Filter out URLs/titles already in vault
-           │
-           ▼
-  5. BATCHED           Single gpt-4o-mini call to produce
-     SYNTHESIS         briefing + per-topic headlines
-           │
-           ▼
-  6. WRITE DAILY      Output structured markdown to
-     NOTE              Research/Dailies/YYYY-MM-DD.md
+  1. VAULT DEDUP      Scan all dailies + library files
+           |           -> extract every URL and title seen before (zero tokens)
+           v
+  2. TOPIC SCANS      One X search per topic, scan mode (grok-4.3)
+           v
+  3. CROSS-DEDUP      Filter out URLs/titles already in vault
+           v
+  4. LAB SCAN         Batched X search over lab-group accounts,
+           |           chunks of 10, no engagement floor
+           v
+  5. PROMINENT        One broad X search, 500+ likes, no hardcoded
+     VOICES            handles; retries if under the prompt's floor
+           v
+  6. NEWS             Google News RSS per topic, deduped against
+           |           vault by URL + title, then LLM-ranked
+           v
+  7. SYNTHESIS        One Claude CLI call over ALL of the above ->
+           |           POW briefing + lab pulse summary (free on Max)
+           v
+  8. WRITE DAILY      Output structured markdown to
+     NOTE              Research/Dailies/YYYY/MM/YYYY-MM-DD.md
 ```
 
 ## Daily Note Structure
 
 ```
-Research/Dailies/2026-02-23.md
+Research/Dailies/2026/08/2026-08-03.md
 ├── YAML frontmatter (date, type, topics, stats)
-├── Key Briefing (executive summary)
-├── Reading List (top 15, checkboxes, topic tags)
-├── Per-topic sections
-│   ├── Headline + key points
-│   ├── Reddit sources table
-│   └── X sources table
-└── Promote to Library instructions
+├── Pipeline Cost callout (calls, tokens, $)
+├── Today's POW (the day's lede, synthesized from every source)
+├── Lab Pulse (prose rollup + list of lab-account posts)
+├── Prominent Voices (high-engagement posts, sorted by likes)
+├── News (numbered list, vault-deduped)
+├── Research Feed (ranked topic-scan items; 📖 marks long-form)
+└── Efficiency Recommendations
 ```
 
-## Long-Term Memory (`#keep` → Library)
+## Research Library
 
-1. Read your daily note in Obsidian
-2. Add `#keep` to any reading list item you want to preserve
-3. Next pipeline run automatically promotes `#keep` items to `Research/Library/{topic}.md`
-4. Tag gets changed to `#kept` so it's not reprocessed
+`Research/Library/` is written automatically by the auto-capture accounts listed in
+`pipeline.md`, and is read on every run for deduplication. There is no manual
+`#keep` promotion path — it was removed along with the `--promote-only` flag.
 
 ## Scheduled Task
 
@@ -123,8 +122,6 @@ Edit `scripts/config.json`:
   "vault_path": "C:\\Users\\nuno_\\Documents\\Obsidian Vault",
   "dailies_folder": "Research/Dailies",
   "library_folder": "Research/Library",
-  "keep_tag": "#keep",
-  "kept_tag": "#kept",
   "items_per_topic": 8,
   "reading_list_max": 15,
   "depth": "scan"
@@ -137,7 +134,7 @@ Custom topics can be added via a `topics` array in config.json.
 
 - **Python 3.10+** (stdlib only — zero pip dependencies)
 - **API keys** in `~/.config/last30days/.env`:
-  - `OPENAI_API_KEY` — Reddit search + synthesis
+  - `XAI_API_KEY` — all X search (pinned to `grok-4.3`)
   - `XAI_API_KEY` — X/Twitter search
 - Reuses `last30days` lib modules (openai_reddit, xai_x, normalize, score, dedupe)
 
@@ -155,5 +152,4 @@ Custom topics can be added via a `topics` array in config.json.
         ├── __init__.py
         ├── vault.py      # Obsidian vault R/W + dedup
         ├── topics.py     # 5 topic tracks with search queries
-        └── promote.py    # #keep → Library promotion
 ```

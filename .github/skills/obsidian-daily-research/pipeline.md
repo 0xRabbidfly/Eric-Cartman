@@ -14,7 +14,6 @@
 
 - agents | Agent Development | 1.2
 - skills | LLM Agent Skills & AI Developer Tools | 1.1
-- models | Frontier Model Releases | 1.0
 - sdd | Spec Driven Development & AI frameworks | 1.0
 - sdlc | Software development lifecycle & AI | 0.9
 
@@ -23,59 +22,58 @@
 
 # Must-Follow Accounts
 
-> Every tweet from these accounts is captured — no engagement floor.
-> All original posts are included regardless of like count.
+> **Only accounts in a lab group are scanned.** A group whose name is in
+> `LAB_GROUP_MAP` (`scripts/run.py`) — Anthropic, OpenAI, Google, SpaceXAI,
+> Mistral, Meta, Moonshot — gets a dedicated X search, batched in chunks of 10,
+> with no engagement floor. Those results feed the **Lab Pulse** section.
 >
-> **Format:** `- @handle — Display Name` or `- @handle — Display Name (solo)`
-> Append `(solo)` to give an account its own dedicated API call.
-> `##` headers group accounts in the daily note — but some names are functional.
-> A group named after a lab (`Anthropic`, `OpenAI`, `Google`, `Meta`, `Mistral`,
-> `SpaceXAI`, `Moonshot` — see `LAB_GROUP_MAP` in `scripts/run.py`) marks its accounts
-> as speaking for that lab: they bypass the engagement floor and are promoted into
-> the **Lab Pulse** section. Any other group name is display-only. So use org
-> groups for lab voices, role groups (Thought Leaders, Researcher, Tool Builder)
-> for the commentary layer — and add a `LAB_GROUP_MAP` entry when adding a new lab.
-> To disable an account, comment it out with `>`.
+> Accounts in non-lab groups (Thought Leaders, Researcher, Tool Builder) are
+> **not scanned**. They still earn their place here: every handle on this list
+> bypasses the topic-scan engagement floor and gets a +20 relevance boost, so
+> deleting them would quietly degrade topic-scan ranking. They reach the note via
+> Prominent Voices, which covers them at 500+ likes.
+>
+> **Format:** `- @handle — Display Name`. To disable an account, comment it out
+> with `>`. There is no per-account `(solo)` flag any more — everything batches.
 
 ## Thought Leaders
 
-- @karpathy — Andrej Karpathy (solo)
-- @swyx — Swyx / Latent Space (solo)
-- @elonmusk — Elon Musk, founder of xAI / SpaceX / Tesla (solo)
+- @karpathy — Andrej Karpathy
+- @elonmusk — Elon Musk, founder of xAI / SpaceX / Tesla
 
 ## Researcher
 
-- @emollick — Ethan Mollick, Wharton professor on AI adoption in real workflows (solo)
+- @emollick — Ethan Mollick, Wharton professor on AI adoption in real workflows
 
 ## Tool Builder
 
-- @theo — Theo Browne (t3.gg), coding agents / MCP / editor tooling (solo)
-- @mntruell — Michael Truell, Cursor (solo)
+- @theo — Theo Browne (t3.gg), coding agents / MCP / editor tooling
+- @mntruell — Michael Truell, Cursor
 
 ## Anthropic
 
-- @bcherny — Boris (solo)
-- @trq212 - Thariq (solo)
-- @DarioAmodei — Dario Amodei (solo)
+- @bcherny — Boris
+- @trq212 - Thariq
+- @DarioAmodei — Dario Amodei
 - @AnthropicAI — Anthropic
-- @claudedevs — ClaudeDevs (solo)
+- @claudedevs — ClaudeDevs
 
 ## OpenAI
 
 - @OpenAI — OpenAI
-- @sama — Sam Altman (solo)
-- @gdb — Greg Brockman, OpenAI co-founder and president (solo)
+- @sama — Sam Altman
+- @gdb — Greg Brockman, OpenAI co-founder and president
 
 ## Google
 
 - @GoogleDeepMind — Google DeepMind
-- @JeffDean — Jeff Dean (solo)
+- @JeffDean — Jeff Dean
 
 ## SpaceXAI
 
 > @xai is dead post-SpaceXAI merger — @SpaceXAIMemphis is the live official
 > handle, and the one that carries lab/facility content over product marketing.
-- @SpaceXAIMemphis — SpaceXAI Memphis, lab / facility content (solo)
+- @SpaceXAIMemphis — SpaceXAI Memphis, lab / facility content
 
 ## Mistral
 
@@ -87,7 +85,7 @@
 
 ## Moonshot
 
-- @kimi_moonshot — Moonshot AI, Kimi long-context / agentic models (solo)
+- @kimi_moonshot — Moonshot AI, Kimi long-context / agentic models
 
 ---
 
@@ -103,7 +101,17 @@
 - reading_list_max: 15
 - depth: scan
 - prominent_ai_min_likes: 500
-- xai_model: auto
+> xai_model is PINNED, not `auto`. Auto-resolution picks the highest grok version
+> number with no price check, which moved the pipeline onto grok-4.5 on 2026-08-02
+> — 8.1x the per-call cost of 4.3 ($0.021 -> $0.173) at an unchanged call count,
+> taking projected spend from ~$11/mo to $88/mo. Search does not need the newer
+> model; analysis runs on Claude CLI. Re-check before changing this.
+- xai_model: grok-4.3
+> Analysis (POW briefing, lab pulse summary, news scoring) runs on Claude CLI,
+> which is free on a Max account. This model is only the fallback for when the
+> CLI is unavailable — a judgment task, so it gets the stronger model even
+> though search does not.
+- xai_synthesis_model: grok-4.5
 
 # Auto-Capture Accounts
 

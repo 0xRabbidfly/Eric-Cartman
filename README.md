@@ -427,7 +427,7 @@ Invoke the `skill-reflection` skill with:
 
 **Automated daily AI research pipeline that writes to your Obsidian vault.**
 
-Scans 5 topic tracks (agents, skills, models, MCP, RAG) across Reddit and X, deduplicates against vault history, and writes a structured daily note with lab updates, prominent voices, deep dives, and per-topic breakdowns. It also supports a feedback loop with `#good` and `#bad` tags, plus `#keep` promotion into your long-term research library.
+Scans topic tracks on X, pulls Google News RSS, and batches a search over frontier-lab accounts, deduplicating everything against vault history. Writes a mobile-friendly daily note: a synthesized briefing, lab pulse, prominent voices, news, and a ranked research feed. Supports a feedback loop with `#good` and `#bad` tags.
 
 **Use When:**
 - Daily research habit for staying current on AI developments
@@ -439,18 +439,18 @@ Scans 5 topic tracks (agents, skills, models, MCP, RAG) across Reddit and X, ded
 **Pipeline Highlights:**
 | Capability | Description |
 |------------|-------------|
-| Must-Follow Scan | Tracks key accounts from Anthropic, OpenAI, Google, Meta, Mistral, and notable individuals |
-| Prominent Voices | Pulls high-engagement posts from prominent AI researchers and operators |
-| Deep Dives | Surfaces long-form threads and article-style content separately from general chatter |
+| Lab Account Scan | Batched X search over frontier-lab accounts (Anthropic, OpenAI, Google, SpaceXAI, Mistral, Meta, Moonshot), chunked at 10, no engagement floor |
+| Prominent Voices | One broad search for high-engagement posts across the AI space, no hardcoded handles |
+| News | Google News RSS per topic, deduplicated against vault history by URL and title, then LLM-ranked |
 | Vault Dedup | Avoids resurfacing links and titles already captured in the vault |
-| Feedback Loop | Learns from `#good` / `#bad` tags and proposes pipeline improvements |
-| Library Promotion | Promotes `#keep` items into `Research/Library/` on the next run |
+| Feedback Loop | Collects `#good` / `#bad` tags into `feedback.json` |
 
-**Cost:** ~$0.10-0.30/day (~$6/month) using scan mode with gpt-5.2 synthesis.
+**Cost:** ~$0.30/day (~$9/month). Search is pinned to `grok-4.3`; analysis runs on
+Claude CLI (free on Max) with `grok-4.5` as fallback.
 
 **Invocation:**
 ```bash
-# Full daily run (all 5 topics)
+# Full daily run (all topics)
 python .github/skills/obsidian-daily-research/scripts/run.py
 
 # Single topic
@@ -459,8 +459,8 @@ python .github/skills/obsidian-daily-research/scripts/run.py --topic agents
 # Preview without writing to vault
 python .github/skills/obsidian-daily-research/scripts/run.py --dry-run
 
-# Promote kept items into the long-term library only
-python .github/skills/obsidian-daily-research/scripts/run.py --promote-only
+# Intentionally regenerate today's note
+python .github/skills/obsidian-daily-research/scripts/run.py --force-rerun
 ```
 
 ```
