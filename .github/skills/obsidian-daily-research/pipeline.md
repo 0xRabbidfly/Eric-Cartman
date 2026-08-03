@@ -13,7 +13,7 @@
 > Weight controls score multiplier (default 1.0). Higher = more prominent.
 
 - agents | Agent Development | 1.2
-- skills | LLM Agent Skills & AI Developer Tools | 1.1
+- harness | LLM Harness Engineering & Agent Scaffolding | 1.1
 - adlc | Agentic Development Lifecycle | 1.1
 - sdd | Spec Driven Development & AI frameworks | 1.0
 - sdlc | Software development lifecycle & AI | 0.9
@@ -109,6 +109,12 @@
 - reading_list_max: 15
 - depth: scan
 - prominent_ai_min_likes: 500
+> Long-form articles linked from the day's posts are judged by the synthesis call
+> and the best are written to Research/Library via the obsidian-linked-research
+> skill. The bar is deliberately high — a primary source worth re-reading in three
+> months — so an empty pick is the normal outcome. This caps how many run per day;
+> each is a Claude CLI subprocess that can take minutes. Set to 0 to disable.
+- auto_capture_max: 3
 > xai_model is PINNED, not `auto`. Auto-resolution picks the highest grok version
 > number with no price check, which moved the pipeline onto grok-4.5 on 2026-08-02
 > — 8.1x the per-call cost of 4.3 ($0.021 -> $0.173) at an unchanged call count,

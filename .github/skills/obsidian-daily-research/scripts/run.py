@@ -887,6 +887,8 @@ def synthesize_all(
     news_items: list | None = None,
     prominent_results: list | None = None,
     must_follow_results: list | None = None,
+    article_candidates: list | None = None,
+    capture_max: int = 3,
 ) -> dict:
     """Single batched synthesis call across the whole day, via Claude CLI (Max account).
 
@@ -947,6 +949,15 @@ def synthesize_all(
         if lab_lines:
             sections.append("### Lab org accounts\n" + "\n".join(lab_lines[:15]) + "\n")
 
+    # Article candidates — real publisher URLs linked from today's posts. The
+    # model picks which deserve a permanent Library note.
+    if article_candidates:
+        cand_lines = []
+        for i, c in enumerate(article_candidates, 1):
+            cand_lines.append(f"  {i}. {c['url']}")
+            cand_lines.append(f"     via @{c['author']}: {_oneline(c['context'], 160)}")
+        sections.append("### Article candidates\n" + "\n".join(cand_lines) + "\n")
+
     prompt = f"""You are a research analyst writing a DAILY morning briefing for an AI practitioner.
 This is NOT a weekly summary. This covers what happened TODAY ({to_date}).
 
@@ -961,7 +972,10 @@ Produce a JSON daily briefing:
 
 {{
   "briefing": "3-5 SHORT PARAGRAPHS separated by blank lines (\n\n), one per theme. See the briefing rules below.",
-  "lab_pulse_summary": "2-3 sentences summarizing what the major model providers (Anthropic, OpenAI, Google, Meta, Mistral, Moonshot, SpaceXAI) and their lead devs said or shipped today. If nothing notable, say so."
+  "lab_pulse_summary": "2-3 sentences summarizing what the major model providers (Anthropic, OpenAI, Google, Meta, Mistral, Moonshot, SpaceXAI) and their lead devs said or shipped today. If nothing notable, say so.",
+  "capture": [
+    {{"url": "exact url copied from Article candidates", "title": "short title", "why": "one line"}}
+  ]
 }}
 
 RULES:
@@ -983,6 +997,17 @@ BRIEFING FORMAT — follow exactly:
 - Be specific: name the companies, people, models and numbers. Plain declarative
   sentences beat clever ones.
 - End the final paragraph with one short forward-looking sentence.
+
+CAPTURE RULES — these become permanent notes in a research library:
+- Choose at most {capture_max}. Returning an EMPTY list is normal and expected on
+  most days. Do not fill slots to be helpful.
+- The bar: a PRIMARY SOURCE a practitioner would want to RE-READ IN THREE MONTHS.
+  Lab announcements, papers, technical writeups, deep architectural posts.
+- Reject: news-about-news, roundups, listicles, opinion columns, marketing pages,
+  release notes without substance, and anything whose value expires this week.
+- "url" MUST be copied exactly from the Article candidates list. Never invent a
+  URL and never use one that is not on that list.
+- If there are no Article candidates, return an empty list.
 - lab_pulse_summary: use the "Lab org accounts" section. Roll up what the providers
   said or shipped in their own words — this is the ONLY place lab posts appear,
   so name the specific releases, numbers and claims rather than gesturing at
@@ -1096,6 +1121,104 @@ _ARTICLE_DOMAINS = [
     "github.com", "huggingface.co", "deepmind.google", "medium.com",
     "notion.site", "dev.to", "latent.space", "cursor.com", "docs.",
 ]
+
+
+def _extract_article_candidates(
+    topic_results: list,
+    prominent_results: list | None,
+    vault_urls: set | None = None,
+    limit: int = 25,
+) -> list:
+    """Collect article URLs linked from scanned X posts.
+
+    Only real publisher domains. Google News items deliberately cannot feed this:
+    their RSS links are opaque `news.google.com/rss/articles/...` wrappers that
+    neither redirect nor carry a publisher href, so there is no URL to hand to
+    the linked-research skill.
+
+    Returns [{url, author, context}], deduplicated and filtered against vault
+    history so nothing already in the Library is offered up again.
+    """
+    vault_urls = vault_urls or set()
+    seen: set[str] = set()
+    out: list[dict] = []
+
+    def _scan(items):
+        for item in items or []:
+            text = getattr(item, "text", "") or ""
+            for raw in re.findall(r'https?://[^\s\)\]"<>]+', text):
+                url = raw.rstrip('.,;:!?)"\'')
+                low = url.lower()
+                if any(s in low for s in ("x.com/", "twitter.com/", "t.co/")):
+                    continue
+                if not any(d in low for d in _ARTICLE_DOMAINS):
+                    continue
+                if url in seen or url in vault_urls:
+                    continue
+                seen.add(url)
+                out.append({
+                    "url": url,
+                    "author": getattr(item, "author_handle", ""),
+                    "context": _oneline(text, 200),
+                })
+
+    for tr in topic_results or []:
+        _scan(tr.get("x_items", []))
+    _scan(prominent_results)
+    return out[:limit]
+
+
+def run_article_captures(picks: list, candidates: list, config: dict) -> list:
+    """Run the linked-research skill over the articles synthesis chose to keep.
+
+    `picks` comes from the model and is untrusted: URLs are validated against the
+    candidate list before anything is fetched, so a hallucinated link can never
+    reach the vault. Capped by `auto_capture_max` because each capture is a
+    Claude CLI subprocess that can run for minutes.
+    """
+    if not picks:
+        return []
+
+    try:
+        max_items = int(config.get("auto_capture_max", 3) or 0)
+    except (TypeError, ValueError):
+        max_items = 3
+    if max_items <= 0:
+        return []
+
+    by_url = {c["url"]: c for c in candidates}
+    linked_research = SKILL_DIR.parent / "obsidian-linked-research"
+    if not linked_research.exists():
+        print("[capture] obsidian-linked-research skill not found — skipping")
+        return []
+
+    captured = []
+    for pick in picks[:max_items]:
+        url = (pick.get("url") or "").strip()
+        if url not in by_url:
+            print(f"  [capture] skipped (not a candidate): {url[:70]}")
+            continue
+        title = _oneline(pick.get("title", "") or url, 120)
+        why = _oneline(pick.get("why", ""), 160)
+        print(f"  [capture] {title[:60]} -> {url[:60]}")
+        try:
+            proc = subprocess.run(
+                [CLAUDE_CLI, "--print", "-p",
+                 f"Run the obsidian-linked-research skill for this URL: {url}"],
+                capture_output=True, text=True, encoding="utf-8", timeout=300,
+            )
+            ok = proc.returncode == 0
+            if not ok:
+                print(f"  [capture] failed: {(proc.stderr or '')[:120]}")
+        except Exception as e:
+            ok = False
+            print(f"  [capture] error: {e}")
+        if ok:
+            captured.append({"url": url, "title": title, "why": why})
+
+    if captured:
+        print(f"[capture] {len(captured)} article(s) added to Research/Library")
+    return captured
 
 
 def auto_capture_articles(must_follow_results: list, config: dict):
@@ -2314,6 +2437,7 @@ def render_daily_note(
     must_follow_results: list = None,
     prominent_results: list = None,
     news_items: list = None,
+    captured_articles: list = None,
     feedback_summary: dict = None,
     tracker: TokenTracker | None = None,
     health_warnings: list[str] = None,
@@ -2376,7 +2500,15 @@ def render_daily_note(
         f"deep_dives: {len(deep_dives)}",
         f"lab_pulse: {len(lab_pulse_items)}",
         f"news_items: {news_count}",
+        f"captured_articles: {len(captured_articles or [])}",
     ]
+    # Name what went to the Library so the note records the vault write itself,
+    # not just a count. Separate key — a scalar cannot take a list beneath it.
+    if captured_articles:
+        fm_lines.append("captured:")
+        for c in captured_articles:
+            safe = c["title"].replace('"', "'")
+            fm_lines.append(f'  - "{safe}"')
     fm_lines.extend(["---", ""])
 
     lines = fm_lines + [
@@ -2496,6 +2628,15 @@ def render_daily_note(
         lines.append("")
     else:
         lines.extend(["*No new research results today.*", ""])
+
+    # Articles promoted to the Library this run. Rendered so a vault write is
+    # never a silent side effect of a scan.
+    if captured_articles:
+        lines.extend(["> 📥 **Captured to Library**", ">"])
+        for c in captured_articles:
+            why = f" — {c['why']}" if c.get("why") else ""
+            lines.append(f"> - [{c['title']}]({c['url']}){why}")
+        lines.append("")
 
     # Footer — compact tag instructions
     lines.extend([
@@ -2917,6 +3058,11 @@ def main():
         print(f"\n[synth] Synthesizing {synth_inputs} items "
               f"({total_items} topic / {len(news_items or [])} news / "
               f"{len(prominent_results or [])} prominent / {lab_item_count} lab)...")
+        article_candidates = _extract_article_candidates(
+            topic_results, prominent_results, vault_only_urls,
+        )
+        if article_candidates:
+            print(f"[capture] {len(article_candidates)} article candidate(s) for review")
         synthesis = synthesize_all(
             topic_results,
             from_date,
@@ -2927,6 +3073,8 @@ def main():
             news_items=news_items,
             prominent_results=prominent_results,
             must_follow_results=must_follow_results,
+            article_candidates=article_candidates,
+            capture_max=int(config.get("auto_capture_max", 3) or 3),
         )
         if synthesis.get("briefing"):
             print(f"[synth] Briefing: {synthesis['briefing'][:120]}...")
@@ -2934,7 +3082,16 @@ def main():
             print(f"[synth] Error: {synthesis['error']}", file=sys.stderr)
     else:
         print("\n[synth] No new items to synthesize")
-        synthesis = {"briefing": "No new research results today.", "topics": []}
+        synthesis = {"briefing": "No new research results today."}
+        article_candidates = []
+
+    # Capture the articles synthesis judged worth keeping. Skipped on --dry-run:
+    # this writes notes to the vault, which a preview must never do.
+    captured_articles = []
+    if not args.dry_run:
+        captured_articles = run_article_captures(
+            synthesis.get("capture") or [], article_candidates, config,
+        )
 
     # Render daily note
     note_content = render_daily_note(
@@ -2945,6 +3102,7 @@ def main():
         feedback_summary=feedback_summary,
         tracker=tracker,
         health_warnings=health_warnings,
+        captured_articles=captured_articles,
     )
 
     if args.dry_run:
