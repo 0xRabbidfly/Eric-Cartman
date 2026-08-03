@@ -84,7 +84,7 @@ Each item gets classified into one of three categories:
 
 | Category | What it catches | Where it appears |
 |----------|----------------|------------------|
-| **Lab Pulse** | Posts from Anthropic, OpenAI, Google, xAI, Meta, Mistral and their lead devs — sourced from both the must-follow scan (primary) and topic scans | Dedicated Lab Pulse section at the top |
+| **Lab Pulse** | Posts from Anthropic, OpenAI, Google, SpaceXAI, Meta, Mistral, Moonshot and their lead devs — sourced from both the must-follow scan (primary) and topic scans. Membership comes from the account's `##` group in `pipeline.md` matching `LAB_GROUP_MAP` in `scripts/run.py` | Dedicated Lab Pulse section at the top |
 | **Prominent Voices** | High-engagement tweets (`prominent_ai_min_likes`, default 500+) from any prominent AI figure, found via broad search. Items with unverifiable like counts are kept — the search query itself enforces the floor. | Prominent Voices section with engagement stats |
 | **Deep Dives** | Long-form threads (≥400 chars), articles from known domains (substack, arxiv, medium, etc.) | Deep Dives section with checkboxes |
 | **General** | Everything else that passes quality filters | Per-topic sections + Reading List |
@@ -166,7 +166,7 @@ Post-scoring filters applied inside `run_topic_scan()` via `config.json → qual
 | **Engagement floor** | Drops X items with `likes < 100`. Items with unknown engagement are dropped (not bypassed). Lab/priority accounts bypass the floor. Must-follow accounts have no floor. | `min_engagement.x_likes` |
 | **Long-form bonus** | +15 pts for X posts with ≥400 chars (threads). | `long_form_bonus`, `long_form_min_chars` |
 | **Priority accounts** | +20 pts for posts from tracked accounts. Frontier lab releases always surface. | `priority_accounts.x`, `priority_account_bonus` |
-| **Lab accounts** | Accounts from the 5 major labs, used for Lab Pulse rollup. Bypass engagement floor. | `lab_accounts.anthropic`, `lab_accounts.openai`, etc. |
+| **Lab accounts** | Accounts whose `pipeline.md` group is a lab name in `LAB_GROUP_MAP`. Used for the Lab Pulse rollup; bypass engagement floor. Derived at parse time — not hand-edited. | `lab_accounts.anthropic`, `lab_accounts.openai`, etc. |
 
 To customize scoring behavior beyond what `pipeline.md` exposes, edit the quality
 filter defaults in `scripts/run.py`.

@@ -28,17 +28,29 @@
 >
 > **Format:** `- @handle — Display Name` or `- @handle — Display Name (solo)`
 > Append `(solo)` to give an account its own dedicated API call.
-> `##` headers are org groups (used for display grouping in the daily note).
+> `##` headers group accounts in the daily note — but some names are functional.
+> A group named after a lab (`Anthropic`, `OpenAI`, `Google`, `Meta`, `Mistral`,
+> `SpaceXAI`, `Moonshot` — see `LAB_GROUP_MAP` in `scripts/run.py`) marks its accounts
+> as speaking for that lab: they bypass the engagement floor and are promoted into
+> the **Lab Pulse** section. Any other group name is display-only. So use org
+> groups for lab voices, role groups (Thought Leaders, Researcher, Tool Builder)
+> for the commentary layer — and add a `LAB_GROUP_MAP` entry when adding a new lab.
 > To disable an account, comment it out with `>`.
 
 ## Thought Leaders
 
 - @karpathy — Andrej Karpathy (solo)
 - @swyx — Swyx / Latent Space (solo)
+- @elonmusk — Elon Musk, founder of xAI / SpaceX / Tesla (solo)
 
-## Cursor
+## Researcher
 
-- @mntruell — Michael Truell (solo)
+- @emollick — Ethan Mollick, Wharton professor on AI adoption in real workflows (solo)
+
+## Tool Builder
+
+- @theo — Theo Browne (t3.gg), coding agents / MCP / editor tooling (solo)
+- @mntruell — Michael Truell, Cursor (solo)
 
 ## Anthropic
 
@@ -52,15 +64,18 @@
 
 - @OpenAI — OpenAI
 - @sama — Sam Altman (solo)
+- @gdb — Greg Brockman, OpenAI co-founder and president (solo)
 
 ## Google
 
 - @GoogleDeepMind — Google DeepMind
 - @JeffDean — Jeff Dean (solo)
 
-## xAI
+## SpaceXAI
 
-- @xaborai — xAI
+> @xai is dead post-SpaceXAI merger — @SpaceXAIMemphis is the live official
+> handle, and the one that carries lab/facility content over product marketing.
+- @SpaceXAIMemphis — SpaceXAI Memphis, lab / facility content (solo)
 
 ## Mistral
 
@@ -69,6 +84,10 @@
 ## Meta
 
 - @MetaAI — Meta AI
+
+## Moonshot
+
+- @kimi_moonshot — Moonshot AI, Kimi long-context / agentic models (solo)
 
 ---
 
