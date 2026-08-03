@@ -33,8 +33,15 @@
 > deleting them would quietly degrade topic-scan ranking. They reach the note via
 > Prominent Voices, which covers them at 500+ likes.
 >
-> **Format:** `- @handle — Display Name`. To disable an account, comment it out
-> with `>`. There is no per-account `(solo)` flag any more — everything batches.
+> **Format:** `- @handle — Display Name`, plus `(org)` for official company or
+> product accounts. Only `(org)` accounts feed the **Lab Pulse** rollup; people at
+> those same labs render under **Prominent Voices**, bypassing its 500-like floor
+> because the lab scan has no floor. The split matters: measured over 14 days,
+> every sub-500 post came from an org account, while every researcher post
+> cleared 500.
+>
+> To disable an account, comment it out with `>`. There is no `(solo)` flag —
+> everything batches.
 
 ## Thought Leaders
 
@@ -55,37 +62,37 @@
 - @bcherny — Boris
 - @trq212 - Thariq
 - @DarioAmodei — Dario Amodei
-- @AnthropicAI — Anthropic
-- @claudedevs — ClaudeDevs
+- @AnthropicAI — Anthropic (org)
+- @claudedevs — ClaudeDevs (org)
 
 ## OpenAI
 
-- @OpenAI — OpenAI
+- @OpenAI — OpenAI (org)
 - @sama — Sam Altman
 - @gdb — Greg Brockman, OpenAI co-founder and president
 
 ## Google
 
-- @GoogleDeepMind — Google DeepMind
+- @GoogleDeepMind — Google DeepMind (org)
 - @JeffDean — Jeff Dean
 
 ## SpaceXAI
 
 > @xai is dead post-SpaceXAI merger — @SpaceXAIMemphis is the live official
 > handle, and the one that carries lab/facility content over product marketing.
-- @SpaceXAIMemphis — SpaceXAI Memphis, lab / facility content
+- @SpaceXAIMemphis — SpaceXAI Memphis, lab / facility content (org)
 
 ## Mistral
 
-- @MistralAI — Mistral AI
+- @MistralAI — Mistral AI (org)
 
 ## Meta
 
-- @MetaAI — Meta AI
+- @MetaAI — Meta AI (org)
 
 ## Moonshot
 
-- @kimi_moonshot — Moonshot AI, Kimi long-context / agentic models
+- @kimi_moonshot — Moonshot AI, Kimi long-context / agentic models (org)
 
 ---
 
