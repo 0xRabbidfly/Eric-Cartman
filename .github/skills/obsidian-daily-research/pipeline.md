@@ -14,6 +14,7 @@
 
 - agents | Agent Development | 1.2
 - skills | LLM Agent Skills & AI Developer Tools | 1.1
+- adlc | Agentic Development Lifecycle | 1.1
 - sdd | Spec Driven Development & AI frameworks | 1.0
 - sdlc | Software development lifecycle & AI | 0.9
 
