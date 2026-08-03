@@ -771,8 +771,9 @@ def run_topic_scan(
 ) -> dict:
     """Run a single topic scan. Returns a result dict.
 
-    Uses last30days lib modules directly in scan mode.
+    Uses last30days lib modules directly, at the depth configured in pipeline.md.
     """
+    depth = config.get("depth", "scan")
     from vendor.last30days import (
         xai_x,
         normalize,
@@ -799,7 +800,7 @@ def run_topic_scan(
                 combined_query,
                 from_date,
                 to_date,
-                depth="scan",
+                depth=depth,
             )
             if tracker:
                 tracker.record(f"X/{topic.slug}", model, _extract_usage(raw))
@@ -825,7 +826,6 @@ def run_topic_scan(
     return result
 
 
-SYNTHESIS_MODEL = "claude-sonnet-4-6"  # kept as fallback reference
 CLAUDE_CLI = r"C:\Users\nuno_\.local\bin\claude.exe"  # kept as fallback reference
 
 
@@ -1125,6 +1125,7 @@ _ARTICLE_DOMAINS = [
 def _extract_article_candidates(
     topic_results: list,
     prominent_results: list | None,
+    must_follow_results: list | None = None,
     vault_urls: set | None = None,
     limit: int = 25,
 ) -> list:
@@ -1164,6 +1165,11 @@ def _extract_article_candidates(
     for tr in topic_results or []:
         _scan(tr.get("x_items", []))
     _scan(prominent_results)
+    # Lab accounts too. A link posted by @OpenAI or @AnthropicAI to their own
+    # announcement or paper is the most reliable primary source in the run —
+    # exactly the bar the capture step is meant to clear.
+    for r in (must_follow_results or []):
+        _scan(r.get("items", []))
     return out[:limit]
 
 
@@ -1306,6 +1312,7 @@ def run_must_follow_scan(
         return []
 
     model = l30_config.get("xai_model", "grok-4-1-fast")
+    depth = config.get("depth", "scan")
     results = []
 
     chunks = [
@@ -1326,7 +1333,7 @@ def run_must_follow_scan(
                 handles,
                 from_date,
                 to_date,
-                depth="scan",
+                depth=depth,
             )
             if tracker:
                 tracker.record(f"MustFollow/batch{n}", model, _extract_usage(raw))
@@ -1429,6 +1436,7 @@ def run_prominent_ai_scan(
         return []
 
     model = l30_config.get("xai_model", "grok-4-1-fast")
+    depth = config.get("depth", "scan")
     try:
         min_likes = int(config.get("prominent_ai_min_likes", 500) or 500)
     except (TypeError, ValueError):
@@ -1442,7 +1450,7 @@ def run_prominent_ai_scan(
             model,
             from_date,
             to_date,
-            depth="scan",
+            depth=depth,
             min_likes=min_likes,
         )
         if tracker:
@@ -1464,7 +1472,7 @@ def run_prominent_ai_scan(
                     model,
                     from_date,
                     to_date,
-                    depth="scan",
+                    depth=depth,
                     min_likes=min_likes,
                 )
                 if tracker:
@@ -1529,64 +1537,6 @@ def run_prominent_ai_scan(
 # ---------------------------------------------------------------------------
 # Feedback Processing (#good / #bad tags)
 # ---------------------------------------------------------------------------
-
-def _extract_reason(line: str, tag: str) -> str:
-    """Extract the reason text after a #good/#bad tag.
-
-    Examples:
-        '#good great long-form analysis'  →  'great long-form analysis'
-        '#bad it was a reply'             →  'it was a reply'
-        '#good'                           →  ''
-    """
-    # Find tag position, grab everything after it on the same line
-    idx = line.find(tag)
-    if idx < 0:
-        return ""
-    after = line[idx + len(tag):].strip()
-    # Stop at next tag or end of line
-    after = re.split(r'#\w', after, maxsplit=1)[0].strip()
-    # Strip trailing markdown artifacts
-    after = after.rstrip('|').strip()
-    return after
-
-
-def _extract_current_topic(lines: list[str], line_idx: int) -> str:
-    """Walk backwards from line_idx to find the nearest ## section header.
-
-    Returns the topic slug if the header matches a known topic section,
-    or the raw header text otherwise.
-    """
-    for j in range(line_idx, -1, -1):
-        m = re.match(r'^##\s+(.+)', lines[j])
-        if m:
-            header = m.group(1).strip()
-            # Known sections that aren't topics
-            if header.lower() in (
-                "rate results", "reading list", "research feed", "news",
-                "today's pow", "vault connections", "efficiency recommendations",
-                "prominent voices", "lab pulse",
-            ):
-                return ""
-            # Strip emoji suffixes like "Lab Pulse 🧪"
-            clean = re.sub(r'[\U0001f300-\U0001faff\u2600-\u27bf]+', '', header).strip()
-            return clean
-    return ""
-
-
-def _clean_title(line: str) -> str:
-    """Extract a clean display title from a markdown line."""
-    # Strip list markers, checkboxes, tags
-    cleaned = re.sub(r'^[-*]\s*(?:\[[ x]\]\s*)?', '', line.strip())
-    # Strip #good/#bad and reason text
-    cleaned = re.sub(r'#(?:good|bad)\S*\s*.*$', '', cleaned).strip()
-    return cleaned[:80] if cleaned else line[:80]
-
-
-def _extract_date_from_path(filepath: str) -> str:
-    """Extract YYYY-MM-DD from a daily note path."""
-    m = re.search(r'(\d{4}-\d{2}-\d{2})', filepath)
-    return m.group(1) if m else ""
-
 
 # ---------------------------------------------------------------------------
 # Feedback Analysis & Proposals
@@ -2893,7 +2843,7 @@ def main():
               f"({total_items} topic / {len(news_items or [])} news / "
               f"{len(prominent_results or [])} prominent / {lab_item_count} lab)...")
         article_candidates = _extract_article_candidates(
-            topic_results, prominent_results, vault_only_urls,
+            topic_results, prominent_results, must_follow_results, vault_only_urls,
         )
         if article_candidates:
             print(f"[capture] {len(article_candidates)} article candidate(s) for review")
