@@ -50,7 +50,7 @@ python .github/skills/obsidian-daily-research/scripts/run.py --force-rerun
 6. **Quality Filters** — Engagement floor (100+ likes on X), long-form bonus, priority-account boost. Every handle in the must-follow roster bypasses the floor and gets the boost, whether or not it is scanned.
 7. **Content Classification** — Tags each item as `deep-dive`, `lab-pulse`, or `general`
 8. **Cross-Dedup** — Filters out any URLs/titles already in the vault
-9. **Lab Account Scan** — Batched X search over the lab-group accounts only, in chunks of 10 (`allowed_x_handles` caps at 10 and truncates silently past it). No engagement floor, so it catches the sub-500 posts Prominent Voices structurally cannot see.
+9. **Lab Account Scan** — Batched X search over the lab-group accounts only, in chunks of 10 (`allowed_x_handles` caps at 10 and truncates silently past it). No engagement floor, so it catches the sub-500 posts Prominent Voices structurally cannot see. Results split by account type: `(org)` accounts feed the Lab Pulse rollup, lab researchers are folded into Prominent Voices.
 10. **Prominent AI Voices Scan** — One broad X search for high-engagement (500+ likes) posts, no hardcoded account names. Retries when the result lands under the prompt's own floor.
 11. **Google News RSS** — Per-topic RSS fetch, deduplicated against vault history by URL and title, then LLM-scored and ranked
 12. **Batched Synthesis** — One Claude CLI call producing the POW briefing and lab pulse summary, reading topic scans, news, prominent voices and lab posts together
@@ -69,7 +69,16 @@ The pipeline is now single-write by default for each day.
 `pipeline.md` is the source of truth for accounts, topics, paths and settings.
 
 Only accounts in a **lab group** (a `##` header matching `LAB_GROUP_MAP` in
-`scripts/run.py`) are scanned, batched in chunks of 10. Accounts in non-lab groups
+`scripts/run.py`) are scanned, batched in chunks of 10.
+
+Within a lab group, `(org)` marks an official company or product account. Only
+those feed the **Lab Pulse** rollup, which renders as prose with no tweet list —
+a lab post appears exactly once in the note. Researchers at the same labs render
+under **Prominent Voices**, bypassing its 500-like floor because the lab scan has
+none. Over 14 days every sub-500 post came from an org account and every
+researcher post cleared 500, so the split matches how the two actually post.
+
+Accounts in non-lab groups
 are not scanned but stay on the list: every must-follow handle bypasses the
 topic-scan engagement floor and earns a priority-score bonus, so removing them
 would quietly degrade ranking. They reach the note through Prominent Voices.

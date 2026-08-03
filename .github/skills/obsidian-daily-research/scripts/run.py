@@ -461,11 +461,13 @@ def _parse_pipeline_md(path: Path) -> dict:
 
             elif section == "must-follow" and line.startswith("- @"):
                 rest = line[3:]  # strip "- @"
-                # Detect (solo) tag — gives this account a dedicated API call
-                solo = False
-                if rest.rstrip().endswith("(solo)"):
-                    solo = True
-                    rest = rest[:rest.rfind("(solo)")].rstrip()
+                # Detect (org) tag — an official company/product account rather
+                # than a person. Only org accounts feed the Lab Pulse rollup;
+                # researchers at the same labs render under Prominent Voices.
+                org = False
+                if rest.rstrip().endswith("(org)"):
+                    org = True
+                    rest = rest[:rest.rfind("(org)")].rstrip()
                 for sep in (" — ", " – ", " - "):
                     if sep in rest:
                         handle, label = rest.split(sep, 1)
@@ -473,7 +475,7 @@ def _parse_pipeline_md(path: Path) -> dict:
                             "handle": handle.strip(),
                             "label": label.strip(),
                             "group": current_group,
-                            "solo": solo,
+                            "org": org,
                         })
                         break
                 else:
@@ -481,7 +483,7 @@ def _parse_pipeline_md(path: Path) -> dict:
                         "handle": rest.strip(),
                         "label": rest.strip(),
                         "group": current_group,
-                        "solo": solo,
+                        "org": org,
                     })
 
             elif section == "settings" and line.startswith("- "):
@@ -932,14 +934,18 @@ def synthesize_all(
             prom_lines.append(f"  - @{item.author_handle} [{likes}likes]: \"{_oneline(item.text, 140)}\"")
         sections.append("### Prominent voices\n" + "\n".join(prom_lines) + "\n")
 
-    # Lab accounts — what the providers themselves posted
+    # Lab org accounts — the companies speaking for themselves. Researchers at
+    # those labs are folded into prominent_results instead, so they reach the
+    # briefing rather than the rollup.
     if must_follow_results:
         lab_lines = []
         for r in must_follow_results:
+            if not r.get("is_org"):
+                continue
             for item in r.get("items", [])[:3]:
                 lab_lines.append(f"  - @{r['handle'].lstrip('@')}: \"{_oneline(item.text, 140)}\"")
         if lab_lines:
-            sections.append("### Lab accounts\n" + "\n".join(lab_lines[:15]) + "\n")
+            sections.append("### Lab org accounts\n" + "\n".join(lab_lines[:15]) + "\n")
 
     prompt = f"""You are a research analyst writing a DAILY morning briefing for an AI practitioner.
 This is NOT a weekly summary. This covers what happened TODAY ({to_date}).
@@ -962,9 +968,9 @@ RULES:
 - This is a DAILY briefing, not weekly. Use "today" language.
 - briefing: lead with the POW moment — the one thing that matters most
 - briefing: draw from Topic scans, News headlines and Prominent voices. Do NOT
-  use the "Lab accounts" section for the briefing — those posts are covered by
+  use the "Lab org accounts" section for the briefing — those posts are covered by
   lab_pulse_summary and must not appear in both.
-- lab_pulse_summary: use the "Lab accounts" section. Roll up what the providers
+- lab_pulse_summary: use the "Lab org accounts" section. Roll up what the providers
   said or shipped in their own words — this is the ONLY place lab posts appear,
   so name the specific releases, numbers and claims rather than gesturing at
   them. Focus on Anthropic, OpenAI and Google, plus anything notable from the
@@ -1234,6 +1240,7 @@ def run_must_follow_scan(
                     "handle": acct["handle"],
                     "label": acct.get("label", acct["handle"]),
                     "group": acct["group"],
+                    "is_org": bool(acct.get("org")),
                     "items": per_handle.get(clean, []),
                 })
 
@@ -1246,6 +1253,7 @@ def run_must_follow_scan(
                     "handle": acct["handle"],
                     "label": acct.get("label", acct["handle"]),
                     "group": acct["group"],
+                    "is_org": bool(acct.get("org")),
                     "items": [],
                     "error": str(e),
                 })
@@ -1353,10 +1361,10 @@ def run_prominent_ai_scan(
             )
         ]
 
-        # Also filter reply patterns from text, and drop lab accounts — they
-        # have their own scan and their own rollup, so surfacing them here
-        # printed the same post twice in one note.
-        lab_handles = _lab_handle_set(config)
+        # Also filter reply patterns from text, and drop lab ORG accounts — they
+        # have their own rollup, so surfacing them here printed the same post
+        # twice in one note. Lab researchers are deliberately kept.
+        lab_handles = _lab_handle_set(config, org_only=True)
         final = []
         for item in high_signal:
             text = item.text.strip()
@@ -2508,16 +2516,28 @@ def render_daily_note(
     return "\n".join(lines)
 
 
-def _lab_handle_set(config: dict) -> set:
-    """Flat set of lowercased lab-account handles.
+def _lab_handle_set(config: dict, org_only: bool = False, people_only: bool = False) -> set:
+    """Lowercased handles of scanned lab accounts.
 
-    Lab accounts get their own scan and their own rollup, so they are excluded
-    everywhere else — a lab post should appear once, as prose, not repeated
-    across Prominent Voices and the Research Feed.
+    Lab groups hold two different kinds of account and they belong in different
+    places. `(org)` accounts — the official company and product handles — feed the
+    Lab Pulse rollup and appear nowhere else. The people at those same labs render
+    under Prominent Voices, where a named researcher reads naturally alongside the
+    rest of the field.
+
+    The split is also what the data shows: over 14 days every sub-500-like post
+    came from an org account and every researcher post cleared 500. Orgs need the
+    floorless lab scan; people would have surfaced anyway.
     """
     handles = set()
-    for hs in (config.get("quality_filters", {}).get("lab_accounts", {}) or {}).values():
-        handles.update(h.lower().lstrip("@") for h in hs)
+    for a in config.get("must_follow_accounts", []):
+        if not LAB_GROUP_MAP.get((a.get("group") or "").strip().lower()):
+            continue
+        if org_only and not a.get("org"):
+            continue
+        if people_only and a.get("org"):
+            continue
+        handles.add(a["handle"].lower().lstrip("@"))
     return handles
 
 
@@ -2822,6 +2842,27 @@ def main():
                 seen_urls.add(item.url)
         except Exception as e:
             print(f"[heal] Prominent AI scan failed ({e}) — continuing without it")
+
+    # Fold lab RESEARCHERS into Prominent Voices. They are scanned with the lab
+    # batch (which has no engagement floor, so nothing is lost), but a named
+    # person reads better next to the rest of the field than inside a rollup of
+    # company announcements. Only `(org)` accounts stay in the Lab Pulse rollup.
+    _people = _lab_handle_set(config, people_only=True)
+    if _people and must_follow_results:
+        _have = {getattr(i, "url", "") for i in prominent_results}
+        _added = []
+        for r in must_follow_results:
+            if r["handle"].lower().lstrip("@") not in _people:
+                continue
+            for item in r.get("items", []):
+                url = getattr(item, "url", "")
+                if url and url not in _have:
+                    _have.add(url)
+                    _added.append(item)
+                    seen_urls.add(url)
+        if _added:
+            prominent_results = list(prominent_results) + _added
+            print(f"[prominent-ai] +{len(_added)} lab researcher posts folded in")
 
     # Analysis (synthesis, news scoring) runs on Claude CLI; this model is only
     # the fallback when the CLI is unavailable. Judgment work, so it gets the
