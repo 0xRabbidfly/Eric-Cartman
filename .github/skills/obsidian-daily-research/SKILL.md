@@ -42,18 +42,18 @@ python .github/skills/obsidian-daily-research/scripts/run.py --force-rerun
 
 ### Pipeline Flow
 
-1. **Feedback Pass** — Scans previous dailies for `#good` / `#bad` tags, logs them to `feedback.json`, marks as processed
-2. **Vault Dedup** — Scans all dailies + library files (including year/month subfolders), extracts every URL and title seen before (zero tokens — filesystem only)
-3. **Multi-Topic Scan** — One X search per topic in scan mode
-4. **Spam Detection** — Filters out misleading content (claim/link mismatches like fake "official guides", engagement bait)
-5. **Reply Filtering** — Drops replies from topic scans using both `is_reply` API field and text-pattern detection
-6. **Quality Filters** — Engagement floor (100+ likes on X), long-form bonus, priority-account boost. Every handle in the must-follow roster bypasses the floor and gets the boost, whether or not it is scanned.
-7. **Content Classification** — Tags each item as `deep-dive`, `lab-pulse`, or `general`
-8. **Cross-Dedup** — Filters out any URLs/titles already in the vault
-9. **Lab Account Scan** — Batched X search over the lab-group accounts only, in chunks of 10 (`allowed_x_handles` caps at 10 and truncates silently past it). No engagement floor, so it catches the sub-500 posts Prominent Voices structurally cannot see. Results split by account type: `(org)` accounts feed the Lab Pulse rollup, lab researchers are folded into Prominent Voices.
-10. **Prominent AI Voices Scan** — One broad X search for high-engagement (500+ likes) posts, no hardcoded account names. Retries when the result lands under the prompt's own floor.
-11. **Google News RSS** — Per-topic RSS fetch, deduplicated against vault history by URL and title, then LLM-scored and ranked
-12. **Batched Synthesis** — One Claude CLI call producing the POW briefing and lab pulse summary, reading topic scans, news, prominent voices and lab posts together
+1. **Vault Dedup** — Scans all dailies + library files (including year/month subfolders), extracts every URL and title seen before (zero tokens — filesystem only)
+2. **Multi-Topic Scan** — One X search per topic in scan mode
+3. **Spam Detection** — Filters out misleading content (claim/link mismatches like fake "official guides", engagement bait)
+4. **Reply Filtering** — Drops replies from topic scans using both `is_reply` API field and text-pattern detection
+5. **Quality Filters** — Engagement floor (100+ likes on X), long-form bonus, priority-account boost. Every handle in the must-follow roster bypasses the floor and gets the boost, whether or not it is scanned.
+6. **Content Classification** — Tags each item as `deep-dive`, `lab-pulse`, or `general`
+7. **Cross-Dedup** — Filters out any URLs/titles already in the vault
+8. **Lab Account Scan** — Batched X search over the lab-group accounts only, in chunks of 10 (`allowed_x_handles` caps at 10 and truncates silently past it). No engagement floor, so it catches the sub-500 posts Prominent Voices structurally cannot see. Results split by account type: `(org)` accounts feed the Lab Pulse rollup, lab researchers are folded into Prominent Voices.
+9. **Prominent AI Voices Scan** — One broad X search for high-engagement (500+ likes) posts, no hardcoded account names. Retries when the result lands under the prompt's own floor.
+10. **Google News RSS** — Per-topic RSS fetch, deduplicated against vault history by URL and title, then LLM-scored and ranked
+11. **Batched Synthesis** — One Claude CLI call producing the POW briefing and lab pulse summary, reading topic scans, news, prominent voices and lab posts together
+12. **Article Capture** — Article URLs linked from the day's posts are offered to the synthesis call, which picks any worth a permanent note. Those run through the `obsidian-linked-research` skill into `Research/Library`. Capped by `auto_capture_max`, validated against the candidate list, and skipped on `--dry-run`.
 13. **Write Daily Note** — Outputs structured markdown to `Research/Dailies/YYYY/MM/YYYY-MM-DD.md`
 
 ### Same-Day Run Protection
@@ -94,19 +94,14 @@ Each item gets classified into one of three categories:
 | **Deep Dives** | Long-form threads (≥400 chars), articles from known domains (substack, arxiv, medium, etc.) | 📖 badge on the item in Research Feed |
 | **General** | Everything else that passes quality filters | Research Feed |
 
-### Tagging System
+### Tags
 
-Two tags you can add to any item in a daily note:
+The daily note carries no action tags. The `#keep` promote path and the
+`#good`/`#bad` feedback loop were both removed — the feedback tags accumulated in
+`feedback.json` with nothing reading them, so tagging changed nothing.
 
-| Tag | What it does | Processed as |
-|-----|-------------|--------------|
-| `#good <reason>` | Log as positive feedback: `#good deep practical tutorial` | → `#good-noted` |
-| `#bad <reason>` | Log as negative feedback: `#bad it was a reply` | → `#bad-noted` |
-
-Feedback accumulates in `scripts/feedback.json` with timestamps, titles, URLs,
-reasons, and topic context. There is no `#keep` tag — the manual promote-to-Library
-path was removed. `Research/Library` is still written automatically by the
-auto-capture accounts and is still read for deduplication.
+`Research/Library` is still written automatically by the auto-capture accounts and
+by the article-capture step, and is still read for deduplication.
 
 ### Daily Note Structure
 
