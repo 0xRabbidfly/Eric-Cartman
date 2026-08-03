@@ -960,16 +960,29 @@ SCAN WINDOW: {from_date} to {to_date}
 Produce a JSON daily briefing:
 
 {{
-  "briefing": "4-6 sentence summary of the biggest AI happenings TODAY. Lead with the single most impactful story. Be vivid and specific — name the companies, people, models, numbers. Write like a sharp morning newsletter opener, not a boring corporate recap. End with one forward-looking thought.",
+  "briefing": "3-5 SHORT PARAGRAPHS separated by blank lines (\n\n), one per theme. See the briefing rules below.",
   "lab_pulse_summary": "2-3 sentences summarizing what the major model providers (Anthropic, OpenAI, Google, Meta, Mistral, Moonshot, SpaceXAI) and their lead devs said or shipped today. If nothing notable, say so."
 }}
 
 RULES:
 - This is a DAILY briefing, not weekly. Use "today" language.
-- briefing: lead with the POW moment — the one thing that matters most
 - briefing: draw from Topic scans, News headlines and Prominent voices. Do NOT
   use the "Lab org accounts" section for the briefing — those posts are covered by
   lab_pulse_summary and must not appear in both.
+
+BRIEFING FORMAT — follow exactly:
+- 3-5 paragraphs, separated by a blank line. ONE theme per paragraph. Do not mix
+  two unrelated stories into the same paragraph.
+- The first paragraph is the lead: the single most important thing today.
+- 2-4 sentences per paragraph.
+- NO RUN-ON SENTENCES. Hard cap of 25 words per sentence. If a sentence needs a
+  comma-spliced clause, an "and, more to the point", or a trailing "which
+  signals...", split it into two sentences instead.
+- At most ONE em dash in the entire briefing. Do not use em dashes to bolt an
+  extra clause onto a finished sentence.
+- Be specific: name the companies, people, models and numbers. Plain declarative
+  sentences beat clever ones.
+- End the final paragraph with one short forward-looking sentence.
 - lab_pulse_summary: use the "Lab org accounts" section. Roll up what the providers
   said or shipped in their own words — this is the ONLY place lab posts appear,
   so name the specific releases, numbers and claims rather than gesturing at
@@ -2425,10 +2438,12 @@ def render_daily_note(
         )
         for item in sorted_prom[:15]:
             likes = item.engagement.likes if item.engagement and item.engagement.likes else 0
-            lines.append(
-                f"- [{_oneline(item.text, 110)}]({item.url}) "
-                f"— @{item.author_handle} · {likes}❤"
-            )
+            # Attribution on the first line, the tweet itself on the second.
+            # Putting the full text in the link title is what made the old Deep
+            # Dives section unreadable on a phone — a paragraph of underlined
+            # link text with the URL invisible.
+            lines.append(f"- **@{item.author_handle}** · {likes}❤ · [open]({item.url})")
+            lines.append(f"  {_oneline(item.text, 600)}")
         lines.append("")
 
     # News — top stories, deduplicated by story (one headline per event)
