@@ -13,16 +13,18 @@ metadata:
 
 ## Purpose
 
-Automated daily research pipeline that scans 5 topic tracks on X,
-deduplicates against your Obsidian vault history, and writes a structured daily note
-with a Lab Pulse rollup, Deep Dives section, and per-topic breakdowns.
+Automated daily research pipeline that scans topic tracks on X, pulls Google News
+RSS, tracks lab accounts, deduplicates against your Obsidian vault history, and
+writes a mobile-friendly daily note.
 
-**Cost**: ~$0.10-0.30/day (~$6/month) using scan mode with gpt-5.2 synthesis.
+**Cost**: ~$0.30/day (~$9/month). Search runs on a pinned `grok-4.3`; analysis
+(briefing, lab summary, news scoring) runs on Claude CLI and is free on a Max
+account, with `grok-4.5` as the fallback.
 
 ## Quick Start
 
 ```
-# Full daily run (all 5 topics)
+# Full daily run (all topics)
 python .github/skills/obsidian-daily-research/scripts/run.py
 
 # Single topic
@@ -34,26 +36,24 @@ python .github/skills/obsidian-daily-research/scripts/run.py --dry-run
 # Intentionally rerun for the same day
 python .github/skills/obsidian-daily-research/scripts/run.py --force-rerun
 
-# Just promote #keep items to Library
-python .github/skills/obsidian-daily-research/scripts/run.py --promote-only
 ```
 
 ## How It Works
 
 ### Pipeline Flow
 
-1. **Promote Pass** — Scans previous dailies for `#keep` tags, promotes those items to `Research/Library/{topic}.md`
-2. **Feedback Pass** — Scans previous dailies for `#good` / `#bad` tags, logs them to `feedback.json`, marks as processed
-3. **Vault Dedup** — Scans all dailies + library files (including year/month subfolders), extracts every URL and title seen before (zero tokens — filesystem only)
-4. **Multi-Topic Scan** — For each of 5 topics, runs X search in scan mode (auto-selected model, no enrichment, 5-12 items each)
-5. **Spam Detection** — Filters out misleading content (claim/link mismatches like fake "official guides", engagement bait)
-6. **Reply Filtering** — Drops replies from topic scans using both `is_reply` API field and text-pattern detection
-7. **Quality Filters** — Strict engagement floor (100+ likes on X — items with unknown engagement are dropped, not bypassed), long-form bonus, priority account boost
-8. **Content Classification** — Tags each item as `deep-dive`, `lab-pulse`, or `general`
-9. **Cross-Dedup** — Filters out any URLs/titles already in the vault
-10. **Must-Follow Scan** — Dedicated per-person X search for tracked accounts. No engagement floor — catches everything they post.
-11. **Prominent AI Voices Scan** — Single broad X search for high-engagement (500+ likes) tweets from prominent AI researchers, engineers, and executives. One API call captures what the top minds are saying without hardcoding account names.
-12. **Batched Synthesis** — Single gpt-5.2 call to produce daily POW briefing + lab pulse summary + per-topic headlines
+1. **Feedback Pass** — Scans previous dailies for `#good` / `#bad` tags, logs them to `feedback.json`, marks as processed
+2. **Vault Dedup** — Scans all dailies + library files (including year/month subfolders), extracts every URL and title seen before (zero tokens — filesystem only)
+3. **Multi-Topic Scan** — One X search per topic in scan mode
+4. **Spam Detection** — Filters out misleading content (claim/link mismatches like fake "official guides", engagement bait)
+5. **Reply Filtering** — Drops replies from topic scans using both `is_reply` API field and text-pattern detection
+6. **Quality Filters** — Engagement floor (100+ likes on X), long-form bonus, priority-account boost. Every handle in the must-follow roster bypasses the floor and gets the boost, whether or not it is scanned.
+7. **Content Classification** — Tags each item as `deep-dive`, `lab-pulse`, or `general`
+8. **Cross-Dedup** — Filters out any URLs/titles already in the vault
+9. **Lab Account Scan** — Batched X search over the lab-group accounts only, in chunks of 10 (`allowed_x_handles` caps at 10 and truncates silently past it). No engagement floor, so it catches the sub-500 posts Prominent Voices structurally cannot see.
+10. **Prominent AI Voices Scan** — One broad X search for high-engagement (500+ likes) posts, no hardcoded account names. Retries when the result lands under the prompt's own floor.
+11. **Google News RSS** — Per-topic RSS fetch, deduplicated against vault history by URL and title, then LLM-scored and ranked
+12. **Batched Synthesis** — One Claude CLI call producing the POW briefing and lab pulse summary, reading topic scans, news, prominent voices and lab posts together
 13. **Write Daily Note** — Outputs structured markdown to `Research/Dailies/YYYY/MM/YYYY-MM-DD.md`
 
 ### Same-Day Run Protection
@@ -66,17 +66,13 @@ The pipeline is now single-write by default for each day.
 
 ### Must-Follow Accounts
 
-Dedicated scan for key people — catches everything they post with no engagement floor.
+`pipeline.md` is the source of truth for accounts, topics, paths and settings.
 
-`pipeline.md` is the source of truth for:
-
-- must-follow accounts and org groups
-- topic slugs, names, and weights
-- vault paths and item limits
-- daily pipeline settings
-
-Edit `pipeline.md` when you want to add or remove followed accounts, adjust topics,
-or tune runtime settings.
+Only accounts in a **lab group** (a `##` header matching `LAB_GROUP_MAP` in
+`scripts/run.py`) are scanned, batched in chunks of 10. Accounts in non-lab groups
+are not scanned but stay on the list: every must-follow handle bypasses the
+topic-scan engagement floor and earns a priority-score bonus, so removing them
+would quietly degrade ranking. They reach the note through Prominent Voices.
 
 ### Content Categories
 
@@ -86,67 +82,35 @@ Each item gets classified into one of three categories:
 |----------|----------------|------------------|
 | **Lab Pulse** | Posts from Anthropic, OpenAI, Google, SpaceXAI, Meta, Mistral, Moonshot and their lead devs — sourced from both the must-follow scan (primary) and topic scans. Membership comes from the account's `##` group in `pipeline.md` matching `LAB_GROUP_MAP` in `scripts/run.py` | Dedicated Lab Pulse section at the top |
 | **Prominent Voices** | High-engagement tweets (`prominent_ai_min_likes`, default 500+) from any prominent AI figure, found via broad search. Items with unverifiable like counts are kept — the search query itself enforces the floor. | Prominent Voices section with engagement stats |
-| **Deep Dives** | Long-form threads (≥400 chars), articles from known domains (substack, arxiv, medium, etc.) | Deep Dives section with checkboxes |
-| **General** | Everything else that passes quality filters | Per-topic sections + Reading List |
+| **Deep Dives** | Long-form threads (≥400 chars), articles from known domains (substack, arxiv, medium, etc.) | 📖 badge on the item in Research Feed |
+| **General** | Everything else that passes quality filters | Research Feed |
 
 ### Tagging System
 
-Three tags you can add to any item in a daily note:
+Two tags you can add to any item in a daily note:
 
 | Tag | What it does | Processed as |
 |-----|-------------|--------------|
-| `#keep` | Promote item to `Research/Library/` with LLM-enriched summary | → `#kept` |
-| `#good <reason>` | Log as positive feedback. Add a reason for better analysis: `#good deep practical tutorial` | → `#good-noted` |
-| `#bad <reason>` | Log as negative feedback. Add a reason: `#bad it was a reply`, `#bad bot-generated`, `#bad self-promo fake official guide` | → `#bad-noted` |
+| `#good <reason>` | Log as positive feedback: `#good deep practical tutorial` | → `#good-noted` |
+| `#bad <reason>` | Log as negative feedback: `#bad it was a reply` | → `#bad-noted` |
 
-Feedback is accumulated in `scripts/feedback.json` with timestamps, titles, URLs, reasons, and topic context.
-
-### Feedback Learning Loop
-
-The pipeline learns from your `#good` and `#bad` tags across a 14-day rolling window:
-
-1. **Collection** — Each run scans previous dailies for unprocessed `#good`/`#bad` tags (skips blockquote template lines). Captures the reason text after the tag and which topic section the item was in.
-2. **Classification** — Reasons are auto-classified into buckets:
-   - **Bad buckets**: `reply`, `low-engagement`, `bot`, `self-promo`, `misleading`, `off-topic`, `duplicate`, `stale`
-   - **Good buckets**: `long-form`, `original-research`, `practical`, `insider`, `high-signal`
-3. **Analysis** — Patterns are extracted: which buckets dominate, which topics produce the most bad results, what good items have in common.
-4. **Proposals** — Concrete improvement suggestions are generated and rendered in the daily note's **Feedback Insights** section. Examples:
-   - "3/5 bad items were replies → reply filter may need strengthening"
-   - "All 4 good items were long-form → consider boosting `long_form_bonus`"
-   - "Topic X produces 60% of bad items → search queries may be too broad"
-5. **Advisory only** — Proposals appear in the daily note for you to review. No auto-applied config changes.
-
-The more reasons you add to your tags, the more precise the proposals become. Tags without reasons still count but get classified as `unclassified`.
-
-### Long-Term Memory
-
-1. Read your daily note in Obsidian
-2. Add `#keep` to any reading list item you want to preserve
-3. Next pipeline run automatically promotes `#keep` items to `Research/Library/{topic}.md`
-4. Tag gets changed to `#kept` so it's not reprocessed
+Feedback accumulates in `scripts/feedback.json` with timestamps, titles, URLs,
+reasons, and topic context. There is no `#keep` tag — the manual promote-to-Library
+path was removed. `Research/Library` is still written automatically by the
+auto-capture accounts and is still read for deduplication.
 
 ### Daily Note Structure
 
 ```
-Research/Dailies/2026/02/2026-02-26.md
-├── YAML frontmatter (date, type, topics, stats, must_follow_tweets, prominent_voices, deep_dives, lab_pulse)
-├── Today's POW (vivid daily summary — the one thing that matters most)
-├── Must Follow 📌 (tweets from tracked accounts, no engagement floor, grouped by org)
-│   ├── Anthropic (AnthropicAI, alexalbert__, daboris)
-│   ├── OpenAI (OpenAI, sama, markchen90)
-│   ├── Google (GoogleDeepMind, JeffDean)
-│   ├── Thought Leaders (karpathy)
-│   └── ...other groups
-├── Prominent Voices 🎙️ (high-engagement tweets from top AI minds, sorted by likes)
-├── Lab Pulse 🧪 (model provider rollup + table of lab posts from must-follow + topic scans)
-├── Deep Dives 📖 (long-form threads ≥400 chars and articles, checkboxes)
-├── Reading List (top 15, checkboxes, topic tags)
-├── Per-topic sections
-│   ├── Headline + key points
-│   └── X sources table
-├── Promote to Library instructions
-├── Rate Results (feedback tag instructions with examples + stats)
-├── Feedback Insights 🔍 (pattern analysis + improvement proposals from last 14 days)
+Research/Dailies/2026/08/2026-08-03.md
+├── YAML frontmatter (date, type, topics, stats)
+├── Pipeline Cost callout (calls, tokens, $)
+├── Today's POW (the day's lede — synthesized from ALL sources: topic scans,
+│                news headlines, prominent voices, and lab posts)
+├── Lab Pulse 🧪 (prose rollup + list of lab-account posts)
+├── Prominent Voices 🎙️ (high-engagement posts, list, sorted by likes)
+├── News 📰 (numbered list, Google News RSS, vault-deduped)
+├── Research Feed (merged topic-scan items, ranked; 📖 marks long-form)
 └── Efficiency Recommendations
 ```
 

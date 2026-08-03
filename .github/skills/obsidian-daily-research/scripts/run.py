@@ -10,7 +10,6 @@ Usage:
     python run.py                      # Full daily pipeline
     python run.py --topic agents       # Single topic only
     python run.py --dry-run            # Fetch + score, print to stdout
-    python run.py --promote-only       # Just run #keep → Library pass
     python run.py --show-dedup         # Dump seen URLs from vault
     python run.py --costs              # Show token cost estimate after run
 
@@ -61,7 +60,6 @@ def _load_local_module(name: str, filepath: Path):
 _local_lib = SCRIPT_DIR / "lib"
 topics_mod = _load_local_module("dr_topics", _local_lib / "topics.py")
 vault = _load_local_module("dr_vault", _local_lib / "vault_v2.py")
-promote = _load_local_module("dr_promote", _local_lib / "promote_v2.py")
 
 # Feedback file path (relative to vault)
 FEEDBACK_FILE = SCRIPT_DIR / "feedback.json"
@@ -351,6 +349,14 @@ LAB_GROUP_MAP = {
     "moonshot": "moonshot",
 }
 
+# xAI's `allowed_x_handles` accepts at most 10 handles and truncates silently
+# past that (see xai_x.py), so must-follow handles are scanned in chunks.
+MUST_FOLLOW_BATCH_SIZE = 10
+
+# Prominent Voices asks the model for 8-15 items but has averaged 5.7/day. Retry
+# below this floor instead of only on a completely empty response.
+PROMINENT_MIN_ITEMS = 8
+
 
 def _apply_derived_quality_filters(config: dict) -> dict:
     """Populate quality filter account lists from pipeline-defined accounts."""
@@ -390,8 +396,6 @@ def _parse_pipeline_md(path: Path) -> dict:
         "vault_path": str(Path.home() / "Documents" / "Obsidian Vault"),
         "dailies_folder": "Research/Dailies",
         "library_folder": "Research/Library",
-        "keep_tag": "#keep",
-        "kept_tag": "#kept",
         "items_per_topic": 8,
         "reading_list_max": 15,
         "depth": "scan",
@@ -878,8 +882,17 @@ def synthesize_all(
     tracker: TokenTracker | None = None,
     api_key: str = "",
     model: str = "grok-4.5",
+    news_items: list | None = None,
+    prominent_results: list | None = None,
+    must_follow_results: list | None = None,
 ) -> dict:
-    """Single batched synthesis call across all topics using Claude CLI (Max account)."""
+    """Single batched synthesis call across the whole day, via Claude CLI (Max account).
+
+    Takes every source the run gathered, not just topic scans. Topic scans alone
+    cap the briefing at ~25 tweets and leave it blind to the day's news headlines
+    and the high-engagement Prominent Voices set, which is where the lead story
+    usually is.
+    """
 
     # Build per-topic summaries
     sections = []
@@ -903,6 +916,31 @@ def synthesize_all(
             section += "(No new results)\n"
         sections.append(section)
 
+    # News headlines — the day's published stories, often where the lead is
+    if news_items:
+        news_lines = [
+            f"  - [{it.get('source', '')}] {_oneline(it.get('title', ''), 140)}"
+            for it in news_items[:10]
+        ]
+        sections.append("### News headlines\n" + "\n".join(news_lines) + "\n")
+
+    # Prominent voices — the highest-engagement posts of the day
+    if prominent_results:
+        prom_lines = []
+        for item in prominent_results[:12]:
+            likes = item.engagement.likes if item.engagement and item.engagement.likes else 0
+            prom_lines.append(f"  - @{item.author_handle} [{likes}likes]: \"{_oneline(item.text, 140)}\"")
+        sections.append("### Prominent voices\n" + "\n".join(prom_lines) + "\n")
+
+    # Lab accounts — what the providers themselves posted
+    if must_follow_results:
+        lab_lines = []
+        for r in must_follow_results:
+            for item in r.get("items", [])[:3]:
+                lab_lines.append(f"  - @{r['handle'].lstrip('@')}: \"{_oneline(item.text, 140)}\"")
+        if lab_lines:
+            sections.append("### Lab accounts\n" + "\n".join(lab_lines[:15]) + "\n")
+
     prompt = f"""You are a research analyst writing a DAILY morning briefing for an AI practitioner.
 This is NOT a weekly summary. This covers what happened TODAY ({to_date}).
 
@@ -917,22 +955,15 @@ Produce a JSON daily briefing:
 
 {{
   "briefing": "4-6 sentence summary of the biggest AI happenings TODAY. Lead with the single most impactful story. Be vivid and specific — name the companies, people, models, numbers. Write like a sharp morning newsletter opener, not a boring corporate recap. End with one forward-looking thought.",
-  "lab_pulse_summary": "2-3 sentences summarizing what the major model providers (Anthropic, OpenAI, Google, Meta, Mistral) and their lead devs said or shipped today. If nothing notable, say so.",
-  "topics": [
-    {{
-      "slug": "topic-slug",
-      "headline": "One bold sentence summarizing this topic's news",
-      "key_points": ["point1", "point2"]
-    }}
-  ]
+  "lab_pulse_summary": "2-3 sentences summarizing what the major model providers (Anthropic, OpenAI, Google, Meta, Mistral, Moonshot, SpaceXAI) and their lead devs said or shipped today. If nothing notable, say so."
 }}
 
 RULES:
 - This is a DAILY briefing, not weekly. Use "today" language.
 - briefing: lead with the POW moment — the one thing that matters most
-- lab_pulse_summary: focus on the 3 big labs (Anthropic, OpenAI, Google) + any notable from Meta/Mistral
-- Each topic: 1-3 key_points (short, specific, actionable)
-- If a topic had no results, say "Quiet day for this topic"
+- Weigh ALL the source sections, not just the topic scans — the lead story is
+  often in News headlines or Prominent voices rather than a topic scan.
+- lab_pulse_summary: focus on the 3 big labs (Anthropic, OpenAI, Google) + any notable from the others
 - Output ONLY valid JSON, no prose before or after"""
 
     # Try Claude CLI first (free on Max)
@@ -1102,12 +1133,16 @@ def run_must_follow_scan(
     to_date: str,
     tracker: TokenTracker | None = None,
 ) -> list:
-    """Scan must-follow accounts on X, hybrid batch/solo strategy.
+    """Scan lab-group accounts on X, batched in chunks of 10.
 
-    Corp accounts (solo=False) are batched into ONE API call using
-    search_x_must_follow_batch (up to 10 handles). Individual accounts
-    (solo=True) each get a dedicated search_x_must_follow call for
-    maximum reliability.
+    Only accounts whose pipeline.md group is in LAB_GROUP_MAP are scanned —
+    those are the ones that feed the Lab Pulse section. Accounts in non-lab
+    groups stay in the roster because every must-follow handle bypasses the
+    topic-scan engagement floor and earns a priority score bonus, but they cost
+    no API calls; Prominent Voices covers them at 500+ likes.
+
+    `allowed_x_handles` accepts at most 10 handles and xai_x truncates silently
+    past that, so handles are chunked rather than sent in a single call.
 
     Returns a list of dicts: {handle, label, group, items: [x_item, ...]}
     """
@@ -1117,19 +1152,26 @@ def run_must_follow_scan(
     if not accounts or not l30_config.get("XAI_API_KEY"):
         return []
 
+    lab_accounts = [
+        a for a in accounts
+        if LAB_GROUP_MAP.get((a.get("group") or "").strip().lower())
+    ]
+    if not lab_accounts:
+        return []
+
     model = l30_config.get("xai_model", "grok-4-1-fast")
     results = []
 
-    # Separate into batch (corp) and solo (individual) accounts
-    batch_accounts = [a for a in accounts if not a.get("solo")]
-    solo_accounts = [a for a in accounts if a.get("solo")]
+    chunks = [
+        lab_accounts[i:i + MUST_FOLLOW_BATCH_SIZE]
+        for i in range(0, len(lab_accounts), MUST_FOLLOW_BATCH_SIZE)
+    ]
 
-    # --- Batch call for corp accounts (one API call) ---
-    if batch_accounts:
-        handles = [a["handle"].lstrip("@") for a in batch_accounts]
+    for n, chunk in enumerate(chunks, 1):
+        handles = [a["handle"].lstrip("@") for a in chunk]
         handle_set = {h.lower() for h in handles}
-        corp_list = ", ".join(f"@{h}" for h in handles)
-        print(f"  [batch] {corp_list}...", end=" ", flush=True)
+        print(f"  [batch {n}/{len(chunks)}] {', '.join('@' + h for h in handles)}...",
+              end=" ", flush=True)
 
         try:
             raw = xai_x.search_x_must_follow_batch(
@@ -1141,17 +1183,16 @@ def run_must_follow_scan(
                 depth="scan",
             )
             if tracker:
-                tracker.record("MustFollow/batch", model, _extract_usage(raw))
+                tracker.record(f"MustFollow/batch{n}", model, _extract_usage(raw))
 
             items = xai_x.parse_x_response(raw)
             normalized = normalize.normalize_x_items(items, from_date, to_date)
 
-            # Hard post-filter: only keep items from handles in this batch
+            # Hard post-filter: only keep items from handles in this chunk
             filtered = []
             dropped = 0
             for item in normalized:
-                item_author = item.author_handle.lower().lstrip("@")
-                if item_author in handle_set:
+                if item.author_handle.lower().lstrip("@") in handle_set:
                     filtered.append(item)
                 else:
                     dropped += 1
@@ -1172,8 +1213,8 @@ def run_must_follow_scan(
             # Substance filter: drop low-value posts (reactions, emojis, social chat)
             final = _filter_must_follow_substance(final)
 
-            # Must-follow: NO engagement floor — catch everything
-            # (engagement floor is for topic scans only)
+            # NO engagement floor — the whole point of the lab scan is to catch
+            # sub-500 posts that Prominent Voices structurally cannot see.
 
             # Distribute items back to per-account results
             per_handle: dict[str, list] = {h.lower(): [] for h in handles}
@@ -1182,7 +1223,7 @@ def run_must_follow_scan(
                 if author in per_handle:
                     per_handle[author].append(item)
 
-            for acct in batch_accounts:
+            for acct in chunk:
                 clean = acct["handle"].lstrip("@").lower()
                 results.append({
                     "handle": acct["handle"],
@@ -1195,7 +1236,7 @@ def run_must_follow_scan(
 
         except Exception as e:
             print(f"error - {e}")
-            for acct in batch_accounts:
+            for acct in chunk:
                 results.append({
                     "handle": acct["handle"],
                     "label": acct.get("label", acct["handle"]),
@@ -1203,67 +1244,6 @@ def run_must_follow_scan(
                     "items": [],
                     "error": str(e),
                 })
-
-    # --- Solo calls for individual accounts (one API call each) ---
-    for acct in solo_accounts:
-        handle = acct["handle"].lstrip("@")
-        print(f"  [solo] @{handle}...", end=" ", flush=True)
-
-        try:
-            raw = xai_x.search_x_must_follow(
-                l30_config["XAI_API_KEY"],
-                model,
-                handle,
-                from_date,
-                to_date,
-                depth="scan",
-            )
-            if tracker:
-                tracker.record(f"MustFollow/@{handle}", model, _extract_usage(raw))
-
-            items = xai_x.parse_x_response(raw)
-            normalized = normalize.normalize_x_items(items, from_date, to_date)
-
-            # Hard post-filter: only this handle
-            filtered = [
-                item for item in normalized
-                if item.author_handle.lower().lstrip("@") == handle.lower()
-            ]
-
-            # Filter out replies
-            final = []
-            for item in filtered:
-                text = item.text.strip()
-                if text.startswith("@") and not text.lower().startswith(f"@{handle.lower()}"):
-                    continue
-                if getattr(item, 'is_reply', False):
-                    continue
-                final.append(item)
-
-            # Substance filter: drop low-value posts (reactions, emojis, social chat)
-            final = _filter_must_follow_substance(final)
-
-            # Must-follow: NO engagement floor — catch everything
-            # (engagement floor is for topic scans only)
-
-            results.append({
-                "handle": acct["handle"],
-                "label": acct.get("label", acct["handle"]),
-                "group": acct["group"],
-                "items": final,
-            })
-
-            print(f"-> {len(final)} tweets")
-
-        except Exception as e:
-            print(f"error - {e}")
-            results.append({
-                "handle": acct["handle"],
-                "label": acct.get("label", acct["handle"]),
-                "group": acct["group"],
-                "items": [],
-                "error": str(e),
-            })
 
     return results
 
@@ -1322,13 +1302,15 @@ def run_prominent_ai_scan(
 
         items = xai_x.parse_x_response(raw)
 
-        # The model sometimes answers {"items": []} even though its searches
-        # found candidates (url_citations attached to the response). Retry
-        # once — an independent sample usually recovers the run.
-        if not items:
+        # The model routinely returns fewer items than the prompt's own floor —
+        # measured mean 5.7/day against a stated 8-15, with days as low as 1.
+        # The old guard only fired on a completely empty list, so thin days were
+        # silently accepted. Retry whenever we're under the minimum; an
+        # independent sample either finds more or confirms the day was quiet.
+        if len(items) < PROMINENT_MIN_ITEMS:
             n_hits = len(xai_x._extract_citation_urls(raw))
             if n_hits > 0:
-                print(f"(empty despite {n_hits} search hits — retrying)", end=" ", flush=True)
+                print(f"({len(items)} items, {n_hits} search hits — retrying)", end=" ", flush=True)
                 raw = xai_x.search_x_prominent_ai(
                     l30_config["XAI_API_KEY"],
                     model,
@@ -1339,9 +1321,14 @@ def run_prominent_ai_scan(
                 )
                 if tracker:
                     tracker.record("ProminentAI/retry", model, _extract_usage(raw))
-                items = xai_x.parse_x_response(raw)
-                if not items:
-                    print("(retry also empty)", end=" ", flush=True)
+                # Merge rather than replace — the first sample may be thin but
+                # non-empty, and overwriting it would discard real items.
+                retry_items = xai_x.parse_x_response(raw)
+                have = {it.get("url") for it in items if isinstance(it, dict)}
+                added = [it for it in retry_items
+                         if not isinstance(it, dict) or it.get("url") not in have]
+                items = list(items) + added
+                print(f"(retry added {len(added)})", end=" ", flush=True)
 
         normalized = normalize.normalize_x_items(items, from_date, to_date)
         scored = score.score_x_items(normalized)
@@ -1449,9 +1436,9 @@ def _extract_current_topic(lines: list[str], line_idx: int) -> str:
             header = m.group(1).strip()
             # Known sections that aren't topics
             if header.lower() in (
-                "rate results", "promote to library", "reading list",
+                "rate results", "reading list", "research feed", "news",
                 "today's pow", "vault connections", "efficiency recommendations",
-                "feedback insights",
+                "prominent voices", "lab pulse",
             ):
                 return ""
             # Strip emoji suffixes like "Lab Pulse 🧪"
@@ -1615,275 +1602,6 @@ def _classify_reason(reason: str, buckets: list[tuple[str, list[str]]]) -> str:
             if re.search(pattern, reason_lower):
                 return bucket_name
     return "unclassified"
-
-
-def analyze_feedback(feedback_data: dict, lookback_days: int = 14) -> dict:
-    """Analyze accumulated feedback and extract actionable patterns.
-
-    Looks at the last `lookback_days` of feedback entries. Returns a dict with:
-      - bad_buckets: {bucket_name: [entries...]}   — classified bad reasons
-      - good_buckets: {bucket_name: [entries...]}  — classified good reasons
-      - bad_topics: {topic: count}                 — which topics produce bad results
-      - good_topics: {topic: count}                — which topics produce good results
-      - top_bad_reasons: [(reason, count)]         — most common raw bad reasons
-      - top_good_reasons: [(reason, count)]        — most common raw good reasons
-      - total_good / total_bad in window
-    """
-    cutoff = (datetime.now() - timedelta(days=lookback_days)).strftime("%Y-%m-%d")
-
-    good_entries = [e for e in feedback_data.get("good", [])
-                    if e.get("date", "") >= cutoff and e.get("url")]
-    bad_entries = [e for e in feedback_data.get("bad", [])
-                   if e.get("date", "") >= cutoff and e.get("url")]
-
-    # Classify bad reasons into buckets
-    bad_buckets: dict[str, list] = {}
-    for entry in bad_entries:
-        bucket = _classify_reason(entry.get("reason", ""), _BAD_REASON_BUCKETS)
-        bad_buckets.setdefault(bucket, []).append(entry)
-
-    # Classify good reasons into buckets
-    good_buckets: dict[str, list] = {}
-    for entry in good_entries:
-        bucket = _classify_reason(entry.get("reason", ""), _GOOD_REASON_BUCKETS)
-        good_buckets.setdefault(bucket, []).append(entry)
-
-    # Topic distribution
-    bad_topics: dict[str, int] = {}
-    for entry in bad_entries:
-        topic = _normalize_feedback_topic(entry.get("topic", "unknown"))
-        bad_topics[topic] = bad_topics.get(topic, 0) + 1
-
-    good_topics: dict[str, int] = {}
-    for entry in good_entries:
-        topic = _normalize_feedback_topic(entry.get("topic", "unknown"))
-        good_topics[topic] = good_topics.get(topic, 0) + 1
-
-    # Most common raw reasons
-    bad_reason_counts: dict[str, int] = {}
-    for entry in bad_entries:
-        r = entry.get("reason", "").strip()
-        if r:
-            bad_reason_counts[r] = bad_reason_counts.get(r, 0) + 1
-    top_bad = sorted(bad_reason_counts.items(), key=lambda x: -x[1])[:5]
-
-    good_reason_counts: dict[str, int] = {}
-    for entry in good_entries:
-        r = entry.get("reason", "").strip()
-        if r:
-            good_reason_counts[r] = good_reason_counts.get(r, 0) + 1
-    top_good = sorted(good_reason_counts.items(), key=lambda x: -x[1])[:5]
-
-    return {
-        "bad_buckets": bad_buckets,
-        "good_buckets": good_buckets,
-        "bad_topics": bad_topics,
-        "good_topics": good_topics,
-        "top_bad_reasons": top_bad,
-        "top_good_reasons": top_good,
-        "total_good": len(good_entries),
-        "total_bad": len(bad_entries),
-        "lookback_days": lookback_days,
-    }
-
-
-def generate_proposals(analysis: dict, config: dict) -> list[str]:
-    """Turn feedback patterns into concrete improvement proposals.
-
-    Each proposal is a markdown string with:
-      - What pattern was detected
-      - What action could improve results
-      - Confidence (based on sample size)
-
-    Returns a list of proposal strings (empty if insufficient data).
-    """
-    proposals: list[str] = []
-    total_bad = analysis["total_bad"]
-    total_good = analysis["total_good"]
-    bad_buckets = analysis["bad_buckets"]
-    good_buckets = analysis["good_buckets"]
-
-    if total_bad + total_good < 3:
-        return []  # Not enough data to make meaningful proposals
-
-    # --- Bad-signal proposals ---
-
-    # Reply detection
-    reply_count = len(bad_buckets.get("reply", []))
-    if reply_count >= 2:
-        pct = reply_count / max(total_bad, 1) * 100
-        proposals.append(
-            f"**Reply leak** — {reply_count}/{total_bad} bad items ({pct:.0f}%) were replies, "
-            f"not original posts. The `is_reply` filter + text-pattern detection may need "
-            f"strengthening. Consider also filtering posts that start with `@username` "
-            f"where the username isn't the author."
-        )
-
-    # Bot / spam
-    bot_count = len(bad_buckets.get("bot", []))
-    if bot_count >= 2:
-        pct = bot_count / max(total_bad, 1) * 100
-        proposals.append(
-            f"**Bot/spam leak** — {bot_count}/{total_bad} bad items ({pct:.0f}%) were bot-generated. "
-            f"Consider adding heuristics: very formulaic text patterns, accounts with "
-            f"high post frequency, or emoji-heavy engagement-bait openers."
-        )
-
-    # Self-promotion
-    promo_count = len(bad_buckets.get("self-promo", []))
-    if promo_count >= 2:
-        pct = promo_count / max(total_bad, 1) * 100
-        proposals.append(
-            f"**Self-promo leak** — {promo_count}/{total_bad} bad items ({pct:.0f}%) were "
-            f"self-promotion (e.g. 'check out my repo', fake official guides). "
-            f"The `claim_link_mismatch` spam detector could be extended with new patterns "
-            f"from these examples."
-        )
-
-    # Low engagement sneaking through
-    low_eng = len(bad_buckets.get("low-engagement", []))
-    if low_eng >= 2:
-        pct = low_eng / max(total_bad, 1) * 100
-        proposals.append(
-            f"**Low-engagement leak** — {low_eng}/{total_bad} bad items ({pct:.0f}%) had "
-            f"suspiciously low engagement. Check if unknown-engagement items are being "
-            f"let through instead of dropped. Current floor: "
-            f"X={config.get('quality_filters', {}).get('min_engagement', {}).get('x_likes', '?')} likes."
-        )
-
-    # Misleading content
-    mislead_count = len(bad_buckets.get("misleading", []))
-    if mislead_count >= 2:
-        proposals.append(
-            f"**Misleading content** — {mislead_count} items flagged as misleading/clickbait. "
-            f"Add the specific claim patterns from these examples to "
-            f"`spam_detection.claim_link_mismatch_patterns` in the quality filters."
-        )
-
-    # Topic-specific problems
-    if total_bad >= 5:
-        for topic, count in sorted(analysis["bad_topics"].items(), key=lambda x: -x[1]):
-            if topic == "unknown":
-                continue
-            topic_pct = count / total_bad * 100
-            if topic_pct >= 40 and count >= 3:
-                proposals.append(
-                    f"**Topic hotspot: {topic}** — {count}/{total_bad} bad items ({topic_pct:.0f}%) "
-                    f"come from this topic. Its search queries may be too broad, or "
-                    f"the topic attracts more noise. Consider narrowing the query or "
-                    f"raising the engagement floor for this topic specifically."
-                )
-                break  # One topic callout is enough
-
-    # --- Good-signal proposals ---
-
-    # Long-form preference
-    longform_count = len(good_buckets.get("long-form", []))
-    if longform_count >= 2:
-        current_bonus = config.get("quality_filters", {}).get("long_form_bonus", 15)
-        proposals.append(
-            f"**Long-form wins** — {longform_count}/{total_good} good items were long-form content. "
-            f"Current `long_form_bonus` is {current_bonus}. "
-            f"Consider increasing it to {current_bonus + 10} to surface more of these."
-        )
-
-    # Practical content preference
-    practical_count = len(good_buckets.get("practical", []))
-    if practical_count >= 2:
-        proposals.append(
-            f"**Practical content valued** — {practical_count}/{total_good} good items were "
-            f"tutorials, how-tos, or code examples. Consider adding bonus scoring for "
-            f"posts containing code blocks, 'tutorial', or linking to GitHub repos "
-            f"(non-self-promo)."
-        )
-
-    # Insider / announcement preference
-    insider_count = len(good_buckets.get("insider", []))
-    if insider_count >= 2:
-        proposals.append(
-            f"**Insider content valued** — {insider_count}/{total_good} good items were "
-            f"from team members or official accounts. The `priority_accounts` list "
-            f"and `lab_accounts` detection are working. Consider expanding the "
-            f"must-follow list if specific people keep surfacing as #good."
-        )
-
-    # Unclassified feedback (user provides tags but no reasons)
-    unclassified_bad = len(bad_buckets.get("unclassified", []))
-    unclassified_good = len(good_buckets.get("unclassified", []))
-    total_unclassified = unclassified_bad + unclassified_good
-    if total_unclassified >= 5 and total_unclassified / max(total_bad + total_good, 1) > 0.5:
-        proposals.append(
-            f"**Add reasons to feedback** — {total_unclassified}/{total_bad + total_good} "
-            f"tagged items have no reason text. Adding a short reason after the tag "
-            f"(e.g. `#bad it was a reply`) enables much better pattern detection."
-        )
-
-    return proposals
-
-
-def _render_feedback_insights(analysis: dict, proposals: list[str]) -> list[str]:
-    """Render the Feedback Insights section for the daily note."""
-    lines = [
-        "## Feedback Insights \U0001f50d",
-        "",
-    ]
-
-    total = analysis["total_good"] + analysis["total_bad"]
-    if total == 0:
-        lines.extend([
-            "> No feedback data yet. Tag items with `#good <reason>` or `#bad <reason>` to start the learning loop.",
-            "",
-        ])
-        return lines
-
-    # Summary line
-    lines.append(
-        f"> Analyzing **{total}** feedback entries from the last "
-        f"**{analysis['lookback_days']}** days "
-        f"({analysis['total_good']} good, {analysis['total_bad']} bad)."
-    )
-    lines.append("")
-
-    # Bad-signal breakdown
-    if analysis["total_bad"] > 0 and analysis["bad_buckets"]:
-        lines.append("**Why you tagged items #bad:**")
-        lines.append("")
-        for bucket_name, entries in sorted(
-            analysis["bad_buckets"].items(),
-            key=lambda x: -len(x[1])
-        ):
-            count = len(entries)
-            pct = count / analysis["total_bad"] * 100
-            lines.append(f"- **{bucket_name}**: {count} ({pct:.0f}%)")
-        lines.append("")
-
-    # Good-signal breakdown
-    if analysis["total_good"] > 0 and analysis["good_buckets"]:
-        lines.append("**Why you tagged items #good:**")
-        lines.append("")
-        for bucket_name, entries in sorted(
-            analysis["good_buckets"].items(),
-            key=lambda x: -len(x[1])
-        ):
-            count = len(entries)
-            pct = count / analysis["total_good"] * 100
-            lines.append(f"- **{bucket_name}**: {count} ({pct:.0f}%)")
-        lines.append("")
-
-    # Proposals
-    if proposals:
-        lines.append("### Proposals")
-        lines.append("")
-        for i, p in enumerate(proposals, 1):
-            lines.append(f"{i}. {p}")
-        lines.append("")
-    elif total >= 3:
-        lines.extend([
-            "> Patterns are forming but no strong signals yet. Keep tagging!",
-            "",
-        ])
-
-    return lines
 
 
 # ---------------------------------------------------------------------------
@@ -2370,7 +2088,8 @@ def _fetch_google_news_topic(query: str, max_items: int = 10, max_age_days: int 
         return []
 
 
-def _score_news_with_llm(items: list, api_key: str = "", model: str = "grok-4.5") -> list:
+def _score_news_with_llm(items: list, api_key: str = "", model: str = "grok-4.5",
+                         tracker: TokenTracker | None = None) -> list:
     """Use xAI API to score, deduplicate, and select top 10 news items for relevance."""
     if not items:
         return []
@@ -2432,7 +2151,11 @@ def _score_news_with_llm(items: list, api_key: str = "", model: str = "grok-4.5"
 
     # Fall back to xAI API
     try:
-        content, _usage = _call_xai_chat(api_key, model, prompt, max_tokens=2048, effort="low")
+        content, usage = _call_xai_chat(api_key, model, prompt, max_tokens=2048, effort="low")
+        # Record it — this path is billable and used to be invisible in the
+        # cost report, which understated every run where the CLI hiccuped.
+        if tracker and usage:
+            tracker.record("News/scoring", model, usage)
         scored = _parse_news_rankings(content)
         if scored:
             print(f"  [news] [xai-fallback] Scored {len(scored)} articles")
@@ -2449,39 +2172,87 @@ _GENERAL_AI_QUERIES = [
     "machine learning latest",
 ]
 
+# Outlets that clear the relevance bar on topic match but publish equity
+# commentary rather than anything an AI practitioner can use.
+_NEWS_SOURCE_DENYLIST = {
+    "yahoo finance", "seeking alpha", "simply wall st", "motley fool",
+    "zacks", "insider monkey", "benzinga", "investorplace", "barchart",
+    "24/7 wall st", "investing.com", "marketbeat", "tipranks",
+}
 
-def fetch_google_news(topics: list, config: dict, api_key: str = "", model: str = "grok-4.5") -> list:
+
+def _news_source_key(source: str) -> str:
+    """Normalize an RSS source name for denylist matching.
+
+    Feeds report the same outlet inconsistently ('The Motley Fool' vs
+    'Motley Fool', 'Yahoo Finance UK'), so strip a leading article and any
+    trailing region suffix before comparing.
+    """
+    s = re.sub(r"^(the|a)\s+", "", (source or "").strip().lower())
+    s = re.sub(r"\s+(uk|us|india|canada|australia)$", "", s)
+    return s.strip()
+
+
+def _news_title_strip_outlet(title: str) -> str:
+    """Drop the trailing ' - Outlet Name' that Google News appends to RSS titles."""
+    return re.sub(r"\s+-\s+[^-]+$", "", (title or "").strip())
+
+
+def fetch_google_news(topics: list, config: dict, api_key: str = "", model: str = "grok-4.5",
+                      tracker: TokenTracker | None = None,
+                      vault_only_urls: set | None = None,
+                      seen_titles: set | None = None) -> list:
     """Fetch Google News RSS across all topics, LLM-score, return top 10.
 
-    Only includes articles from the last 7 days.  If topic-specific queries
-    yield fewer than 10 scored items, backfills with general AI news.
+    Only includes articles from the last 7 days. If topic-specific queries yield
+    fewer than 10 scored items, backfills with general AI news.
+
+    Dedups against vault history. Without it the 7-day RSS window re-served the
+    same article every day — measured at 53% of the rendered section, with one
+    story running 7 days straight.
     """
     all_items = []
     seen_urls: set[str] = set()
+    seen_run_titles: set[str] = set()
+
+    vault_urls = vault_only_urls or set()
+    vault_titles = seen_titles or set()
+
+    def _accept(item: dict) -> bool:
+        url = item.get("url", "")
+        if not url or url in seen_urls or url in vault_urls:
+            return False
+        if _news_source_key(item.get("source", "")) in _NEWS_SOURCE_DENYLIST:
+            return False
+        title = _news_title_strip_outlet(item.get("title", ""))
+        key = title.lower()
+        if key in seen_run_titles:
+            return False
+        if vault.title_is_seen(title, vault_titles):
+            return False
+        seen_urls.add(url)
+        seen_run_titles.add(key)
+        return True
 
     for topic in topics:
         query = f"{topic.display_name} AI"
         items = _fetch_google_news_topic(query, max_items=10, max_age_days=7)
-        for item in items:
-            if item["url"] not in seen_urls:
-                seen_urls.add(item["url"])
-                all_items.append(item)
-        print(f"  [news/{topic.slug}] {len(items)} articles (last 7 days)")
+        kept = [it for it in items if _accept(it)]
+        all_items.extend(kept)
+        print(f"  [news/{topic.slug}] {len(items)} articles, {len(kept)} new (last 7 days)")
 
     if not all_items:
         # Nothing from topics — try general queries directly
         for gq in _GENERAL_AI_QUERIES:
             items = _fetch_google_news_topic(gq, max_items=10, max_age_days=7)
-            for item in items:
-                if item["url"] not in seen_urls:
-                    seen_urls.add(item["url"])
-                    all_items.append(item)
-            print(f"  [news/general] {len(items)} articles for '{gq}'")
+            kept = [it for it in items if _accept(it)]
+            all_items.extend(kept)
+            print(f"  [news/general] {len(items)} articles, {len(kept)} new for '{gq}'")
         if not all_items:
             return []
 
-    print(f"  [news] Scoring {len(all_items)} articles via xAI API...")
-    scored = _score_news_with_llm(all_items, api_key=api_key, model=model)
+    print(f"  [news] Scoring {len(all_items)} articles...")
+    scored = _score_news_with_llm(all_items, api_key=api_key, model=model, tracker=tracker)
 
     # Backfill: if fewer than 10 scored items, fetch general AI news
     if len(scored) < 10:
@@ -2490,12 +2261,10 @@ def fetch_google_news(topics: list, config: dict, api_key: str = "", model: str 
         backfill_items = []
         for gq in _GENERAL_AI_QUERIES:
             items = _fetch_google_news_topic(gq, max_items=10, max_age_days=7)
-            for item in items:
-                if item["url"] not in seen_urls:
-                    seen_urls.add(item["url"])
-                    backfill_items.append(item)
+            backfill_items.extend(it for it in items if _accept(it))
         if backfill_items:
-            extra_scored = _score_news_with_llm(backfill_items, api_key=api_key, model=model)
+            extra_scored = _score_news_with_llm(backfill_items, api_key=api_key,
+                                                model=model, tracker=tracker)
             scored.extend(extra_scored[:shortfall])
             print(f"  [news] Backfilled {min(len(extra_scored), shortfall)} general AI articles")
 
@@ -2511,8 +2280,6 @@ def render_daily_note(
     prominent_results: list = None,
     news_items: list = None,
     feedback_summary: dict = None,
-    feedback_analysis: dict = None,
-    feedback_proposals: list[str] = None,
     tracker: TokenTracker | None = None,
     health_warnings: list[str] = None,
 ) -> str:
@@ -2610,53 +2377,34 @@ def render_daily_note(
             "",
         ])
 
-    # Must Follow — every tweet from tracked accounts, grouped
-    if must_follow_results:
-        has_tweets = any(r["items"] for r in must_follow_results)
-        if has_tweets:
-            lines.extend([
-                "## Must Follow \U0001f4cc",
-                "",
-            ])
-            # Group by group label
-            groups = {}
-            for r in must_follow_results:
-                if not r["items"]:
-                    continue
-                grp = r["group"]
-                if grp not in groups:
-                    groups[grp] = []
-                groups[grp].append(r)
+    # (Must Follow section removed — lab posts render under Lab Pulse, which
+    #  already duplicated 56% of them. Non-lab tracked accounts arrive via
+    #  Prominent Voices.)
 
-            for group_name, accounts in groups.items():
-                lines.extend([f"### {group_name}", ""])
-                for acct in accounts:
-                    for item in acct["items"]:
-                        text = item.text if hasattr(item, 'text') else str(item)
-                        url = item.url if hasattr(item, 'url') else ""
-                        likes = 0
-                        if hasattr(item, 'engagement') and item.engagement and hasattr(item.engagement, 'likes'):
-                            likes = item.engagement.likes or 0
-                        date_str_item = ""
-                        if hasattr(item, 'date') and item.date:
-                            date_str_item = f" ({item.date})"
-                        text_display = _oneline(text, 280)
-                        lines.append(
-                            f"- @{acct['handle']}{date_str_item}: {text_display} "
-                            f"[{likes}\u2764\ufe0f]({url})"
-                        )
-                lines.append("")
-
+    # Lab Pulse — what the model providers said/shipped today
+    lab_pulse_summary = synthesis.get("lab_pulse_summary", "")
+    if lab_pulse_summary or lab_pulse_items:
+        lines.extend([
+            "## Lab Pulse \U0001f9ea",
+            "",
+        ])
+        if lab_pulse_summary:
+            lines.extend([lab_pulse_summary, ""])
+        for item, topic, source in lab_pulse_items[:10]:
+            likes = item.engagement.likes if item.engagement and item.engagement.likes else 0
+            lines.append(
+                f"- [{_oneline(item.text, 110)}]({item.url}) "
+                f"— @{item.author_handle} · {likes}❤"
+            )
+        lines.append("")
 
     # Prominent AI Voices — high-engagement tweets from top AI minds (broad search)
     if prominent_results:
         lines.extend([
-            "## Prominent Voices \U0001f399\ufe0f",
+            "## Prominent Voices \U0001f399️",
             "",
-            f"> High-engagement tweets ({config.get('prominent_ai_min_likes', 500)}+ likes) from prominent AI researchers, engineers, and executives.",
+            f"> {config.get('prominent_ai_min_likes', 500)}+ likes, from across the AI space.",
             "",
-            "| Author | Post | Likes | Link |",
-            "|--------|------|-------|------|",
         ])
         # Sort by likes descending for impact
         sorted_prom = sorted(
@@ -2666,9 +2414,9 @@ def render_daily_note(
         )
         for item in sorted_prom[:15]:
             likes = item.engagement.likes if item.engagement and item.engagement.likes else 0
-            text_short = _oneline(item.text, 280)
             lines.append(
-                f"| @{item.author_handle} | {text_short} | {likes}\u2764\ufe0f | [→]({item.url}) |"
+                f"- [{_oneline(item.text, 110)}]({item.url}) "
+                f"— @{item.author_handle} · {likes}❤"
             )
         lines.append("")
 
@@ -2688,66 +2436,19 @@ def render_daily_note(
             except ValueError:
                 pub_short = raw_date[:12]
             url = item.get("url", "")
-            also = item.get("also_covered_by", [])
-            also_str = f" *(also: {', '.join(also[:3])})*" if also else ""
-            lines.append(f"{i}. [{title}]({url}) — {source}, {pub_short}{also_str}")
+            lines.append(f"{i}. [{title}]({url}) — {source}, {pub_short}")
         lines.append("")
 
-    # Lab Pulse — what the model providers said/shipped today
-    lab_pulse_summary = synthesis.get("lab_pulse_summary", "")
-    if lab_pulse_summary or lab_pulse_items:
-        lines.extend([
-            "## Lab Pulse \U0001f9ea",
-            "",
-        ])
-        if lab_pulse_summary:
-            lines.extend([lab_pulse_summary, ""])
-        if lab_pulse_items:
-            lines.append("| Author | Post | Likes | Link |")
-            lines.append("|--------|------|-------|------|")
-            for item, topic, source in lab_pulse_items[:10]:
-                likes = item.engagement.likes if item.engagement and item.engagement.likes else 0
-                text_short = _oneline(item.text, 280)
-                lines.append(
-                    f"| @{item.author_handle} | {text_short} | {likes} | [→]({item.url}) |"
-                )
-            lines.append("")
+    # (Deep Dives section removed — every row already appeared in Research Feed
+    #  below. Long-form items now carry a 📖 badge there instead.)
 
-    # Deep Dives — long-form threads and articles
-    if deep_dives:
-        lines.extend([
-            "## Deep Dives \U0001f4d6",
-            "",
-        ])
-        for item, topic, source in deep_dives[:8]:
-            # Cap the link title — scan text can now run to 2000 chars
-            title = _oneline(item.text, 200)
-            lines.append(f"- [ ] [{title}]({item.url}) — @{item.author_handle} #{topic.slug}")
-        lines.append("")
+    # (Topic Summaries removed — the synthesis prompt no longer emits `topics[]`.
+    #  It never rendered: the prompt labelled source data with display names while
+    #  the render looked items up by slug, so the lookup missed for 155 days.)
 
-    # Unified research table: reading list + per-topic items merged
-    topic_synths = {t.get("slug", ""): t for t in synthesis.get("topics", [])}
-
-    # Topic synthesis summaries (compact)
-    has_any_synth = False
-    for tr in topic_results:
-        topic = tr["topic"]
-        synth = topic_synths.get(topic.slug, {})
-        headline = synth.get("headline", "")
-        key_points = synth.get("key_points", [])
-        if headline or key_points:
-            if not has_any_synth:
-                lines.extend(["---", "", "## Topic Summaries", ""])
-                has_any_synth = True
-            if headline:
-                lines.append(f"**{topic.display_name}** — {headline}")
-            else:
-                lines.append(f"**{topic.display_name}**")
-            for kp in key_points:
-                lines.append(f"- {kp}")
-            lines.append("")
-
-    # Build single merged table from all topic items, ranked by weighted score
+    # Research Feed — one merged list, ranked by weighted score.
+    # List rather than a table: tables overflow horizontally on mobile Obsidian.
+    deep_dive_urls = {getattr(i, "url", "") for i, _t, _s in deep_dives}
     reading_list = _build_reading_list(topic_results, config)
     if reading_list:
         lines.extend([
@@ -2755,16 +2456,12 @@ def render_daily_note(
             "",
             "## Research Feed",
             "",
-            "| # | Topic | Post | Author | Link |",
-            "|---|-------|------|--------|------|",
         ])
         for i, item in enumerate(reading_list, 1):
-            topic_tag = item['topic_slug']
-            title = _oneline(item['title'], 0)
-            author = item['summary']
-            url = item['url']
+            badge = "\U0001f4d6 " if item["url"] in deep_dive_urls else ""
             lines.append(
-                f"| {i} | {topic_tag} | {title} | {author} | [→]({url}) |"
+                f"{i}. {badge}[{item['title']}]({item['url']}) "
+                f"— {item['author']} #{item['topic_slug']}"
             )
         lines.append("")
     else:
@@ -2774,7 +2471,7 @@ def render_daily_note(
     lines.extend([
         "---",
         "",
-        "> **Tags:** `#keep` → promote to Library | `#good <reason>` / `#bad <reason>` → feedback loop",
+        "> **Tags:** `#good <reason>` / `#bad <reason>` → feedback loop",
         "",
     ])
 
@@ -2788,9 +2485,9 @@ def render_daily_note(
             "",
         ])
 
-    # Feedback Insights — pattern analysis + proposals from accumulated feedback
-    if feedback_analysis:
-        lines.extend(_render_feedback_insights(feedback_analysis, feedback_proposals or []))
+    # (Feedback Insights section removed — it rendered ~110 chars of boilerplate
+    #  every day. Feedback is still collected and still drives scoring; it just
+    #  no longer takes up space in the note.)
 
     # Efficiency recommendations — only render if there are actual issues
     if tracker and tracker.num_calls > 0:
@@ -2819,6 +2516,10 @@ def _build_reading_list(topic_results: list, config: dict) -> list:
             all_items.append({
                 "title": _oneline(item.text, 80),
                 "url": item.url,
+                # `author` is the actual handle. The old `summary` field held
+                # `why_relevant` — LLM justification prose — but rendered under a
+                # column headed "Author", which is what it looked like to readers.
+                "author": f"@{item.author_handle}",
                 "summary": item.why_relevant or f"@{item.author_handle}",
                 "topic_slug": topic.slug,
                 "score": item.score * topic.weight,
@@ -2894,7 +2595,6 @@ def main():
     parser = argparse.ArgumentParser(description="Daily research pipeline → Obsidian")
     parser.add_argument("--topic", help="Run only this topic slug (e.g., agents)")
     parser.add_argument("--dry-run", action="store_true", help="Fetch + score, print to stdout only")
-    parser.add_argument("--promote-only", action="store_true", help="Only run #keep → Library pass")
     parser.add_argument("--show-dedup", action="store_true", help="Show all seen URLs from vault")
     parser.add_argument("--costs", action="store_true", help="Show estimated token costs after run")
     parser.add_argument("--debug", action="store_true", help="Enable verbose debug logging")
@@ -2944,23 +2644,6 @@ def main():
             print(f"  {url}")
         return
 
-    # --promote-only: just run promotion pass and exit
-    if args.promote_only:
-        from vendor.last30days import env as l30_env
-        l30_config = l30_env.get_config()
-
-        promoted = promote.promote_items(
-            config, dry_run=args.dry_run,
-        )
-        if promoted:
-            print(f"Promoted {len(promoted)} items to Library:")
-            for item in promoted:
-                path = item.get('library_path', item['topic_slug'])
-                print(f"  [{item['topic_slug']}] {item['title']} -> {path}")
-        else:
-            print("No #keep items found to promote.")
-        return
-
     # Enable debug
     if args.debug:
         os.environ["LAST30DAYS_DEBUG"] = "1"
@@ -2969,13 +2652,12 @@ def main():
         print(f"[skip] Daily research note already exists for {today}. Use --force-rerun to run again intentionally.")
         return
 
-    # Run promote pass first (tag-to-library for previous dailies)
     from vendor.last30days import env as l30_env
     l30_config = l30_env.get_config()
 
-    promoted = promote.promote_items(config)
-    if promoted:
-        print(f"[promote] Moved {len(promoted)} items to Library")
+    # (#keep → Library promote pass removed. Research/Library is still written by
+    #  auto_capture_articles and still read for dedup — only the manual tag path
+    #  is gone.)
 
     # Process feedback tags (#good / #bad) from previous dailies
     print("[feedback] Scanning for #good / #bad tags...")
@@ -2986,10 +2668,6 @@ def main():
         print("[feedback] No new feedback tags found")
 
     # Analyze accumulated feedback and generate proposals
-    feedback_analysis = analyze_feedback(feedback_summary["data"], lookback_days=14)
-    feedback_proposals = generate_proposals(feedback_analysis, config)
-    if feedback_proposals:
-        print(f"[feedback] Generated {len(feedback_proposals)} improvement proposals")
 
     if not l30_config.get("XAI_API_KEY"):
         print("Error: No XAI_API_KEY found. Set it in ~/.config/last30days/.env", file=sys.stderr)
@@ -3087,10 +2765,11 @@ def main():
     must_follow_results = []
     mf_accounts = config.get("must_follow_accounts", [])
     if mf_accounts and l30_config.get("XAI_API_KEY"):
-        n_batch = sum(1 for a in mf_accounts if not a.get("solo"))
-        n_solo = sum(1 for a in mf_accounts if a.get("solo"))
-        n_calls = (1 if n_batch else 0) + n_solo
-        print(f"\n[must-follow] Scanning {len(mf_accounts)} accounts ({n_batch} batch + {n_solo} solo = {n_calls} calls) | last 24h ({mf_from_date} -> {to_date})...")
+        n_lab = sum(1 for a in mf_accounts
+                    if LAB_GROUP_MAP.get((a.get("group") or "").strip().lower()))
+        n_calls = -(-n_lab // MUST_FOLLOW_BATCH_SIZE)  # ceil
+        print(f"\n[must-follow] Scanning {n_lab} lab accounts of {len(mf_accounts)} tracked "
+              f"({n_calls} batched calls) | last 24h ({mf_from_date} -> {to_date})...")
         try:
             must_follow_results = run_must_follow_scan(
                 config, l30_config, mf_from_date, to_date,
@@ -3125,10 +2804,22 @@ def main():
         except Exception as e:
             print(f"[heal] Prominent AI scan failed ({e}) — continuing without it")
 
+    # Analysis (synthesis, news scoring) runs on Claude CLI; this model is only
+    # the fallback when the CLI is unavailable. Judgment work, so it gets the
+    # stronger model even though search is pinned to a cheaper one.
+    synth_model = config.get("xai_synthesis_model") or resolved_xai
+
     # Google News RSS — top 10 LLM-scored articles across all topics
     print(f"\n[news] Fetching Google News RSS for {len(all_topics)} topics...")
     try:
-        news_items = fetch_google_news(all_topics, config, api_key=l30_config["XAI_API_KEY"], model=resolved_xai)
+        news_items = fetch_google_news(
+            all_topics, config,
+            api_key=l30_config["XAI_API_KEY"],
+            model=synth_model,
+            tracker=tracker,
+            vault_only_urls=vault_only_urls,
+            seen_titles=seen_titles,
+        )
         print(f"[news] Selected {len(news_items)} articles")
     except Exception as e:
         news_items = []
@@ -3137,15 +2828,26 @@ def main():
     # Synthesize (single batched Claude CLI call — uses Max account, no API key)
     synthesis = {}
     total_items = sum(len(tr["x_items"]) for tr in topic_results)
-    if total_items > 0:
-        print(f"\n[synth] Synthesizing {total_items} items across {len(all_topics)} topics via xAI API ({resolved_xai})...")
+    # Gate on ALL sources, not just topic scans. Now that the briefing reads news,
+    # prominent voices and lab posts too, a quiet topic day is no longer a reason
+    # to skip it — that produced "No new research results today" on days with 10
+    # news items and 8 prominent voices sitting right below it.
+    lab_item_count = sum(len(r.get("items", [])) for r in (must_follow_results or []))
+    synth_inputs = total_items + len(news_items or []) + len(prominent_results or []) + lab_item_count
+    if synth_inputs > 0:
+        print(f"\n[synth] Synthesizing {synth_inputs} items "
+              f"({total_items} topic / {len(news_items or [])} news / "
+              f"{len(prominent_results or [])} prominent / {lab_item_count} lab)...")
         synthesis = synthesize_all(
             topic_results,
             from_date,
             to_date,
             tracker=tracker,
             api_key=l30_config["XAI_API_KEY"],
-            model=resolved_xai,
+            model=synth_model,
+            news_items=news_items,
+            prominent_results=prominent_results,
+            must_follow_results=must_follow_results,
         )
         if synthesis.get("briefing"):
             print(f"[synth] Briefing: {synthesis['briefing'][:120]}...")
@@ -3162,8 +2864,6 @@ def main():
         prominent_results=prominent_results,
         news_items=news_items,
         feedback_summary=feedback_summary,
-        feedback_analysis=feedback_analysis,
-        feedback_proposals=feedback_proposals,
         tracker=tracker,
         health_warnings=health_warnings,
     )
@@ -3208,8 +2908,6 @@ def main():
                         prominent_results=prominent_results,
                         news_items=news_items,
                         feedback_summary=feedback_summary,
-                        feedback_analysis=feedback_analysis,
-                        feedback_proposals=feedback_proposals,
                         tracker=tracker,
                         health_warnings=health_warnings,
                     )
