@@ -51,7 +51,24 @@
     "Mira Marotti": "Mira Murati",
     "listener grows": "Wissner-Gross",
     "DeLong": "Delangue",
-    "Vero Rubin": "Vera Rubin"
+    "Vero Rubin": "Vera Rubin",
+
+    "clock code": "Claude Code",
+    "Cloud Code": "Claude Code",
+    "LLN Ops": "LLM Ops",
+    "LLN ops": "LLM Ops",
+    "LandGraph": "LangGraph",
+    "Land Graph": "LangGraph",
+    "LandChain": "LangChain",
+    "Land Chain": "LangChain",
+    "Pydentic": "Pydantic",
+    "landfuse": "Langfuse",
+    "land fuse": "Langfuse",
+    "landsmith": "LangSmith",
+    "land smith": "LangSmith",
+    "Superbase": "Supabase",
+    "the same Altman": "Sam Altman",
+    "same Altman was fired": "Sam Altman was fired"
   },
 
   "_risky_not_applied": {
@@ -59,6 +76,10 @@
     "England / Ingline": "Almost certainly 'Inkling' (the Thinking Machines model), but 'England' appeared legitimately in the same episode (football talk).",
     "Gwen": "Likely 'Qwen' (Alibaba model), but Gwen is a real name.",
     "WICO / Weco": "Startup name uncertain from audio alone; verify against the source before adding.",
-    "Mythos / mythos": "May be a model codename or the ordinary noun."
-  }
+    "Mythos / mythos": "May be a model codename or the ordinary noun.",
+    "Automanus": "Heard in a CRM list next to Salesforce and HubSpot. Could be Attio, Monday.com, or a genuine product name — do not guess.",
+    "John / Sean": "In the @polydao agent-harness clip the speaker self-identifies as 'John' once and is called 'Sean' twice. One of the two is an ASR error; the correct name is unresolved, so quotes are attributed to the opening self-introduction."
+  },
+
+  "_initial_prompt_caveat": "initial_prompt is a single global string currently tuned to the Moonshots/Diamandis show. It mis-primes unrelated content: an AI-agent-architecture clip produced 'LandGraph', 'Pydentic', 'landfuse' and 'clock code' because none of those terms were primed. If non-podcast clips become common, split initial_prompt per show/source rather than growing one list."
 }
