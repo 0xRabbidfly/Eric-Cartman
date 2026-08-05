@@ -327,7 +327,10 @@ created: YYYY-MM-DDTHH:MM:SSZ
 
 # <Episode Title>
 
-**Show:** [[Podcasts/<Show Name>]] · 📅 YYYY-MM-DD · ⏱ HH:MM:SS
+**Show:** [[<parent folder>/<Show Name>]] · 📅 YYYY-MM-DD · ⏱ HH:MM:SS
+<!-- parent folder is `podcasts_folder` in podcast mode and `clips_folder`
+     in URL mode — it must match where the note is written or the link
+     dead-ends. Passed to generate_note() as `parent_folder`. -->
 
 ---
 

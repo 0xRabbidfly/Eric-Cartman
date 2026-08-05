@@ -92,7 +92,7 @@ created: {created}
 
 # {episode_title}
 
-**Show:** [[Podcasts/{show_name}]] · 📅 {published} · ⏱ {duration}
+**Show:** [[{parent_folder}/{show_name}]] · 📅 {published} · ⏱ {duration}
 
 ---
 
@@ -155,8 +155,15 @@ def generate_note(
     episode: Dict[str, str],
     transcript_text: str,
     ai_summary: Optional[Dict[str, Any]] = None,
+    parent_folder: str = "Podcasts",
 ) -> str:
-    """Generate a structured Obsidian note from episode metadata + transcript."""
+    """Generate a structured Obsidian note from episode metadata + transcript.
+
+    ``parent_folder`` is the vault folder the note will actually be written to
+    ("Podcasts" for RSS episodes, the clips folder for ``--url`` mode).  The
+    show backlink is built from it, so it must match the real write path or the
+    link dead-ends.
+    """
     show_name = episode.get("show_name", "Unknown Show")
     show_slug = _slugify(show_name)
     episode_title = episode.get("title", "Untitled Episode")
@@ -185,12 +192,13 @@ def generate_note(
         deep_dives = "_Add your OpenAI API key to `.env` as `OPENAI_API_KEY` to auto-generate deep dives._"
         actionables = "- [ ] Review transcript and extract action items"
         quotes = "> _Add your OpenAI API key to `.env` as `OPENAI_API_KEY` to auto-extract key quotes._"
-        backlinks = f"[[Podcasts/{show_name}]]"
+        backlinks = f"[[{parent_folder}/{show_name}]]"
 
     return NOTE_TEMPLATE.format(
         show_slug=show_slug,
         extra_tags=extra_tags,
         show_name=show_name,
+        parent_folder=parent_folder,
         show_name_yaml=_yaml_str(show_name),
         episode_title=episode_title,
         episode_title_yaml=_yaml_str(episode_title),

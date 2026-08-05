@@ -470,18 +470,23 @@ def step_generate_notes(
     config: Dict[str, Any],
     work_dir: Path,
     use_ai: bool = True,
+    parent_folder: Optional[str] = None,
 ) -> List[Tuple[Episode, str, str, Path]]:
     """Generate Obsidian notes from transcripts.
 
     Checks .work/summaries/<name>.json for a pre-generated summary first
     (written by the orchestrator/AI).  Falls back to template-only if absent.
 
+    ``parent_folder`` overrides the vault folder used for both the reported
+    path and the in-note show backlink — URL mode passes its clips folder so
+    the backlink matches where the note is actually written.
+
     Returns: [(Episode, note_content, vault_path, transcript_path), ...]
     """
     print("\n=== Step 4: Generate Notes ===\n")
     results = []
     skipped_no_ai = []
-    podcasts_folder = config.get("podcasts_folder", "Podcasts")
+    podcasts_folder = parent_folder or config.get("podcasts_folder", "Podcasts")
     summaries_dir = work_dir / "summaries"
     summaries_dir.mkdir(parents=True, exist_ok=True)
 
@@ -527,6 +532,7 @@ def step_generate_notes(
                 episode=ep.to_dict(),
                 transcript_text=transcript_text,
                 ai_summary=ai_summary,
+                parent_folder=podcasts_folder,
             )
 
             # Vault path
@@ -1017,18 +1023,20 @@ def run_url_pipeline(args: argparse.Namespace) -> None:
         return
 
     # --- Step 3: Generate note ---
+    clips_folder = args.clips_folder or config.get("clips_folder", "Clips")
+
     notes = step_generate_notes(
         transcribed=transcribed,
         config=config,
         work_dir=work_dir,
         use_ai=not args.no_ai,
+        parent_folder=clips_folder,
     )
     if not notes:
         print("\n[error] Note generation failed.")
         return
 
     # --- Step 4: Inject source_url into frontmatter + write to vault ---
-    clips_folder = args.clips_folder or config.get("clips_folder", "Clips")
     safe_show = re.sub(r'[<>:"/\\|?*]', '', source_label).strip()
 
     if args.dry_run:
