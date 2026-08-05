@@ -24,6 +24,7 @@ import io
 import json
 import os
 import re
+import subprocess
 import sys
 import time
 from datetime import datetime, timedelta, timezone
@@ -1278,7 +1279,70 @@ def run_pipeline(args: argparse.Namespace) -> None:
     stats = manifest.stats()
     print(f"  Episodes written this run: {total_written}")
     print(f"  Manifest totals: {stats['shows']} shows, {stats['completed']} completed, {stats['failed']} failed")
+
+    if not args.dry_run:
+        commit_manifest(
+            manifest,
+            reason=f"{total_written} episode(s) written",
+            enabled=not args.no_commit_manifest,
+        )
     print()
+
+
+# ---------------------------------------------------------------------------
+# Manifest version control
+# ---------------------------------------------------------------------------
+
+def commit_manifest(manifest, reason: str, enabled: bool = True) -> None:
+    """Commit the manifest after a run that changed it.
+
+    The manifest is checked-in state that every successful run mutates, so
+    without this it permanently dirties the working tree and its diff gets
+    swept into whatever unrelated commit comes next.
+
+    Deliberately narrow:
+      * commits ONLY the manifest pathspec, so a staged index and any other
+        working-tree edits are left exactly as they were;
+      * never pushes — a scheduled run must not publish anything on its own;
+      * never raises. A git problem is not a reason to fail a run whose real
+        work (transcribe, write to vault) already succeeded.
+    """
+    if not enabled:
+        return
+
+    path = Path(manifest.path).resolve()
+    repo = path.parent
+    try:
+        inside = subprocess.run(
+            ["git", "rev-parse", "--is-inside-work-tree"],
+            cwd=repo, capture_output=True, text=True, timeout=15,
+        )
+        if inside.returncode != 0 or inside.stdout.strip() != "true":
+            return  # not a git checkout — nothing to do
+
+        # --quiet exits 1 when the path differs from HEAD.
+        changed = subprocess.run(
+            ["git", "diff", "--quiet", "HEAD", "--", str(path)],
+            cwd=repo, capture_output=True, text=True, timeout=15,
+        )
+        if changed.returncode == 0:
+            return  # manifest identical to HEAD — nothing to commit
+
+        # Pathspec form: commits the working-tree version of this one file and
+        # leaves the index untouched.
+        done = subprocess.run(
+            ["git", "commit", "--only", "--no-verify",
+             "-m", f"chore(podcast-to-obsidian): update manifest — {reason}",
+             "--", str(path)],
+            cwd=repo, capture_output=True, text=True, timeout=60,
+        )
+        if done.returncode == 0:
+            print(f"  [git] Manifest committed ({reason})")
+        else:
+            detail = (done.stderr or done.stdout).strip().splitlines()
+            print(f"  [git] Manifest not committed: {detail[0] if detail else 'unknown error'}")
+    except Exception as e:
+        print(f"  [git] Manifest commit skipped: {e}")
 
 
 # ---------------------------------------------------------------------------
@@ -1310,6 +1374,8 @@ def cmd_add_show(args: argparse.Namespace) -> None:
     # Register in manifest
     manifest.add_show(show_id=show_id, name=name, rss_url=rss_url)
     manifest.save()
+    commit_manifest(manifest, reason=f"add show {name}",
+                    enabled=not args.no_commit_manifest)
 
     # Verify feed
     try:
@@ -1355,6 +1421,8 @@ def cmd_seed_watermarks(args: argparse.Namespace) -> None:
 
     if seeded:
         manifest.save()
+        commit_manifest(manifest, reason=f"seed {len(seeded)} watermark(s)",
+                        enabled=not args.no_commit_manifest)
         print(f"\n✓ Seeded {len(seeded)} shows. Episodes at or before each watermark "
               f"will no longer be auto-detected.")
     else:
@@ -1405,6 +1473,8 @@ def cmd_set_watermark(args: argparse.Namespace) -> None:
 
     if changed:
         manifest.save()
+        commit_manifest(manifest, reason=f"set watermark {target} on {changed} show(s)",
+                        enabled=not args.no_commit_manifest)
         print(f"\n✓ Watermark set on {changed} shows. Episodes published on or before "
               f"{target} will no longer be auto-detected.")
         print("  Backfill manually with: --backfill-since YYYY-MM-DD [--show \"Name\"]")
@@ -1454,6 +1524,8 @@ def cmd_retry_failed(args: argparse.Namespace) -> None:
             if ep["episode_id"] in show["episodes"]:
                 del show["episodes"][ep["episode_id"]]
     manifest.save()
+    commit_manifest(manifest, reason=f"reset {len(failed)} failed episode(s)",
+                    enabled=not args.no_commit_manifest)
 
     print("\nFailed episodes reset. Run the pipeline to retry them.")
 
@@ -1513,6 +1585,9 @@ def main() -> None:
                         help="Retry failed episodes")
     parser.add_argument("--keep-audio", action="store_true",
                         help="Don't purge .mp3 files after successful run")
+    parser.add_argument("--no-commit-manifest", action="store_true",
+                        help="Don't git-commit the manifest after a run that changed it "
+                             "(default: commit it, so runs stop dirtying the working tree)")
     parser.add_argument("--backfill-since", type=str, default=None, metavar="YYYY-MM-DD",
                         help="Manual backfill: also consider episodes published on or "
                              "after this date, ignoring the release watermark. "

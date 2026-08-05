@@ -547,7 +547,7 @@ research this: https://x.com/...
 
 **Podcast → transcript → structured Obsidian note, fully local.**
 
-Detects new episodes via Spotify MCP, downloads audio from RSS enclosures, transcribes locally with faster-whisper, and writes structured notes with summaries, key ideas, quotes, and backlinks. A manifest tracks processed episodes so nothing gets transcribed twice. A `--url` mode transcribes any single X/YouTube/Vimeo video via yt-dlp, no manifest or RSS involved.
+Detects new episodes via Spotify MCP, downloads audio from RSS enclosures, transcribes locally with faster-whisper, and writes structured notes with summaries, key ideas, quotes, and backlinks. A manifest tracks processed episodes so nothing gets transcribed twice, and the pipeline git-commits that manifest itself so runs don't leave the working tree dirty (`--no-commit-manifest` opts out). A `--url` mode transcribes any single X/YouTube/Vimeo video via yt-dlp, no manifest or RSS involved.
 
 **Use When:**
 - User says "podcast to obsidian", "check new episodes", "transcribe podcast"

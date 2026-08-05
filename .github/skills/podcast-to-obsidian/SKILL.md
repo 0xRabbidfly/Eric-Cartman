@@ -290,6 +290,13 @@ Persistent JSON file tracking all processed episodes.
 - If not → process and append
 - Manifest updated ONLY after successful Obsidian write
 - Supports manual RSS-only entries (no Spotify ID required)
+- **The pipeline git-commits the manifest itself** when a run changes it.
+  Without this, every successful run permanently dirties the working tree and
+  its diff gets swept into whatever unrelated commit lands next. The commit is
+  deliberately narrow: it uses a pathspec so a staged index and other
+  working-tree edits are left alone, it **never pushes**, and a git failure is
+  logged rather than failing a run whose real work already succeeded. Opt out
+  with `--no-commit-manifest`
 - Each show carries `latest_published`, the release watermark (see **New Releases Only**). It advances only on `completed`, never on `failed`, and never moves backwards
 
 ## Obsidian Note Structure
@@ -515,6 +522,7 @@ Restart VS Code after configuration.
 | `--model <size>` | Sets whisper model (base/large-v3) | — |
 | `--retry-failed` | Re-processes failed episodes | Already-completed episodes |
 | `--keep-audio` | Keeps .mp3 files after successful run | Cleanup step |
+| `--no-commit-manifest` | Leaves the manifest uncommitted after a run | The automatic manifest commit |
 | `--set-watermark <date\|today>` | Forces the release watermark, then exits | Everything else — it's a maintenance command |
 | `--seed-watermarks` | Seeds watermarks from newest completed episode, then exits | Everything else |
 | `--backfill-since <date>` | Manual backfill from a date floor | The watermark gate |
