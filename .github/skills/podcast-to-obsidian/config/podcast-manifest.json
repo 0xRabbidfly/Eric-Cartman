@@ -191,9 +191,18 @@
           "note_path": "Podcasts/Limitless/2026-07-31 - THIS WEEK IN AI Leopold's Fund Collapses, Nvidia Backs Ilya, Slowing Down AI.md",
           "processed_at": "2026-08-01T06:08:32.576880+00:00",
           "status": "completed"
+        },
+        "7414d925-409b-41c1-a03f-5c2f62f4c94f": {
+          "title": "Situational Awareness: The Full Story of Leopold's Collapse",
+          "published": "2026-08-04",
+          "audio_url": "https://media.transistor.fm/6df38699/0ca014d0.mp3",
+          "transcript_path": "Podcasts/Limitless/transcripts/2026-08-04 - Situational Awareness The Full Story of Leopold's Collapse.md",
+          "note_path": "Podcasts/Limitless/2026-08-04 - Situational Awareness The Full Story of Leopold's Collapse.md",
+          "processed_at": "2026-08-05T06:10:00.630636+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-07-31"
+      "latest_published": "2026-08-04"
     },
     "the-pomp-podcast": {
       "name": "The Pomp Podcast",
@@ -370,9 +379,18 @@
           "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-07-29 - Dario vs Jensen on Open Weights, OpenAI & Anthropic in DC, Xi Exports AI to Global South  EP 275.md",
           "processed_at": "2026-07-30T06:22:16.266730+00:00",
           "status": "completed"
+        },
+        "aaf52de0-8f83-11f1-860e-6b185f9c4171": {
+          "title": "Michael Kratsios on the New Golden Age of American Science | EP #276",
+          "published": "2026-08-04",
+          "audio_url": "https://traffic.megaphone.fm/DVVTS2167508195.mp3",
+          "transcript_path": "Podcasts/Moonshots with Peter Diamandis/transcripts/2026-08-04 - Michael Kratsios on the New Golden Age of American Science  EP 276.md",
+          "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-08-04 - Michael Kratsios on the New Golden Age of American Science  EP 276.md",
+          "processed_at": "2026-08-05T06:20:21.280032+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-07-29"
+      "latest_published": "2026-08-04"
     },
     "dwarkesh-podcast": {
       "name": "Dwarkesh Podcast",
@@ -504,9 +522,18 @@
           "note_path": "Podcasts/No Priors Artificial Intelligence  Technology  Startups/2026-07-23 - Building an Autonomous Delivery Experience with DoorDash Co-Founders Andy Fang and Stanley Tang.md",
           "processed_at": "2026-07-24T06:33:20.186294+00:00",
           "status": "completed"
+        },
+        "db17d1d8-8c79-11f1-9e05-6bb27aab1f6f": {
+          "title": "Building an Autonomous Enterprise for Real-World Services with Netic Founder Melisa Tokmak",
+          "published": "2026-07-31",
+          "audio_url": "https://traffic.megaphone.fm/PDP6533459307.mp3",
+          "transcript_path": "Podcasts/No Priors Artificial Intelligence  Technology  Startups/transcripts/2026-07-31 - Building an Autonomous Enterprise for Real-World Services with Netic Founder Melisa Tokmak.md",
+          "note_path": "Podcasts/No Priors Artificial Intelligence  Technology  Startups/2026-07-31 - Building an Autonomous Enterprise for Real-World Services with Netic Founder Melisa Tokmak.md",
+          "processed_at": "2026-08-02T06:11:08.725560+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-07-23"
+      "latest_published": "2026-07-31"
     },
     "cgi-conversations": {
       "name": "CGI Conversations",
@@ -620,9 +647,27 @@
           "note_path": "Podcasts/The a16z Podcast/2026-07-28 - Fei-Fei Li on Spatial Intelligence and Robotics.md",
           "processed_at": "2026-07-28T11:04:11.171413+00:00",
           "status": "completed"
+        },
+        "bcd869cb-a80e-475f-a044-7191309af9da": {
+          "title": "Marc Andreessen and Chris Dixon: What’s at Stake in Crypto Regulation",
+          "published": "2026-08-01",
+          "audio_url": "https://mgln.ai/e/1344/afp-848985-injected.calisto.simplecastaudio.com/3f86df7b-51c6-4101-88a2-550dba782de8/episodes/6a1f350c-90b5-47b5-bfa5-20e411df9ecd/audio/128/default.mp3?aid=rss_feed&awCollectionId=3f86df7b-51c6-4101-88a2-550dba782de8&awEpisodeId=6a1f350c-90b5-47b5-bfa5-20e411df9ecd&feed=JGE3yC0V",
+          "transcript_path": "Podcasts/The a16z Podcast/transcripts/2026-08-01 - Marc Andreessen and Chris Dixon What’s at Stake in Crypto Regulation.md",
+          "note_path": "Podcasts/The a16z Podcast/2026-08-01 - Marc Andreessen and Chris Dixon What’s at Stake in Crypto Regulation.md",
+          "processed_at": "2026-08-02T06:19:31.549657+00:00",
+          "status": "completed"
+        },
+        "7ef41fcf-3127-4992-ad89-e3ea46e3ee78": {
+          "title": "Ruby Thelot on Internet Culture, AI, and the Future of Taste",
+          "published": "2026-08-02",
+          "audio_url": "https://mgln.ai/e/1344/afp-848985-injected.calisto.simplecastaudio.com/3f86df7b-51c6-4101-88a2-550dba782de8/episodes/03b39caa-2d5d-4ade-815f-7d9df9231c3f/audio/128/default.mp3?aid=rss_feed&awCollectionId=3f86df7b-51c6-4101-88a2-550dba782de8&awEpisodeId=03b39caa-2d5d-4ade-815f-7d9df9231c3f&feed=JGE3yC0V",
+          "transcript_path": "Podcasts/The a16z Podcast/transcripts/2026-08-02 - Ruby Thelot on Internet Culture, AI, and the Future of Taste.md",
+          "note_path": "Podcasts/The a16z Podcast/2026-08-02 - Ruby Thelot on Internet Culture, AI, and the Future of Taste.md",
+          "processed_at": "2026-08-03T06:11:03.716666+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-07-28"
+      "latest_published": "2026-08-02"
     },
     "the-joe-rogan-experience": {
       "name": "The Joe Rogan Experience",
