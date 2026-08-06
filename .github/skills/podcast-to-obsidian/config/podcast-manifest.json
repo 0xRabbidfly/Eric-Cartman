@@ -665,9 +665,27 @@
           "note_path": "Podcasts/The a16z Podcast/2026-08-02 - Ruby Thelot on Internet Culture, AI, and the Future of Taste.md",
           "processed_at": "2026-08-03T06:11:03.716666+00:00",
           "status": "completed"
+        },
+        "6ca3b211-07cb-478b-8ae6-95e3c06d26ef": {
+          "title": "Three Startups Reinventing Critical Infrastructure",
+          "published": "2026-08-05",
+          "audio_url": "https://mgln.ai/e/1344/afp-848985-injected.calisto.simplecastaudio.com/3f86df7b-51c6-4101-88a2-550dba782de8/episodes/15117efd-a4fa-490c-a098-726d0b74ba74/audio/128/default.mp3?aid=rss_feed&awCollectionId=3f86df7b-51c6-4101-88a2-550dba782de8&awEpisodeId=15117efd-a4fa-490c-a098-726d0b74ba74&feed=JGE3yC0V",
+          "transcript_path": "Podcasts/The a16z Podcast/transcripts/2026-08-05 - Three Startups Reinventing Critical Infrastructure.md",
+          "note_path": "Podcasts/The a16z Podcast/2026-08-05 - Three Startups Reinventing Critical Infrastructure.md",
+          "processed_at": "2026-08-06T06:27:27.961280+00:00",
+          "status": "completed"
+        },
+        "e4ebaa91-7ab6-4995-ba37-8a1dccf036d1": {
+          "title": "OpenAI's Joshua Achiam: Did We Already Reach AGI?",
+          "published": "2026-08-04",
+          "audio_url": "https://mgln.ai/e/1344/afp-848985-injected.calisto.simplecastaudio.com/3f86df7b-51c6-4101-88a2-550dba782de8/episodes/877d13fc-d13f-4690-9859-6605a2f2b404/audio/128/default.mp3?aid=rss_feed&awCollectionId=3f86df7b-51c6-4101-88a2-550dba782de8&awEpisodeId=877d13fc-d13f-4690-9859-6605a2f2b404&feed=JGE3yC0V",
+          "transcript_path": "Podcasts/The a16z Podcast/transcripts/2026-08-04 - OpenAI's Joshua Achiam Did We Already Reach AGI.md",
+          "note_path": "Podcasts/The a16z Podcast/2026-08-04 - OpenAI's Joshua Achiam Did We Already Reach AGI.md",
+          "processed_at": "2026-08-06T06:27:28.000025+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-08-02"
+      "latest_published": "2026-08-05"
     },
     "the-joe-rogan-experience": {
       "name": "The Joe Rogan Experience",
