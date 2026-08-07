@@ -200,9 +200,18 @@
           "note_path": "Podcasts/Limitless/2026-08-04 - Situational Awareness The Full Story of Leopold's Collapse.md",
           "processed_at": "2026-08-05T06:10:00.630636+00:00",
           "status": "completed"
+        },
+        "412d3115-a25d-4614-ae53-bc9e56d3ded6": {
+          "title": "Making Sense of SpaceX's First Earnings Report",
+          "published": "2026-08-06",
+          "audio_url": "https://media.transistor.fm/d192113c/e8c03f8e.mp3",
+          "transcript_path": "Podcasts/Limitless/transcripts/2026-08-06 - Making Sense of SpaceX's First Earnings Report.md",
+          "note_path": "Podcasts/Limitless/2026-08-06 - Making Sense of SpaceX's First Earnings Report.md",
+          "processed_at": "2026-08-07T06:12:21.202603+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-08-04"
+      "latest_published": "2026-08-06"
     },
     "the-pomp-podcast": {
       "name": "The Pomp Podcast",
@@ -531,9 +540,18 @@
           "note_path": "Podcasts/No Priors Artificial Intelligence  Technology  Startups/2026-07-31 - Building an Autonomous Enterprise for Real-World Services with Netic Founder Melisa Tokmak.md",
           "processed_at": "2026-08-02T06:11:08.725560+00:00",
           "status": "completed"
+        },
+        "17b96322-915c-11f1-aad7-53d361bc6996": {
+          "title": "Chasing Trillion-Dollar Companies, Founder Ambition, Token Budgets, and Regulatory Capture with Sarah & Elad",
+          "published": "2026-08-06",
+          "audio_url": "https://traffic.megaphone.fm/PDP3190127956.mp3",
+          "transcript_path": "Podcasts/No Priors Artificial Intelligence  Technology  Startups/transcripts/2026-08-06 - Chasing Trillion-Dollar Companies, Founder Ambition, Token Budgets, and Regulatory Capture with Sarah & Elad.md",
+          "note_path": "Podcasts/No Priors Artificial Intelligence  Technology  Startups/2026-08-06 - Chasing Trillion-Dollar Companies, Founder Ambition, Token Budgets, and Regulatory Capture with Sarah & Elad.md",
+          "processed_at": "2026-08-07T06:19:02.110709+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-07-31"
+      "latest_published": "2026-08-06"
     },
     "cgi-conversations": {
       "name": "CGI Conversations",
