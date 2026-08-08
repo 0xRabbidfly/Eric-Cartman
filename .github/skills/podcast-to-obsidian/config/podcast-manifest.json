@@ -209,9 +209,18 @@
           "note_path": "Podcasts/Limitless/2026-08-06 - Making Sense of SpaceX's First Earnings Report.md",
           "processed_at": "2026-08-07T06:12:21.202603+00:00",
           "status": "completed"
+        },
+        "34fd1052-49e1-40bc-a383-53ad9b1a0d2a": {
+          "title": "THIS WEEK IN AI: Google's Big Change, AI Keeps Breaking Out, OpenAI vs Apple",
+          "published": "2026-08-07",
+          "audio_url": "https://media.transistor.fm/44f15439/d3f8e38c.mp3",
+          "transcript_path": "Podcasts/Limitless/transcripts/2026-08-07 - THIS WEEK IN AI Google's Big Change, AI Keeps Breaking Out, OpenAI vs Apple.md",
+          "note_path": "Podcasts/Limitless/2026-08-07 - THIS WEEK IN AI Google's Big Change, AI Keeps Breaking Out, OpenAI vs Apple.md",
+          "processed_at": "2026-08-08T06:12:48.949595+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-08-06"
+      "latest_published": "2026-08-07"
     },
     "the-pomp-podcast": {
       "name": "The Pomp Podcast",
@@ -701,9 +710,18 @@
           "note_path": "Podcasts/The a16z Podcast/2026-08-04 - OpenAI's Joshua Achiam Did We Already Reach AGI.md",
           "processed_at": "2026-08-06T06:27:28.000025+00:00",
           "status": "completed"
+        },
+        "90707990-5bff-46f5-a7eb-bf041ec1b5f3": {
+          "title": "The Reality of AI-Powered Cyberattacks | Truffle Security & Socket",
+          "published": "2026-08-07",
+          "audio_url": "https://mgln.ai/e/1344/afp-848985-injected.calisto.simplecastaudio.com/3f86df7b-51c6-4101-88a2-550dba782de8/episodes/87281352-dde8-4d86-8aca-b732656f750d/audio/128/default.mp3?aid=rss_feed&awCollectionId=3f86df7b-51c6-4101-88a2-550dba782de8&awEpisodeId=87281352-dde8-4d86-8aca-b732656f750d&feed=JGE3yC0V",
+          "transcript_path": "Podcasts/The a16z Podcast/transcripts/2026-08-07 - The Reality of AI-Powered Cyberattacks  Truffle Security & Socket.md",
+          "note_path": "Podcasts/The a16z Podcast/2026-08-07 - The Reality of AI-Powered Cyberattacks  Truffle Security & Socket.md",
+          "processed_at": "2026-08-08T06:17:05.860230+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-08-05"
+      "latest_published": "2026-08-07"
     },
     "the-joe-rogan-experience": {
       "name": "The Joe Rogan Experience",
