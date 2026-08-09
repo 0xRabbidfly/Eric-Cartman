@@ -1300,8 +1300,12 @@ app.post('/api/cancel', auth, (req, res) => {
 // Latest Notes — scan Obsidian vault for recently modified notes
 // ---------------------------------------------------------------------------
 const VAULT_PATH = path.join('C:', 'Users', 'nuno_', 'Documents', 'Obsidian Vault');
+const LIBRARY_REL = 'Research/Library';
+const PODCASTS_REL = 'Podcasts';
 
-app.get('/api/recent-notes', auth, (req, res) => {
+// Scan the vault once and return every note, newest first. Shared by all three
+// note endpoints — they differ only in how they group the result.
+function scanVaultNotes() {
   const scanDirs = [
     path.join(VAULT_PATH, 'Research', 'Library'),
     path.join(VAULT_PATH, 'Podcasts'),
@@ -1318,7 +1322,7 @@ app.get('/api/recent-notes', auth, (req, res) => {
       const fullPath = path.join(dir, entry.name);
       if (entry.isDirectory()) {
         const lowerName = entry.name.toLowerCase();
-        if (lowerName === 'transcripts' || entry.name === '00 MOC') continue;
+        if (lowerName === 'transcripts' || lowerName === 'attachments' || entry.name === '00 MOC') continue;
         scanRecursive(fullPath);
       } else if (entry.isFile() && entry.name.endsWith('.md')) {
         try {
@@ -1334,22 +1338,132 @@ app.get('/api/recent-notes', auth, (req, res) => {
           // Obsidian deep links: vault name unencoded, file path with / preserved but spaces encoded
           const encodedFile = filePath.split('/').map(s => encodeURIComponent(s)).join('/');
           const obsidianUrl = 'obsidian://open?vault=Rabbidfly Vault&file=' + encodedFile;
-          notes.push({ title, path: relativePath, modified: stat.mtime.toISOString(), folder, obsidianUrl });
+
+          // Topic = first folder below Research/Library (e.g. "01 Agent Harnesses
+          // & Architecture"); for podcasts it's the show folder.
+          let section = 'Other';
+          let topic = folder;
+          if (relativePath.startsWith(LIBRARY_REL + '/')) {
+            section = 'Library';
+            const rest = relativePath.slice(LIBRARY_REL.length + 1).split('/');
+            topic = rest.length > 1 ? rest[0] : 'Library root';
+          } else if (relativePath.startsWith(PODCASTS_REL + '/')) {
+            section = 'Podcasts';
+            const rest = relativePath.slice(PODCASTS_REL.length + 1).split('/');
+            topic = rest.length > 1 ? rest[0] : 'Podcasts root';
+          }
+          const topicMatch = /^(\d{2})\s+(.*)$/.exec(topic);
+          const topicKey = topicMatch ? topicMatch[1] : topic;
+          const topicLabel = topicMatch ? topicMatch[2] : topic;
+
+          notes.push({
+            title, path: relativePath, modified: stat.mtime.toISOString(),
+            folder, section, topic, topicKey, topicLabel, obsidianUrl,
+          });
         } catch {}
       }
     }
   }
 
-  for (const dir of scanDirs) {
-    scanRecursive(dir);
+  for (const dir of scanDirs) scanRecursive(dir);
+  notes.sort((a, b) => new Date(b.modified) - new Date(a.modified));
+  return notes;
+}
+
+// `?days=N` trims to the last N days. days=0 (or `all`) disables the window.
+function applyDaysWindow(notes, daysParam, fallback) {
+  const raw = daysParam === undefined ? fallback : daysParam;
+  if (raw === 'all') return notes;
+  const days = parseInt(raw, 10);
+  if (!Number.isFinite(days) || days <= 0) return notes;
+  const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+  return notes.filter(n => new Date(n.modified).getTime() >= cutoff);
+}
+
+// ISO-8601 week number (weeks start Monday, week 1 contains the first Thursday)
+function isoWeekOf(date) {
+  const t = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = t.getUTCDay() || 7;          // Sunday = 7, not 0
+  t.setUTCDate(t.getUTCDate() + 4 - dayNum);  // shift to the week's Thursday
+  const yearStart = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
+  const week = Math.ceil(((t - yearStart) / 86400000 + 1) / 7);
+  return { year: t.getUTCFullYear(), week };
+}
+
+function weekBounds(date) {
+  const dayNum = date.getDay() || 7;
+  const start = new Date(date.getFullYear(), date.getMonth(), date.getDate() - (dayNum - 1));
+  const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6, 23, 59, 59);
+  return { start, end };
+}
+
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const fmtDay = d => `${MONTHS[d.getMonth()]} ${d.getDate()}`;
+
+app.get('/api/recent-notes', auth, (req, res) => {
+  res.json(applyDaysWindow(scanVaultNotes(), req.query.days, 7));
+});
+
+// Notes grouped by Library subfolder / podcast show — the "By Topic" reader view
+app.get('/api/notes-by-topic', auth, (req, res) => {
+  const notes = applyDaysWindow(scanVaultNotes(), req.query.days, 'all');
+  const byTopic = new Map();
+
+  for (const note of notes) {
+    let group = byTopic.get(note.topic);
+    if (!group) {
+      group = {
+        topic: note.topic,
+        topicKey: note.topicKey,
+        topicLabel: note.topicLabel,
+        section: note.section,
+        count: 0,
+        latest: note.modified,   // notes are newest-first, so the first wins
+        notes: [],
+      };
+      byTopic.set(note.topic, group);
+    }
+    group.count++;
+    group.notes.push(note);
   }
 
-  notes.sort((a, b) => new Date(b.modified) - new Date(a.modified));
-  // Filter to last 7 days by default, override with ?days=N query param
-  const days = parseInt(req.query.days) || 7;
-  const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-  const filtered = notes.filter(n => new Date(n.modified) >= cutoff);
-  res.json(filtered);
+  const groups = [...byTopic.values()].sort((a, b) =>
+    a.section === b.section ? b.count - a.count : (a.section === 'Library' ? -1 : 1));
+
+  res.json({ total: notes.length, groups });
+});
+
+// Notes grouped by ISO week — the "By Date" reader view
+app.get('/api/notes-by-week', auth, (req, res) => {
+  const notes = applyDaysWindow(scanVaultNotes(), req.query.days, 'all');
+  const byWeek = new Map();
+
+  for (const note of notes) {
+    const date = new Date(note.modified);
+    const { year, week } = isoWeekOf(date);
+    const id = `${year}-W${String(week).padStart(2, '0')}`;
+    let group = byWeek.get(id);
+    if (!group) {
+      const { start, end } = weekBounds(date);
+      group = {
+        week: id,
+        weekNumber: week,
+        year,
+        label: `W${week}`,
+        range: `${fmtDay(start)} – ${fmtDay(end)}`,
+        start: start.toISOString(),
+        end: end.toISOString(),
+        count: 0,
+        notes: [],
+      };
+      byWeek.set(id, group);
+    }
+    group.count++;
+    group.notes.push(note);
+  }
+
+  const groups = [...byWeek.values()].sort((a, b) => new Date(b.start) - new Date(a.start));
+  res.json({ total: notes.length, groups });
 });
 
 // ---------------------------------------------------------------------------

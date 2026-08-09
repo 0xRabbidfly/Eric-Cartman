@@ -654,6 +654,7 @@ Lightweight Express.js server that auto-discovers every skill from `.github/skil
 |---------|-------------|
 | Skill Discovery | Auto-scans all SKILL.md files at startup |
 | Chat Interface | Natural language, Claude picks the right skill |
+| Research Reader | Browse the vault by topic, by ISO week, or last 7 days — with search and Obsidian deep links |
 | Skill Picker | Pin a specific skill to scope your messages |
 | Queue | Requests serialize — safe for concurrent use |
 | Auth | Bearer token via `API_SECRET` (keyring, env var, or `.env`) |

@@ -6,7 +6,7 @@ user-invocable: true
 disable-model-invocation: false
 metadata:
   author: 0xrabbidfly
-  version: "1.1.0"
+  version: "1.2.0"
 ---
 
 # Remote Skills API
@@ -107,6 +107,13 @@ Phone (Safari/Chrome)
 | POST | `/api/invoke/:skill` | Direct skill invocation (`{args}`) |
 | POST | `/api/admin/restart` | Restart the Node service so `start-service.bat` relaunches it |
 | POST | `/api/cancel` | Kill running Claude process |
+| GET | `/api/recent-notes` | Vault notes touched in the last 7 days (`?days=N`, `?days=all`) |
+| GET | `/api/notes-by-topic` | Notes grouped by Library subfolder / podcast show |
+| GET | `/api/notes-by-week` | Notes grouped by ISO week, newest first |
+
+All three note endpoints scan `Research/Library` and `Podcasts` in the vault
+(skipping `00 MOC`, `attachments`, `transcripts`, show index files, and stubs
+under 1 KB) and return Obsidian deep links (`obsidian://open?vault=Rabbidfly Vault…`).
 
 ## Environment Variables
 
@@ -141,14 +148,25 @@ Phone (Safari/Chrome)
 1. Install Tailscale on your phone
 2. Open `http://<pc-tailscale-ip>:3838?token=YOUR_API_SECRET` once on a new device (optional)
 3. Token is saved to localStorage — bookmark the page
-4. Use 🔑 in the header anytime to update token on that device
+4. Use **Settings → API token** anytime to update the token on that device
 5. Add to Home Screen for app-like experience (iOS: Share → Add to Home Screen)
 
 ## UI Features
 
+Four bottom tabs — **Chat**, **Reader**, **Skills**, **Settings** — replace the
+old crowded header icon bar.
+
 - **Chat interface**: Natural language, rendered with Markdown
-- **Skill picker**: Bottom drawer with all discovered skills
+- **Research Reader**: Three tab-selectable views over the vault
+  - *By Topic* — Library subfolders and podcast shows as colour-coded cards with
+    note counts; tap to drill into that folder's notes
+  - *By Date* — collapsible ISO-week groups (W32 · Aug 3 – Aug 9), newest open
+  - *Recent* — flat feed of the last 7 days
+  - Search box filters across every note regardless of the active view;
+    pull-to-refresh re-scans the vault; every note deep-links into Obsidian mobile
+- **Skills tab**: Full skill list with All / 🌐 Public / 🔒 Private filters
 - **Skill chip**: Pin a skill to scope your messages
+- **Settings tab**: API token, server restart, cancel request, live server status
 - **Status indicator**: Green = ready, yellow = processing
 - **Cancel button**: Kill a long-running request
 - **Live streaming feedback**: Shows phases (starting, thinking, tool use, writing) while Claude runs

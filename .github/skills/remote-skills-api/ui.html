@@ -465,31 +465,155 @@
     .toast.error { border-color: rgba(239,68,68,.55); }
     .toast.success { border-color: rgba(34,197,94,.55); }
 
-    /* ── Notes drawer ── */
-    .notes-drawer-overlay {
-      position: fixed; inset: 0;
-      background: rgba(0,0,0,.6);
-      z-index: 50;
-      opacity: 0; pointer-events: none;
-      transition: opacity .25s;
+    /* ── Views + bottom tab bar ── */
+    #views { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+    .view { display: none; flex: 1; min-height: 0; flex-direction: column; }
+    .view.active { display: flex; }
+    .view-scroll {
+      flex: 1; min-height: 0; overflow-y: auto;
+      padding: 0 12px 20px;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior-y: contain;
     }
-    .notes-drawer-overlay.open { opacity: 1; pointer-events: auto; }
-    .notes-drawer {
-      position: fixed; bottom: 0; left: 0; right: 0;
-      background: var(--surface);
-      border-radius: 20px 20px 0 0;
-      max-height: 75dvh;
-      z-index: 51;
-      transform: translateY(100%);
-      transition: transform .3s ease;
-      display: flex; flex-direction: column;
-    }
-    .notes-drawer.open { transform: translateY(0); }
-    .notes-drawer-header {
+    .view-head {
       display: flex; align-items: center; justify-content: space-between;
-      padding: 14px 20px 10px;
+      gap: 10px; padding: 14px 16px 8px; flex-shrink: 0;
     }
-    .notes-drawer-title { font-weight: 700; font-size: 16px; }
+    .view-title { font-weight: 700; font-size: 16px; }
+
+    .tabbar {
+      display: flex; flex-shrink: 0;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+    .tab-btn {
+      flex: 1; background: none; border: none; color: var(--text-dim);
+      padding: 8px 4px 10px;
+      display: flex; flex-direction: column; align-items: center; gap: 3px;
+      font-size: 10px; font-weight: 600; letter-spacing: .02em;
+      cursor: pointer; touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+      transition: color .15s;
+    }
+    .tab-btn .tab-icon { font-size: 19px; line-height: 1; }
+    .tab-btn.active { color: var(--accent); }
+    .tab-btn.active .tab-icon { transform: translateY(-1px); }
+
+    /* ── Research reader ── */
+    .lib-search-wrap { padding: 0 16px 8px; flex-shrink: 0; }
+    .lib-search {
+      width: 100%; padding: 9px 12px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text); font-size: 14px;
+      outline: none;
+    }
+    .lib-search:focus { border-color: var(--accent); }
+    .seg {
+      display: flex; gap: 4px; margin: 0 16px 10px;
+      background: var(--surface2);
+      border-radius: 10px; padding: 3px;
+      flex-shrink: 0;
+    }
+    .seg-btn {
+      flex: 1; background: none; border: none;
+      color: var(--text-dim); font-size: 13px; font-weight: 600;
+      padding: 7px 4px; border-radius: 8px;
+      cursor: pointer; touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+      transition: background .15s, color .15s;
+    }
+    .seg-btn.active { background: var(--accent); color: #fff; }
+
+    .topic-grid {
+      display: grid; grid-template-columns: repeat(2, 1fr);
+      gap: 10px; padding-top: 4px;
+    }
+    .topic-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-left: 3px solid var(--topic-color, var(--accent));
+      border-radius: 12px; padding: 12px;
+      cursor: pointer; touch-action: manipulation;
+      transition: background .15s, transform .1s;
+      display: flex; flex-direction: column; gap: 6px; min-height: 84px;
+    }
+    .topic-card:active { background: var(--surface2); transform: scale(.985); }
+    .topic-card-name {
+      font-size: 13px; font-weight: 600; line-height: 1.3;
+      display: -webkit-box; -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .topic-card-meta {
+      margin-top: auto;
+      font-size: 11px; color: var(--text-dim);
+      display: flex; align-items: center; justify-content: space-between; gap: 6px;
+    }
+    .topic-count {
+      background: var(--topic-color, var(--accent)); color: #fff;
+      border-radius: 999px; padding: 1px 7px;
+      font-size: 10px; font-weight: 700;
+    }
+    .section-label {
+      font-size: 11px; font-weight: 700; letter-spacing: .06em;
+      text-transform: uppercase; color: var(--text-dim);
+      padding: 16px 4px 6px;
+    }
+
+    .week-group { margin-bottom: 6px; }
+    .week-head {
+      display: flex; align-items: center; gap: 10px;
+      padding: 12px; border-radius: 12px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      cursor: pointer; touch-action: manipulation;
+    }
+    .week-head:active { background: var(--surface2); }
+    .week-chevron { color: var(--text-dim); font-size: 12px; transition: transform .2s; }
+    .week-group.open .week-chevron { transform: rotate(90deg); }
+    .week-label { font-weight: 700; font-size: 14px; }
+    .week-range { font-size: 11px; color: var(--text-dim); }
+    .week-count {
+      margin-left: auto; background: var(--surface2);
+      color: var(--text-dim); border-radius: 999px;
+      padding: 2px 8px; font-size: 11px; font-weight: 700;
+    }
+    .week-body { display: none; padding: 4px 0 8px; }
+    .week-group.open .week-body { display: block; }
+
+    .lib-back {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: none; border: none; color: var(--accent);
+      font-size: 13px; font-weight: 600; padding: 4px 0;
+      cursor: pointer; touch-action: manipulation;
+    }
+    .lib-empty {
+      text-align: center; color: var(--text-dim);
+      padding: 32px 16px; font-size: 14px;
+    }
+
+    /* ── Settings ── */
+    .settings-row {
+      display: flex; align-items: center; gap: 12px;
+      padding: 14px 12px; border-radius: 12px;
+      background: var(--surface); border: 1px solid var(--border);
+      margin-bottom: 8px; cursor: pointer; touch-action: manipulation;
+    }
+    .settings-row:active { background: var(--surface2); }
+    .settings-row .s-icon {
+      width: 34px; height: 34px; border-radius: 9px;
+      background: var(--surface2);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; flex-shrink: 0;
+    }
+    .settings-row .s-label { font-size: 14px; font-weight: 600; }
+    .settings-row .s-desc { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+    .settings-info {
+      font-size: 12px; color: var(--text-dim);
+      padding: 10px 12px; line-height: 1.6;
+    }
+
     .notes-refresh-btn {
       background: var(--surface2);
       border: 1px solid var(--border);
@@ -503,14 +627,6 @@
     }
     .notes-refresh-btn:active { background: var(--accent-soft); }
     .notes-refresh-btn.spinning { animation: spin .8s linear infinite; }
-    .notes-list {
-      overflow-y: auto; padding: 0 12px 20px;
-      -webkit-overflow-scrolling: touch;
-    }
-    .notes-list .notes-empty {
-      text-align: center; color: var(--text-dim);
-      padding: 32px 16px; font-size: 14px;
-    }
     .note-item {
       display: flex; align-items: flex-start; gap: 12px;
       padding: 12px;
@@ -560,36 +676,10 @@
   <div class="header">
     <div class="header-left">
       <div id="statusDot" class="status-dot"></div>
-      <h1>Skills</h1>
+      <h1 id="headerTitle">Eric Cartman</h1>
     </div>
     <div class="header-actions">
-      <button class="icon-btn" onclick="openDrawer('oss')" title="Public Skills">🌐</button>
-      <button class="icon-btn" onclick="openDrawer('personal')" title="Private Skills">🔒</button>
-      <button class="icon-btn" onclick="openNotesDrawer()" title="Latest Notes">📚</button>
-      <button class="icon-btn" onclick="promptSetToken()" title="Set API Token">🔑</button>
-      <button class="icon-btn" onclick="restartServer()" title="Restart Server">🔁</button>
-      <button class="icon-btn" onclick="cancelRequest()" title="Cancel">✕</button>
-    </div>
-  </div>
-
-  <!-- Skills Drawer -->
-  <div id="drawerOverlay" class="drawer-overlay" onclick="closeDrawer()"></div>
-  <div id="drawer" class="drawer">
-    <div class="drawer-handle"></div>
-    <div id="drawerTitle" class="drawer-title">Available Skills</div>
-    <div id="skillList" class="skill-list"></div>
-  </div>
-
-  <!-- Notes Drawer -->
-  <div id="notesOverlay" class="notes-drawer-overlay" onclick="closeNotesDrawer()"></div>
-  <div id="notesDrawer" class="notes-drawer">
-    <div class="drawer-handle"></div>
-    <div class="notes-drawer-header">
-      <div class="notes-drawer-title">📚 Latest Notes</div>
-      <button id="notesRefreshBtn" class="notes-refresh-btn" onclick="fetchRecentNotes()" title="Refresh">🔄</button>
-    </div>
-    <div id="notesList" class="notes-list">
-      <div class="notes-empty">Loading...</div>
+      <button class="icon-btn" onclick="cancelRequest()" title="Cancel running request">✕</button>
     </div>
   </div>
 
@@ -607,34 +697,118 @@
 
   <div id="toast" class="toast"></div>
 
-  <!-- Chat messages -->
-  <div id="chatArea" class="chat-area">
-    <div id="welcome" class="welcome">
-      <div class="welcome-icon">
-        <img src="https://upload.wikimedia.org/wikipedia/en/7/77/EricCartman.png" alt="Eric Cartman">
+  <div id="views">
+
+    <!-- ── Chat ── -->
+    <div id="viewChat" class="view active">
+      <div id="chatArea" class="chat-area">
+        <div id="welcome" class="welcome">
+          <div class="welcome-icon">
+            <img src="https://upload.wikimedia.org/wikipedia/en/7/77/EricCartman.png" alt="Eric Cartman">
+          </div>
+          <h2>Eric Cartman Skills</h2>
+          <p>Chat naturally or pick a skill. Running on your PC — accessible over Tailscale.</p>
+          <div id="quickActions" class="quick-actions"></div>
+        </div>
       </div>
-      <h2>Eric Cartman Skills</h2>
-      <p>Chat naturally or pick a skill. Running on your PC — accessible over Tailscale.</p>
-      <div id="quickActions" class="quick-actions"></div>
+
+      <div class="input-bar">
+        <div id="skillChip" class="skill-chip" onclick="clearSkill()">
+          <span id="chipName"></span><span class="x">✕</span>
+        </div>
+        <div class="input-row">
+          <div class="input-wrap">
+            <textarea id="msgInput" rows="1" placeholder="Ask anything…"
+                      oninput="autoGrow(this)" onkeydown="handleKey(event)"></textarea>
+            <button class="send-btn" id="sendBtn" onclick="sendMessage()" disabled>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
+
+    <!-- ── Research Reader ── -->
+    <div id="viewLibrary" class="view">
+      <div class="view-head">
+        <div class="view-title">📚 Research Reader</div>
+        <button id="libRefreshBtn" class="notes-refresh-btn" onclick="loadLibrary(true)" title="Refresh">🔄</button>
+      </div>
+      <div class="lib-search-wrap">
+        <input id="libSearch" class="lib-search" type="search" placeholder="Search all notes…"
+               autocomplete="off" oninput="onLibSearch()">
+      </div>
+      <div class="seg">
+        <button class="seg-btn active" data-lib="topic" onclick="setLibView('topic')">By Topic</button>
+        <button class="seg-btn" data-lib="week" onclick="setLibView('week')">By Date</button>
+        <button class="seg-btn" data-lib="recent" onclick="setLibView('recent')">Recent</button>
+      </div>
+      <div id="libScroll" class="view-scroll">
+        <div class="lib-empty">Loading…</div>
+      </div>
+    </div>
+
+    <!-- ── Skills ── -->
+    <div id="viewSkills" class="view">
+      <div class="view-head">
+        <div class="view-title">⚡ Skills</div>
+        <button class="notes-refresh-btn" onclick="loadSkills()" title="Reload skills">🔄</button>
+      </div>
+      <div class="seg">
+        <button class="seg-btn active" data-src="all" onclick="setSkillFilter(null)">All</button>
+        <button class="seg-btn" data-src="oss" onclick="setSkillFilter('oss')">🌐 Public</button>
+        <button class="seg-btn" data-src="personal" onclick="setSkillFilter('personal')">🔒 Private</button>
+      </div>
+      <div id="skillList" class="view-scroll skill-list"></div>
+    </div>
+
+    <!-- ── Settings ── -->
+    <div id="viewSettings" class="view">
+      <div class="view-head"><div class="view-title">⚙️ Settings</div></div>
+      <div class="view-scroll">
+        <div class="settings-row" onclick="promptSetToken()">
+          <div class="s-icon">🔑</div>
+          <div>
+            <div class="s-label">API token</div>
+            <div class="s-desc" id="tokenStatus">—</div>
+          </div>
+        </div>
+        <div class="settings-row" onclick="restartServer()">
+          <div class="s-icon">🔁</div>
+          <div>
+            <div class="s-label">Restart server</div>
+            <div class="s-desc">Reload server.js and pick up code changes</div>
+          </div>
+        </div>
+        <div class="settings-row" onclick="cancelRequest()">
+          <div class="s-icon">✕</div>
+          <div>
+            <div class="s-label">Cancel running request</div>
+            <div class="s-desc">Kill the active Claude process</div>
+          </div>
+        </div>
+        <div class="settings-info" id="settingsInfo">Loading status…</div>
+      </div>
+    </div>
+
   </div>
 
-  <!-- Input bar -->
-  <div class="input-bar">
-    <div id="skillChip" class="skill-chip" onclick="clearSkill()">
-      <span id="chipName"></span><span class="x">✕</span>
-    </div>
-    <div class="input-row">
-      <div class="input-wrap">
-        <textarea id="msgInput" rows="1" placeholder="Ask anything…" 
-                  oninput="autoGrow(this)" onkeydown="handleKey(event)"></textarea>
-        <button class="send-btn" id="sendBtn" onclick="sendMessage()" disabled>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
-          </svg>
-        </button>
-      </div>
-    </div>
+  <!-- ── Bottom tab bar ── -->
+  <div class="tabbar">
+    <button class="tab-btn active" data-tab="chat" onclick="setTab('chat')">
+      <span class="tab-icon">💬</span>Chat
+    </button>
+    <button class="tab-btn" data-tab="library" onclick="setTab('library')">
+      <span class="tab-icon">📚</span>Reader
+    </button>
+    <button class="tab-btn" data-tab="skills" onclick="setTab('skills')">
+      <span class="tab-icon">⚡</span>Skills
+    </button>
+    <button class="tab-btn" data-tab="settings" onclick="setTab('settings')">
+      <span class="tab-icon">⚙️</span>Settings
+    </button>
   </div>
 
   <!-- Markdown renderer (loaded from CDN since marked is lightweight) -->
@@ -885,19 +1059,40 @@
       renderSkillList();
     }
 
-    // ── Drawer ──
+    // ── Tabs ──
+    // The tab bar already shows which section is active, so the header title
+    // stays fixed — each view carries its own heading.
+    let currentTab = 'chat';
+
+    function setTab(tab) {
+      currentTab = tab;
+      const viewId = { chat: 'viewChat', library: 'viewLibrary', skills: 'viewSkills', settings: 'viewSettings' }[tab];
+      document.querySelectorAll('#views .view').forEach(v => v.classList.toggle('active', v.id === viewId));
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+      if (tab === 'library' && !libData.loaded) loadLibrary();
+      if (tab === 'settings') refreshSettings();
+      if (tab === 'chat') {
+        const area = document.getElementById('chatArea');
+        area.scrollTop = area.scrollHeight;
+      }
+    }
+
+    // ── Skills tab ──
     let drawerFilter = null;
-    function openDrawer(filter) {
+    function setSkillFilter(filter) {
       drawerFilter = filter || null;
-      const title = filter === 'personal' ? '🔒 Private Skills' : filter === 'oss' ? '🌐 Public Skills' : 'Available Skills';
-      document.getElementById('drawerTitle').textContent = title;
+      document.querySelectorAll('#viewSkills .seg-btn').forEach(b =>
+        b.classList.toggle('active', b.dataset.src === (filter || 'all')));
       renderSkillList();
-      document.getElementById('drawer').classList.add('open');
-      document.getElementById('drawerOverlay').classList.add('open');
+    }
+    // Kept so existing call sites (quick actions, selectSkill) keep working:
+    // opening "the drawer" now means switching to the Skills tab.
+    function openDrawer(filter) {
+      setSkillFilter(filter);
+      setTab('skills');
     }
     function closeDrawer() {
-      document.getElementById('drawer').classList.remove('open');
-      document.getElementById('drawerOverlay').classList.remove('open');
+      if (currentTab === 'skills') setTab('chat');
     }
 
     // ── Chat ──
@@ -1366,13 +1561,29 @@
       }
     }
 
-    // ── Notes drawer ──
-    let notesCache = null;
+    // ── Research Reader ──
+    const libData = { loaded: false, topics: [], weeks: [], recent: [], all: [] };
+    let libView = 'topic';
+    let libSearchTerm = '';
+    let libDrillTopic = null;   // when set, the Topic view shows one topic's notes
+    let libSearchTimer = null;
+
+    const TOPIC_COLORS = ['#6366f1','#f59e0b','#22c55e','#ef4444','#06b6d4','#a855f7',
+                          '#ec4899','#84cc16','#f97316','#14b8a6','#8b5cf6','#eab308'];
+    function topicColor(key) {
+      let h = 0;
+      for (const ch of String(key)) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+      return TOPIC_COLORS[h % TOPIC_COLORS.length];
+    }
 
     function formatNoteTitle(filename) {
       return filename
-        .replace(/-/g, ' ')
-        .replace(/\b\w/g, c => c.toUpperCase());
+        .replace(/^\d{4}-\d{2}-\d{2}\s*-\s*/, '')   // podcast notes lead with the episode date
+        .replace(/[-_]/g, ' ')
+        // Capitalise word starts only — \b\w would also hit the letter after an
+        // apostrophe and render "Google's" as "Google'S".
+        .replace(/(^|\s)(\w)/g, (_, sep, ch) => sep + ch.toUpperCase())
+        .trim();
     }
 
     function formatRelativeTime(isoDate) {
@@ -1392,50 +1603,204 @@
       return new Date(isoDate).toLocaleDateString();
     }
 
-    function renderNotesList(notes) {
-      const el = document.getElementById('notesList');
-      if (!notes || notes.length === 0) {
-        el.innerHTML = '<div class="notes-empty">No recent notes found.</div>';
-        return;
-      }
-      el.innerHTML = notes.map(n => `
+    function noteItemHtml(n, color) {
+      const badge = n.topicLabel || n.folder;
+      const dot = color || topicColor(n.topicKey || n.folder);
+      return `
         <a class="note-item" href="${escHtml(n.obsidianUrl)}" target="_blank" rel="noopener">
-          <div class="note-icon">📄</div>
+          <div class="note-icon" style="color:${dot}">${n.section === 'Podcasts' ? '🎙️' : '📄'}</div>
           <div class="note-info">
             <div class="note-title">${escHtml(formatNoteTitle(n.title))}</div>
             <div class="note-meta">
-              <span class="note-folder-badge">${escHtml(n.folder)}</span>
+              <span class="note-folder-badge" style="border-left:3px solid ${dot}">${escHtml(badge)}</span>
               <span class="note-time">${formatRelativeTime(n.modified)}</span>
             </div>
           </div>
-        </a>
-      `).join('');
+        </a>`;
     }
 
-    async function fetchRecentNotes() {
-      const btn = document.getElementById('notesRefreshBtn');
-      btn.classList.add('spinning');
+    function renderNotesList(notes, emptyMsg) {
+      if (!notes || notes.length === 0) {
+        return `<div class="lib-empty">${escHtml(emptyMsg || 'No notes found.')}</div>`;
+      }
+      return notes.map(n => noteItemHtml(n)).join('');
+    }
+
+    async function loadLibrary(force) {
+      const btn = document.getElementById('libRefreshBtn');
+      const el = document.getElementById('libScroll');
+      if (btn) btn.classList.add('spinning');
+      if (force || !libData.loaded) el.innerHTML = '<div class="lib-empty">Loading…</div>';
       try {
-        const notes = await api('/api/recent-notes');
-        notesCache = notes;
-        renderNotesList(notes);
+        const [byTopic, byWeek, recent] = await Promise.all([
+          api('/api/notes-by-topic'),
+          api('/api/notes-by-week'),
+          api('/api/recent-notes'),
+        ]);
+        libData.topics = byTopic.groups || [];
+        libData.weeks = byWeek.groups || [];
+        libData.recent = recent || [];
+        libData.all = libData.topics.flatMap(g => g.notes);
+        libData.loaded = true;
+        renderLibrary();
       } catch (e) {
-        const el = document.getElementById('notesList');
-        el.innerHTML = `<div class="notes-empty">Failed to load notes: ${escHtml(e.message)}</div>`;
+        el.innerHTML = `<div class="lib-empty">Failed to load notes: ${escHtml(e.message)}</div>`;
       } finally {
-        btn.classList.remove('spinning');
+        if (btn) btn.classList.remove('spinning');
       }
     }
 
-    function openNotesDrawer() {
-      document.getElementById('notesDrawer').classList.add('open');
-      document.getElementById('notesOverlay').classList.add('open');
-      if (!notesCache) fetchRecentNotes();
+    function setLibView(view) {
+      libView = view;
+      libDrillTopic = null;
+      document.querySelectorAll('#viewLibrary .seg-btn').forEach(b =>
+        b.classList.toggle('active', b.dataset.lib === view));
+      document.getElementById('libScroll').scrollTop = 0;
+      renderLibrary();
     }
 
-    function closeNotesDrawer() {
-      document.getElementById('notesDrawer').classList.remove('open');
-      document.getElementById('notesOverlay').classList.remove('open');
+    function onLibSearch() {
+      clearTimeout(libSearchTimer);
+      libSearchTimer = setTimeout(() => {
+        libSearchTerm = document.getElementById('libSearch').value.trim().toLowerCase();
+        renderLibrary();
+      }, 120);
+    }
+
+    function openTopic(topic) {
+      libDrillTopic = topic;
+      document.getElementById('libScroll').scrollTop = 0;
+      renderLibrary();
+    }
+    function openTopicIdx(idx) {
+      const g = libData.topics[idx];
+      openTopic(g ? g.topic : null);
+    }
+
+    function toggleWeek(id) {
+      const el = document.getElementById(id);
+      if (el) el.classList.toggle('open');
+    }
+
+    function renderLibrary() {
+      const el = document.getElementById('libScroll');
+      if (!libData.loaded) return;
+
+      // Search cuts across every view — one flat result list
+      if (libSearchTerm) {
+        const hits = libData.all.filter(n =>
+          n.title.toLowerCase().includes(libSearchTerm) ||
+          (n.topicLabel || '').toLowerCase().includes(libSearchTerm) ||
+          n.path.toLowerCase().includes(libSearchTerm));
+        el.innerHTML =
+          `<div class="section-label">${hits.length} match${hits.length === 1 ? '' : 'es'}</div>` +
+          renderNotesList(hits, `Nothing matches “${libSearchTerm}”.`);
+        return;
+      }
+
+      if (libView === 'recent') {
+        el.innerHTML =
+          '<div class="section-label">Last 7 days</div>' +
+          renderNotesList(libData.recent, 'No notes touched in the last 7 days.');
+        return;
+      }
+
+      if (libView === 'week') {
+        if (!libData.weeks.length) { el.innerHTML = '<div class="lib-empty">No notes found.</div>'; return; }
+        el.innerHTML = libData.weeks.map((w, i) => `
+          <div class="week-group ${i === 0 ? 'open' : ''}" id="week-${escHtml(w.week)}">
+            <div class="week-head" onclick="toggleWeek('week-${escHtml(w.week)}')">
+              <span class="week-chevron">▶</span>
+              <div>
+                <div class="week-label">${escHtml(w.label)} · ${w.year}</div>
+                <div class="week-range">${escHtml(w.range)}</div>
+              </div>
+              <span class="week-count">${w.count}</span>
+            </div>
+            <div class="week-body">${renderNotesList(w.notes)}</div>
+          </div>
+        `).join('');
+        return;
+      }
+
+      // ── By Topic ──
+      if (libDrillTopic) {
+        const group = libData.topics.find(g => g.topic === libDrillTopic);
+        if (!group) { libDrillTopic = null; renderLibrary(); return; }
+        const color = topicColor(group.topicKey);
+        el.innerHTML =
+          `<button class="lib-back" onclick="openTopic(null)">← All topics</button>
+           <div class="section-label" style="color:${color}">${escHtml(group.topicLabel)} · ${group.count} notes</div>` +
+          renderNotesList(group.notes, null);
+        return;
+      }
+
+      const sections = [
+        { name: 'Library', groups: libData.topics.filter(g => g.section === 'Library') },
+        { name: 'Podcasts', groups: libData.topics.filter(g => g.section === 'Podcasts') },
+        { name: 'Other', groups: libData.topics.filter(g => g.section !== 'Library' && g.section !== 'Podcasts') },
+      ].filter(s => s.groups.length);
+
+      if (!sections.length) { el.innerHTML = '<div class="lib-empty">No notes found.</div>'; return; }
+
+      // Cards address their group by index — topic names contain & and quotes
+      el.innerHTML = sections.map(section => `
+        <div class="section-label">${escHtml(section.name)} · ${section.groups.length} folders</div>
+        <div class="topic-grid">
+          ${section.groups.map(g => {
+            const color = topicColor(g.topicKey);
+            const idx = libData.topics.indexOf(g);
+            return `
+            <div class="topic-card" style="--topic-color:${color}" onclick="openTopicIdx(${idx})">
+              <div class="topic-card-name">${escHtml(g.topicLabel)}</div>
+              <div class="topic-card-meta">
+                <span class="topic-count">${g.count}</span>
+                <span>${formatRelativeTime(g.latest)}</span>
+              </div>
+            </div>`;
+          }).join('')}
+        </div>
+      `).join('');
+    }
+
+    // Pull-to-refresh on the reader list
+    (function wirePullToRefresh() {
+      const el = document.getElementById('libScroll');
+      let startY = null, pulled = 0;
+      el.addEventListener('touchstart', e => {
+        startY = el.scrollTop <= 0 ? e.touches[0].clientY : null;
+        pulled = 0;
+      }, { passive: true });
+      el.addEventListener('touchmove', e => {
+        if (startY === null) return;
+        pulled = e.touches[0].clientY - startY;
+        if (pulled > 0) el.style.transform = `translateY(${Math.min(pulled / 2.5, 56)}px)`;
+      }, { passive: true });
+      el.addEventListener('touchend', () => {
+        el.style.transition = 'transform .2s';
+        el.style.transform = '';
+        setTimeout(() => { el.style.transition = ''; }, 220);
+        if (pulled > 70) loadLibrary(true);
+        startY = null; pulled = 0;
+      }, { passive: true });
+    })();
+
+    // ── Settings ──
+    async function refreshSettings() {
+      document.getElementById('tokenStatus').textContent =
+        API_TOKEN ? 'Saved on this device — tap to replace' : 'Not set — tap to enter';
+      const info = document.getElementById('settingsInfo');
+      try {
+        const s = await api('/api/status');
+        info.innerHTML = [
+          `Skills discovered: <b>${s.skillCount ?? '—'}</b>`,
+          `State: <b>${s.active ? 'running' : 'idle'}</b>${s.goal ? ` — ${escHtml(String(s.goal))}` : ''}`,
+          `Queued: <b>${s.queueLength ?? 0}</b>`,
+          `Notes indexed: <b>${libData.loaded ? libData.all.length : '—'}</b>`,
+        ].join('<br>');
+      } catch (e) {
+        info.textContent = `Status unavailable: ${e.message}`;
+      }
     }
 
     // ── Init ──
