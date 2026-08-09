@@ -1324,6 +1324,9 @@ app.get('/api/recent-notes', auth, (req, res) => {
         try {
           const stat = fs.statSync(fullPath);
           if (stat.size < 1024) continue;
+          // Skip show index files (e.g., "Moonshots with Peter Diamandis/Moonshots with Peter Diamandis.md")
+          const parentName = path.basename(path.dirname(fullPath));
+          if (entry.name === parentName + '.md') continue;
           const relativePath = path.relative(VAULT_PATH, fullPath).replace(/\\/g, '/');
           const folder = path.basename(path.dirname(fullPath));
           const title = entry.name.replace(/\.md$/, '');
