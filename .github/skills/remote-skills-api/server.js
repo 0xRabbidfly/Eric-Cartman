@@ -1345,7 +1345,11 @@ app.get('/api/recent-notes', auth, (req, res) => {
   }
 
   notes.sort((a, b) => new Date(b.modified) - new Date(a.modified));
-  res.json(notes.slice(0, 10));
+  // Filter to last 7 days by default, override with ?days=N query param
+  const days = parseInt(req.query.days) || 7;
+  const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+  const filtered = notes.filter(n => new Date(n.modified) >= cutoff);
+  res.json(filtered);
 });
 
 // ---------------------------------------------------------------------------
