@@ -1297,6 +1297,53 @@ app.post('/api/cancel', auth, (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
+// Latest Notes — scan Obsidian vault for recently modified notes
+// ---------------------------------------------------------------------------
+const VAULT_PATH = path.join('C:', 'Users', 'nuno_', 'Documents', 'Obsidian Vault');
+
+app.get('/api/recent-notes', auth, (req, res) => {
+  const scanDirs = [
+    path.join(VAULT_PATH, 'Research', 'Library'),
+    path.join(VAULT_PATH, 'Podcasts'),
+  ];
+
+  const notes = [];
+
+  function scanRecursive(dir) {
+    let entries;
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); }
+    catch { return; }
+
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        const lowerName = entry.name.toLowerCase();
+        if (lowerName === 'transcripts' || entry.name === '00 MOC') continue;
+        scanRecursive(fullPath);
+      } else if (entry.isFile() && entry.name.endsWith('.md')) {
+        try {
+          const stat = fs.statSync(fullPath);
+          if (stat.size < 1024) continue;
+          const relativePath = path.relative(VAULT_PATH, fullPath).replace(/\\/g, '/');
+          const folder = path.basename(path.dirname(fullPath));
+          const title = entry.name.replace(/\.md$/, '');
+          const filePath = relativePath.replace(/\.md$/, '');
+          const obsidianUrl = 'obsidian://open?vault=Obsidian%20Vault&file=' + encodeURIComponent(filePath);
+          notes.push({ title, path: relativePath, modified: stat.mtime.toISOString(), folder, obsidianUrl });
+        } catch {}
+      }
+    }
+  }
+
+  for (const dir of scanDirs) {
+    scanRecursive(dir);
+  }
+
+  notes.sort((a, b) => new Date(b.modified) - new Date(a.modified));
+  res.json(notes.slice(0, 10));
+});
+
+// ---------------------------------------------------------------------------
 // Serve static reports (HTML files in project root)
 // ---------------------------------------------------------------------------
 app.get('/report/:filename', (req, res) => {
