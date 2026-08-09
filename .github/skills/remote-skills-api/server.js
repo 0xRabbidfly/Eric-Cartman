@@ -1328,7 +1328,9 @@ app.get('/api/recent-notes', auth, (req, res) => {
           const folder = path.basename(path.dirname(fullPath));
           const title = entry.name.replace(/\.md$/, '');
           const filePath = relativePath.replace(/\.md$/, '');
-          const obsidianUrl = 'obsidian://open?vault=Obsidian%20Vault&file=' + encodeURIComponent(filePath);
+          // Obsidian deep links: vault name unencoded, file path with / preserved but spaces encoded
+          const encodedFile = filePath.split('/').map(s => encodeURIComponent(s)).join('/');
+          const obsidianUrl = 'obsidian://open?vault=Rabbidfly Vault&file=' + encodedFile;
           notes.push({ title, path: relativePath, modified: stat.mtime.toISOString(), folder, obsidianUrl });
         } catch {}
       }
