@@ -728,9 +728,18 @@
           "note_path": "Podcasts/The a16z Podcast/2026-08-07 - The Reality of AI-Powered Cyberattacks  Truffle Security & Socket.md",
           "processed_at": "2026-08-08T06:17:05.860230+00:00",
           "status": "completed"
+        },
+        "70162548-bc1e-4524-b6d0-580a4bf81281": {
+          "title": "The Self-Improving Company | Kavak's AI Playbook",
+          "published": "2026-08-10",
+          "audio_url": "https://mgln.ai/e/1344/afp-848985-injected.calisto.simplecastaudio.com/3f86df7b-51c6-4101-88a2-550dba782de8/episodes/64ca2d41-4e29-406a-b05e-d686b57f1a61/audio/128/default.mp3?aid=rss_feed&awCollectionId=3f86df7b-51c6-4101-88a2-550dba782de8&awEpisodeId=64ca2d41-4e29-406a-b05e-d686b57f1a61&feed=JGE3yC0V",
+          "transcript_path": "Podcasts/The a16z Podcast/transcripts/2026-08-10 - The Self-Improving Company  Kavak's AI Playbook.md",
+          "note_path": "Podcasts/The a16z Podcast/2026-08-10 - The Self-Improving Company  Kavak's AI Playbook.md",
+          "processed_at": "2026-08-11T06:12:27.787013+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-08-07"
+      "latest_published": "2026-08-10"
     },
     "the-joe-rogan-experience": {
       "name": "The Joe Rogan Experience",
