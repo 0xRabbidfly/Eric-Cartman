@@ -227,9 +227,18 @@
           "note_path": "Podcasts/Limitless/2026-08-11 - The AI Cyber Attack Era 3 Weeks, 3 Hacks.md",
           "processed_at": "2026-08-12T06:11:24.624316+00:00",
           "status": "completed"
+        },
+        "f69b65c9-51c5-4a48-9cf5-6c2a570d566c": {
+          "title": "Zuck's Open Source Playbook: Meta Muse Glimmer and 14-Page Manifesto",
+          "published": "2026-08-12",
+          "audio_url": "https://media.transistor.fm/c448a69b/f50f2ae8.mp3",
+          "transcript_path": "Podcasts/Limitless/transcripts/2026-08-12 - Zuck's Open Source Playbook Meta Muse Glimmer and 14-Page Manifesto.md",
+          "note_path": "Podcasts/Limitless/2026-08-12 - Zuck's Open Source Playbook Meta Muse Glimmer and 14-Page Manifesto.md",
+          "processed_at": "2026-08-13T06:11:30.527747+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-08-11"
+      "latest_published": "2026-08-12"
     },
     "the-pomp-podcast": {
       "name": "The Pomp Podcast",
@@ -497,9 +506,18 @@
           "note_path": "Podcasts/The Pragmatic Engineer/2026-07-29 - Formal methods with Hillel Wayne.md",
           "processed_at": "2026-08-01T06:19:22.057449+00:00",
           "status": "completed"
+        },
+        "substack:post:210687046": {
+          "title": "Stop being skeptical about AI for development with Charity Majors",
+          "published": "2026-08-12",
+          "audio_url": "https://api.substack.com/feed/podcast/210687046/6848e1425a37055978b528751cd7c42b.mp3",
+          "transcript_path": "Podcasts/The Pragmatic Engineer/transcripts/2026-08-12 - Stop being skeptical about AI for development with Charity Majors.md",
+          "note_path": "Podcasts/The Pragmatic Engineer/2026-08-12 - Stop being skeptical about AI for development with Charity Majors.md",
+          "processed_at": "2026-08-13T06:22:00.560685+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-07-29"
+      "latest_published": "2026-08-12"
     },
     "naval": {
       "name": "Naval",
