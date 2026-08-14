@@ -236,9 +236,18 @@
           "note_path": "Podcasts/Limitless/2026-08-12 - Zuck's Open Source Playbook Meta Muse Glimmer and 14-Page Manifesto.md",
           "processed_at": "2026-08-13T06:11:30.527747+00:00",
           "status": "completed"
+        },
+        "aad5b48f-71fb-480c-b4f3-f328f23156b5": {
+          "title": "The NVIDIA Bank: Jensen's $500B Wall Street Deal and GPUs as an Asset Class",
+          "published": "2026-08-13",
+          "audio_url": "https://media.transistor.fm/75d435a9/32ead296.mp3",
+          "transcript_path": "Podcasts/Limitless/transcripts/2026-08-13 - The NVIDIA Bank Jensen's $500B Wall Street Deal and GPUs as an Asset Class.md",
+          "note_path": "Podcasts/Limitless/2026-08-13 - The NVIDIA Bank Jensen's $500B Wall Street Deal and GPUs as an Asset Class.md",
+          "processed_at": "2026-08-14T06:11:57.310726+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-08-12"
+      "latest_published": "2026-08-13"
     },
     "the-pomp-podcast": {
       "name": "The Pomp Podcast",
@@ -442,9 +451,18 @@
           "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-08-11 - Sergey Brin Retakes Gemini, 4 Labs Lose Containment, Compute Trades at NYSE w Kush Bavaria  EP 278.md",
           "processed_at": "2026-08-12T06:32:31.072310+00:00",
           "status": "completed"
+        },
+        "45a1b3e6-971c-11f1-ab8e-8bbf4b88874e": {
+          "title": "Bernie Demands the Labs Stop, Wall Street Turns GPUs Into Bonds, Grok 4.7 Takes #1 with Emad Mostaque | EP #279",
+          "published": "2026-08-13",
+          "audio_url": "https://traffic.megaphone.fm/DVVTS5579830738.mp3",
+          "transcript_path": "Podcasts/Moonshots with Peter Diamandis/transcripts/2026-08-13 - Bernie Demands the Labs Stop, Wall Street Turns GPUs Into Bonds, Grok 4.7 Takes 1 with Emad Mostaque  EP 279.md",
+          "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-08-13 - Bernie Demands the Labs Stop, Wall Street Turns GPUs Into Bonds, Grok 4.7 Takes 1 with Emad Mostaque  EP 279.md",
+          "processed_at": "2026-08-14T06:30:24.249583+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-08-11"
+      "latest_published": "2026-08-13"
     },
     "dwarkesh-podcast": {
       "name": "Dwarkesh Podcast",
