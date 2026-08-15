@@ -245,9 +245,18 @@
           "note_path": "Podcasts/Limitless/2026-08-13 - The NVIDIA Bank Jensen's $500B Wall Street Deal and GPUs as an Asset Class.md",
           "processed_at": "2026-08-14T06:11:57.310726+00:00",
           "status": "completed"
+        },
+        "2bb3be1a-270e-4144-b3ca-a4aaab66b09c": {
+          "title": "THIS WEEK IN AI: Grok Bot (and 4.6), AI Watermarks, Deepseek Strategy, Selling the Lakers",
+          "published": "2026-08-14",
+          "audio_url": "https://media.transistor.fm/c5102074/fe62b3ca.mp3",
+          "transcript_path": "Podcasts/Limitless/transcripts/2026-08-14 - THIS WEEK IN AI Grok Bot (and 4.6), AI Watermarks, Deepseek Strategy, Selling the Lakers.md",
+          "note_path": "Podcasts/Limitless/2026-08-14 - THIS WEEK IN AI Grok Bot (and 4.6), AI Watermarks, Deepseek Strategy, Selling the Lakers.md",
+          "processed_at": "2026-08-15T06:12:17.344180+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-08-13"
+      "latest_published": "2026-08-14"
     },
     "the-pomp-podcast": {
       "name": "The Pomp Podcast",
@@ -621,9 +630,18 @@
           "note_path": "Podcasts/No Priors Artificial Intelligence  Technology  Startups/2026-08-06 - Chasing Trillion-Dollar Companies, Founder Ambition, Token Budgets, and Regulatory Capture with Sarah & Elad.md",
           "processed_at": "2026-08-07T06:19:02.110709+00:00",
           "status": "completed"
+        },
+        "2f8edaf4-9698-11f1-bdc1-eb068382bf86": {
+          "title": "What Chess.com Teaches US About Superhuman Capabilities, with CEO Erik Allebest",
+          "published": "2026-08-13",
+          "audio_url": "https://traffic.megaphone.fm/PDP3695187109.mp3",
+          "transcript_path": "Podcasts/No Priors Artificial Intelligence  Technology  Startups/transcripts/2026-08-13 - What Chess.com Teaches US About Superhuman Capabilities, with CEO Erik Allebest.md",
+          "note_path": "Podcasts/No Priors Artificial Intelligence  Technology  Startups/2026-08-13 - What Chess.com Teaches US About Superhuman Capabilities, with CEO Erik Allebest.md",
+          "processed_at": "2026-08-15T06:19:10.127782+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-08-06"
+      "latest_published": "2026-08-13"
     },
     "cgi-conversations": {
       "name": "CGI Conversations",
