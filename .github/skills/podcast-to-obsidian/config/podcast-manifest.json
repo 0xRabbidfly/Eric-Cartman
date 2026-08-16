@@ -469,9 +469,18 @@
           "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-08-13 - Bernie Demands the Labs Stop, Wall Street Turns GPUs Into Bonds, Grok 4.7 Takes 1 with Emad Mostaque  EP 279.md",
           "processed_at": "2026-08-14T06:30:24.249583+00:00",
           "status": "completed"
+        },
+        "79d5b1ce-9836-11f1-91ea-3f4eeb824a0e": {
+          "title": "200GW Hiding in Grid, Sodium Batteries 10x Cheaper, Wave-Powered Datacenters w/ Ramez Naam | EP #280",
+          "published": "2026-08-15",
+          "audio_url": "https://traffic.megaphone.fm/DVVTS7884087529.mp3",
+          "transcript_path": "Podcasts/Moonshots with Peter Diamandis/transcripts/2026-08-15 - 200GW Hiding in Grid, Sodium Batteries 10x Cheaper, Wave-Powered Datacenters w Ramez Naam  EP 280.md",
+          "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-08-15 - 200GW Hiding in Grid, Sodium Batteries 10x Cheaper, Wave-Powered Datacenters w Ramez Naam  EP 280.md",
+          "processed_at": "2026-08-16T06:24:48.405578+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-08-13"
+      "latest_published": "2026-08-15"
     },
     "dwarkesh-podcast": {
       "name": "Dwarkesh Podcast",
@@ -809,9 +818,18 @@
           "note_path": "Podcasts/The a16z Podcast/2026-08-10 - The Self-Improving Company  Kavak's AI Playbook.md",
           "processed_at": "2026-08-11T06:12:27.787013+00:00",
           "status": "completed"
+        },
+        "f3e84891-157e-4d47-a921-bd6727f27c34": {
+          "title": "Ben Horowitz and Travis Kalanick on Building Again",
+          "published": "2026-08-14",
+          "audio_url": "https://mgln.ai/e/1344/afp-848985-injected.calisto.simplecastaudio.com/3f86df7b-51c6-4101-88a2-550dba782de8/episodes/121c3a09-4be1-4ba9-a3b7-52aa4c4e3c1f/audio/128/default.mp3?aid=rss_feed&awCollectionId=3f86df7b-51c6-4101-88a2-550dba782de8&awEpisodeId=121c3a09-4be1-4ba9-a3b7-52aa4c4e3c1f&feed=JGE3yC0V",
+          "transcript_path": "Podcasts/The a16z Podcast/transcripts/2026-08-14 - Ben Horowitz and Travis Kalanick on Building Again.md",
+          "note_path": "Podcasts/The a16z Podcast/2026-08-14 - Ben Horowitz and Travis Kalanick on Building Again.md",
+          "processed_at": "2026-08-16T06:31:37.044289+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-08-10"
+      "latest_published": "2026-08-14"
     },
     "the-joe-rogan-experience": {
       "name": "The Joe Rogan Experience",
