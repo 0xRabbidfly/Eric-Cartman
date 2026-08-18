@@ -68,9 +68,27 @@
           "note_path": "Podcasts/Raoul Pal The Journey Man/2026-07-30 - The Universal Code.md",
           "processed_at": "2026-07-31T06:11:25.835357+00:00",
           "status": "completed"
+        },
+        "91d01c22-9a63-11f1-80c1-ebdda3285787": {
+          "title": "Why The Next Phase of Crypto Is Bigger Than You Think w/ Blue Macellari",
+          "published": "2026-08-13",
+          "audio_url": "https://www.podtrac.com/pts/redirect.mp3/chrt.fm/track/1B146C/pscrb.fm/rss/p/traffic.megaphone.fm/ADV5911106709.mp3",
+          "transcript_path": "Podcasts/Raoul Pal The Journey Man/transcripts/2026-08-13 - Why The Next Phase of Crypto Is Bigger Than You Think w Blue Macellari.md",
+          "note_path": "Podcasts/Raoul Pal The Journey Man/2026-08-13 - Why The Next Phase of Crypto Is Bigger Than You Think w Blue Macellari.md",
+          "processed_at": "2026-08-18T06:25:55.093690+00:00",
+          "status": "completed"
+        },
+        "0bedfb80-9a61-11f1-8c2b-577a0d91cdfb": {
+          "title": "Why Markets Could Be Ready To Move | With Julien Bittel",
+          "published": "2026-08-06",
+          "audio_url": "https://www.podtrac.com/pts/redirect.mp3/chrt.fm/track/1B146C/pscrb.fm/rss/p/traffic.megaphone.fm/ADV8219396386.mp3",
+          "transcript_path": "Podcasts/Raoul Pal The Journey Man/transcripts/2026-08-06 - Why Markets Could Be Ready To Move  With Julien Bittel.md",
+          "note_path": "Podcasts/Raoul Pal The Journey Man/2026-08-06 - Why Markets Could Be Ready To Move  With Julien Bittel.md",
+          "processed_at": "2026-08-18T06:25:55.130791+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-07-30"
+      "latest_published": "2026-08-13"
     },
     "lex-fridman-podcast": {
       "name": "Lex Fridman Podcast",
