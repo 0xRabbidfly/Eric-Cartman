@@ -272,9 +272,18 @@
           "note_path": "Podcasts/Limitless/2026-08-14 - THIS WEEK IN AI Grok Bot (and 4.6), AI Watermarks, Deepseek Strategy, Selling the Lakers.md",
           "processed_at": "2026-08-15T06:12:17.344180+00:00",
           "status": "completed"
+        },
+        "3c3d63da-8a4b-4d34-8e64-e7407cf13390": {
+          "title": "New 13F Filings: Leopold's Ghost Portfolio and The Shifting AI Trade",
+          "published": "2026-08-18",
+          "audio_url": "https://media.transistor.fm/b9099693/a60bf178.mp3",
+          "transcript_path": "Podcasts/Limitless/transcripts/2026-08-18 - New 13F Filings Leopold's Ghost Portfolio and The Shifting AI Trade.md",
+          "note_path": "Podcasts/Limitless/2026-08-18 - New 13F Filings Leopold's Ghost Portfolio and The Shifting AI Trade.md",
+          "processed_at": "2026-08-19T06:11:38.846123+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-08-14"
+      "latest_published": "2026-08-18"
     },
     "the-pomp-podcast": {
       "name": "The Pomp Podcast",
@@ -496,9 +505,18 @@
           "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-08-15 - 200GW Hiding in Grid, Sodium Batteries 10x Cheaper, Wave-Powered Datacenters w Ramez Naam  EP 280.md",
           "processed_at": "2026-08-16T06:24:48.405578+00:00",
           "status": "completed"
+        },
+        "2c65d748-9b29-11f1-a661-2b7ef242b9a6": {
+          "title": "China’s Endgame: ASI Timelines, US-China Relations, and the $1.7T AI Bubble With Alvin Graylin | #281",
+          "published": "2026-08-18",
+          "audio_url": "https://traffic.megaphone.fm/DVVTS8448084358.mp3",
+          "transcript_path": "Podcasts/Moonshots with Peter Diamandis/transcripts/2026-08-18 - China’s Endgame ASI Timelines, US-China Relations, and the $1.7T AI Bubble With Alvin Graylin  281.md",
+          "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-08-18 - China’s Endgame ASI Timelines, US-China Relations, and the $1.7T AI Bubble With Alvin Graylin  281.md",
+          "processed_at": "2026-08-19T06:29:26.781875+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-08-15"
+      "latest_published": "2026-08-18"
     },
     "dwarkesh-podcast": {
       "name": "Dwarkesh Podcast",
