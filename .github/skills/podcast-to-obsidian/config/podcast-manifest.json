@@ -86,9 +86,18 @@
           "note_path": "Podcasts/Raoul Pal The Journey Man/2026-08-06 - Why Markets Could Be Ready To Move  With Julien Bittel.md",
           "processed_at": "2026-08-18T06:25:55.130791+00:00",
           "status": "completed"
+        },
+        "ce4a9e16-9c1b-11f1-a2cc-0b06961215f2": {
+          "title": "Are You Ready for Robots Smarter Than You…Everywhere? with Andrew Kang",
+          "published": "2026-08-20",
+          "audio_url": "https://www.podtrac.com/pts/redirect.mp3/chrt.fm/track/1B146C/pscrb.fm/rss/p/traffic.megaphone.fm/ADV1901136202.mp3",
+          "transcript_path": "Podcasts/Raoul Pal The Journey Man/transcripts/2026-08-20 - Are You Ready for Robots Smarter Than You…Everywhere with Andrew Kang.md",
+          "note_path": "Podcasts/Raoul Pal The Journey Man/2026-08-20 - Are You Ready for Robots Smarter Than You…Everywhere with Andrew Kang.md",
+          "processed_at": "2026-08-20T06:15:24.024808+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-08-13"
+      "latest_published": "2026-08-20"
     },
     "lex-fridman-podcast": {
       "name": "Lex Fridman Podcast",
@@ -281,9 +290,18 @@
           "note_path": "Podcasts/Limitless/2026-08-18 - New 13F Filings Leopold's Ghost Portfolio and The Shifting AI Trade.md",
           "processed_at": "2026-08-19T06:11:38.846123+00:00",
           "status": "completed"
+        },
+        "fcb640b2-da20-4ffd-a8ee-29434122eb9b": {
+          "title": "The $7 Billion AI Middle Man: Stripe Buys OpenRouter",
+          "published": "2026-08-19",
+          "audio_url": "https://media.transistor.fm/d978c875/f8eca461.mp3",
+          "transcript_path": "Podcasts/Limitless/transcripts/2026-08-19 - The $7 Billion AI Middle Man Stripe Buys OpenRouter.md",
+          "note_path": "Podcasts/Limitless/2026-08-19 - The $7 Billion AI Middle Man Stripe Buys OpenRouter.md",
+          "processed_at": "2026-08-20T06:20:20.532691+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-08-18"
+      "latest_published": "2026-08-19"
     },
     "the-pomp-podcast": {
       "name": "The Pomp Podcast",
