@@ -72,7 +72,7 @@
         "the-a16z-podcast": {
             "name": "The a16z Podcast",
             "rss_url": "https://feeds.simplecast.com/JGE3yC0V",
-            "enabled": true
+            "enabled": false
         },
         "the-joe-rogan-experience": {
             "name": "The Joe Rogan Experience",

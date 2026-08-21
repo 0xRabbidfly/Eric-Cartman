@@ -29,6 +29,7 @@ if sys.platform == "win32":
 VAULT_PATH = Path(r"C:\Users\nuno_\Documents\Obsidian Vault")
 LIBRARY_DIR = VAULT_PATH / "Research" / "Library"
 PODCASTS_DIR = VAULT_PATH / "Podcasts"
+MOCS_DIR = VAULT_PATH / "Research" / "Library" / "00 MOC"
 CONNECTIONS_FILE = VAULT_PATH / "Research" / "connections.json"
 XAI_API_URL = "https://api.x.ai/v1/chat/completions"
 MODEL = "grok-4.5"
@@ -212,26 +213,70 @@ def extract_podcast_content(text: str) -> str:
 # Vault scanning
 # ---------------------------------------------------------------------------
 
+def _is_podcast_episode(p: Path) -> bool:
+    """Check if a podcast path is an episode note (not transcript or show index)."""
+    path_str = str(p).replace("\\", "/")
+    if "/transcripts/" in path_str:
+        return False
+    # Episode notes start with a date: YYYY-MM-DD
+    if not re.match(r"\d{4}-\d{2}-\d{2}\s+-\s+", p.name):
+        return False
+    return p.stat().st_size > 2000
+
+
 def find_library_notes() -> list[Path]:
     """Find all markdown files in the Library and Podcasts directories."""
     notes = []
     if LIBRARY_DIR.exists():
-        notes.extend(LIBRARY_DIR.rglob("*.md"))
+        for p in LIBRARY_DIR.rglob("*.md"):
+            # Skip MOC directory — index files, not content notes
+            if "00 MOC" in p.parts:
+                continue
+            notes.append(p)
     else:
         print(f"WARNING: Library directory not found: {LIBRARY_DIR}")
     if PODCASTS_DIR.exists():
-        # Include podcast notes but skip transcript files and show indexes
         for p in PODCASTS_DIR.rglob("*.md"):
-            if "/transcripts/" not in str(p).replace("\\", "/") and p.stat().st_size > 2000:
+            if _is_podcast_episode(p):
                 notes.append(p)
     return sorted(notes)
 
 
 def find_recent_notes(n: int) -> list[Path]:
-    """Find the N most recently modified notes in Library + Podcasts."""
-    notes = find_library_notes()
-    notes.sort(key=lambda p: p.stat().st_mtime, reverse=True)
-    return notes[:n]
+    """Find the N most recently modified notes, balancing Library and Podcasts.
+
+    Collects recent notes from each directory separately, then merges.
+    This prevents Library notes whose mtime was bumped by Connections
+    section updates from crowding out newly-created podcast notes.
+    """
+    library_notes = []
+    if LIBRARY_DIR.exists():
+        library_notes = sorted(
+            (p for p in LIBRARY_DIR.rglob("*.md") if "00 MOC" not in p.parts),
+            key=lambda p: p.stat().st_mtime, reverse=True,
+        )
+
+    podcast_notes = []
+    if PODCASTS_DIR.exists():
+        podcast_notes = sorted(
+            (p for p in PODCASTS_DIR.rglob("*.md") if _is_podcast_episode(p)),
+            key=lambda p: p.stat().st_mtime, reverse=True,
+        )
+
+    if not podcast_notes:
+        return library_notes[:n]
+    if not library_notes:
+        return podcast_notes[:n]
+
+    # Reserve at least 1/3 of slots for podcasts (min 2)
+    podcast_slots = min(len(podcast_notes), max(2, (n + 2) // 3))
+    library_slots = min(len(library_notes), n - podcast_slots)
+    # Give any unused library slots back to podcasts
+    podcast_slots = min(len(podcast_notes), n - library_slots)
+
+    result = library_notes[:library_slots] + podcast_notes[:podcast_slots]
+    result.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+    return result[:n]
 
 
 def find_candidates(source_path: Path, source_text: str) -> list[Path]:
@@ -449,6 +494,124 @@ def add_connections_section(note_path: Path, connections: list[dict]) -> None:
 
 
 # ---------------------------------------------------------------------------
+# MOC integration
+# ---------------------------------------------------------------------------
+
+def discover_moc_mapping() -> dict[str, Path]:
+    """Map library folder prefixes (e.g. '01') to topic MOC file paths.
+
+    Reads each '📍 MOC - *.md' file and extracts the '## NN ...' section
+    header to determine which library folder it covers.
+    """
+    mapping: dict[str, Path] = {}
+    if not MOCS_DIR.exists():
+        return mapping
+    for moc_path in MOCS_DIR.glob("📍 MOC - *.md"):
+        try:
+            text = moc_path.read_text(encoding="utf-8")
+            match = re.search(r"^##\s+(\d{2})\s+", text, re.MULTILINE)
+            if match:
+                mapping[match.group(1)] = moc_path
+        except (OSError, UnicodeDecodeError):
+            continue
+    return mapping
+
+
+def _library_folder_prefix(slug: str) -> str | None:
+    """Extract the folder prefix from a library note slug.
+
+    'Research/Library/01 Agent Harnesses & Architecture/some-note' → '01'
+    """
+    m = re.match(r"Research/Library/(\d{2})\s+", slug)
+    return m.group(1) if m else None
+
+
+def update_mocs(new_connections: list[dict], moc_mapping: dict[str, Path]) -> int:
+    """Add podcast notes to relevant topic MOCs for cross-type connections.
+
+    Returns the number of MOC entries added.
+    """
+    if not moc_mapping:
+        return 0
+
+    # Group updates by MOC
+    updates: dict[Path, list[dict]] = {}
+    for conn in new_connections:
+        src_pod = conn["source"].startswith("Podcasts/")
+        tgt_pod = conn["target"].startswith("Podcasts/")
+        if src_pod == tgt_pod:
+            continue  # skip same-type connections
+
+        podcast_slug = conn["source"] if src_pod else conn["target"]
+        library_slug = conn["target"] if src_pod else conn["source"]
+
+        prefix = _library_folder_prefix(library_slug)
+        if not prefix or prefix not in moc_mapping:
+            continue
+
+        moc_path = moc_mapping[prefix]
+        updates.setdefault(moc_path, []).append({
+            "podcast_slug": podcast_slug,
+            "library_slug": library_slug,
+            "relationship": conn["relationship"],
+            "confidence": conn["confidence"],
+        })
+
+    added = 0
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    for moc_path, entries in updates.items():
+        try:
+            text = moc_path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+
+        section_hdr = "### 🎙️ Related Podcast Episodes"
+        if section_hdr not in text:
+            # Insert before the --- footer, or at end
+            footer = re.search(r"\n---\s*\n\*Last updated:", text)
+            if footer:
+                text = text[:footer.start()] + f"\n{section_hdr}\n\n" + text[footer.start():]
+            else:
+                text = text.rstrip() + f"\n\n{section_hdr}\n\n"
+
+        modified = False
+        for entry in entries:
+            podcast_name = entry["podcast_slug"].split("/")[-1]
+            if podcast_name in text:
+                continue  # already listed
+
+            library_name = entry["library_slug"].split("/")[-1]
+            rel = entry["relationship"]
+            line = (
+                f"- [[{entry['podcast_slug']}|{podcast_name}]]"
+                f" — *{rel}* → [[{library_name}]] `{today}`\n"
+            )
+
+            # Insert right after the section header + blank line
+            hdr_pos = text.index(section_hdr) + len(section_hdr)
+            nl = text.index("\n", hdr_pos)
+            insert_at = nl + 1
+            # Skip one blank line if present
+            if insert_at < len(text) and text[insert_at] == "\n":
+                insert_at += 1
+            text = text[:insert_at] + line + text[insert_at:]
+            modified = True
+            added += 1
+
+        if modified:
+            text = re.sub(
+                r"\*Last updated: \d{4}-\d{2}-\d{2}\*",
+                f"*Last updated: {today}*",
+                text,
+            )
+            moc_path.write_text(text, encoding="utf-8")
+            print(f"  Updated MOC: {moc_path.name}")
+
+    return added
+
+
+# ---------------------------------------------------------------------------
 # Main detection logic
 # ---------------------------------------------------------------------------
 
@@ -456,6 +619,7 @@ def detect_connections(
     source_path: Path,
     api_key: str,
     add_section: bool = True,
+    moc_mapping: dict[str, Path] | None = None,
 ) -> list[dict]:
     """Detect connections for a single note."""
     source_text = source_path.read_text(encoding="utf-8")
@@ -530,6 +694,12 @@ def detect_connections(
             ]
             add_connections_section(source_path, all_source_connections)
             print(f"  Updated Connections section in note")
+
+        # Update topic MOCs with podcast↔library connections
+        if moc_mapping:
+            moc_added = update_mocs(new_connections, moc_mapping)
+            if moc_added:
+                print(f"  Added {moc_added} podcast entries to MOCs")
     else:
         print(f"  No new connections found")
 
@@ -551,11 +721,15 @@ def main():
     )
     group.add_argument(
         "--scan-recent", type=int, metavar="N",
-        help="Scan the N most recently modified Library notes",
+        help="Scan the N most recently modified notes (Library + Podcasts)",
     )
     group.add_argument(
         "--scan-all", action="store_true",
         help="Full corpus scan (expensive)",
+    )
+    group.add_argument(
+        "--update-mocs", action="store_true",
+        help="Backfill existing podcast connections into topic MOCs (no new detection)",
     )
     parser.add_argument(
         "--no-section", action="store_true",
@@ -563,10 +737,28 @@ def main():
     )
 
     args = parser.parse_args()
-    api_key = load_api_key()
     add_section = not args.no_section
 
+    # Discover MOC mapping once at startup
+    moc_mapping = discover_moc_mapping()
+    if moc_mapping:
+        print(f"MOC mapping: {len(moc_mapping)} topic MOCs discovered")
+
     total_new = 0
+
+    if args.update_mocs:
+        # Backfill: push all existing podcast↔library connections into MOCs
+        data = load_connections()
+        podcast_conns = [
+            c for c in data["connections"]
+            if c["source"].startswith("Podcasts/") != c["target"].startswith("Podcasts/")
+        ]
+        print(f"Backfilling {len(podcast_conns)} podcast↔library connections into MOCs...")
+        added = update_mocs(podcast_conns, moc_mapping)
+        print(f"  Added {added} new entries to MOCs")
+        return
+
+    api_key = load_api_key()
 
     if args.note:
         note_path = Path(args.note)
@@ -575,21 +767,21 @@ def main():
         if not note_path.exists():
             print(f"ERROR: Note not found: {note_path}")
             sys.exit(1)
-        results = detect_connections(note_path, api_key, add_section)
+        results = detect_connections(note_path, api_key, add_section, moc_mapping)
         total_new = len(results)
 
     elif args.scan_recent:
         notes = find_recent_notes(args.scan_recent)
         print(f"Scanning {len(notes)} recent notes...")
         for note_path in notes:
-            results = detect_connections(note_path, api_key, add_section)
+            results = detect_connections(note_path, api_key, add_section, moc_mapping)
             total_new += len(results)
 
     elif args.scan_all:
         notes = find_library_notes()
         print(f"Full corpus scan: {len(notes)} notes (this may take a while)...")
         for note_path in notes:
-            results = detect_connections(note_path, api_key, add_section)
+            results = detect_connections(note_path, api_key, add_section, moc_mapping)
             total_new += len(results)
 
     # Summary

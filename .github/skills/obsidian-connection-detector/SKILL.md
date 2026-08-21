@@ -19,6 +19,7 @@ Detects and classifies relationships between Obsidian vault notes using AI-power
 4. Classifies each relationship as: **supports**, **contradicts**, **extends**, or **bridges**
 5. Writes connection entries to a tracker file (`Research/connections.json`)
 6. Optionally adds a `## Connections` section to the source note with classified links
+7. Updates relevant topic MOCs with podcast↔library connections (adds a `### 🎙️ Related Podcast Episodes` subsection)
 
 ## Usage
 
@@ -26,11 +27,17 @@ Detects and classifies relationships between Obsidian vault notes using AI-power
 # Detect connections for a specific note
 python scripts/detect.py --note "Research/Library/01.../some-note.md"
 
-# Scan the 5 most recently modified Library notes
+# Detect connections for a podcast note
+python scripts/detect.py --note "Podcasts/The a16z Podcast/2026-08-04 - Episode Title.md"
+
+# Scan the 5 most recently modified notes (Library + Podcasts, balanced)
 python scripts/detect.py --scan-recent 5
 
 # Full corpus scan (expensive — calls xAI API for every candidate pair)
 python scripts/detect.py --scan-all
+
+# Backfill existing podcast connections into topic MOCs (no API calls)
+python scripts/detect.py --update-mocs
 ```
 
 ## Configuration
