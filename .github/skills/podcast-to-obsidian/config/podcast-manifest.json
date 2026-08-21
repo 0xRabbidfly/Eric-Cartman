@@ -299,9 +299,18 @@
           "note_path": "Podcasts/Limitless/2026-08-19 - The $7 Billion AI Middle Man Stripe Buys OpenRouter.md",
           "processed_at": "2026-08-20T06:20:20.532691+00:00",
           "status": "completed"
+        },
+        "1b99d1cc-1cc3-46d7-967a-10ea76f3fc5d": {
+          "title": "Which AI Should You Actually Use? Claude vs ChatGPT vs Grok vs Gemini (2026 Guide)",
+          "published": "2026-08-20",
+          "audio_url": "https://media.transistor.fm/adab9769/f6ee90bd.mp3",
+          "transcript_path": "Podcasts/Limitless/transcripts/2026-08-20 - Which AI Should You Actually Use Claude vs ChatGPT vs Grok vs Gemini (2026 Guide).md",
+          "note_path": "Podcasts/Limitless/2026-08-20 - Which AI Should You Actually Use Claude vs ChatGPT vs Grok vs Gemini (2026 Guide).md",
+          "processed_at": "2026-08-21T06:14:22.158214+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-08-19"
+      "latest_published": "2026-08-20"
     },
     "the-pomp-podcast": {
       "name": "The Pomp Podcast",
@@ -605,9 +614,18 @@
           "note_path": "Podcasts/The Pragmatic Engineer/2026-08-12 - Stop being skeptical about AI for development with Charity Majors.md",
           "processed_at": "2026-08-13T06:22:00.560685+00:00",
           "status": "completed"
+        },
+        "substack:post:211500766": {
+          "title": "From Chrome DevTools to AI Engineering, with Addy Osmani",
+          "published": "2026-08-19",
+          "audio_url": "https://api.substack.com/feed/podcast/211500766/d45c422ebd831ae22c6a8fe2b54be431.mp3",
+          "transcript_path": "Podcasts/The Pragmatic Engineer/transcripts/2026-08-19 - From Chrome DevTools to AI Engineering, with Addy Osmani.md",
+          "note_path": "Podcasts/The Pragmatic Engineer/2026-08-19 - From Chrome DevTools to AI Engineering, with Addy Osmani.md",
+          "processed_at": "2026-08-21T06:44:06.194495+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-08-12"
+      "latest_published": "2026-08-19"
     },
     "naval": {
       "name": "Naval",
