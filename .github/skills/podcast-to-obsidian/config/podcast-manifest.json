@@ -308,9 +308,18 @@
           "note_path": "Podcasts/Limitless/2026-08-20 - Which AI Should You Actually Use Claude vs ChatGPT vs Grok vs Gemini (2026 Guide).md",
           "processed_at": "2026-08-21T06:16:14.495507+00:00",
           "status": "completed"
+        },
+        "c3a9e90d-9b8f-48b6-9ca5-1752d8a9acd1": {
+          "title": "THIS WEEK IN AI: OpenAI Pauses Research, Huge Medical Breakthrough, Unitree IPO",
+          "published": "2026-08-21",
+          "audio_url": "https://media.transistor.fm/1b7755ce/7c10cbbf.mp3",
+          "transcript_path": "Podcasts/Limitless/transcripts/2026-08-21 - THIS WEEK IN AI OpenAI Pauses Research, Huge Medical Breakthrough, Unitree IPO.md",
+          "note_path": "Podcasts/Limitless/2026-08-21 - THIS WEEK IN AI OpenAI Pauses Research, Huge Medical Breakthrough, Unitree IPO.md",
+          "processed_at": "2026-08-22T06:16:07.777467+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-08-20"
+      "latest_published": "2026-08-21"
     },
     "the-pomp-podcast": {
       "name": "The Pomp Podcast",
@@ -720,9 +729,18 @@
           "note_path": "Podcasts/No Priors Artificial Intelligence  Technology  Startups/2026-08-13 - What Chess.com Teaches US About Superhuman Capabilities, with CEO Erik Allebest.md",
           "processed_at": "2026-08-15T06:19:10.127782+00:00",
           "status": "completed"
+        },
+        "8ec6281a-9c1a-11f1-b9ab-fb1fa4061363": {
+          "title": "From Restoring Sight to Reimagining the Brain, with Max Hodak",
+          "published": "2026-08-20",
+          "audio_url": "https://traffic.megaphone.fm/PDP1497116966.mp3",
+          "transcript_path": "Podcasts/No Priors Artificial Intelligence  Technology  Startups/transcripts/2026-08-20 - From Restoring Sight to Reimagining the Brain, with Max Hodak.md",
+          "note_path": "Podcasts/No Priors Artificial Intelligence  Technology  Startups/2026-08-20 - From Restoring Sight to Reimagining the Brain, with Max Hodak.md",
+          "processed_at": "2026-08-22T06:56:27.281822+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-08-13"
+      "latest_published": "2026-08-20"
     },
     "cgi-conversations": {
       "name": "CGI Conversations",
