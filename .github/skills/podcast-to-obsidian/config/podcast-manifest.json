@@ -550,9 +550,18 @@
           "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-08-18 - China’s Endgame ASI Timelines, US-China Relations, and the $1.7T AI Bubble With Alvin Graylin  281.md",
           "processed_at": "2026-08-19T06:29:26.781875+00:00",
           "status": "completed"
+        },
+        "0e0b5862-9d7d-11f1-93d2-f7a1ad40d7e8": {
+          "title": "OpenAI Pauses Frontier Training, Elon's 100X Prediction Lands, Robot Beats Usain Bolt with Emad Mostaque | EP#282",
+          "published": "2026-08-21",
+          "audio_url": "https://traffic.megaphone.fm/DVVTS5949178347.mp3",
+          "transcript_path": "Podcasts/Moonshots with Peter Diamandis/transcripts/2026-08-21 - OpenAI Pauses Frontier Training, Elon's 100X Prediction Lands, Robot Beats Usain Bolt with Emad Mostaque  EP282.md",
+          "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-08-21 - OpenAI Pauses Frontier Training, Elon's 100X Prediction Lands, Robot Beats Usain Bolt with Emad Mostaque  EP282.md",
+          "processed_at": "2026-08-23T06:27:35.811585+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-08-18"
+      "latest_published": "2026-08-21"
     },
     "dwarkesh-podcast": {
       "name": "Dwarkesh Podcast",
