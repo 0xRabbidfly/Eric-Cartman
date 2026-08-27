@@ -317,9 +317,18 @@
           "note_path": "Podcasts/Limitless/2026-08-21 - THIS WEEK IN AI OpenAI Pauses Research, Huge Medical Breakthrough, Unitree IPO.md",
           "processed_at": "2026-08-22T06:18:52.210217+00:00",
           "status": "completed"
+        },
+        "2e7212f3-5ac5-44f2-aedf-21fe1f071737": {
+          "title": "Robot Olympics 2026: China's Robots Just Broke Human World Records",
+          "published": "2026-08-26",
+          "audio_url": "https://media.transistor.fm/a2a68604/8b579cd7.mp3",
+          "transcript_path": "Podcasts/Limitless/transcripts/2026-08-26 - Robot Olympics 2026 China's Robots Just Broke Human World Records.md",
+          "note_path": "Podcasts/Limitless/2026-08-26 - Robot Olympics 2026 China's Robots Just Broke Human World Records.md",
+          "processed_at": "2026-08-27T06:12:09.536754+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-08-21"
+      "latest_published": "2026-08-26"
     },
     "the-pomp-podcast": {
       "name": "The Pomp Podcast",
@@ -641,9 +650,18 @@
           "note_path": "Podcasts/The Pragmatic Engineer/2026-08-19 - From Chrome DevTools to AI Engineering, with Addy Osmani.md",
           "processed_at": "2026-08-21T06:45:03.351384+00:00",
           "status": "completed"
+        },
+        "substack:post:212722114": {
+          "title": "Why performant code matters (but gets widely ignored), with Casey Muratori",
+          "published": "2026-08-26",
+          "audio_url": "https://api.substack.com/feed/podcast/212722114/7fbb605079b04c25aa18da6ab32c0469.mp3",
+          "transcript_path": "Podcasts/The Pragmatic Engineer/transcripts/2026-08-26 - Why performant code matters (but gets widely ignored), with Casey Muratori.md",
+          "note_path": "Podcasts/The Pragmatic Engineer/2026-08-26 - Why performant code matters (but gets widely ignored), with Casey Muratori.md",
+          "processed_at": "2026-08-27T06:28:43.147716+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-08-19"
+      "latest_published": "2026-08-26"
     },
     "naval": {
       "name": "Naval",
