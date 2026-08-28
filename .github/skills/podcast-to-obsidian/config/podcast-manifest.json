@@ -95,9 +95,18 @@
           "note_path": "Podcasts/Raoul Pal The Journey Man/2026-08-20 - Are You Ready for Robots Smarter Than You…Everywhere with Andrew Kang.md",
           "processed_at": "2026-08-20T06:15:24.024808+00:00",
           "status": "completed"
+        },
+        "73d121cc-a219-11f1-823d-cbc6f857270e": {
+          "title": "Scott Bessent Could Change Everything w/ Andreas Steno",
+          "published": "2026-08-27",
+          "audio_url": "https://www.podtrac.com/pts/redirect.mp3/chrt.fm/track/1B146C/pscrb.fm/rss/p/traffic.megaphone.fm/ADV4167580288.mp3",
+          "transcript_path": "Podcasts/Raoul Pal The Journey Man/transcripts/2026-08-27 - Scott Bessent Could Change Everything w Andreas Steno.md",
+          "note_path": "Podcasts/Raoul Pal The Journey Man/2026-08-27 - Scott Bessent Could Change Everything w Andreas Steno.md",
+          "processed_at": "2026-08-28T06:13:43.013478+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-08-20"
+      "latest_published": "2026-08-27"
     },
     "lex-fridman-podcast": {
       "name": "Lex Fridman Podcast",
@@ -326,9 +335,18 @@
           "note_path": "Podcasts/Limitless/2026-08-26 - Robot Olympics 2026 China's Robots Just Broke Human World Records.md",
           "processed_at": "2026-08-27T06:12:09.536754+00:00",
           "status": "completed"
+        },
+        "9a32ae42-60f5-4a6f-aebe-78247cffc593": {
+          "title": "Ox Alpha Revealed: China's GLM-5.3-Flash Gave Away Free AI",
+          "published": "2026-08-27",
+          "audio_url": "https://media.transistor.fm/aa5bb1a7/9734c04e.mp3",
+          "transcript_path": "Podcasts/Limitless/transcripts/2026-08-27 - Ox Alpha Revealed China's GLM-5.3-Flash Gave Away Free AI.md",
+          "note_path": "Podcasts/Limitless/2026-08-27 - Ox Alpha Revealed China's GLM-5.3-Flash Gave Away Free AI.md",
+          "processed_at": "2026-08-28T06:19:06.502893+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-08-26"
+      "latest_published": "2026-08-27"
     },
     "the-pomp-podcast": {
       "name": "The Pomp Podcast",
