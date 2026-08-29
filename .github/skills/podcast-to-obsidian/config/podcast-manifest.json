@@ -344,9 +344,18 @@
           "note_path": "Podcasts/Limitless/2026-08-27 - Ox Alpha Revealed China's GLM-5.3-Flash Gave Away Free AI.md",
           "processed_at": "2026-08-28T06:19:06.502893+00:00",
           "status": "completed"
+        },
+        "90153568-f111-4194-b3d9-ff958aedf93a": {
+          "title": "THIS WEEK IN AI: Nvidia Acquires HuggingFace, Leopold vs SEC, New Waymo Chip",
+          "published": "2026-08-28",
+          "audio_url": "https://media.transistor.fm/93d9a15a/43712764.mp3",
+          "transcript_path": "Podcasts/Limitless/transcripts/2026-08-28 - THIS WEEK IN AI Nvidia Acquires HuggingFace, Leopold vs SEC, New Waymo Chip.md",
+          "note_path": "Podcasts/Limitless/2026-08-28 - THIS WEEK IN AI Nvidia Acquires HuggingFace, Leopold vs SEC, New Waymo Chip.md",
+          "processed_at": "2026-08-29T06:13:34.196767+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-08-27"
+      "latest_published": "2026-08-28"
     },
     "the-pomp-podcast": {
       "name": "The Pomp Podcast",
@@ -586,9 +595,18 @@
           "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-08-21 - OpenAI Pauses Frontier Training, Elon's 100X Prediction Lands, Robot Beats Usain Bolt with Emad Mostaque  EP282.md",
           "processed_at": "2026-08-23T06:27:35.811585+00:00",
           "status": "completed"
+        },
+        "ca702e5a-a251-11f1-81e3-4ff6c683f74d": {
+          "title": "Sam Altman: Singularity Slow-Down, Emad Runs 18 Grokbots, Waymo Slashes Hardware 83% | EP #283",
+          "published": "2026-08-27",
+          "audio_url": "https://traffic.megaphone.fm/DVVTS1461313799.mp3",
+          "transcript_path": "Podcasts/Moonshots with Peter Diamandis/transcripts/2026-08-27 - Sam Altman Singularity Slow-Down, Emad Runs 18 Grokbots, Waymo Slashes Hardware 83%  EP 283.md",
+          "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-08-27 - Sam Altman Singularity Slow-Down, Emad Runs 18 Grokbots, Waymo Slashes Hardware 83%  EP 283.md",
+          "processed_at": "2026-08-29T06:32:27.238329+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-08-21"
+      "latest_published": "2026-08-27"
     },
     "dwarkesh-podcast": {
       "name": "Dwarkesh Podcast",
