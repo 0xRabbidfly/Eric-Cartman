@@ -604,9 +604,18 @@
           "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-08-27 - Sam Altman Singularity Slow-Down, Emad Runs 18 Grokbots, Waymo Slashes Hardware 83%  EP 283.md",
           "processed_at": "2026-08-29T06:32:27.238329+00:00",
           "status": "completed"
+        },
+        "15e49284-a3ad-11f1-ad3f-b33f879d3d7e": {
+          "title": "NVIDIA's $96.2B Quarter, China's 200,000 Fake Accounts, & OpenAI's New Chip | EP #284",
+          "published": "2026-08-29",
+          "audio_url": "https://traffic.megaphone.fm/DVVTS6713198248.mp3",
+          "transcript_path": "Podcasts/Moonshots with Peter Diamandis/transcripts/2026-08-29 - NVIDIA's $96.2B Quarter, China's 200,000 Fake Accounts, & OpenAI's New Chip  EP 284.md",
+          "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-08-29 - NVIDIA's $96.2B Quarter, China's 200,000 Fake Accounts, & OpenAI's New Chip  EP 284.md",
+          "processed_at": "2026-08-30T06:30:34.460199+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-08-27"
+      "latest_published": "2026-08-29"
     },
     "dwarkesh-podcast": {
       "name": "Dwarkesh Podcast",
@@ -801,9 +810,18 @@
           "note_path": "Podcasts/No Priors Artificial Intelligence  Technology  Startups/2026-08-20 - From Restoring Sight to Reimagining the Brain, with Max Hodak.md",
           "processed_at": "2026-08-22T06:57:59.533554+00:00",
           "status": "completed"
+        },
+        "dc36d7b4-a1cb-11f1-a66e-afd86ce968a2": {
+          "title": "Rethinking Legacy Data Infrastructure with Eon Co-Founders Ofir Ehrlich and Gonen Stein",
+          "published": "2026-08-27",
+          "audio_url": "https://traffic.megaphone.fm/PDP7982864975.mp3",
+          "transcript_path": "Podcasts/No Priors Artificial Intelligence  Technology  Startups/transcripts/2026-08-27 - Rethinking Legacy Data Infrastructure with Eon Co-Founders Ofir Ehrlich and Gonen Stein.md",
+          "note_path": "Podcasts/No Priors Artificial Intelligence  Technology  Startups/2026-08-27 - Rethinking Legacy Data Infrastructure with Eon Co-Founders Ofir Ehrlich and Gonen Stein.md",
+          "processed_at": "2026-08-30T06:38:02.988705+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-08-20"
+      "latest_published": "2026-08-27"
     },
     "cgi-conversations": {
       "name": "CGI Conversations",
