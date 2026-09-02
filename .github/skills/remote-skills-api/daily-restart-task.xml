@@ -43,7 +43,7 @@
   <Actions Context="Author">
     <Exec>
       <Command>powershell.exe</Command>
-      <Arguments>-NoProfile -WindowStyle Hidden -Command "try { Invoke-WebRequest -Uri 'http://localhost:3838/api/admin/restart' -Method POST -Headers @{Authorization='Bearer REDACTED_USE_KEYRING'} -ContentType 'application/json' -Body '{\"force\":true}' -UseBasicParsing -TimeoutSec 30 | Out-Null; Write-Output 'Restart triggered' } catch { Write-Output \"Restart failed: $_\" }"</Arguments>
+      <Arguments>-NoProfile -WindowStyle Hidden -Command "try { $secret = python -c \"import keyring; print(keyring.get_password('automation/api', 'api_secret'))\"; Invoke-WebRequest -Uri 'http://localhost:3838/api/admin/restart' -Method POST -Headers @{Authorization=\"Bearer $secret\"} -ContentType 'application/json' -Body '{\"force\":true}' -UseBasicParsing -TimeoutSec 30 | Out-Null; Write-Output 'Restart triggered' } catch { Write-Output \"Restart failed: $_\" }"</Arguments>
     </Exec>
   </Actions>
 </Task>
