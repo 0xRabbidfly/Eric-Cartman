@@ -353,9 +353,18 @@
           "note_path": "Podcasts/Limitless/2026-08-28 - THIS WEEK IN AI Nvidia Acquires HuggingFace, Leopold vs SEC, New Waymo Chip.md",
           "processed_at": "2026-08-29T06:13:34.196767+00:00",
           "status": "completed"
+        },
+        "bdd16557-1e2d-45a6-8522-1b6b77c4c01d": {
+          "title": "The ChatGPT Breakout Was Way Worse Than We Thought..",
+          "published": "2026-09-02",
+          "audio_url": "https://media.transistor.fm/1e0aa6c9/d3408ef5.mp3",
+          "transcript_path": "Podcasts/Limitless/transcripts/2026-09-02 - The ChatGPT Breakout Was Way Worse Than We Thought.md",
+          "note_path": "Podcasts/Limitless/2026-09-02 - The ChatGPT Breakout Was Way Worse Than We Thought.md",
+          "processed_at": "2026-09-03T06:12:04.511696+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-08-28"
+      "latest_published": "2026-09-02"
     },
     "the-pomp-podcast": {
       "name": "The Pomp Podcast",
@@ -613,9 +622,18 @@
           "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-08-29 - NVIDIA's $96.2B Quarter, China's 200,000 Fake Accounts, & OpenAI's New Chip  EP 284.md",
           "processed_at": "2026-08-30T06:30:34.460199+00:00",
           "status": "completed"
+        },
+        "c788c560-a6fe-11f1-8883-4773df526e10": {
+          "title": "Humanity's First Star Probe, Architect Labs Beats NVIDIA 3.4x, Musk Wants Satellites to Cool Earth | EP #285",
+          "published": "2026-09-02",
+          "audio_url": "https://traffic.megaphone.fm/DVVTS7440541241.mp3",
+          "transcript_path": "Podcasts/Moonshots with Peter Diamandis/transcripts/2026-09-02 - Humanity's First Star Probe, Architect Labs Beats NVIDIA 3.4x, Musk Wants Satellites to Cool Earth  EP 285.md",
+          "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-09-02 - Humanity's First Star Probe, Architect Labs Beats NVIDIA 3.4x, Musk Wants Satellites to Cool Earth  EP 285.md",
+          "processed_at": "2026-09-03T06:31:55.987495+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-08-29"
+      "latest_published": "2026-09-02"
     },
     "dwarkesh-podcast": {
       "name": "Dwarkesh Podcast",
