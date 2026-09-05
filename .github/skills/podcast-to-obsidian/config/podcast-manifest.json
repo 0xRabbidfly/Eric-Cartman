@@ -362,9 +362,18 @@
           "note_path": "Podcasts/Limitless/2026-09-02 - The ChatGPT Breakout Was Way Worse Than We Thought.md",
           "processed_at": "2026-09-03T06:12:04.511696+00:00",
           "status": "completed"
+        },
+        "8ccc6793-caf7-4e0f-940f-10d103b26f8f": {
+          "title": "THIS WEEK IN AI: GPT Astra, OpenAI vs Cursor, The Truth About Data Centers",
+          "published": "2026-09-04",
+          "audio_url": "https://media.transistor.fm/c4d3d04d/b1003565.mp3",
+          "transcript_path": "Podcasts/Limitless/transcripts/2026-09-04 - THIS WEEK IN AI GPT Astra, OpenAI vs Cursor, The Truth About Data Centers.md",
+          "note_path": "Podcasts/Limitless/2026-09-04 - THIS WEEK IN AI GPT Astra, OpenAI vs Cursor, The Truth About Data Centers.md",
+          "processed_at": "2026-09-05T06:12:50.410475+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-09-02"
+      "latest_published": "2026-09-04"
     },
     "the-pomp-podcast": {
       "name": "The Pomp Podcast",
@@ -837,9 +846,18 @@
           "note_path": "Podcasts/No Priors Artificial Intelligence  Technology  Startups/2026-08-27 - Rethinking Legacy Data Infrastructure with Eon Co-Founders Ofir Ehrlich and Gonen Stein.md",
           "processed_at": "2026-08-30T06:38:02.988705+00:00",
           "status": "completed"
+        },
+        "8476d0dc-a726-11f1-86e6-bbc25e1787ef": {
+          "title": "Redefining Chip Architecture with Arm CEO Rene Haas",
+          "published": "2026-09-03",
+          "audio_url": "https://traffic.megaphone.fm/PDP3024512727.mp3",
+          "transcript_path": "Podcasts/No Priors Artificial Intelligence  Technology  Startups/transcripts/2026-09-03 - Redefining Chip Architecture with Arm CEO Rene Haas.md",
+          "note_path": "Podcasts/No Priors Artificial Intelligence  Technology  Startups/2026-09-03 - Redefining Chip Architecture with Arm CEO Rene Haas.md",
+          "processed_at": "2026-09-05T06:19:22.612747+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-08-27"
+      "latest_published": "2026-09-03"
     },
     "cgi-conversations": {
       "name": "CGI Conversations",
