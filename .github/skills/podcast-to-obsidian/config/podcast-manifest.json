@@ -640,9 +640,18 @@
           "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-09-02 - Humanity's First Star Probe, Architect Labs Beats NVIDIA 3.4x, Musk Wants Satellites to Cool Earth  EP 285.md",
           "processed_at": "2026-09-03T06:31:55.987495+00:00",
           "status": "completed"
+        },
+        "7ad7fcd8-a931-11f1-bffa-c7609ced84aa": {
+          "title": "GPT-6 Astra Saturates ARC-AGI-3, Tesla's $30K Cybercab Floods Austin, Anthropic Proves Fermat's Last Theorem | EP #286",
+          "published": "2026-09-05",
+          "audio_url": "https://traffic.megaphone.fm/DVVTS3996679437.mp3",
+          "transcript_path": "Podcasts/Moonshots with Peter Diamandis/transcripts/2026-09-05 - GPT-6 Astra Saturates ARC-AGI-3, Tesla's $30K Cybercab Floods Austin, Anthropic Proves Fermat's Last Theorem  EP 286.md",
+          "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-09-05 - GPT-6 Astra Saturates ARC-AGI-3, Tesla's $30K Cybercab Floods Austin, Anthropic Proves Fermat's Last Theorem  EP 286.md",
+          "processed_at": "2026-09-06T06:28:19.064324+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-09-02"
+      "latest_published": "2026-09-05"
     },
     "dwarkesh-podcast": {
       "name": "Dwarkesh Podcast",
