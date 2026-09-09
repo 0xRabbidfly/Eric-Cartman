@@ -595,6 +595,21 @@ function scheduleRestart(reason) {
 /**
  * Run Claude CLI once and return the full result text.
  */
+/**
+ * Env for the spawned claude CLI.
+ * ANTHROPIC_API_KEY / ANTHROPIC_AUTH_TOKEN must NOT be inherited: either one makes the
+ * CLI authenticate per-token against the API (fails outright once the credit balance is
+ * empty) and disables claude.ai connectors. Set USE_ANTHROPIC_API_KEY=true to opt back in.
+ */
+function claudeEnv() {
+  const env = { ...process.env };
+  if ((process.env.USE_ANTHROPIC_API_KEY || '').toLowerCase() !== 'true') {
+    delete env.ANTHROPIC_API_KEY;
+    delete env.ANTHROPIC_AUTH_TOKEN;
+  }
+  return env;
+}
+
 async function runClaude(prompt, opts = {}) {
   // Start Playwright on-demand for browser skills (skip for stdio skills that spawn their own)
   if (opts.skill && BROWSER_SKILLS.has(opts.skill) && !STDIO_BROWSER_SKILLS.has(opts.skill)) {
@@ -624,7 +639,7 @@ async function runClaude(prompt, opts = {}) {
     const proc = spawn(CLAUDE_PATH, args, {
       cwd: PROJECT_DIR,
       stdio: ['pipe', 'pipe', 'pipe'],
-      env: { ...process.env },
+      env: claudeEnv(),
       shell: false,
     });
     activeProcess = proc;
@@ -658,7 +673,12 @@ async function runClaude(prompt, opts = {}) {
           resolve(stdout.trim() || 'Done (no output)');
         }
       } else {
-        reject(new Error(stderr || `Claude exited ${code}`));
+        let apiErrorText = '';
+        try {
+          const json = JSON.parse(stdout);
+          if (json.is_error) apiErrorText = json.result || json.error || '';
+        } catch {}
+        reject(new Error(apiErrorText || stderr || `Claude exited ${code}`));
       }
     });
 
@@ -702,7 +722,7 @@ async function runClaudeStreaming(prompt, onEvent, opts = {}) {
     const proc = spawn(CLAUDE_PATH, args, {
       cwd: PROJECT_DIR,
       stdio: ['pipe', 'pipe', 'pipe'],
-      env: { ...process.env },
+      env: claudeEnv(),
       shell: false,
     });
     activeProcess = proc;
@@ -724,6 +744,7 @@ async function runClaudeStreaming(prompt, onEvent, opts = {}) {
     let stderr = '';
     let buffer = '';
     let resultText = '';
+    let apiErrorText = '';
     let toolCallCount = 0;
 
     proc.stdout.on('data', chunk => {
@@ -762,6 +783,9 @@ async function runClaudeStreaming(prompt, onEvent, opts = {}) {
             onEvent({ type: 'init', session_id: evt.session_id });
           } else if (evt.type === 'result') {
             resultText = evt.result || '';
+            // The CLI reports billing/API failures here, not on stderr — keep the text so
+            // the non-zero exit below reports the real cause instead of a stray warning.
+            if (evt.is_error) apiErrorText = evt.result || evt.error || '';
             const elapsed = ((Date.now() - start) / 1000).toFixed(1);
             onEvent({
               type: 'done',
@@ -787,7 +811,7 @@ async function runClaudeStreaming(prompt, onEvent, opts = {}) {
       if (code === 0) {
         resolve(resultText || 'Done (no output)');
       } else {
-        reject(new Error(stderr || `Claude exited ${code}`));
+        reject(new Error(apiErrorText || stderr || `Claude exited ${code}`));
       }
     });
 
