@@ -1614,6 +1614,11 @@
     }
 
     async function reopenGymSession() {
+      // Same pin, and the longest await of the three: the confirm modal waits on
+      // a human. Reopen the session the dialog was about, not whatever is on
+      // screen when they get back to the phone.
+      const profileId = gym.profileId;
+      const week = gymSession.week, day = gymSession.day;
       const ok = await showModal({
         title: 'Reopen this session?',
         message: 'It goes back to editable so you can correct a number. Finishing it again '
@@ -1622,31 +1627,33 @@
       });
       if (!ok?.confirmed) return;
       try {
-        await api(`/api/gym/session/${gymSession.week}/${gymSession.day}/reopen?profile=${encodeURIComponent(gym.profileId)}`, {
+        await api(`/api/gym/session/${week}/${day}/reopen?profile=${encodeURIComponent(profileId)}`, {
           method: 'POST',
           body: JSON.stringify({}),
         });
-        await openGymSession(gymSession.week, gymSession.day);
+        await openGymSession(week, day);
       } catch (e) {
         showToast(`Could not reopen: ${e.message}`, 'error', 4200);
       }
     }
 
     async function retryGymAssessment() {
-      // Pinned once, like pollGymJob does. The profile switcher lives in the
-      // fixed header and stays tappable across these awaits; re-reading
-      // gym.profileId per request could reopen one athlete's session and
-      // finish the other's.
+      // Pinned once, like pollGymJob does. The header stays live across these
+      // awaits: the profile switcher could reopen one athlete's session and
+      // finish the other's, and navigating to another day could aim the finish
+      // at a session that was never reopened. Target is fixed before the first
+      // request, not re-read per request.
       const profileId = gym.profileId;
+      const week = gymSession.week, day = gymSession.day;
       gymSession.assessment = null;
       gymSession.assessmentFailed = false;
       renderGymSession();
       try {
-        const res = await api(`/api/gym/session/${gymSession.week}/${gymSession.day}/reopen?profile=${encodeURIComponent(profileId)}`, {
+        const res = await api(`/api/gym/session/${week}/${day}/reopen?profile=${encodeURIComponent(profileId)}`, {
           method: 'POST', body: JSON.stringify({}),
         });
         void res;
-        const finish = await api(`/api/gym/session/${gymSession.week}/${gymSession.day}/finish?profile=${encodeURIComponent(profileId)}`, {
+        const finish = await api(`/api/gym/session/${week}/${day}/finish?profile=${encodeURIComponent(profileId)}`, {
           method: 'POST', body: JSON.stringify({}),
         });
         gymSession.data.log = finish.log;
@@ -1662,20 +1669,27 @@
       if (gymCollectEntries().length === 0) {
         return showToast('Log at least one set first.', 'error');
       }
-      // Pinned before the first await. Both profiles' week files are
-      // byte-identical, so itemId validation would happily accept Athlete A's sets
-      // into Athlete B's log if the switcher were tapped mid-finish — and then
-      // recompute her maxes from them.
+      // Pinned before the first await — profile, week and day together, because
+      // all three are read off live state that the header and the day list can
+      // change mid-finish. Both profiles' week files are byte-identical, so
+      // itemId validation would happily accept Athlete A's sets into Athlete B's log if
+      // the switcher were tapped — and then recompute her maxes from them.
       const profileId = gym.profileId;
+      const week = gymSession.week, day = gymSession.day;
+      // The body is snapshotted here too, not read back after the flush. Pinning
+      // the URL while still collecting entries live would post whatever session
+      // is open when the flush resolves to the session that was open when Finish
+      // was tapped — the same mismatch, pointing the other way.
+      const body = { entries: gymCollectEntries(), dayNotes: gymSession.dayNotes };
       await gymFlushSave();
       const btn = document.querySelector('.gym-finish');
       if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
       try {
-        await api(`/api/gym/session/${gymSession.week}/${gymSession.day}?profile=${encodeURIComponent(profileId)}`, {
+        await api(`/api/gym/session/${week}/${day}?profile=${encodeURIComponent(profileId)}`, {
           method: 'PUT',
-          body: JSON.stringify({ entries: gymCollectEntries(), dayNotes: gymSession.dayNotes }),
+          body: JSON.stringify(body),
         });
-        const res = await api(`/api/gym/session/${gymSession.week}/${gymSession.day}/finish?profile=${encodeURIComponent(profileId)}`, {
+        const res = await api(`/api/gym/session/${week}/${day}/finish?profile=${encodeURIComponent(profileId)}`, {
           method: 'POST',
           body: JSON.stringify({}),
         });
