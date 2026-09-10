@@ -499,6 +499,9 @@
     .tab-btn .tab-icon { font-size: 19px; line-height: 1; }
     .tab-btn.active { color: var(--accent); }
     .tab-btn.active .tab-icon { transform: translateY(-1px); }
+    /* The tab bar sets display:flex, which beats the UA stylesheet's [hidden] rule.
+       Without this, hiding the Gym tab on a clone with no gym data silently fails. */
+    .tab-btn[hidden] { display: none; }
 
     /* ── Research reader ── */
     .lib-search-wrap { padding: 0 16px 8px; flex-shrink: 0; }
@@ -668,6 +671,137 @@
     @media (min-width: 600px) {
       body { max-width: 500px; margin: 0 auto; border-left: 1px solid var(--border); border-right: 1px solid var(--border); }
     }
+
+    /* ── Gym tracker ── */
+    .gym-weekbar {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 8px; margin: 0 16px 10px; padding: 8px 10px;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 10px; flex-shrink: 0;
+    }
+    .gym-weekbar button {
+      background: none; border: none; color: var(--text);
+      font-size: 18px; line-height: 1; padding: 4px 8px; cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .gym-weekbar button:disabled { opacity: .25; }
+    .gym-weekbar .gw-label { text-align: center; flex: 1; }
+    .gym-weekbar .gw-title { font-weight: 700; font-size: 14px; }
+    .gym-weekbar .gw-sub { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+    .gym-banner {
+      margin: 0 16px 10px; padding: 9px 11px;
+      background: #f59e0b18; border: 1px solid #f59e0b55;
+      border-radius: 10px; font-size: 12px; line-height: 1.45; color: #f6c66b;
+    }
+    .gym-day {
+      display: flex; align-items: center; gap: 12px;
+      padding: 13px 14px; margin-bottom: 9px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .gym-day:active { background: var(--surface2); }
+    .gym-day .gd-num {
+      width: 34px; height: 34px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 9px; background: var(--surface2);
+      font-weight: 700; font-size: 13px; color: var(--text-dim);
+    }
+    .gym-day.done .gd-num { background: var(--success); color: #06210f; }
+    .gym-day.partial .gd-num { background: var(--warn); color: #2a1c00; }
+    .gym-day .gd-body { flex: 1; min-width: 0; }
+    .gym-day .gd-title { font-weight: 600; font-size: 14px; }
+    .gym-day .gd-meta { font-size: 11.5px; color: var(--text-dim); margin-top: 3px; }
+    .gym-day .gd-chev { color: var(--text-dim); font-size: 18px; }
+    .gym-empty { text-align: center; color: var(--text-dim); padding: 40px 20px; font-size: 13px; }
+    .gym-back {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: none; border: none; color: var(--accent);
+      font-size: 13px; font-weight: 600; padding: 4px 0 10px; cursor: pointer;
+    }
+    .gym-warmup {
+      margin-bottom: 12px; padding: 10px 12px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; font-size: 12px; line-height: 1.5; color: var(--text-dim);
+    }
+    .gym-warmup b { color: var(--text); }
+    .gym-item {
+      margin-bottom: 12px; padding: 12px;
+      background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    }
+    .gym-item .gi-head { display: flex; align-items: baseline; gap: 8px; }
+    .gym-item .gi-block {
+      font-size: 10px; font-weight: 800; color: var(--accent);
+      background: var(--accent-soft); border-radius: 5px; padding: 2px 5px;
+    }
+    .gym-item .gi-name {
+      font-weight: 600; font-size: 14px; color: var(--text);
+      text-decoration: underline dotted var(--text-dim); cursor: pointer;
+    }
+    .gym-item .gi-presc { font-size: 11.5px; color: var(--text-dim); margin: 5px 0 9px; line-height: 1.5; }
+    .gym-sets { display: flex; flex-direction: column; gap: 6px; }
+    .gym-setrow { display: grid; grid-template-columns: 26px 1fr 1fr 1fr; gap: 6px; align-items: center; }
+    .gym-setrow.head { font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: .05em; }
+    .gym-setrow .sr-n { font-size: 12px; color: var(--text-dim); text-align: center; }
+    .gym-setrow input {
+      width: 100%; padding: 8px 6px; text-align: center;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text); font-size: 15px; outline: none;
+      -webkit-appearance: none;
+    }
+    .gym-setrow input:focus { border-color: var(--accent); }
+    .gym-setrow input.filled { border-color: var(--success); }
+    .gym-setctl { display: flex; gap: 8px; margin-top: 8px; }
+    .gym-setctl button {
+      flex: 1; padding: 7px; font-size: 12px; font-weight: 600;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text-dim); cursor: pointer;
+    }
+    .gym-notes {
+      width: 100%; min-height: 74px; padding: 10px 12px; margin-bottom: 12px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; color: var(--text); font-size: 14px;
+      font-family: inherit; resize: vertical; outline: none;
+    }
+    .gym-finish {
+      width: 100%; padding: 14px; margin-bottom: 8px;
+      background: var(--accent); border: none; border-radius: 12px;
+      color: #fff; font-size: 15px; font-weight: 700; cursor: pointer;
+    }
+    .gym-finish:disabled { opacity: .45; }
+    .gym-assess {
+      margin: 4px 0 20px; padding: 13px 14px;
+      background: var(--bot-bubble); border: 1px solid var(--border);
+      border-radius: 12px; font-size: 13.5px; line-height: 1.6;
+    }
+    .gym-assess h1, .gym-assess h2, .gym-assess h3 { font-size: 14px; margin: 10px 0 6px; }
+    .gym-assess p { margin: 7px 0; }
+    .gym-assess ul { margin: 7px 0 7px 18px; }
+    .gym-sheet-body { font-size: 13px; line-height: 1.6; text-align: left; }
+    .gym-sheet-body b { color: var(--accent); }
+    .gym-sheet-body p { margin: 8px 0; }
+    .gym-statcard {
+      margin-bottom: 10px; padding: 12px 14px;
+      background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    }
+    .gym-statcard h3 { font-size: 12px; color: var(--text-dim); font-weight: 700;
+                       text-transform: uppercase; letter-spacing: .05em; margin-bottom: 10px; }
+    .gym-statrow { display: grid; grid-template-columns: 42px 1fr 66px; gap: 10px;
+                   align-items: center; padding: 5px 0; font-size: 12.5px; }
+    .gym-statrow .sr-label { color: var(--text-dim); }
+    .gym-statrow .sr-value { text-align: right; font-variant-numeric: tabular-nums; }
+    .gym-statrow.dim { opacity: .4; }
+    .gym-bar { height: 7px; border-radius: 4px; background: var(--surface2); overflow: hidden; }
+    .gym-bar > span { display: block; height: 100%; background: var(--accent); border-radius: 4px; }
+    .gym-note {
+      margin-bottom: 10px; background: var(--surface);
+      border: 1px solid var(--border); border-radius: 12px; overflow: hidden;
+    }
+    .gym-note summary { padding: 12px 14px; cursor: pointer; font-weight: 600; font-size: 13.5px; }
+    .gym-note summary::-webkit-details-marker { display: none; }
+    .gym-note .gn-body { padding: 0 14px 14px; font-size: 13px; line-height: 1.6; }
+    .gym-note .gn-body h1, .gym-note .gn-body h2, .gym-note .gn-body h3 { font-size: 14px; margin: 10px 0 6px; }
+    .gym-note .gn-body ul { margin: 7px 0 7px 18px; }
   </style>
 </head>
 <body>
@@ -793,6 +927,23 @@
       </div>
     </div>
 
+    <!-- ── Gym ── -->
+    <div id="viewGym" class="view">
+      <div class="view-head">
+        <div class="view-title">🏋️ Gym</div>
+        <button class="notes-refresh-btn" onclick="loadGymWeek(gym.week, true)" title="Refresh">🔄</button>
+      </div>
+      <div class="seg" id="gymProfileSeg"></div>
+      <div class="seg">
+        <button class="seg-btn active" data-gym="week" onclick="setGymView('week')">Week</button>
+        <button class="seg-btn" data-gym="stats" onclick="setGymView('stats')">Stats</button>
+        <button class="seg-btn" data-gym="notes" onclick="setGymView('notes')">Notes</button>
+      </div>
+      <div id="gymScroll" class="view-scroll">
+        <div class="gym-empty">Loading…</div>
+      </div>
+    </div>
+
   </div>
 
   <!-- ── Bottom tab bar ── -->
@@ -805,6 +956,9 @@
     </button>
     <button class="tab-btn" data-tab="skills" onclick="setTab('skills')">
       <span class="tab-icon">⚡</span>Skills
+    </button>
+    <button class="tab-btn" data-tab="gym" onclick="setTab('gym')" id="gymTabBtn" hidden>
+      <span class="tab-icon">🏋️</span>Gym
     </button>
     <button class="tab-btn" data-tab="settings" onclick="setTab('settings')">
       <span class="tab-icon">⚙️</span>Settings
@@ -863,7 +1017,8 @@
       const confirm = document.getElementById('modalConfirm');
 
       title.textContent = options.title || 'Confirm';
-      text.textContent = options.message || '';
+      if (options.html) text.innerHTML = options.html;
+      else text.textContent = options.message || '';
       confirm.textContent = options.confirmLabel || 'OK';
       cancel.textContent = options.cancelLabel || 'Cancel';
       cancel.classList.toggle('hidden', options.showCancel === false);
@@ -999,6 +1154,7 @@
 
     function skillIcon(name) {
       const icons = {
+        'gym-cyclist': '🏋️',
         'obsidian': '💎', 'last30days': '📰', 'visual-explainer': '🎨',
         'project-guide': '🗺️', 'content-research-writer': '✍️',
         'skill-reflection': '🪞', 'health-audit': '🩺',
@@ -1059,6 +1215,629 @@
       renderSkillList();
     }
 
+    // ── Gym tracker ──
+    // The tab hides itself when the server has no gym data, so a clone of this
+    // repo shows the four tabs it always had.
+    const gym = {
+      loaded: false,
+      enabled: false,
+      profiles: [],
+      profileId: localStorage.getItem('gym_profile') || null,
+      week: 1,
+      currentWeek: 1,
+      weekData: null,
+      view: 'week',
+      showing: null,
+      // Keyed profile/week/day, so a result that lands while the user is looking
+      // at something else is still there when they come back.
+      assessmentCache: {},
+      exercises: null,
+    };
+
+    async function loadGymProfiles() {
+      try {
+        const data = await api('/api/gym/profiles');
+        gym.loaded = true;
+        gym.enabled = !!data.enabled;
+        gym.profiles = data.profiles || [];
+        document.getElementById('gymTabBtn').hidden = !gym.enabled;
+        if (!gym.enabled) return;
+        if (!gym.profiles.some(p => p.id === gym.profileId)) {
+          gym.profileId = gym.profiles[0]?.id || null;
+        }
+        renderGymProfileSeg();
+        const me = gym.profiles.find(p => p.id === gym.profileId);
+        gym.currentWeek = me ? me.currentWeek : 1;
+        gym.week = Math.min(gym.currentWeek, 12);
+        await loadGymWeek(gym.week);
+      } catch (e) {
+        document.getElementById('gymScroll').innerHTML =
+          `<div class="gym-empty">Could not load gym data.<br>${escHtml(e.message)}</div>`;
+      }
+    }
+
+    function renderGymProfileSeg() {
+      document.getElementById('gymProfileSeg').innerHTML = gym.profiles.map(p => `
+        <button class="seg-btn ${p.id === gym.profileId ? 'active' : ''}"
+                onclick="setGymProfile('${escJsAttr(p.id)}')">${escHtml(p.name)}</button>
+      `).join('');
+    }
+
+    async function setGymProfile(id) {
+      if (id === gym.profileId) return;
+      await gymFlushSave();
+      gym.profileId = id;
+      localStorage.setItem('gym_profile', id);
+      const me = gym.profiles.find(p => p.id === id);
+      gym.currentWeek = me ? me.currentWeek : 1;
+      gym.week = Math.min(gym.currentWeek, 12);
+      renderGymProfileSeg();
+      if (gym.view === 'week') await loadGymWeek(gym.week);
+      else setGymView(gym.view);
+    }
+
+    async function loadGymWeek(n, force) {
+      gym.showing = 'week';
+      gym.week = Math.min(Math.max(n, 1), 12);
+      const scroll = document.getElementById('gymScroll');
+      if (force || !gym.weekData) scroll.innerHTML = '<div class="gym-empty">Loading…</div>';
+      try {
+        gym.weekData = await api(`/api/gym/week/${gym.week}?profile=${encodeURIComponent(gym.profileId)}`);
+        renderGymWeek();
+      } catch (e) {
+        scroll.innerHTML = `<div class="gym-empty">${escHtml(e.message)}</div>`;
+      }
+    }
+
+    const GYM_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    function gymShortDate(iso) {
+      const d = new Date(`${iso}T00:00:00Z`);
+      return `${GYM_MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}`;
+    }
+
+    function renderGymWeek() {
+      gym.showing = 'week';
+      const w = gym.weekData;
+      if (!w) return;
+      const bounds = `${gymShortDate(w.bounds.start)} – ${gymShortDate(w.bounds.end)}`;
+      const isNow = w.week === gym.currentWeek;
+
+      const banner = w.loadsResolved ? '' : `
+        <div class="gym-banner">Loads for this week are not set yet. They are
+        calculated once week ${w.week - 1} is fully logged and the tests it depends on exist.
+        You can still log whatever you lift.</div>`;
+
+      const days = w.days.map(d => {
+        const cls = d.logStatus === 'complete' ? 'done'
+                  : d.logStatus === 'in_progress' ? 'partial' : '';
+        const sets = `${d.loggedSets} set${d.loggedSets === 1 ? '' : 's'} logged`;
+        const meta = d.logStatus === 'complete'
+          ? `Done ${gymShortDate(d.performedOn)} · ${sets}`
+          : d.logStatus === 'in_progress'
+            ? `In progress · ${sets}`
+            : `${d.estMinutes} min · ${d.items.length} exercises`;
+        return `
+          <div class="gym-day ${cls}" onclick="openGymSession(${w.week}, ${d.day})">
+            <div class="gd-num">D${d.day}</div>
+            <div class="gd-body">
+              <div class="gd-title">${escHtml(d.title)}</div>
+              <div class="gd-meta">${escHtml(meta)}</div>
+            </div>
+            <div class="gd-chev">›</div>
+          </div>`;
+      }).join('');
+
+      document.getElementById('gymScroll').innerHTML = `
+        <div class="gym-weekbar">
+          <button onclick="loadGymWeek(${w.week - 1})" ${w.week <= 1 ? 'disabled' : ''}>‹</button>
+          <div class="gw-label">
+            <div class="gw-title">W${w.week} · ${escHtml(w.blockLabel)}</div>
+            <div class="gw-sub">${bounds}${isNow ? ' · this week' : ''}</div>
+          </div>
+          <button onclick="loadGymWeek(${w.week + 1})" ${w.week >= 12 ? 'disabled' : ''}>›</button>
+        </div>
+        ${banner}
+        ${days}`;
+    }
+
+    function setGymView(view) {
+      gym.view = view;
+      document.querySelectorAll('#viewGym .seg-btn[data-gym]').forEach(b =>
+        b.classList.toggle('active', b.dataset.gym === view));
+      if (view === 'week') renderGymWeek();
+      if (view === 'stats') renderGymStats();
+      if (view === 'notes') renderGymNotes();
+    }
+
+    // ── Gym session logging ──
+    const gymSession = { week: null, day: null, data: null, entries: new Map(), dayNotes: '',
+                         saveTimer: null, pending: null, saving: Promise.resolve(),
+                         job: null, assessment: null, assessmentFailed: false };
+
+    function gymEntryKey(itemId, setNo) { return `${itemId}#${setNo}`; }
+
+    async function openGymSession(week, day) {
+      await gymFlushSave();
+      gymSession.week = week;
+      gymSession.day = day;
+      gymSession.assessment = null;
+      gymSession.assessmentFailed = false;
+      gymSession.job = null;
+      document.getElementById('gymScroll').innerHTML = '<div class="gym-empty">Loading…</div>';
+      try {
+        const [data, exercises] = await Promise.all([
+          api(`/api/gym/session/${week}/${day}?profile=${encodeURIComponent(gym.profileId)}`),
+          gym.exercises ? Promise.resolve(gym.exercises)
+                        : api(`/api/gym/exercises?profile=${encodeURIComponent(gym.profileId)}`),
+        ]);
+        gym.exercises = exercises;
+        gymSession.data = data;
+        gymSession.dayNotes = data.log.dayNotes || '';
+        gymSession.entries = new Map(
+          (data.log.entries || []).map(e => [gymEntryKey(e.itemId, e.set), e]));
+        const cached = gym.assessmentCache[`${gym.profileId}/${week}/${day}`];
+        if (cached) gymSession.assessment = cached;
+        renderGymSession();
+      } catch (e) {
+        document.getElementById('gymScroll').innerHTML =
+          `<div class="gym-empty">${escHtml(e.message)}</div>`;
+      }
+    }
+
+    function gymRowCount(item) {
+      let max = item.sets;
+      for (const key of gymSession.entries.keys()) {
+        const [itemId, setNo] = key.split('#');
+        if (itemId === item.id) max = Math.max(max, Number(setNo));
+      }
+      return max;
+    }
+
+    function gymLoadLabel(item) {
+      const target = item.targetLoad;
+      if (item.loadType === 'bodyweight') return 'bodyweight';
+      if (item.loadType === 'setting') return target ? `setting ${target}` : 'cable setting';
+      if (item.loadType === 'bodyweight_plus_kg') return target ? `bw + ${target} kg` : 'bw + load';
+      if (target === null || target === undefined) {
+        return item.targetPct ? `${item.targetPct}% of 1RM — not set yet` : 'your call';
+      }
+      if (item.loadType === 'kg_total_pair') return `${target} kg total (${target / 2}/hand)`;
+      return `${target} kg`;
+    }
+
+    const GYM_UNITS = { reps: 'reps', reps_per_side: 'reps/side', seconds: 's', cm: 'cm', metres: 'm' };
+
+    function gymRepLabel(item) {
+      return `${item.sets}${item.setsAreOptional ? ' max' : ''} × ${item.reps} ${GYM_UNITS[item.resultType]}`;
+    }
+
+    // The prescribed load, shown in the box the athlete is about to type into,
+    // so logging is mostly confirming a number rather than recalling one.
+    //
+    // Deliberately a placeholder and not a pre-filled `value`. A filled box
+    // reads as already logged when nothing has been logged, and `onchange`
+    // does not fire on a field the user taps and leaves unchanged — so
+    // "confirming" a pre-filled target would silently record nothing.
+    function gymLoadPlaceholder(item) {
+      if (item.targetLoad !== null && item.targetLoad !== undefined) return String(item.targetLoad);
+      return item.loadType === 'bodyweight' ? 'bw' : 'load';
+    }
+
+    // The middle column holds whatever the exercise is measured in: reps for a
+    // squat, centimetres for a broad jump, seconds for a plank.
+    function gymResultPlaceholder(item) {
+      return item.resultType === 'reps' || item.resultType === 'reps_per_side'
+        ? String(item.reps)
+        : GYM_UNITS[item.resultType];
+    }
+
+    function renderGymSession() {
+      gym.showing = 'session';
+      const s = gymSession.data;
+      const done = s.log.status === 'complete';
+
+      const items = s.day.items.map(item => {
+        const rows = [];
+        for (let n = 1; n <= gymRowCount(item); n += 1) {
+          const e = gymSession.entries.get(gymEntryKey(item.id, n)) || {};
+          const val = v => (v === null || v === undefined ? '' : v);
+          const filled = v => (v === null || v === undefined || v === '' ? '' : 'filled');
+          rows.push(`
+            <div class="gym-setrow">
+              <div class="sr-n">${n}</div>
+              <input inputmode="decimal" placeholder="${escHtml(gymLoadPlaceholder(item))}"
+                     class="${filled(e.load)}" value="${val(e.load)}" ${done ? 'disabled' : ''}
+                     onchange="gymSetInput('${escJsAttr(item.id)}', ${n}, 'load', this.value, this)">
+              <input inputmode="numeric" placeholder="${escHtml(gymResultPlaceholder(item))}"
+                     class="${filled(e.reps)}" value="${val(e.reps)}" ${done ? 'disabled' : ''}
+                     onchange="gymSetInput('${escJsAttr(item.id)}', ${n}, 'reps', this.value, this)">
+              <input inputmode="decimal" placeholder="RPE"
+                     class="${filled(e.rpe)}" value="${val(e.rpe)}" ${done ? 'disabled' : ''}
+                     onchange="gymSetInput('${escJsAttr(item.id)}', ${n}, 'rpe', this.value, this)">
+            </div>`);
+        }
+
+        const paired = item.pairedWith
+          ? ` · then ${item.pairedWith.reps} ${item.pairedWith.exerciseKey.replace(/-/g, ' ')} within ${item.pairedWith.withinSec}s`
+          : '';
+        const rpe = item.targetRpe ? ` · RPE ${item.targetRpe}` : '';
+        const ctl = (item.setsAreOptional && !done) ? `
+          <div class="gym-setctl">
+            <button onclick="gymAddSet('${escJsAttr(item.id)}')">+ set</button>
+            <button onclick="gymRemoveSet('${escJsAttr(item.id)}')">− set</button>
+          </div>` : '';
+
+        return `
+          <div class="gym-item">
+            <div class="gi-head">
+              <span class="gi-block">${escHtml(item.block)}</span>
+              <span class="gi-name" onclick="gymShowExercise('${escJsAttr(item.exerciseKey)}')">${escHtml(item.label)}</span>
+            </div>
+            <div class="gi-presc">${escHtml(gymRepLabel(item))} · ${escHtml(gymLoadLabel(item))}${rpe} · rest ${item.restSec}s${escHtml(paired)}
+              ${item.loadNote ? `<br>${escHtml(item.loadNote)}` : ''}</div>
+            <div class="gym-sets">
+              <div class="gym-setrow head"><div></div><div>Load</div><div>Reps</div><div>RPE</div></div>
+              ${rows.join('')}
+            </div>
+            ${ctl}
+          </div>`;
+      }).join('');
+
+      const retry = gymSession.assessmentFailed
+        ? '<button class="gym-finish" onclick="retryGymAssessment()">Retry the assessment</button>'
+        : '';
+      const assessment = gymSession.assessment
+        ? `<div class="gym-assess">${marked.parse(gymSession.assessment)}</div>${retry}`
+        : gymSession.job
+          ? '<div class="gym-assess">Assessing the session… this takes a minute or two.</div>'
+          : '';
+
+      document.getElementById('gymScroll').innerHTML = `
+        <button class="gym-back" onclick="loadGymWeek(${gymSession.week}, true)">‹ W${gymSession.week}</button>
+        <div class="gym-weekbar">
+          <div class="gw-label">
+            <div class="gw-title">D${s.day.day} · ${escHtml(s.day.title)}</div>
+            <div class="gw-sub">${s.day.estMinutes} min · ${escHtml(s.week.blockLabel)}${done ? ` · done ${gymShortDate(s.log.performedOn)}` : ''}</div>
+          </div>
+        </div>
+        <div class="gym-warmup"><b>Warm-up</b> · ${s.day.warmup.map(escHtml).join(' · ')}</div>
+        ${items}
+        <textarea class="gym-notes" placeholder="Day notes — sleep, ride load, anything sore"
+                  ${done ? 'disabled' : ''}
+                  onchange="gymSetNotes(this.value)">${escHtml(gymSession.dayNotes)}</textarea>
+        ${done
+          ? `<button class="gym-back" onclick="reopenGymSession()">Reopen to correct a number</button>`
+          : `<button class="gym-finish" onclick="finishGymWorkout()">Finish workout</button>`}
+        ${assessment}`;
+    }
+
+    function gymCollectEntries() {
+      return [...gymSession.entries.values()].filter(e =>
+        e.load !== null || e.reps !== null || e.rpe !== null);
+    }
+
+    // Snapshot BOTH the target and the body at queue time. Reading them when the
+    // timer fires 800ms later is how one day's edit lands on another day.
+    function gymQueueSave() {
+      clearTimeout(gymSession.saveTimer);
+      gymSession.pending = {
+        week: gymSession.week,
+        day: gymSession.day,
+        profileId: gym.profileId,
+        body: { entries: gymCollectEntries(), dayNotes: gymSession.dayNotes },
+      };
+      gymSession.saveTimer = setTimeout(gymFlushSave, 800);
+    }
+
+    // Serialised: one PUT at a time, so a delayed small snapshot can never land
+    // after a newer larger one. Safe to call at any navigation boundary.
+    function gymFlushSave() {
+      clearTimeout(gymSession.saveTimer);
+      gymSession.saveTimer = null;
+      const pending = gymSession.pending;
+      if (!pending) return gymSession.saving;
+      gymSession.pending = null;
+      gymSession.saving = gymSession.saving
+        .then(() => api(`/api/gym/session/${pending.week}/${pending.day}?profile=${encodeURIComponent(pending.profileId)}`, {
+          method: 'PUT',
+          body: JSON.stringify(pending.body),
+        }))
+        .catch(e => showToast(`Not saved: ${e.message}`, 'error', 4200));
+      return gymSession.saving;
+    }
+
+    // A phone backgrounding the app is the common case, not an edge case.
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') gymFlushSave();
+    });
+
+    function gymSetInput(itemId, setNo, field, raw, el) {
+      const item = gymSession.data.day.items.find(i => i.id === itemId);
+      const key = gymEntryKey(itemId, setNo);
+      const entry = gymSession.entries.get(key)
+        || { itemId, set: setNo, load: null, loadType: item.loadType, reps: null, rpe: null, note: '' };
+      const text = String(raw).trim();
+      entry[field] = text === '' ? null : Number(text);
+      if (Number.isNaN(entry[field])) entry[field] = null;
+      gymSession.entries.set(key, entry);
+      // Keep the green "logged" border in step with what was just typed.
+      if (el) el.classList.toggle('filled', String(raw).trim() !== '');
+      gymQueueSave();
+    }
+
+    function gymSetNotes(value) {
+      gymSession.dayNotes = value;
+      gymQueueSave();
+    }
+
+    function gymAddSet(itemId) {
+      const item = gymSession.data.day.items.find(i => i.id === itemId);
+      const next = gymRowCount(item) + 1;
+      gymSession.entries.set(gymEntryKey(itemId, next),
+        { itemId, set: next, load: null, loadType: item.loadType, reps: null, rpe: null, note: '' });
+      renderGymSession();
+    }
+
+    async function gymRemoveSet(itemId) {
+      const item = gymSession.data.day.items.find(i => i.id === itemId);
+      const last = gymRowCount(item);
+      if (last <= 1) return;
+      const key = gymEntryKey(itemId, last);
+      const entry = gymSession.entries.get(key);
+      if (entry && (entry.load !== null || entry.reps !== null || entry.rpe !== null)) {
+        const ok = await showModal({
+          title: 'Remove this set?',
+          message: `Set ${last} has a logged value. Removing it deletes what you entered.`,
+          confirmLabel: 'Remove',
+        });
+        if (!ok?.confirmed) return;
+      }
+      gymSession.entries.delete(key);
+      gymQueueSave();
+      renderGymSession();
+    }
+
+    function gymShowExercise(key) {
+      const ex = (gym.exercises || {})[key];
+      if (!ex) return showToast('No entry for that exercise.', 'error');
+      showModal({
+        title: ex.name,
+        html: `<div class="gym-sheet-body">
+          <p><b>Why</b> ${escHtml(ex.why)}</p>
+          <p><b>How</b> ${escHtml(ex.how)}</p>
+          <p><b>Cues</b> ${escHtml(ex.cues)}</p>
+          <p><a href="${escHtml(ex.video)}" target="_blank" rel="noopener">Watch the tutorial ›</a></p>
+        </div>`,
+        confirmLabel: 'Close',
+        showCancel: false,
+      });
+    }
+
+    async function reopenGymSession() {
+      // Same pin, and the longest await of the three: the confirm modal waits on
+      // a human. Reopen the session the dialog was about, not whatever is on
+      // screen when they get back to the phone.
+      const profileId = gym.profileId;
+      const week = gymSession.week, day = gymSession.day;
+      const ok = await showModal({
+        title: 'Reopen this session?',
+        message: 'It goes back to editable so you can correct a number. Finishing it again '
+               + 'recomputes your maxes and re-runs the assessment.',
+        confirmLabel: 'Reopen',
+      });
+      if (!ok?.confirmed) return;
+      try {
+        await api(`/api/gym/session/${week}/${day}/reopen?profile=${encodeURIComponent(profileId)}`, {
+          method: 'POST',
+          body: JSON.stringify({}),
+        });
+        await openGymSession(week, day);
+      } catch (e) {
+        showToast(`Could not reopen: ${e.message}`, 'error', 4200);
+      }
+    }
+
+    async function retryGymAssessment() {
+      // Pinned once, like pollGymJob does. The header stays live across these
+      // awaits: the profile switcher could reopen one athlete's session and
+      // finish the other's, and navigating to another day could aim the finish
+      // at a session that was never reopened. Target is fixed before the first
+      // request, not re-read per request.
+      const profileId = gym.profileId;
+      const week = gymSession.week, day = gymSession.day;
+      gymSession.assessment = null;
+      gymSession.assessmentFailed = false;
+      renderGymSession();
+      try {
+        const res = await api(`/api/gym/session/${week}/${day}/reopen?profile=${encodeURIComponent(profileId)}`, {
+          method: 'POST', body: JSON.stringify({}),
+        });
+        void res;
+        const finish = await api(`/api/gym/session/${week}/${day}/finish?profile=${encodeURIComponent(profileId)}`, {
+          method: 'POST', body: JSON.stringify({}),
+        });
+        gymSession.data.log = finish.log;
+        gymSession.job = finish.jobId || null;
+        renderGymSession();
+        if (finish.jobId) pollGymJob(finish.jobId);
+      } catch (e) {
+        showToast(`Retry failed: ${e.message}`, 'error', 4200);
+      }
+    }
+
+    async function finishGymWorkout() {
+      if (gymCollectEntries().length === 0) {
+        return showToast('Log at least one set first.', 'error');
+      }
+      // Pinned before the first await — profile, week and day together, because
+      // all three are read off live state that the header and the day list can
+      // change mid-finish. Both profiles' week files are byte-identical, so
+      // itemId validation would happily accept Athlete A's sets into Athlete B's log if
+      // the switcher were tapped — and then recompute her maxes from them.
+      const profileId = gym.profileId;
+      const week = gymSession.week, day = gymSession.day;
+      // The body is snapshotted here too, not read back after the flush. Pinning
+      // the URL while still collecting entries live would post whatever session
+      // is open when the flush resolves to the session that was open when Finish
+      // was tapped — the same mismatch, pointing the other way.
+      const body = { entries: gymCollectEntries(), dayNotes: gymSession.dayNotes };
+      await gymFlushSave();
+      const btn = document.querySelector('.gym-finish');
+      if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+      try {
+        await api(`/api/gym/session/${week}/${day}?profile=${encodeURIComponent(profileId)}`, {
+          method: 'PUT',
+          body: JSON.stringify(body),
+        });
+        const res = await api(`/api/gym/session/${week}/${day}/finish?profile=${encodeURIComponent(profileId)}`, {
+          method: 'POST',
+          body: JSON.stringify({}),
+        });
+        gymSession.data.log = res.log;
+        gymSession.job = res.jobId || null;
+        showToast('Workout saved.', 'success');
+        if (!res.jobId) {
+          // The skill is not installed on this machine. The log is still saved.
+          gymSession.assessment = res.assessmentSkipped || 'No assessment was run.';
+          renderGymSession();
+          return;
+        }
+        renderGymSession();
+        pollGymJob(res.jobId);
+      } catch (e) {
+        showToast(`Finish failed: ${e.message}`, 'error', 5000);
+        if (btn) { btn.disabled = false; btn.textContent = 'Finish workout'; }
+      }
+    }
+
+    async function pollGymJob(jobId) {
+      // The log is already saved server-side, so a failure here costs the
+      // assessment only. Give up after ten minutes rather than polling forever.
+      const week = gymSession.week, day = gymSession.day, profileId = gym.profileId;
+      const key = `${profileId}/${week}/${day}`;
+      const stillHere = () => gym.showing === 'session'
+        && gymSession.week === week && gymSession.day === day;
+      const deadline = Date.now() + 10 * 60 * 1000;
+      while (Date.now() < deadline) {
+        await new Promise(r => setTimeout(r, 4000));
+        if (gymSession.job !== jobId) return;   // a newer finish superseded this run
+        let job;
+        try { job = await api(`/api/jobs/${jobId}`); } catch { continue; }
+        if (job.status === 'done') {
+          const text = job.result || job.text || 'Assessment finished with no text.';
+          gym.assessmentCache[key] = text;
+          gymSession.job = null;
+          if (stillHere()) { gymSession.assessment = text; renderGymSession(); }
+          else showToast('Assessment ready. Open the session to read it.', 'success', 5000);
+          return;
+        }
+        if (job.status === 'error') {
+          const text = `Assessment failed: ${job.error}\n\nYour log is saved either way.`;
+          gym.assessmentCache[key] = text;
+          gymSession.assessmentFailed = true;
+          gymSession.job = null;
+          if (stillHere()) { gymSession.assessment = text; renderGymSession(); }
+          else showToast('Assessment failed. Open the session to read it.', 'error', 5000);
+          return;
+        }
+      }
+      const text = 'Assessment timed out. Your log is saved.';
+      gym.assessmentCache[key] = text;
+      gymSession.assessmentFailed = true;
+      gymSession.job = null;
+      if (stillHere()) { gymSession.assessment = text; renderGymSession(); }
+      else showToast('Assessment timed out. Open the session to read it.', 'error', 5000);
+    }
+    function gymBar(value, max) {
+      const pct = max > 0 ? Math.round((value / max) * 100) : 0;
+      return `<div class="gym-bar"><span style="width:${pct}%"></span></div>`;
+    }
+
+    async function renderGymStats() {
+      gym.showing = 'stats';
+      const scroll = document.getElementById('gymScroll');
+      scroll.innerHTML = '<div class="gym-empty">Loading…</div>';
+      let data;
+      try {
+        data = await api(`/api/gym/stats?profile=${encodeURIComponent(gym.profileId)}`);
+      } catch (e) {
+        scroll.innerHTML = `<div class="gym-empty">${escHtml(e.message)}</div>`;
+        return;
+      }
+
+      const maxTonnage = Math.max(1, ...data.weeks.map(w => w.tonnage));
+      const weeks = data.weeks.map(w => `
+        <div class="gym-statrow ${w.sessionsCompleted === 0 ? 'dim' : ''}">
+          <div class="sr-label">W${w.week}</div>
+          ${gymBar(w.tonnage, maxTonnage)}
+          <div class="sr-value">${w.tonnage ? `${(w.tonnage / 1000).toFixed(1)}t` : '—'}</div>
+        </div>`).join('');
+
+      const adherence = data.weeks.filter(w => w.sessionsCompleted > 0).map(w => `
+        <div class="gym-statrow">
+          <div class="sr-label">W${w.week}</div>
+          ${gymBar(w.sessionsCompleted, w.sessionsPlanned)}
+          <div class="sr-value">${w.sessionsCompleted}/${w.sessionsPlanned}${w.avgRpe ? ` · RPE ${w.avgRpe}` : ''}</div>
+        </div>`).join('') || '<div class="gym-empty">No sessions logged yet.</div>';
+
+      const LIFT_NAMES = {
+        'back-squat': 'Back squat', 'trap-bar-deadlift': 'Trap-bar deadlift',
+        'dumbbell-bench-press': 'DB bench', 'pull-up-weighted': 'Weighted pull-up',
+      };
+      const trend = Object.entries(LIFT_NAMES).map(([key, name]) => {
+        const points = data.maxTrend[key];
+        if (!points || !points.length) {
+          return `<div class="gym-statrow dim"><div class="sr-label" style="width:auto">${name}</div>
+                  <div class="sr-label">not tested yet</div><div class="sr-value">—</div></div>`;
+        }
+        const latest = points[points.length - 1];
+        const first = points[0];
+        const delta = latest.e1rm - first.e1rm;
+        const sign = delta > 0 ? '+' : '';
+        return `<div class="gym-statrow">
+          <div class="sr-label" style="width:auto">${name}</div>
+          <div class="sr-label">3RM ${latest.threeRm} · W${latest.testedWeek || latest.week}${
+            points.length > 1 ? ` · ${sign}${delta.toFixed(1)} kg` : ''}</div>
+          <div class="sr-value">${latest.e1rm} kg</div>
+        </div>`;
+      }).join('');
+
+      const baselineRows = Object.entries(data.baselines).map(([key, value]) => {
+        const label = key.replace(/-/g, ' ').replace(/^./, c => c.toUpperCase());
+        const shown = value.cm !== undefined && value.cm !== null ? `${value.cm} cm`
+                    : value.seconds !== undefined && value.seconds !== null ? `${value.seconds} s` : '—';
+        return `<div class="gym-statrow"><div class="sr-label" style="width:auto">${escHtml(label)}</div>
+                <div></div><div class="sr-value">${shown}</div></div>`;
+      }).join('') || '<div class="gym-empty">Recorded on day 3 of a test week.</div>';
+
+      scroll.innerHTML = `
+        <div class="gym-statcard"><h3>Estimated 1RM</h3>${trend}</div>
+        <div class="gym-statcard"><h3>Weekly tonnage</h3>${weeks}</div>
+        <div class="gym-statcard"><h3>Sessions and average RPE</h3>${adherence}</div>
+        <div class="gym-statcard"><h3>Power and core baselines</h3>${baselineRows}</div>`;
+    }
+
+    async function renderGymNotes() {
+      gym.showing = 'notes';
+      const scroll = document.getElementById('gymScroll');
+      scroll.innerHTML = '<div class="gym-empty">Loading…</div>';
+      try {
+        const data = await api(`/api/gym/assessments?profile=${encodeURIComponent(gym.profileId)}`);
+        const list = data.assessments || [];
+        if (!list.length) {
+          scroll.innerHTML = '<div class="gym-empty">No assessments yet.<br>They appear here after you finish a workout.</div>';
+          return;
+        }
+        scroll.innerHTML = list.map((a, i) => `
+          <details class="gym-note" ${i === 0 ? 'open' : ''}>
+            <summary>W${a.week} D${a.day} · ${gymShortDate(a.modified.slice(0, 10))}</summary>
+            <div class="gn-body">${marked.parse(a.body)}</div>
+          </details>`).join('');
+      } catch (e) {
+        scroll.innerHTML = `<div class="gym-empty">${escHtml(e.message)}</div>`;
+      }
+    }
+
     // ── Tabs ──
     // The tab bar already shows which section is active, so the header title
     // stays fixed — each view carries its own heading.
@@ -1066,11 +1845,14 @@
 
     function setTab(tab) {
       currentTab = tab;
-      const viewId = { chat: 'viewChat', library: 'viewLibrary', skills: 'viewSkills', settings: 'viewSettings' }[tab];
+      if (tab !== 'gym') gym.showing = null;
+      const viewId = { chat: 'viewChat', library: 'viewLibrary', skills: 'viewSkills',
+                       gym: 'viewGym', settings: 'viewSettings' }[tab];
       document.querySelectorAll('#views .view').forEach(v => v.classList.toggle('active', v.id === viewId));
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
       if (tab === 'library' && !libData.loaded) loadLibrary();
       if (tab === 'settings') refreshSettings();
+      if (tab === 'gym' && !gym.loaded) loadGymProfiles();
       if (tab === 'chat') {
         const area = document.getElementById('chatArea');
         area.scrollTop = area.scrollHeight;
@@ -1100,6 +1882,16 @@
       const d = document.createElement('div');
       d.textContent = s || '';
       return d.innerHTML;
+    }
+
+    // escHtml protects HTML text but not quotes, so it cannot make a value safe
+    // inside a JS string literal in an attribute. This does both jobs.
+    function escJsAttr(s) {
+      return String(s)
+        .replace(/\\/g, '\\\\')
+        .replace(/'/g, "\\'")
+        .replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;');
     }
 
     function renderMarkdown(text) {
@@ -1809,10 +2601,11 @@
       // No token yet — show prompt first, then load skills after
       setTimeout(async () => {
         await promptSetToken();
-        if (API_TOKEN) loadSkills();
+        if (API_TOKEN) { loadSkills(); loadGymProfiles(); }
       }, 150);
     } else {
       loadSkills();
+      loadGymProfiles();
     }
   </script>
 </body>

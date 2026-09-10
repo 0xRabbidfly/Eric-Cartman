@@ -815,7 +815,8 @@ Every skill in `.github/skills/` (28 total). ⭐ marks the ones with a deep-dive
 > **Note:** `.github/skills/` is the open-source portable scaffold — it works with any AI IDE.
 > `.claude/` holds Claude Code configuration and a second skill set, only part of which is
 > shared here. Local-only files — `CLAUDE.md`, `mcp.json`, and personal skills that touch
-> private accounts (banking, groceries, car search) — are gitignored and stay on the machine.
+> private accounts or personal records (banking, groceries, car search, training logs) —
+> are gitignored and stay on the machine.
 
 ---
 

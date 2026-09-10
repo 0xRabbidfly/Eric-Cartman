@@ -115,6 +115,9 @@ scratch/
 # Teams Daily Digest - contains PII and internal channel names
 .claude/skills/teams-daily-digest/
 
+# Personal training data — body weights, lift numbers, assessments
+.claude/skills/gym-cyclist/
+
 # Portugal Lawyer
 .github/agents/portuguese-lawyer.md
 
