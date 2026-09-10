@@ -1166,7 +1166,7 @@
     function renderGymProfileSeg() {
       document.getElementById('gymProfileSeg').innerHTML = gym.profiles.map(p => `
         <button class="seg-btn ${p.id === gym.profileId ? 'active' : ''}"
-                onclick="setGymProfile('${p.id}')">${escHtml(p.name)}</button>
+                onclick="setGymProfile('${escJsAttr(p.id)}')">${escHtml(p.name)}</button>
       `).join('');
     }
 
@@ -1305,6 +1305,16 @@
       const d = document.createElement('div');
       d.textContent = s || '';
       return d.innerHTML;
+    }
+
+    // escHtml protects HTML text but not quotes, so it cannot make a value safe
+    // inside a JS string literal in an attribute. This does both jobs.
+    function escJsAttr(s) {
+      return String(s)
+        .replace(/\\/g, '\\\\')
+        .replace(/'/g, "\\'")
+        .replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;');
     }
 
     function renderMarkdown(text) {
