@@ -90,7 +90,11 @@ function createGymStore(dataRoot) {
   }
 
   function weekBounds(startDate, week) {
-    const start = mondayOf(new Date(`${startDate}T00:00:00Z`)) + (week - 1) * 7 * DAY_MS;
+    const startMs = new Date(`${startDate}T00:00:00Z`).getTime();
+    if (Number.isNaN(startMs)) {
+      throw fail('gym_data_corrupt', `profiles.json has an unusable startDate: ${JSON.stringify(startDate)}`);
+    }
+    const start = mondayOf(new Date(startMs)) + (week - 1) * 7 * DAY_MS;
     return { start: isoDate(start), end: isoDate(start + 6 * DAY_MS) };
   }
 
@@ -167,6 +171,150 @@ function createGymStore(dataRoot) {
     return readJson(at('exercises.json'), {});
   }
 
+  function estimateOneRm(threeRm) {
+    return Math.round(threeRm * 1.08 * 10) / 10;
+  }
+
+  function writeJson(file, obj) {
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, `${JSON.stringify(obj, null, 2)}\n`, 'utf8');
+  }
+
+  function dayItems(profileId, week, day) {
+    const weekData = readWeekFile(profileId, week);
+    const dayData = weekData.days.find((d) => d.day === day);
+    if (!dayData) throw fail('gym_session_not_found', `Week ${week} has no day ${day}.`);
+    return dayData.items;
+  }
+
+  /**
+   * Merge a partial update into the stored log and write it back.
+   * `entries` replaces the whole array — the client always holds the full set
+   * grid, so a merge would only let a stale client resurrect deleted rows.
+   */
+  function saveSession(profileId, week, day, patch = {}, now = new Date()) {
+    requireProfile(profileId);
+    const existing = readLog(profileId, week, day) || emptyLog(profileId, week, day);
+    if (existing.status === 'complete') {
+      throw fail('gym_session_complete', `W${week} D${day} is already finished. Reopen it before editing.`);
+    }
+
+    const next = { ...existing };
+    if (patch.entries !== undefined) {
+      const valid = new Set(dayItems(profileId, week, day).map((i) => i.id));
+      for (const entry of patch.entries) {
+        if (!valid.has(entry.itemId)) {
+          throw fail('gym_invalid_entry', `"${entry.itemId}" is not an exercise in W${week} D${day}.`);
+        }
+      }
+      next.entries = patch.entries;
+    }
+    if (patch.dayNotes !== undefined) next.dayNotes = String(patch.dayNotes);
+    if (!next.startedAt) next.startedAt = now.toISOString();
+
+    writeJson(at(profileId, 'logs', `W${week}D${day}.json`), next);
+    return next;
+  }
+
+  /** Heaviest set of full reps at RPE 9.5 or below. That is the program's definition. */
+  function bestCleanSet(entries, item) {
+    return entries
+      .filter((e) => e.itemId === item.id)
+      .filter((e) => e.reps >= item.reps)
+      .filter((e) => e.rpe === null || e.rpe === undefined || e.rpe <= 9.5)
+      .filter((e) => typeof e.load === 'number')
+      .reduce((best, e) => (best === null || e.load > best.load ? e : best), null);
+  }
+
+  /** Best result on a baseline item — the longest hold, the furthest jump, the tallest box. */
+  function bestResult(entries, item) {
+    return entries
+      .filter((e) => e.itemId === item.id)
+      .map((e) => e.reps)                       // the result column holds cm or seconds here
+      .filter((v) => typeof v === 'number')
+      .reduce((best, v) => (best === null || v > best ? v : best), null);
+  }
+
+  const BASELINE_UNITS = { cm: 'cm', seconds: 'seconds' };
+
+  function recomputeMaxes(profileId, week, day, now = new Date()) {
+    const file = at(profileId, 'maxes.json');
+    const maxes = readJson(file, {});
+    const log = readLog(profileId, week, day);
+    if (!log) return maxes;
+    const testedOn = now.toISOString().slice(0, 10);
+
+    let changed = false;
+    for (const item of dayItems(profileId, week, day)) {
+      if (item.isRamp) {
+        const best = bestCleanSet(log.entries, item);
+        if (!best) continue;
+        maxes[item.exerciseKey] = {
+          ...(maxes[item.exerciseKey] || {}),
+          threeRm: best.load,
+          loadType: item.loadType,
+          e1rm: estimateOneRm(best.load),
+          testedWeek: week,
+          testedOn,
+        };
+        changed = true;
+        continue;
+      }
+
+      // Jump distance, box height and plank hold are baselines, not maxes. They
+      // have no load, so bestCleanSet cannot see them.
+      const unit = BASELINE_UNITS[item.resultType];
+      if (!unit) continue;
+      const best = bestResult(log.entries, item);
+      if (best === null) continue;
+      maxes[item.exerciseKey] = {
+        ...(maxes[item.exerciseKey] || {}),
+        [unit]: best,
+        testedWeek: week,
+        testedOn,
+      };
+      changed = true;
+    }
+    if (changed) writeJson(file, maxes);
+    return maxes;
+  }
+
+  /**
+   * Flip a finished session back to editable.
+   *
+   * Finished sessions are read-only so a phone in a gym bag cannot silently
+   * rewrite them, but the W1 numbers were transcribed from paper and will need
+   * correcting. This is the only way back in.
+   */
+  function reopenSession(profileId, week, day) {
+    requireProfile(profileId);
+    const log = readLog(profileId, week, day);
+    if (!log) throw fail('gym_session_not_found', `Nothing logged for W${week} D${day}.`);
+    const reopened = { ...log, status: 'in_progress', completedAt: null };
+    writeJson(at(profileId, 'logs', `W${week}D${day}.json`), reopened);
+    return reopened;
+  }
+
+  function finishSession(profileId, week, day, now = new Date()) {
+    requireProfile(profileId);
+    const log = readLog(profileId, week, day);
+    if (log && log.status === 'complete') {
+      throw fail('gym_session_complete', `W${week} D${day} is already finished.`);
+    }
+    if (!log || log.entries.length === 0) {
+      throw fail('gym_session_empty', `Nothing logged for W${week} D${day} yet.`);
+    }
+    const finished = {
+      ...log,
+      status: 'complete',
+      performedOn: now.toISOString().slice(0, 10),
+      completedAt: now.toISOString(),
+    };
+    writeJson(at(profileId, 'logs', `W${week}D${day}.json`), finished);
+    const maxes = recomputeMaxes(profileId, week, day, now);
+    return { log: finished, maxes };
+  }
+
   return {
     dataRoot,
     isEnabled,
@@ -177,6 +325,12 @@ function createGymStore(dataRoot) {
     getWeek,
     getSession,
     getExercises,
+    saveSession,
+    finishSession,
+    reopenSession,
+    recomputeMaxes,
+    estimateOneRm,
+    _writeJson: writeJson,
     // internals reused by later tasks
     _readJson: readJson,
     _at: at,

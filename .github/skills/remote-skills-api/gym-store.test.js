@@ -186,3 +186,159 @@ test('a session file that is valid JSON but not an object is reported as corrupt
   const store = createGymStore(root);
   assert.throws(() => store.getSession('athlete-a', 1, 1), (err) => err.code === 'gym_data_corrupt');
 });
+
+test('estimateOneRm matches the Python seed helper', () => {
+  const store = createGymStore(fixture());
+  assert.equal(store.estimateOneRm(70), 75.6);
+  assert.equal(store.estimateOneRm(80), 86.4);
+  assert.equal(store.estimateOneRm(50), 54.0);
+  assert.equal(store.estimateOneRm(77.5), 83.7);
+});
+
+test('saveSession creates a log and stamps startedAt once', () => {
+  const store = createGymStore(fixture());
+  const first = store.saveSession('athlete-b', 1, 2, {
+    entries: [{ itemId: 'a-back-squat', set: 1, load: 30, loadType: 'kg', reps: 3, rpe: 5, note: '' }],
+  });
+  assert.equal(first.status, 'in_progress');
+  assert.ok(first.startedAt);
+  const second = store.saveSession('athlete-b', 1, 2, { dayNotes: 'felt good' });
+  assert.equal(second.startedAt, first.startedAt);
+  assert.equal(second.dayNotes, 'felt good');
+});
+
+test('saveSession replaces entries wholesale rather than merging them', () => {
+  const store = createGymStore(fixture());
+  store.saveSession('athlete-b', 1, 2, {
+    entries: [{ itemId: 'a-back-squat', set: 1, load: 30, loadType: 'kg', reps: 3, rpe: 5, note: '' },
+              { itemId: 'a-back-squat', set: 2, load: 40, loadType: 'kg', reps: 3, rpe: 6, note: '' }],
+  });
+  const after = store.saveSession('athlete-b', 1, 2, {
+    entries: [{ itemId: 'a-back-squat', set: 1, load: 32.5, loadType: 'kg', reps: 3, rpe: 5, note: '' }],
+  });
+  assert.equal(after.entries.length, 1);
+  assert.equal(after.entries[0].load, 32.5);
+});
+
+test('saveSession round-trips through the filesystem', () => {
+  const root = fixture();
+  createGymStore(root).saveSession('athlete-b', 1, 3, { dayNotes: 'slept badly' });
+  assert.equal(createGymStore(root).getSession('athlete-b', 1, 3).log.dayNotes, 'slept badly');
+});
+
+test('saveSession rejects an entry whose itemId is not in that day', () => {
+  const store = createGymStore(fixture());
+  expectCode(() => store.saveSession('athlete-b', 1, 2, {
+    entries: [{ itemId: 'z-nope', set: 1, load: 30, loadType: 'kg', reps: 3, rpe: 5, note: '' }],
+  }), 'gym_invalid_entry');
+});
+
+test('saveSession refuses to touch a finished session', () => {
+  const store = createGymStore(fixture());
+  expectCode(() => store.saveSession('athlete-a', 1, 1, { dayNotes: 'x' }), 'gym_session_complete');
+});
+
+test('finishSession marks the log complete and dates it today', () => {
+  const store = createGymStore(fixture());
+  store.saveSession('athlete-b', 1, 2, {
+    entries: [{ itemId: 'a-back-squat', set: 1, load: 60, loadType: 'kg', reps: 3, rpe: 9, note: '' }],
+  });
+  const { log } = store.finishSession('athlete-b', 1, 2, new Date('2026-09-11T19:00:00Z'));
+  assert.equal(log.status, 'complete');
+  assert.equal(log.performedOn, '2026-09-11');
+  assert.ok(log.completedAt.startsWith('2026-09-11T'));
+});
+
+test('finishSession takes the heaviest clean triple as the new 3RM', () => {
+  const store = createGymStore(fixture());
+  store.saveSession('athlete-b', 1, 2, {
+    entries: [
+      { itemId: 'a-back-squat', set: 1, load: 50, loadType: 'kg', reps: 3, rpe: 7, note: '' },
+      { itemId: 'a-back-squat', set: 2, load: 60, loadType: 'kg', reps: 3, rpe: 9, note: '' },
+    ],
+  });
+  const { maxes } = store.finishSession('athlete-b', 1, 2, new Date('2026-09-11T19:00:00Z'));
+  assert.equal(maxes['back-squat'].threeRm, 60);
+  assert.equal(maxes['back-squat'].e1rm, 64.8);
+  assert.equal(maxes['back-squat'].testedWeek, 1);
+  assert.equal(maxes['back-squat'].testedOn, '2026-09-11');
+});
+
+test('a set above RPE 9.5 or short on reps is not a clean triple', () => {
+  const store = createGymStore(fixture());
+  store.saveSession('athlete-b', 1, 2, {
+    entries: [
+      { itemId: 'a-back-squat', set: 1, load: 50, loadType: 'kg', reps: 3, rpe: 8, note: '' },
+      { itemId: 'a-back-squat', set: 2, load: 60, loadType: 'kg', reps: 2, rpe: 10, note: 'failed' },
+      { itemId: 'a-back-squat', set: 3, load: 62.5, loadType: 'kg', reps: 3, rpe: 10, note: 'grind' },
+    ],
+  });
+  const { maxes } = store.finishSession('athlete-b', 1, 2, new Date('2026-09-11T19:00:00Z'));
+  assert.equal(maxes['back-squat'].threeRm, 50);
+});
+
+test('finishSession leaves maxes alone when the day has no ramp', () => {
+  const root = fixture();
+  const noRamp = JSON.parse(fs.readFileSync(path.join(root, 'athlete-b', 'weeks', 'W2.json'), 'utf8'));
+  noRamp.days.forEach((d) => d.items.forEach((i) => { i.isRamp = false; }));
+  fs.writeFileSync(path.join(root, 'athlete-b', 'weeks', 'W2.json'), JSON.stringify(noRamp), 'utf8');
+  const store = createGymStore(root);
+  store.saveSession('athlete-b', 2, 1, {
+    entries: [{ itemId: 'a-back-squat', set: 1, load: 200, loadType: 'kg', reps: 3, rpe: 5, note: '' }],
+  });
+  const { maxes } = store.finishSession('athlete-b', 2, 1, new Date('2026-09-18T19:00:00Z'));
+  assert.equal(maxes['back-squat'].threeRm, 70);
+});
+
+test('finishSession refuses an empty log', () => {
+  const store = createGymStore(fixture());
+  expectCode(() => store.finishSession('athlete-b', 1, 3), 'gym_session_empty');
+});
+
+test('finishSession is idempotent-safe: a finished session cannot be finished twice', () => {
+  const store = createGymStore(fixture());
+  expectCode(() => store.finishSession('athlete-a', 1, 1), 'gym_session_complete');
+});
+
+test('finishSession records a baseline result that has no load', () => {
+  const root = fixture();
+  const week = JSON.parse(fs.readFileSync(path.join(root, 'athlete-b', 'weeks', 'W1.json'), 'utf8'));
+  week.days[2].items = [{
+    id: 'e-front-plank', block: 'E', exerciseKey: 'front-plank', label: 'Front plank — baseline',
+    sets: 1, reps: 120, resultType: 'seconds', loadType: 'bodyweight', targetLoad: null,
+    targetPct: null, loadNote: '', targetRpe: null, restSec: 0,
+    isRamp: false, setsAreOptional: false, pairedWith: null,
+  }];
+  fs.writeFileSync(path.join(root, 'athlete-b', 'weeks', 'W1.json'), JSON.stringify(week), 'utf8');
+  const store = createGymStore(root);
+  store.saveSession('athlete-b', 1, 3, {
+    entries: [
+      { itemId: 'e-front-plank', set: 1, load: null, loadType: 'bodyweight', reps: 78, rpe: null, note: '' },
+      { itemId: 'e-front-plank', set: 2, load: null, loadType: 'bodyweight', reps: 95, rpe: null, note: '' },
+    ],
+  });
+  const { maxes } = store.finishSession('athlete-b', 1, 3, new Date('2026-09-12T19:00:00Z'));
+  assert.equal(maxes['front-plank'].seconds, 95);
+  assert.equal(maxes['front-plank'].testedOn, '2026-09-12');
+  assert.equal(maxes['front-plank'].threeRm, undefined);
+});
+
+test('reopenSession makes a finished session editable again', () => {
+  const store = createGymStore(fixture());
+  const reopened = store.reopenSession('athlete-a', 1, 1);
+  assert.equal(reopened.status, 'in_progress');
+  assert.equal(reopened.completedAt, null);
+  assert.equal(reopened.entries.length, 1);
+  const saved = store.saveSession('athlete-a', 1, 1, { dayNotes: 'corrected the squat load' });
+  assert.equal(saved.dayNotes, 'corrected the squat load');
+});
+
+test('reopenSession refuses a session that was never logged', () => {
+  const store = createGymStore(fixture());
+  expectCode(() => store.reopenSession('athlete-b', 4, 2), 'gym_session_not_found');
+});
+
+test('weekBounds rejects an unusable startDate rather than throwing a RangeError', () => {
+  const store = createGymStore(fixture());
+  assert.throws(() => store.weekBounds('not-a-date', 1), (err) => err.code === 'gym_data_corrupt');
+});
