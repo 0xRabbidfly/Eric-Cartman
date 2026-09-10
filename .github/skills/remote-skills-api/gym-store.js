@@ -38,14 +38,20 @@ function createGymStore(dataRoot) {
     let raw;
     try {
       raw = fs.readFileSync(file, 'utf8');
-    } catch {
-      return fallback;
+    } catch (err) {
+      if (err.code === 'ENOENT') return fallback;
+      throw fail('gym_data_corrupt', `${path.relative(dataRoot, file)} could not be read: ${err.message}`);
     }
+    let parsed;
     try {
-      return JSON.parse(raw);
+      parsed = JSON.parse(raw);
     } catch (err) {
       throw fail('gym_data_corrupt', `${path.relative(dataRoot, file)} is not valid JSON: ${err.message}`);
     }
+    if (parsed === null || typeof parsed !== 'object') {
+      throw fail('gym_data_corrupt', `${path.relative(dataRoot, file)} should hold an object, not ${parsed === null ? 'null' : typeof parsed}`);
+    }
+    return parsed;
   }
 
   function isEnabled() {
@@ -74,7 +80,11 @@ function createGymStore(dataRoot) {
 
   /** Calendar weeks elapsed since the start Monday, 1-based. PROGRAM_WEEKS+1 means maintenance. */
   function currentWeekFor(startDate, today = new Date()) {
-    const start = mondayOf(new Date(`${startDate}T00:00:00Z`));
+    const parsed = new Date(`${startDate}T00:00:00Z`);
+    if (Number.isNaN(parsed.getTime())) {
+      throw fail('gym_data_corrupt', `profiles.json has an unusable startDate: ${JSON.stringify(startDate)}`);
+    }
+    const start = mondayOf(parsed);
     const elapsed = Math.floor((mondayOf(today) - start) / (7 * DAY_MS));
     return Math.min(Math.max(elapsed + 1, 1), PROGRAM_WEEKS + 1);
   }
@@ -113,6 +123,9 @@ function createGymStore(dataRoot) {
     const file = at(profileId, 'weeks', `W${week}.json`);
     const data = readJson(file, null);
     if (!data) throw fail('gym_week_not_found', `No prescription for week ${week}.`);
+    if (!Array.isArray(data.days)) {
+      throw fail('gym_data_corrupt', `${profileId}/weeks/W${week}.json has no days array.`);
+    }
     return data;
   }
 

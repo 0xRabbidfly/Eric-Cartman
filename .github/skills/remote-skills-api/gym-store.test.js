@@ -155,3 +155,34 @@ test('corrupt JSON reports the file rather than throwing a parse error', () => {
     return true;
   });
 });
+
+test('a week file that is valid JSON but has no days array is reported as corrupt', () => {
+  const root = fixture();
+  fs.writeFileSync(path.join(root, 'athlete-a', 'weeks', 'W3.json'), JSON.stringify({ week: 3 }), 'utf8');
+  const store = createGymStore(root);
+  assert.throws(() => store.getWeek('athlete-a', 3), (err) => {
+    assert.equal(err.code, 'gym_data_corrupt');
+    assert.match(err.message, /days array/);
+    return true;
+  });
+});
+
+test('a profiles file holding null is reported as corrupt, not a TypeError', () => {
+  const root = fixture();
+  fs.writeFileSync(path.join(root, 'profiles.json'), 'null', 'utf8');
+  const store = createGymStore(root);
+  assert.throws(() => store.listProfiles(), (err) => err.code === 'gym_data_corrupt');
+});
+
+test('an unusable startDate throws a coded error instead of returning NaN', () => {
+  const store = createGymStore(fixture());
+  assert.throws(() => store.currentWeekFor('not-a-date', new Date('2026-09-09T00:00:00Z')),
+    (err) => err.code === 'gym_data_corrupt');
+});
+
+test('a session file that is valid JSON but not an object is reported as corrupt', () => {
+  const root = fixture();
+  fs.writeFileSync(path.join(root, 'athlete-a', 'logs', 'W1D1.json'), '42', 'utf8');
+  const store = createGymStore(root);
+  assert.throws(() => store.getSession('athlete-a', 1, 1), (err) => err.code === 'gym_data_corrupt');
+});
