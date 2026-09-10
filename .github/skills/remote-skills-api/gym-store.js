@@ -201,6 +201,9 @@ function createGymStore(dataRoot) {
 
     const next = { ...existing };
     if (patch.entries !== undefined) {
+      if (!Array.isArray(patch.entries)) {
+        throw fail('gym_invalid_entry', 'entries must be an array of logged sets.');
+      }
       const valid = new Set(dayItems(profileId, week, day).map((i) => i.id));
       for (const entry of patch.entries) {
         if (!valid.has(entry.itemId)) {

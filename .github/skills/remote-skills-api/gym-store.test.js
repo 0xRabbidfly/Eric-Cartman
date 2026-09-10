@@ -313,8 +313,9 @@ test('finishSession records a baseline result that has no load', () => {
   const store = createGymStore(root);
   store.saveSession('athlete-b', 1, 3, {
     entries: [
-      { itemId: 'e-front-plank', set: 1, load: null, loadType: 'bodyweight', reps: 78, rpe: null, note: '' },
-      { itemId: 'e-front-plank', set: 2, load: null, loadType: 'bodyweight', reps: 95, rpe: null, note: '' },
+      // Best first, so a buggy "last wins" reduce cannot pass this test.
+      { itemId: 'e-front-plank', set: 1, load: null, loadType: 'bodyweight', reps: 95, rpe: null, note: '' },
+      { itemId: 'e-front-plank', set: 2, load: null, loadType: 'bodyweight', reps: 78, rpe: null, note: '' },
     ],
   });
   const { maxes } = store.finishSession('athlete-b', 1, 3, new Date('2026-09-12T19:00:00Z'));
@@ -341,4 +342,42 @@ test('reopenSession refuses a session that was never logged', () => {
 test('weekBounds rejects an unusable startDate rather than throwing a RangeError', () => {
   const store = createGymStore(fixture());
   assert.throws(() => store.weekBounds('not-a-date', 1), (err) => err.code === 'gym_data_corrupt');
+});
+
+test('a ramp set logged with no load is ignored when picking the max', () => {
+  const store = createGymStore(fixture());
+  store.saveSession('athlete-b', 1, 2, {
+    entries: [
+      { itemId: 'a-back-squat', set: 1, load: 55, loadType: 'kg', reps: 3, rpe: 8, note: '' },
+      { itemId: 'a-back-squat', set: 2, load: null, loadType: 'kg', reps: 3, rpe: 9, note: 'forgot to write it down' },
+    ],
+  });
+  const { maxes } = store.finishSession('athlete-b', 1, 2, new Date('2026-09-11T19:00:00Z'));
+  assert.equal(maxes['back-squat'].threeRm, 55);
+});
+
+test('recomputing a max leaves a sibling exercise and its injury flags untouched', () => {
+  const root = fixture();
+  const store = createGymStore(root);
+  const bench = {
+    threeRm: 80, loadType: 'kg_total_pair', e1rm: 86.4, testedWeek: 1, testedOn: '2026-09-09',
+    watch: true, note: 'Shoulder discomfort on the back-off set; swap if it recurs.',
+  };
+  store._writeJson(path.join(root, 'athlete-b', 'maxes.json'), {
+    'back-squat': { threeRm: 70, loadType: 'kg', e1rm: 75.6, testedWeek: 1, watch: false, note: '' },
+    'dumbbell-bench-press': bench,
+  });
+  store.saveSession('athlete-b', 1, 2, {
+    entries: [{ itemId: 'a-back-squat', set: 1, load: 65, loadType: 'kg', reps: 3, rpe: 8, note: '' }],
+  });
+  const { maxes } = store.finishSession('athlete-b', 1, 2, new Date('2026-09-11T19:00:00Z'));
+  assert.equal(maxes['back-squat'].threeRm, 65);
+  assert.equal(maxes['back-squat'].watch, false);
+  assert.deepEqual(maxes['dumbbell-bench-press'], bench);
+});
+
+test('saveSession rejects a malformed entries payload with a coded error', () => {
+  const store = createGymStore(fixture());
+  expectCode(() => store.saveSession('athlete-b', 1, 2, { entries: null }), 'gym_invalid_entry');
+  expectCode(() => store.saveSession('athlete-b', 1, 3, { entries: 'nope' }), 'gym_invalid_entry');
 });
