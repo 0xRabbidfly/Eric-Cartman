@@ -1239,6 +1239,7 @@
 
     async function setGymProfile(id) {
       if (id === gym.profileId) return;
+      await gymFlushSave();
       gym.profileId = id;
       localStorage.setItem('gym_profile', id);
       const me = gym.profiles.find(p => p.id === id);
@@ -1321,11 +1322,13 @@
 
     // ── Gym session logging ──
     const gymSession = { week: null, day: null, data: null, entries: new Map(), dayNotes: '',
-                         saveTimer: null, job: null, assessment: null, assessmentFailed: false };
+                         saveTimer: null, pending: null, saving: Promise.resolve(),
+                         job: null, assessment: null, assessmentFailed: false };
 
     function gymEntryKey(itemId, setNo) { return `${itemId}#${setNo}`; }
 
     async function openGymSession(week, day) {
+      await gymFlushSave();
       gymSession.week = week;
       gymSession.day = day;
       gymSession.assessment = null;
@@ -1400,13 +1403,13 @@
               <div class="sr-n">${n}</div>
               <input inputmode="decimal" placeholder="${item.loadType === 'bodyweight' ? 'bw' : 'load'}"
                      class="${filled(e.load)}" value="${val(e.load)}" ${done ? 'disabled' : ''}
-                     onchange="gymSetInput('${escJsAttr(item.id)}', ${n}, 'load', this.value)">
+                     onchange="gymSetInput('${escJsAttr(item.id)}', ${n}, 'load', this.value, this)">
               <input inputmode="numeric" placeholder="${escHtml(gymResultPlaceholder(item))}"
                      class="${filled(e.reps)}" value="${val(e.reps)}" ${done ? 'disabled' : ''}
-                     onchange="gymSetInput('${escJsAttr(item.id)}', ${n}, 'reps', this.value)">
+                     onchange="gymSetInput('${escJsAttr(item.id)}', ${n}, 'reps', this.value, this)">
               <input inputmode="decimal" placeholder="RPE"
                      class="${filled(e.rpe)}" value="${val(e.rpe)}" ${done ? 'disabled' : ''}
-                     onchange="gymSetInput('${escJsAttr(item.id)}', ${n}, 'rpe', this.value)">
+                     onchange="gymSetInput('${escJsAttr(item.id)}', ${n}, 'rpe', this.value, this)">
             </div>`);
         }
 
@@ -1423,7 +1426,7 @@
         return `
           <div class="gym-item">
             <div class="gi-head">
-              <span class="gi-block">${item.block}</span>
+              <span class="gi-block">${escHtml(item.block)}</span>
               <span class="gi-name" onclick="gymShowExercise('${escJsAttr(item.exerciseKey)}')">${escHtml(item.label)}</span>
             </div>
             <div class="gi-presc">${escHtml(gymRepLabel(item))} · ${escHtml(gymLoadLabel(item))}${rpe} · rest ${item.restSec}s${escHtml(paired)}
@@ -1469,21 +1472,42 @@
         e.load !== null || e.reps !== null || e.rpe !== null);
     }
 
+    // Snapshot BOTH the target and the body at queue time. Reading them when the
+    // timer fires 800ms later is how one day's edit lands on another day.
     function gymQueueSave() {
       clearTimeout(gymSession.saveTimer);
-      gymSession.saveTimer = setTimeout(async () => {
-        try {
-          await api(`/api/gym/session/${gymSession.week}/${gymSession.day}?profile=${encodeURIComponent(gym.profileId)}`, {
-            method: 'PUT',
-            body: JSON.stringify({ entries: gymCollectEntries(), dayNotes: gymSession.dayNotes }),
-          });
-        } catch (e) {
-          showToast(`Not saved: ${e.message}`, 'error', 4200);
-        }
-      }, 800);
+      gymSession.pending = {
+        week: gymSession.week,
+        day: gymSession.day,
+        profileId: gym.profileId,
+        body: { entries: gymCollectEntries(), dayNotes: gymSession.dayNotes },
+      };
+      gymSession.saveTimer = setTimeout(gymFlushSave, 800);
     }
 
-    function gymSetInput(itemId, setNo, field, raw) {
+    // Serialised: one PUT at a time, so a delayed small snapshot can never land
+    // after a newer larger one. Safe to call at any navigation boundary.
+    function gymFlushSave() {
+      clearTimeout(gymSession.saveTimer);
+      gymSession.saveTimer = null;
+      const pending = gymSession.pending;
+      if (!pending) return gymSession.saving;
+      gymSession.pending = null;
+      gymSession.saving = gymSession.saving
+        .then(() => api(`/api/gym/session/${pending.week}/${pending.day}?profile=${encodeURIComponent(pending.profileId)}`, {
+          method: 'PUT',
+          body: JSON.stringify(pending.body),
+        }))
+        .catch(e => showToast(`Not saved: ${e.message}`, 'error', 4200));
+      return gymSession.saving;
+    }
+
+    // A phone backgrounding the app is the common case, not an edge case.
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') gymFlushSave();
+    });
+
+    function gymSetInput(itemId, setNo, field, raw, el) {
       const item = gymSession.data.day.items.find(i => i.id === itemId);
       const key = gymEntryKey(itemId, setNo);
       const entry = gymSession.entries.get(key)
@@ -1492,6 +1516,8 @@
       entry[field] = text === '' ? null : Number(text);
       if (Number.isNaN(entry[field])) entry[field] = null;
       gymSession.entries.set(key, entry);
+      // Keep the green "logged" border in step with what was just typed.
+      if (el) el.classList.toggle('filled', String(raw).trim() !== '');
       gymQueueSave();
     }
 
@@ -1508,11 +1534,21 @@
       renderGymSession();
     }
 
-    function gymRemoveSet(itemId) {
+    async function gymRemoveSet(itemId) {
       const item = gymSession.data.day.items.find(i => i.id === itemId);
       const last = gymRowCount(item);
       if (last <= 1) return;
-      gymSession.entries.delete(gymEntryKey(itemId, last));
+      const key = gymEntryKey(itemId, last);
+      const entry = gymSession.entries.get(key);
+      if (entry && (entry.load !== null || entry.reps !== null || entry.rpe !== null)) {
+        const ok = await showModal({
+          title: 'Remove this set?',
+          message: `Set ${last} has a logged value. Removing it deletes what you entered.`,
+          confirmLabel: 'Remove',
+        });
+        if (!ok?.confirmed) return;
+      }
+      gymSession.entries.delete(key);
       gymQueueSave();
       renderGymSession();
     }
@@ -1577,7 +1613,7 @@
       if (gymCollectEntries().length === 0) {
         return showToast('Log at least one set first.', 'error');
       }
-      clearTimeout(gymSession.saveTimer);
+      await gymFlushSave();
       const btn = document.querySelector('.gym-finish');
       if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
       try {
@@ -1609,28 +1645,32 @@
     async function pollGymJob(jobId) {
       // The log is already saved server-side, so a failure here costs the
       // assessment only. Give up after ten minutes rather than polling forever.
+      const week = gymSession.week, day = gymSession.day;
+      const stillHere = () => gymSession.week === week && gymSession.day === day;
       const deadline = Date.now() + 10 * 60 * 1000;
       while (Date.now() < deadline) {
         await new Promise(r => setTimeout(r, 4000));
-        if (gymSession.job !== jobId) return;      // user navigated away
+        if (gymSession.job !== jobId || !stillHere()) return;      // user navigated away
         let job;
         try { job = await api(`/api/jobs/${jobId}`); } catch { continue; }
         if (job.status === 'done') {
           gymSession.assessment = job.result || job.text || 'Assessment finished with no text.';
           gymSession.job = null;
-          return renderGymSession();
+          if (stillHere()) renderGymSession();
+          return;
         }
         if (job.status === 'error') {
           gymSession.assessment = `Assessment failed: ${job.error}\n\nYour log is saved either way.`;
           gymSession.assessmentFailed = true;
           gymSession.job = null;
-          return renderGymSession();
+          if (stillHere()) renderGymSession();
+          return;
         }
       }
       gymSession.assessment = 'Assessment timed out. Your log is saved.';
       gymSession.assessmentFailed = true;
       gymSession.job = null;
-      renderGymSession();
+      if (stillHere()) renderGymSession();
     }
     function renderGymStats() {
       document.getElementById('gymScroll').innerHTML = '<div class="gym-empty">Stats coming next.</div>';
