@@ -1228,6 +1228,9 @@
       weekData: null,
       view: 'week',
       showing: null,
+      // Keyed profile/week/day, so a result that lands while the user is looking
+      // at something else is still there when they come back.
+      assessmentCache: {},
       exercises: null,
     };
 
@@ -1274,6 +1277,7 @@
     }
 
     async function loadGymWeek(n, force) {
+      gym.showing = 'week';
       gym.week = Math.min(Math.max(n, 1), 12);
       const scroll = document.getElementById('gymScroll');
       if (force || !gym.weekData) scroll.innerHTML = '<div class="gym-empty">Loading…</div>';
@@ -1370,6 +1374,8 @@
         gymSession.dayNotes = data.log.dayNotes || '';
         gymSession.entries = new Map(
           (data.log.entries || []).map(e => [gymEntryKey(e.itemId, e.set), e]));
+        const cached = gym.assessmentCache[`${gym.profileId}/${week}/${day}`];
+        if (cached) gymSession.assessment = cached;
         renderGymSession();
       } catch (e) {
         document.getElementById('gymScroll').innerHTML =
@@ -1676,27 +1682,33 @@
       const deadline = Date.now() + 10 * 60 * 1000;
       while (Date.now() < deadline) {
         await new Promise(r => setTimeout(r, 4000));
-        if (gymSession.job !== jobId || !stillHere()) return;      // user navigated away
+        if (gymSession.job !== jobId) return;   // a newer finish superseded this run
         let job;
         try { job = await api(`/api/jobs/${jobId}`); } catch { continue; }
         if (job.status === 'done') {
-          gymSession.assessment = job.result || job.text || 'Assessment finished with no text.';
+          const text = job.result || job.text || 'Assessment finished with no text.';
+          gym.assessmentCache[`${gym.profileId}/${week}/${day}`] = text;
           gymSession.job = null;
-          if (stillHere()) renderGymSession();
+          if (stillHere()) { gymSession.assessment = text; renderGymSession(); }
+          else showToast('Assessment ready. Open the session to read it.', 'success', 5000);
           return;
         }
         if (job.status === 'error') {
-          gymSession.assessment = `Assessment failed: ${job.error}\n\nYour log is saved either way.`;
+          const text = `Assessment failed: ${job.error}\n\nYour log is saved either way.`;
+          gym.assessmentCache[`${gym.profileId}/${week}/${day}`] = text;
           gymSession.assessmentFailed = true;
           gymSession.job = null;
-          if (stillHere()) renderGymSession();
+          if (stillHere()) { gymSession.assessment = text; renderGymSession(); }
+          else showToast('Assessment failed. Open the session to read it.', 'error', 5000);
           return;
         }
       }
-      gymSession.assessment = 'Assessment timed out. Your log is saved.';
+      const text = 'Assessment timed out. Your log is saved.';
+      gym.assessmentCache[`${gym.profileId}/${week}/${day}`] = text;
       gymSession.assessmentFailed = true;
       gymSession.job = null;
-      if (stillHere()) renderGymSession();
+      if (stillHere()) { gymSession.assessment = text; renderGymSession(); }
+      else showToast('Assessment timed out. Open the session to read it.', 'error', 5000);
     }
     function gymBar(value, max) {
       const pct = max > 0 ? Math.round((value / max) * 100) : 0;
