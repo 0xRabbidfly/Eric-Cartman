@@ -23,6 +23,7 @@ const cors    = require('cors');
 const path    = require('path');
 const fs      = require('fs');
 const { spawn, execSync } = require('child_process');
+const { createGymStore } = require('./gym-store');
 
 // ---------------------------------------------------------------------------
 // Config
@@ -68,6 +69,11 @@ if (!API_SECRET) {
 // Usage Stats (persisted to disk)
 // ---------------------------------------------------------------------------
 const USAGE_FILE = path.join(__dirname, 'usage-stats.json');
+// Gym tracker data lives outside the repo tree by default (it is gitignored).
+// GYM_DATA_ROOT lets the route tests point at a temp directory.
+const GYM_DATA_ROOT = process.env.GYM_DATA_ROOT
+  || path.join(PROJECT_DIR, '.claude', 'skills', 'gym-cyclist', 'data');
+const gymStore = createGymStore(GYM_DATA_ROOT);
 let usageStats = { skills: {} };
 try {
   if (fs.existsSync(USAGE_FILE)) {
@@ -188,6 +194,29 @@ function makeJobId() {
 function createJob() {
   const job = { id: makeJobId(), status: 'running', text: '', result: null, error: null, createdAt: Date.now() };
   jobs.set(job.id, job);
+  return job;
+}
+
+/**
+ * Run Claude in the background and report through the jobs map.
+ *
+ * Every other Claude call site awaits its result. The gym assessment cannot:
+ * the phone needs its "workout saved" response straight away, and the model run
+ * takes minutes. The caller gets a job id and polls GET /api/jobs/:id.
+ */
+function runJobDetached(prompt, opts = {}) {
+  const job = createJob();
+  enqueue(() => runClaudeStreaming(prompt, (evt) => {
+    if (evt.type === 'text' && evt.text) job.text += evt.text;
+  }, opts))
+    .then((result) => {
+      job.result = result;
+      job.status = 'done';
+    })
+    .catch((err) => {
+      job.error = classifyError(err, 'gym_assessment_failed').error;
+      job.status = 'error';
+    });
   return job;
 }
 
@@ -1493,6 +1522,105 @@ app.get('/api/notes-by-week', auth, (req, res) => {
 // ---------------------------------------------------------------------------
 // Serve static reports (HTML files in project root)
 // ---------------------------------------------------------------------------
+// ─────────────────────────────────────────────────────────────
+// Gym tracker — the 12-week cycling strength program, two profiles.
+// All data logic lives in gym-store.js; these routes are transport only.
+// ─────────────────────────────────────────────────────────────
+
+const GYM_ERROR_STATUS = {
+  gym_not_configured: 404,
+  gym_profile_required: 400,
+  gym_week_not_found: 404,
+  gym_session_not_found: 404,
+  gym_invalid_entry: 400,
+  gym_session_complete: 409,
+  gym_session_empty: 400,
+  gym_data_corrupt: 500,
+};
+
+function gymHandler(fn) {
+  return (req, res) => {
+    try {
+      fn(req, res);
+    } catch (err) {
+      const status = GYM_ERROR_STATUS[err.code] || 500;
+      res.status(status).json({ code: err.code || 'gym_failed', error: err.message });
+    }
+  };
+}
+
+const gymProfileId = (req) => String(req.query.profile || '');
+
+app.get('/api/gym/profiles', auth, (req, res) => {
+  if (!gymStore.isEnabled()) return res.json({ enabled: false, profiles: [] });
+  try {
+    res.json({ enabled: true, profiles: gymStore.listProfiles() });
+  } catch (err) {
+    res.status(500).json({ code: err.code || 'gym_failed', error: err.message });
+  }
+});
+
+app.get('/api/gym/week/:n', auth, gymHandler((req, res) => {
+  res.json(gymStore.getWeek(gymProfileId(req), parseInt(req.params.n, 10)));
+}));
+
+app.get('/api/gym/session/:week/:day', auth, gymHandler((req, res) => {
+  res.json(gymStore.getSession(gymProfileId(req),
+    parseInt(req.params.week, 10), parseInt(req.params.day, 10)));
+}));
+
+app.put('/api/gym/session/:week/:day', auth, gymHandler((req, res) => {
+  res.json(gymStore.saveSession(gymProfileId(req),
+    parseInt(req.params.week, 10), parseInt(req.params.day, 10), req.body || {}));
+}));
+
+app.post('/api/gym/session/:week/:day/finish', auth, gymHandler((req, res) => {
+  const profileId = gymProfileId(req);
+  const week = parseInt(req.params.week, 10);
+  const day = parseInt(req.params.day, 10);
+
+  // Save and recompute first, synchronously. The log must survive even if the
+  // model run fails, times out, or the phone drops off the network.
+  const { log, maxes } = gymStore.finishSession(profileId, week, day);
+
+  // buildInvokePrompt reads the skill file off the registry, so it throws when
+  // gym-cyclist is not installed — which is every clone that lacks the private
+  // skill. Degrade to a saved log with no assessment rather than a 500 over a
+  // session that was already written.
+  if (!skillRegistry.has('gym-cyclist')) {
+    return res.json({ log, maxes, jobId: null,
+      assessmentSkipped: 'The gym-cyclist skill is not installed, so the log was saved without an assessment.' });
+  }
+
+  const prompt = buildInvokePrompt('gym-cyclist',
+    `Assess the session just completed: profile=${profileId} week=${week} day=${day}. `
+    + 'Read the log, write the assessment file, apply the adjustment rules, and if all '
+    + 'three days of this week are logged, generate the next week. '
+    + 'Reply with the short summary only.');
+  trackSkillUsage('gym-cyclist');
+  currentGoal = `/gym-cyclist W${week}D${day} ${profileId}`;
+  const job = runJobDetached(prompt, { skill: 'gym-cyclist' });
+
+  res.json({ log, maxes, jobId: job.id });
+}));
+
+app.post('/api/gym/session/:week/:day/reopen', auth, gymHandler((req, res) => {
+  res.json(gymStore.reopenSession(gymProfileId(req),
+    parseInt(req.params.week, 10), parseInt(req.params.day, 10)));
+}));
+
+app.get('/api/gym/exercises', auth, gymHandler((req, res) => {
+  res.json(gymStore.getExercises());
+}));
+
+app.get('/api/gym/stats', auth, gymHandler((req, res) => {
+  res.json(gymStore.getStats(gymProfileId(req)));
+}));
+
+app.get('/api/gym/assessments', auth, gymHandler((req, res) => {
+  res.json({ assessments: gymStore.listAssessments(gymProfileId(req)) });
+}));
+
 app.get('/report/:filename', (req, res) => {
   const filename = path.basename(req.params.filename); // prevent path traversal
   const reportPath = path.join(__dirname, '..', '..', '..', filename);
