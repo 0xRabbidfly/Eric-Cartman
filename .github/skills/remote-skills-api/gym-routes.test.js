@@ -46,7 +46,7 @@ let dataRoot;
 test.before(async () => {
   dataRoot = seedDataRoot();
   server = spawn(process.execPath, [path.join(__dirname, 'server.js')], {
-    env: { ...process.env, API_SECRET: SECRET, SKILLS_PORT: String(PORT), GYM_DATA_ROOT: dataRoot },
+    env: { ...process.env, API_SECRET: SECRET, SKILLS_PORT: String(PORT), GYM_DATA_ROOT: dataRoot, GYM_ASSESSMENT_DISABLED: '1' },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   const deadline = Date.now() + 20000;
@@ -157,9 +157,11 @@ test('finish saves the log even when the gym-cyclist skill is absent', async () 
   const body = await res.json();
   assert.equal(body.log.status, 'complete');
   assert.equal(body.maxes['back-squat'].threeRm, 55);
-  // The private skill is not installed in CI, so no model run is started.
-  if (body.jobId === null) assert.match(body.assessmentSkipped, /not installed/);
-  else assert.match(body.jobId, /^j_/);
+  // Unconditional on purpose. The spawned server runs with GYM_ASSESSMENT_DISABLED,
+  // so no model call can ever be made from a test run, whether or not the skill
+  // is installed on this machine.
+  assert.equal(body.jobId, null);
+  assert.match(body.assessmentSkipped, /GYM_ASSESSMENT_DISABLED/);
 });
 
 test('reopen refuses a session that was never logged', async () => {
@@ -170,4 +172,37 @@ test('reopen refuses a session that was never logged', async () => {
   });
   assert.equal(res.status, 404);
   assert.equal((await res.json()).code, 'gym_session_not_found');
+});
+
+test('a finished session can be reopened and edited again over HTTP', async () => {
+  const entries = [{ itemId: 'a-back-squat', set: 1, load: 70, loadType: 'kg', reps: 3, rpe: 9, note: '' }];
+  await put('/api/gym/session/3/1?profile=athlete-a', { entries });
+  const finished = await (await fetch(`${BASE}/api/gym/session/3/1/finish?profile=athlete-a`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${SECRET}`, 'Content-Type': 'application/json' },
+    body: '{}',
+  })).json();
+  assert.equal(finished.log.status, 'complete');
+
+  // A finished session refuses edits until it is reopened.
+  assert.equal((await put('/api/gym/session/3/1?profile=athlete-a', { dayNotes: 'x' })).status, 409);
+
+  const reopened = await fetch(`${BASE}/api/gym/session/3/1/reopen?profile=athlete-a`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${SECRET}`, 'Content-Type': 'application/json' },
+    body: '{}',
+  });
+  assert.equal(reopened.status, 200);
+  assert.equal((await reopened.json()).status, 'in_progress');
+  assert.equal((await put('/api/gym/session/3/1?profile=athlete-a', { dayNotes: 'corrected' })).status, 200);
+});
+
+test('assessments come back newest first once they exist', async () => {
+  const dir = path.join(dataRoot, 'athlete-a', 'assessments');
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'W1D1.md'), '# W1 D1\n\nBaseline.', 'utf8');
+  fs.writeFileSync(path.join(dir, 'W2D1.md'), '# W2 D1\n\nHeavier.', 'utf8');
+  const body = await (await get('/api/gym/assessments?profile=athlete-a')).json();
+  assert.deepEqual(body.assessments.map((a) => `${a.week}-${a.day}`), ['2-1', '1-1']);
+  assert.match(body.assessments[1].body, /Baseline/);
 });

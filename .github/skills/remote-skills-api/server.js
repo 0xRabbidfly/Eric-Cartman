@@ -74,6 +74,9 @@ const USAGE_FILE = path.join(__dirname, 'usage-stats.json');
 const GYM_DATA_ROOT = process.env.GYM_DATA_ROOT
   || path.join(PROJECT_DIR, '.claude', 'skills', 'gym-cyclist', 'data');
 const gymStore = createGymStore(GYM_DATA_ROOT);
+// Lets a caller log or backfill sessions without triggering a model run. The route
+// tests set it, so a test run can never spend a real Claude call by accident.
+const GYM_ASSESSMENT_DISABLED = /^(1|true|yes)$/i.test(process.env.GYM_ASSESSMENT_DISABLED || '');
 let usageStats = { skills: {} };
 try {
   if (fs.existsSync(USAGE_FILE)) {
@@ -1519,9 +1522,6 @@ app.get('/api/notes-by-week', auth, (req, res) => {
   res.json({ total: notes.length, groups });
 });
 
-// ---------------------------------------------------------------------------
-// Serve static reports (HTML files in project root)
-// ---------------------------------------------------------------------------
 // ─────────────────────────────────────────────────────────────
 // Gym tracker — the 12-week cycling strength program, two profiles.
 // All data logic lives in gym-store.js; these routes are transport only.
@@ -1551,14 +1551,10 @@ function gymHandler(fn) {
 
 const gymProfileId = (req) => String(req.query.profile || '');
 
-app.get('/api/gym/profiles', auth, (req, res) => {
+app.get('/api/gym/profiles', auth, gymHandler((req, res) => {
   if (!gymStore.isEnabled()) return res.json({ enabled: false, profiles: [] });
-  try {
-    res.json({ enabled: true, profiles: gymStore.listProfiles() });
-  } catch (err) {
-    res.status(500).json({ code: err.code || 'gym_failed', error: err.message });
-  }
-});
+  res.json({ enabled: true, profiles: gymStore.listProfiles() });
+}));
 
 app.get('/api/gym/week/:n', auth, gymHandler((req, res) => {
   res.json(gymStore.getWeek(gymProfileId(req), parseInt(req.params.n, 10)));
@@ -1587,9 +1583,11 @@ app.post('/api/gym/session/:week/:day/finish', auth, gymHandler((req, res) => {
   // gym-cyclist is not installed — which is every clone that lacks the private
   // skill. Degrade to a saved log with no assessment rather than a 500 over a
   // session that was already written.
-  if (!skillRegistry.has('gym-cyclist')) {
+  if (GYM_ASSESSMENT_DISABLED || !skillRegistry.has('gym-cyclist')) {
     return res.json({ log, maxes, jobId: null,
-      assessmentSkipped: 'The gym-cyclist skill is not installed, so the log was saved without an assessment.' });
+      assessmentSkipped: GYM_ASSESSMENT_DISABLED
+        ? 'Assessments are turned off by GYM_ASSESSMENT_DISABLED, so the log was saved without one.'
+        : 'The gym-cyclist skill is not installed, so the log was saved without an assessment.' });
   }
 
   const prompt = buildInvokePrompt('gym-cyclist',
@@ -1621,6 +1619,9 @@ app.get('/api/gym/assessments', auth, gymHandler((req, res) => {
   res.json({ assessments: gymStore.listAssessments(gymProfileId(req)) });
 }));
 
+// ---------------------------------------------------------------------------
+// Serve static reports (HTML files in project root)
+// ---------------------------------------------------------------------------
 app.get('/report/:filename', (req, res) => {
   const filename = path.basename(req.params.filename); // prevent path traversal
   const reportPath = path.join(__dirname, '..', '..', '..', filename);
