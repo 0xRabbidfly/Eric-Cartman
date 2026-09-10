@@ -110,10 +110,24 @@ Phone (Safari/Chrome)
 | GET | `/api/recent-notes` | Vault notes touched in the last 7 days (`?days=N`, `?days=all`) |
 | GET | `/api/notes-by-topic` | Notes grouped by Library subfolder / podcast show |
 | GET | `/api/notes-by-week` | Notes grouped by ISO week, newest first |
+| GET | `/api/gym/profiles` | Gym profiles and each one's current program week (`{enabled:false}` when no gym data) |
+| GET | `/api/gym/week/:n` | Week prescription plus per-day log status (`?profile=`) |
+| GET | `/api/gym/session/:week/:day` | One day's prescription merged with its log (`?profile=`) |
+| PUT | `/api/gym/session/:week/:day` | Save a partial log (`?profile=`) |
+| POST | `/api/gym/session/:week/:day/finish` | Complete the session and start the assessment; returns `{jobId}` |
+| POST | `/api/gym/session/:week/:day/reopen` | Make a finished session editable again (`?profile=`) |
+| GET | `/api/gym/exercises` | Exercise library with how-tos and videos |
+| GET | `/api/gym/stats` | Week-by-week tonnage, RPE, adherence and 1RM trend (`?profile=`) |
+| GET | `/api/gym/assessments` | Past session assessments, newest first (`?profile=`) |
 
 All three note endpoints scan `Research/Library` and `Podcasts` in the vault
 (skipping `00 MOC`, `attachments`, `transcripts`, show index files, and stubs
 under 1 KB) and return Obsidian deep links (`obsidian://open?vault=Rabbidfly Vault…`).
+
+The gym routes read a private data store outside version control. When it is
+absent, `/api/gym/profiles` reports `enabled: false`, every other gym route
+returns 404 `gym_not_configured`, and the UI hides the Gym tab, so a fresh clone
+behaves exactly as it did before this feature existed.
 
 ## Environment Variables
 
@@ -127,6 +141,7 @@ under 1 KB) and return Obsidian deep links (`obsidian://open?vault=Rabbidfly Vau
 | `ALLOW_QUERY_TOKEN` | `false` | Allow `?token=` authentication on API routes (not recommended) |
 | `RESTART_EXIT_CODE` | `75` | Exit code that tells `start-service.bat` to relaunch the service |
 | `CLAUDE_TIMEOUT_MS` | `300000` | Kill Claude process after this many ms (0 = no timeout) |
+| `GYM_ASSESSMENT_DISABLED` | `false` | Set to `1`, `true` or `yes` to save finished gym sessions without running an assessment. The route tests set it so a test run can never spend a real model call. |
 
 ## Conversation Context Guards
 
@@ -153,8 +168,8 @@ under 1 KB) and return Obsidian deep links (`obsidian://open?vault=Rabbidfly Vau
 
 ## UI Features
 
-Four bottom tabs — **Chat**, **Reader**, **Skills**, **Settings** — replace the
-old crowded header icon bar.
+Bottom tabs — **Chat**, **Reader**, **Skills**, **Gym**, **Settings** — replace the
+old crowded header icon bar. The Gym tab appears only when gym data is present.
 
 - **Chat interface**: Natural language, rendered with Markdown
 - **Research Reader**: Three tab-selectable views over the vault
@@ -165,6 +180,15 @@ old crowded header icon bar.
   - Search box filters across every note regardless of the active view;
     pull-to-refresh re-scans the vault; every note deep-links into Obsidian mobile
 - **Skills tab**: Full skill list with All / 🌐 Public / 🔒 Private filters
+- **Gym tab**: The 12-week cycling strength program for two profiles
+  - Profile switcher, then Week, Stats and Notes views
+  - Week view shows the three sessions with completion status and the date each was
+    actually performed, so a Monday session done on Thursday reads correctly
+  - Session view logs load, reps and RPE per set with a numeric keypad, autosaves
+    every change, and links each exercise to its how-to and video
+  - Finish workout runs the `gym-cyclist` skill and shows the assessment inline
+  - Stats shows estimated 1RM trend, weekly tonnage, adherence and average RPE
+  - A finished session is read-only until reopened for safety and audit purposes
 - **Skill chip**: Pin a skill to scope your messages
 - **Settings tab**: API token, server restart, cancel request, live server status
 - **Status indicator**: Green = ready, yellow = processing
