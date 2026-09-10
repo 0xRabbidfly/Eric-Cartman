@@ -501,3 +501,84 @@ test('tonnage counts a dumbbell pair total once and ignores cable and bodyweight
   assert.equal(week1.tonnage, 300);   // 60 x 5, counted once; the setting and bodyweight rows add nothing
   assert.equal(week1.avgRpe, 7);      // (8 + 6) / 2 — the set with no RPE is skipped, not counted as zero
 });
+
+test('re-testing a lift archives the outgoing max onto history', () => {
+  const root = fixture();
+  const store = createGymStore(root);
+  store._writeJson(path.join(root, 'athlete-b', 'maxes.json'), {
+    'back-squat': { threeRm: 70, loadType: 'kg', e1rm: 75.6, testedWeek: 1, testedOn: '2026-09-09' },
+  });
+  store.saveSession('athlete-b', 5, 1, {
+    entries: [{ itemId: 'a-back-squat', set: 1, load: 80, loadType: 'kg', reps: 3, rpe: 9, note: '' }],
+  });
+  const { maxes } = store.finishSession('athlete-b', 5, 1, new Date('2026-10-06T19:00:00Z'));
+  assert.equal(maxes['back-squat'].threeRm, 80);
+  assert.equal(maxes['back-squat'].testedWeek, 5);
+  assert.deepEqual(maxes['back-squat'].history, [{ week: 1, threeRm: 70, e1rm: 75.6 }]);
+});
+
+test('the archived history is what getStats draws its trend from', () => {
+  const root = fixture();
+  const store = createGymStore(root);
+  store._writeJson(path.join(root, 'athlete-b', 'maxes.json'), {
+    'back-squat': { threeRm: 70, loadType: 'kg', e1rm: 75.6, testedWeek: 1, testedOn: '2026-09-09' },
+  });
+  store.saveSession('athlete-b', 5, 1, {
+    entries: [{ itemId: 'a-back-squat', set: 1, load: 80, loadType: 'kg', reps: 3, rpe: 9, note: '' }],
+  });
+  store.finishSession('athlete-b', 5, 1, new Date('2026-10-06T19:00:00Z'));
+  const trend = store.getStats('athlete-b').maxTrend['back-squat'];
+  assert.deepEqual(trend.map((p) => p.week), [1, 5]);
+  assert.deepEqual(trend.map((p) => p.threeRm), [70, 80]);
+});
+
+test('re-finishing the same week corrects it in place instead of duplicating history', () => {
+  const root = fixture();
+  const store = createGymStore(root);
+  store._writeJson(path.join(root, 'athlete-b', 'maxes.json'), {
+    'back-squat': { threeRm: 70, loadType: 'kg', e1rm: 75.6, testedWeek: 1, testedOn: '2026-09-09' },
+  });
+  store.saveSession('athlete-b', 5, 1, {
+    entries: [{ itemId: 'a-back-squat', set: 1, load: 80, loadType: 'kg', reps: 3, rpe: 9, note: '' }],
+  });
+  store.finishSession('athlete-b', 5, 1, new Date('2026-10-06T19:00:00Z'));
+  store.reopenSession('athlete-b', 5, 1);
+  store.saveSession('athlete-b', 5, 1, {
+    entries: [{ itemId: 'a-back-squat', set: 1, load: 82.5, loadType: 'kg', reps: 3, rpe: 9, note: '' }],
+  });
+  const { maxes } = store.finishSession('athlete-b', 5, 1, new Date('2026-10-06T20:00:00Z'));
+  assert.equal(maxes['back-squat'].threeRm, 82.5);
+  assert.deepEqual(maxes['back-squat'].history, [{ week: 1, threeRm: 70, e1rm: 75.6 }]);
+});
+
+test('a first-ever test archives nothing, and a baseline archives its own unit', () => {
+  const root = fixture();
+  const store = createGymStore(root);
+  store._writeJson(path.join(root, 'athlete-b', 'maxes.json'), {
+    'back-squat': { threeRm: null, loadType: 'kg', e1rm: null, testedWeek: null },
+  });
+  store.saveSession('athlete-b', 1, 1, {
+    entries: [{ itemId: 'a-back-squat', set: 1, load: 60, loadType: 'kg', reps: 3, rpe: 8, note: '' }],
+  });
+  const first = store.finishSession('athlete-b', 1, 1, new Date('2026-09-09T19:00:00Z')).maxes;
+  assert.deepEqual(first['back-squat'].history, []);
+
+  const week = JSON.parse(fs.readFileSync(path.join(root, 'athlete-b', 'weeks', 'W9.json'), 'utf8'));
+  week.days[0].items = [{
+    id: 'a-standing-broad-jump', block: 'A', exerciseKey: 'standing-broad-jump',
+    label: 'Standing broad jump', sets: 3, reps: 1, resultType: 'cm', loadType: 'bodyweight',
+    targetLoad: null, targetPct: null, loadNote: '', targetRpe: null, restSec: 60,
+    isRamp: false, setsAreOptional: false, pairedWith: null,
+  }];
+  fs.writeFileSync(path.join(root, 'athlete-b', 'weeks', 'W9.json'), JSON.stringify(week), 'utf8');
+  const s2 = createGymStore(root);
+  s2._writeJson(path.join(root, 'athlete-b', 'maxes.json'), {
+    'standing-broad-jump': { cm: 205, testedWeek: 1, testedOn: '2026-09-11' },
+  });
+  s2.saveSession('athlete-b', 9, 1, {
+    entries: [{ itemId: 'a-standing-broad-jump', set: 1, load: null, loadType: 'bodyweight', reps: 218, rpe: null, note: '' }],
+  });
+  const { maxes } = s2.finishSession('athlete-b', 9, 1, new Date('2026-11-03T19:00:00Z'));
+  assert.equal(maxes['standing-broad-jump'].cm, 218);
+  assert.deepEqual(maxes['standing-broad-jump'].history, [{ week: 1, cm: 205 }]);
+});

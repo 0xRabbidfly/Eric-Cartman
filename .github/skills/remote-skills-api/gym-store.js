@@ -238,6 +238,27 @@ function createGymStore(dataRoot) {
       .reduce((best, v) => (best === null || v > best ? v : best), null);
   }
 
+  /**
+   * Archive the outgoing tested value before it is replaced, so the trend keeps
+   * every test. The assessment skill cannot do this — recomputeMaxes runs
+   * synchronously in the finish route, before the skill is ever invoked.
+   *
+   * The testedWeek guard means reopening and re-finishing the same session
+   * corrects that week's entry in place rather than appending a duplicate.
+   */
+  function archiveMax(prev, week) {
+    const history = Array.isArray(prev.history) ? prev.history.slice() : [];
+    if (prev.testedWeek === undefined || prev.testedWeek === null) return history;
+    if (prev.testedWeek === week) return history;
+    const point = { week: prev.testedWeek };
+    if (typeof prev.threeRm === 'number') { point.threeRm = prev.threeRm; point.e1rm = prev.e1rm; }
+    if (typeof prev.cm === 'number') point.cm = prev.cm;
+    if (typeof prev.seconds === 'number') point.seconds = prev.seconds;
+    if (Object.keys(point).length === 1) return history;   // nothing worth keeping
+    history.push(point);
+    return history;
+  }
+
   const BASELINE_UNITS = { cm: 'cm', seconds: 'seconds' };
 
   function recomputeMaxes(profileId, week, day, now = new Date()) {
@@ -252,8 +273,10 @@ function createGymStore(dataRoot) {
       if (item.isRamp) {
         const best = bestCleanSet(log.entries, item);
         if (!best) continue;
+        const prev = maxes[item.exerciseKey] || {};
         maxes[item.exerciseKey] = {
-          ...(maxes[item.exerciseKey] || {}),
+          ...prev,
+          history: archiveMax(prev, week),
           threeRm: best.load,
           loadType: item.loadType,
           e1rm: estimateOneRm(best.load),
@@ -272,6 +295,7 @@ function createGymStore(dataRoot) {
       if (best === null) continue;
       maxes[item.exerciseKey] = {
         ...(maxes[item.exerciseKey] || {}),
+        history: archiveMax(maxes[item.exerciseKey] || {}, week),
         [unit]: best,
         testedWeek: week,
         testedOn,
