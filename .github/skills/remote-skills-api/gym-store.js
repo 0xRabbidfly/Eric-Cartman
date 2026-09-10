@@ -328,6 +328,9 @@ function createGymStore(dataRoot) {
     for (let week = 1; week <= PROGRAM_WEEKS; week += 1) {
       const meta = readJson(at(profileId, 'weeks', `W${week}.json`), null);
       if (!meta) continue;
+      if (!Array.isArray(meta.days)) {
+        throw fail('gym_data_corrupt', `${profileId}/weeks/W${week}.json has no days array.`);
+      }
       let tonnage = 0;
       let rpeSum = 0;
       let rpeCount = 0;

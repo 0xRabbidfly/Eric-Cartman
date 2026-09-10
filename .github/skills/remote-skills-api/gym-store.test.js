@@ -436,9 +436,10 @@ test('writeAssessment then listAssessments round-trips newest first', () => {
   const store = createGymStore(fixture());
   store.writeAssessment('athlete-a', 1, 1, '# W1 D1\n\nSolid baseline.');
   store.writeAssessment('athlete-a', 1, 2, '# W1 D2\n\nGood.');
+  store.writeAssessment('athlete-a', 2, 1, '# W2 D1\n\nHeavier.');
   const list = store.listAssessments('athlete-a');
-  assert.deepEqual(list.map((a) => `${a.week}-${a.day}`), ['1-2', '1-1']);
-  assert.match(list[1].body, /Solid baseline/);
+  assert.deepEqual(list.map((a) => `${a.week}-${a.day}`), ['2-1', '1-2', '1-1']);
+  assert.match(list[2].body, /Solid baseline/);
 });
 
 test('listAssessments is empty rather than throwing when none exist', () => {
@@ -457,4 +458,46 @@ test('a ramp item whose every set has no load leaves that max untouched', () => 
   });
   const { maxes } = store.finishSession('athlete-b', 1, 2, new Date('2026-09-11T19:00:00Z'));
   assert.deepEqual(maxes['back-squat'], before['back-squat']);
+});
+
+test('getStats reports a corrupt week file with a coded error, not a TypeError', () => {
+  const root = fixture();
+  fs.writeFileSync(path.join(root, 'athlete-a', 'weeks', 'W4.json'), JSON.stringify({ week: 4 }), 'utf8');
+  const store = createGymStore(root);
+  assert.throws(() => store.getStats('athlete-a'), (err) => {
+    assert.equal(err.code, 'gym_data_corrupt');
+    assert.match(err.message, /W4\.json/);
+    return true;
+  });
+});
+
+test('maxTrend merges stored history with the current value, oldest week first', () => {
+  const root = fixture();
+  createGymStore(root)._writeJson(path.join(root, 'athlete-a', 'maxes.json'), {
+    'back-squat': {
+      threeRm: 80, loadType: 'kg', e1rm: 86.4, testedWeek: 9,
+      history: [{ week: 5, e1rm: 81.0, threeRm: 75 }, { week: 1, e1rm: 75.6, threeRm: 70 }],
+    },
+    'trap-bar-deadlift': { threeRm: null, loadType: 'kg', e1rm: null },
+  });
+  const trend = createGymStore(root).getStats('athlete-a').maxTrend;
+  assert.deepEqual(trend['back-squat'].map((p) => p.week), [1, 5, 9]);
+  assert.equal(trend['back-squat'][2].threeRm, 80);
+  // A lift that has never been tested is absent, not present with nulls.
+  assert.equal(trend['trap-bar-deadlift'], undefined);
+});
+
+test('tonnage counts a dumbbell pair total once and ignores cable and bodyweight work', () => {
+  const store = createGymStore(fixture());
+  store.saveSession('athlete-b', 1, 2, {
+    entries: [
+      { itemId: 'a-back-squat', set: 1, load: 60, loadType: 'kg_total_pair', reps: 5, rpe: 8, note: '' },
+      { itemId: 'a-back-squat', set: 2, load: 70, loadType: 'setting', reps: 10, rpe: null, note: '' },
+      { itemId: 'a-back-squat', set: 3, load: null, loadType: 'bodyweight', reps: 12, rpe: 6, note: '' },
+    ],
+  });
+  store.finishSession('athlete-b', 1, 2, new Date('2026-09-11T19:00:00Z'));
+  const week1 = store.getStats('athlete-b').weeks.find((w) => w.week === 1);
+  assert.equal(week1.tonnage, 300);   // 60 x 5, counted once; the setting and bodyweight rows add nothing
+  assert.equal(week1.avgRpe, 7);      // (8 + 6) / 2 — the set with no RPE is skipped, not counted as zero
 });
