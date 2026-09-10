@@ -318,6 +318,92 @@ function createGymStore(dataRoot) {
     return { log: finished, maxes };
   }
 
+  const TONNAGE_TYPES = new Set(['kg', 'kg_total_pair']);
+
+  function getStats(profileId) {
+    requireProfile(profileId);
+    const maxes = readJson(at(profileId, 'maxes.json'), {});
+    const weeks = [];
+
+    for (let week = 1; week <= PROGRAM_WEEKS; week += 1) {
+      const meta = readJson(at(profileId, 'weeks', `W${week}.json`), null);
+      if (!meta) continue;
+      let tonnage = 0;
+      let rpeSum = 0;
+      let rpeCount = 0;
+      let completed = 0;
+
+      for (const day of meta.days) {
+        const log = readLog(profileId, week, day.day);
+        if (!log) continue;
+        if (log.status === 'complete') completed += 1;
+        for (const entry of log.entries) {
+          if (TONNAGE_TYPES.has(entry.loadType) && typeof entry.load === 'number') {
+            tonnage += entry.load * (entry.reps || 0);
+          }
+          if (typeof entry.rpe === 'number') {
+            rpeSum += entry.rpe;
+            rpeCount += 1;
+          }
+        }
+      }
+
+      weeks.push({
+        week,
+        block: meta.block,
+        blockLabel: meta.blockLabel,
+        sessionsPlanned: meta.days.length,
+        sessionsCompleted: completed,
+        tonnage: Math.round(tonnage),
+        avgRpe: rpeCount ? Math.round((rpeSum / rpeCount) * 10) / 10 : null,
+      });
+    }
+
+    const maxTrend = {};
+    const baselines = {};
+    for (const [key, value] of Object.entries(maxes)) {
+      if (key.startsWith('_')) continue;
+      if (typeof value.threeRm === 'number') {
+        const history = Array.isArray(value.history) ? value.history : [];
+        maxTrend[key] = [...history, { week: value.testedWeek, e1rm: value.e1rm, threeRm: value.threeRm }]
+          .sort((a, b) => a.week - b.week);
+      }
+      if (typeof value.cm === 'number' || typeof value.seconds === 'number') {
+        baselines[key] = value;
+      }
+    }
+
+    return { profileId, weeks, maxTrend, baselines, maxes };
+  }
+
+  function writeAssessment(profileId, week, day, body) {
+    const file = at(profileId, 'assessments', `W${week}D${day}.md`);
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, body, 'utf8');
+    return file;
+  }
+
+  function listAssessments(profileId) {
+    requireProfile(profileId);
+    const dir = at(profileId, 'assessments');
+    let names;
+    try {
+      names = fs.readdirSync(dir);
+    } catch {
+      return [];
+    }
+    return names
+      .map((name) => /^W(\d+)D(\d+)\.md$/.exec(name))
+      .filter(Boolean)
+      .map((match) => ({
+        week: Number(match[1]),
+        day: Number(match[2]),
+        body: fs.readFileSync(path.join(dir, match[0]), 'utf8'),
+        modified: fs.statSync(path.join(dir, match[0])).mtime.toISOString(),
+      }))
+      .sort((a, b) => (b.week - a.week) || (b.day - a.day));
+  }
+
   return {
     dataRoot,
     isEnabled,
@@ -333,6 +419,9 @@ function createGymStore(dataRoot) {
     reopenSession,
     recomputeMaxes,
     estimateOneRm,
+    getStats,
+    writeAssessment,
+    listAssessments,
     _writeJson: writeJson,
     // internals reused by later tasks
     _readJson: readJson,

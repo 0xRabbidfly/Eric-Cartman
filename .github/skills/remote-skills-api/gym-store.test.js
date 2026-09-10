@@ -381,3 +381,80 @@ test('saveSession rejects a malformed entries payload with a coded error', () =>
   expectCode(() => store.saveSession('athlete-b', 1, 2, { entries: null }), 'gym_invalid_entry');
   expectCode(() => store.saveSession('athlete-b', 1, 3, { entries: 'nope' }), 'gym_invalid_entry');
 });
+
+test('getStats summarises each week that has any log', () => {
+  const store = createGymStore(fixture());
+  const stats = store.getStats('athlete-a');
+  const week1 = stats.weeks.find((w) => w.week === 1);
+  assert.equal(week1.sessionsCompleted, 1);
+  assert.equal(week1.sessionsPlanned, 3);
+  assert.equal(week1.tonnage, 120);          // 40 kg × 3 reps × 1 set
+  assert.equal(week1.avgRpe, 7);
+  assert.equal(week1.blockLabel, 'Test week');
+});
+
+test('getStats reports zero for weeks with no logs', () => {
+  const store = createGymStore(fixture());
+  const week2 = store.getStats('athlete-a').weeks.find((w) => w.week === 2);
+  assert.equal(week2.sessionsCompleted, 0);
+  assert.equal(week2.tonnage, 0);
+  assert.equal(week2.avgRpe, null);
+});
+
+test('getStats excludes bodyweight and cable work from tonnage', () => {
+  const store = createGymStore(fixture());
+  store.saveSession('athlete-b', 1, 2, {
+    entries: [
+      { itemId: 'a-back-squat', set: 1, load: 50, loadType: 'kg', reps: 3, rpe: 7, note: '' },
+      { itemId: 'a-back-squat', set: 2, load: 70, loadType: 'setting', reps: 10, rpe: 7, note: '' },
+      { itemId: 'a-back-squat', set: 3, load: null, loadType: 'bodyweight', reps: 8, rpe: 7, note: '' },
+    ],
+  });
+  store.finishSession('athlete-b', 1, 2, new Date('2026-09-11T19:00:00Z'));
+  assert.equal(store.getStats('athlete-b').weeks.find((w) => w.week === 1).tonnage, 150);
+});
+
+test('getStats tracks the estimated 1RM trend per tested lift', () => {
+  const store = createGymStore(fixture());
+  const trend = store.getStats('athlete-a').maxTrend;
+  assert.deepEqual(trend['back-squat'], [{ week: 1, e1rm: 75.6, threeRm: 70 }]);
+});
+
+test('getStats surfaces the jump and plank baselines', () => {
+  const root = fixture();
+  const store = createGymStore(root);
+  const maxes = store._readJson(path.join(root, 'athlete-a', 'maxes.json'), {});
+  maxes['standing-broad-jump'] = { cm: 210, testedWeek: 1 };
+  maxes['front-plank'] = { seconds: 95, testedWeek: 1 };
+  store._writeJson(path.join(root, 'athlete-a', 'maxes.json'), maxes);
+  const baselines = createGymStore(root).getStats('athlete-a').baselines;
+  assert.equal(baselines['standing-broad-jump'].cm, 210);
+  assert.equal(baselines['front-plank'].seconds, 95);
+});
+
+test('writeAssessment then listAssessments round-trips newest first', () => {
+  const store = createGymStore(fixture());
+  store.writeAssessment('athlete-a', 1, 1, '# W1 D1\n\nSolid baseline.');
+  store.writeAssessment('athlete-a', 1, 2, '# W1 D2\n\nGood.');
+  const list = store.listAssessments('athlete-a');
+  assert.deepEqual(list.map((a) => `${a.week}-${a.day}`), ['1-2', '1-1']);
+  assert.match(list[1].body, /Solid baseline/);
+});
+
+test('listAssessments is empty rather than throwing when none exist', () => {
+  assert.deepEqual(createGymStore(fixture()).listAssessments('athlete-b'), []);
+});
+
+test('a ramp item whose every set has no load leaves that max untouched', () => {
+  const root = fixture();
+  const store = createGymStore(root);
+  const before = store._readJson(path.join(root, 'athlete-b', 'maxes.json'), {});
+  store.saveSession('athlete-b', 1, 2, {
+    entries: [
+      { itemId: 'a-back-squat', set: 1, load: null, loadType: 'kg', reps: 3, rpe: 8, note: '' },
+      { itemId: 'a-back-squat', set: 2, load: null, loadType: 'kg', reps: 3, rpe: 9, note: '' },
+    ],
+  });
+  const { maxes } = store.finishSession('athlete-b', 1, 2, new Date('2026-09-11T19:00:00Z'));
+  assert.deepEqual(maxes['back-squat'], before['back-squat']);
+});
