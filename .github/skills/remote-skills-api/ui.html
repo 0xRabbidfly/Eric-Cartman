@@ -780,6 +780,28 @@
     .gym-sheet-body { font-size: 13px; line-height: 1.6; text-align: left; }
     .gym-sheet-body b { color: var(--accent); }
     .gym-sheet-body p { margin: 8px 0; }
+    .gym-statcard {
+      margin-bottom: 10px; padding: 12px 14px;
+      background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    }
+    .gym-statcard h3 { font-size: 12px; color: var(--text-dim); font-weight: 700;
+                       text-transform: uppercase; letter-spacing: .05em; margin-bottom: 10px; }
+    .gym-statrow { display: grid; grid-template-columns: 42px 1fr 66px; gap: 10px;
+                   align-items: center; padding: 5px 0; font-size: 12.5px; }
+    .gym-statrow .sr-label { color: var(--text-dim); }
+    .gym-statrow .sr-value { text-align: right; font-variant-numeric: tabular-nums; }
+    .gym-statrow.dim { opacity: .4; }
+    .gym-bar { height: 7px; border-radius: 4px; background: var(--surface2); overflow: hidden; }
+    .gym-bar > span { display: block; height: 100%; background: var(--accent); border-radius: 4px; }
+    .gym-note {
+      margin-bottom: 10px; background: var(--surface);
+      border: 1px solid var(--border); border-radius: 12px; overflow: hidden;
+    }
+    .gym-note summary { padding: 12px 14px; cursor: pointer; font-weight: 600; font-size: 13.5px; }
+    .gym-note summary::-webkit-details-marker { display: none; }
+    .gym-note .gn-body { padding: 0 14px 14px; font-size: 13px; line-height: 1.6; }
+    .gym-note .gn-body h1, .gym-note .gn-body h2, .gym-note .gn-body h3 { font-size: 14px; margin: 10px 0 6px; }
+    .gym-note .gn-body ul { margin: 7px 0 7px 18px; }
   </style>
 </head>
 <body>
@@ -1205,6 +1227,7 @@
       currentWeek: 1,
       weekData: null,
       view: 'week',
+      showing: null,
       exercises: null,
     };
 
@@ -1269,6 +1292,7 @@
     }
 
     function renderGymWeek() {
+      gym.showing = 'week';
       const w = gym.weekData;
       if (!w) return;
       const bounds = `${gymShortDate(w.bounds.start)} – ${gymShortDate(w.bounds.end)}`;
@@ -1389,6 +1413,7 @@
     }
 
     function renderGymSession() {
+      gym.showing = 'session';
       const s = gymSession.data;
       const done = s.log.status === 'complete';
 
@@ -1646,7 +1671,8 @@
       // The log is already saved server-side, so a failure here costs the
       // assessment only. Give up after ten minutes rather than polling forever.
       const week = gymSession.week, day = gymSession.day;
-      const stillHere = () => gymSession.week === week && gymSession.day === day;
+      const stillHere = () => gym.showing === 'session'
+        && gymSession.week === week && gymSession.day === day;
       const deadline = Date.now() + 10 * 60 * 1000;
       while (Date.now() < deadline) {
         await new Promise(r => setTimeout(r, 4000));
@@ -1672,11 +1698,94 @@
       gymSession.job = null;
       if (stillHere()) renderGymSession();
     }
-    function renderGymStats() {
-      document.getElementById('gymScroll').innerHTML = '<div class="gym-empty">Stats coming next.</div>';
+    function gymBar(value, max) {
+      const pct = max > 0 ? Math.round((value / max) * 100) : 0;
+      return `<div class="gym-bar"><span style="width:${pct}%"></span></div>`;
     }
-    function renderGymNotes() {
-      document.getElementById('gymScroll').innerHTML = '<div class="gym-empty">Notes coming next.</div>';
+
+    async function renderGymStats() {
+      gym.showing = 'stats';
+      const scroll = document.getElementById('gymScroll');
+      scroll.innerHTML = '<div class="gym-empty">Loading…</div>';
+      let data;
+      try {
+        data = await api(`/api/gym/stats?profile=${encodeURIComponent(gym.profileId)}`);
+      } catch (e) {
+        scroll.innerHTML = `<div class="gym-empty">${escHtml(e.message)}</div>`;
+        return;
+      }
+
+      const maxTonnage = Math.max(1, ...data.weeks.map(w => w.tonnage));
+      const weeks = data.weeks.map(w => `
+        <div class="gym-statrow ${w.sessionsCompleted === 0 ? 'dim' : ''}">
+          <div class="sr-label">W${w.week}</div>
+          ${gymBar(w.tonnage, maxTonnage)}
+          <div class="sr-value">${w.tonnage ? `${(w.tonnage / 1000).toFixed(1)}t` : '—'}</div>
+        </div>`).join('');
+
+      const adherence = data.weeks.filter(w => w.sessionsCompleted > 0).map(w => `
+        <div class="gym-statrow">
+          <div class="sr-label">W${w.week}</div>
+          ${gymBar(w.sessionsCompleted, w.sessionsPlanned)}
+          <div class="sr-value">${w.sessionsCompleted}/${w.sessionsPlanned}${w.avgRpe ? ` · RPE ${w.avgRpe}` : ''}</div>
+        </div>`).join('') || '<div class="gym-empty">No sessions logged yet.</div>';
+
+      const LIFT_NAMES = {
+        'back-squat': 'Back squat', 'trap-bar-deadlift': 'Trap-bar deadlift',
+        'dumbbell-bench-press': 'DB bench', 'pull-up-weighted': 'Weighted pull-up',
+      };
+      const trend = Object.entries(LIFT_NAMES).map(([key, name]) => {
+        const points = data.maxTrend[key];
+        if (!points || !points.length) {
+          return `<div class="gym-statrow dim"><div class="sr-label" style="width:auto">${name}</div>
+                  <div class="sr-label">not tested yet</div><div class="sr-value">—</div></div>`;
+        }
+        const latest = points[points.length - 1];
+        const first = points[0];
+        const delta = latest.e1rm - first.e1rm;
+        const sign = delta > 0 ? '+' : '';
+        return `<div class="gym-statrow">
+          <div class="sr-label" style="width:auto">${name}</div>
+          <div class="sr-label">3RM ${latest.threeRm} · W${latest.testedWeek || latest.week}${
+            points.length > 1 ? ` · ${sign}${delta.toFixed(1)} kg` : ''}</div>
+          <div class="sr-value">${latest.e1rm} kg</div>
+        </div>`;
+      }).join('');
+
+      const baselineRows = Object.entries(data.baselines).map(([key, value]) => {
+        const label = key.replace(/-/g, ' ').replace(/^./, c => c.toUpperCase());
+        const shown = value.cm !== undefined && value.cm !== null ? `${value.cm} cm`
+                    : value.seconds !== undefined && value.seconds !== null ? `${value.seconds} s` : '—';
+        return `<div class="gym-statrow"><div class="sr-label" style="width:auto">${escHtml(label)}</div>
+                <div></div><div class="sr-value">${shown}</div></div>`;
+      }).join('') || '<div class="gym-empty">Recorded on day 3 of a test week.</div>';
+
+      scroll.innerHTML = `
+        <div class="gym-statcard"><h3>Estimated 1RM</h3>${trend}</div>
+        <div class="gym-statcard"><h3>Weekly tonnage</h3>${weeks}</div>
+        <div class="gym-statcard"><h3>Sessions and average RPE</h3>${adherence}</div>
+        <div class="gym-statcard"><h3>Power and core baselines</h3>${baselineRows}</div>`;
+    }
+
+    async function renderGymNotes() {
+      gym.showing = 'notes';
+      const scroll = document.getElementById('gymScroll');
+      scroll.innerHTML = '<div class="gym-empty">Loading…</div>';
+      try {
+        const data = await api(`/api/gym/assessments?profile=${encodeURIComponent(gym.profileId)}`);
+        const list = data.assessments || [];
+        if (!list.length) {
+          scroll.innerHTML = '<div class="gym-empty">No assessments yet.<br>They appear here after you finish a workout.</div>';
+          return;
+        }
+        scroll.innerHTML = list.map((a, i) => `
+          <details class="gym-note" ${i === 0 ? 'open' : ''}>
+            <summary>W${a.week} D${a.day} · ${gymShortDate(a.modified.slice(0, 10))}</summary>
+            <div class="gn-body">${marked.parse(a.body)}</div>
+          </details>`).join('');
+      } catch (e) {
+        scroll.innerHTML = `<div class="gym-empty">${escHtml(e.message)}</div>`;
+      }
     }
 
     // ── Tabs ──
@@ -1686,6 +1795,7 @@
 
     function setTab(tab) {
       currentTab = tab;
+      if (tab !== 'gym') gym.showing = null;
       const viewId = { chat: 'viewChat', library: 'viewLibrary', skills: 'viewSkills',
                        gym: 'viewGym', settings: 'viewSettings' }[tab];
       document.querySelectorAll('#views .view').forEach(v => v.classList.toggle('active', v.id === viewId));
