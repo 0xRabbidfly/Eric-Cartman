@@ -714,6 +714,72 @@
     .gym-day .gd-meta { font-size: 11.5px; color: var(--text-dim); margin-top: 3px; }
     .gym-day .gd-chev { color: var(--text-dim); font-size: 18px; }
     .gym-empty { text-align: center; color: var(--text-dim); padding: 40px 20px; font-size: 13px; }
+    .gym-back {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: none; border: none; color: var(--accent);
+      font-size: 13px; font-weight: 600; padding: 4px 0 10px; cursor: pointer;
+    }
+    .gym-warmup {
+      margin-bottom: 12px; padding: 10px 12px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; font-size: 12px; line-height: 1.5; color: var(--text-dim);
+    }
+    .gym-warmup b { color: var(--text); }
+    .gym-item {
+      margin-bottom: 12px; padding: 12px;
+      background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    }
+    .gym-item .gi-head { display: flex; align-items: baseline; gap: 8px; }
+    .gym-item .gi-block {
+      font-size: 10px; font-weight: 800; color: var(--accent);
+      background: var(--accent-soft); border-radius: 5px; padding: 2px 5px;
+    }
+    .gym-item .gi-name {
+      font-weight: 600; font-size: 14px; color: var(--text);
+      text-decoration: underline dotted var(--text-dim); cursor: pointer;
+    }
+    .gym-item .gi-presc { font-size: 11.5px; color: var(--text-dim); margin: 5px 0 9px; line-height: 1.5; }
+    .gym-sets { display: flex; flex-direction: column; gap: 6px; }
+    .gym-setrow { display: grid; grid-template-columns: 26px 1fr 1fr 1fr; gap: 6px; align-items: center; }
+    .gym-setrow.head { font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: .05em; }
+    .gym-setrow .sr-n { font-size: 12px; color: var(--text-dim); text-align: center; }
+    .gym-setrow input {
+      width: 100%; padding: 8px 6px; text-align: center;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text); font-size: 15px; outline: none;
+      -webkit-appearance: none;
+    }
+    .gym-setrow input:focus { border-color: var(--accent); }
+    .gym-setrow input.filled { border-color: var(--success); }
+    .gym-setctl { display: flex; gap: 8px; margin-top: 8px; }
+    .gym-setctl button {
+      flex: 1; padding: 7px; font-size: 12px; font-weight: 600;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text-dim); cursor: pointer;
+    }
+    .gym-notes {
+      width: 100%; min-height: 74px; padding: 10px 12px; margin-bottom: 12px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; color: var(--text); font-size: 14px;
+      font-family: inherit; resize: vertical; outline: none;
+    }
+    .gym-finish {
+      width: 100%; padding: 14px; margin-bottom: 8px;
+      background: var(--accent); border: none; border-radius: 12px;
+      color: #fff; font-size: 15px; font-weight: 700; cursor: pointer;
+    }
+    .gym-finish:disabled { opacity: .45; }
+    .gym-assess {
+      margin: 4px 0 20px; padding: 13px 14px;
+      background: var(--bot-bubble); border: 1px solid var(--border);
+      border-radius: 12px; font-size: 13.5px; line-height: 1.6;
+    }
+    .gym-assess h1, .gym-assess h2, .gym-assess h3 { font-size: 14px; margin: 10px 0 6px; }
+    .gym-assess p { margin: 7px 0; }
+    .gym-assess ul { margin: 7px 0 7px 18px; }
+    .gym-sheet-body { font-size: 13px; line-height: 1.6; text-align: left; }
+    .gym-sheet-body b { color: var(--accent); }
+    .gym-sheet-body p { margin: 8px 0; }
   </style>
 </head>
 <body>
@@ -929,7 +995,8 @@
       const confirm = document.getElementById('modalConfirm');
 
       title.textContent = options.title || 'Confirm';
-      text.textContent = options.message || '';
+      if (options.html) text.innerHTML = options.html;
+      else text.textContent = options.message || '';
       confirm.textContent = options.confirmLabel || 'OK';
       cancel.textContent = options.cancelLabel || 'Cancel';
       cancel.classList.toggle('hidden', options.showCancel === false);
@@ -1252,8 +1319,318 @@
       if (view === 'notes') renderGymNotes();
     }
 
-    function openGymSession(week, day) {
-      showToast(`Session W${week} D${day} — coming in the next task.`, 'info');
+    // ── Gym session logging ──
+    const gymSession = { week: null, day: null, data: null, entries: new Map(), dayNotes: '',
+                         saveTimer: null, job: null, assessment: null, assessmentFailed: false };
+
+    function gymEntryKey(itemId, setNo) { return `${itemId}#${setNo}`; }
+
+    async function openGymSession(week, day) {
+      gymSession.week = week;
+      gymSession.day = day;
+      gymSession.assessment = null;
+      gymSession.assessmentFailed = false;
+      gymSession.job = null;
+      document.getElementById('gymScroll').innerHTML = '<div class="gym-empty">Loading…</div>';
+      try {
+        const [data, exercises] = await Promise.all([
+          api(`/api/gym/session/${week}/${day}?profile=${encodeURIComponent(gym.profileId)}`),
+          gym.exercises ? Promise.resolve(gym.exercises)
+                        : api(`/api/gym/exercises?profile=${encodeURIComponent(gym.profileId)}`),
+        ]);
+        gym.exercises = exercises;
+        gymSession.data = data;
+        gymSession.dayNotes = data.log.dayNotes || '';
+        gymSession.entries = new Map(
+          (data.log.entries || []).map(e => [gymEntryKey(e.itemId, e.set), e]));
+        renderGymSession();
+      } catch (e) {
+        document.getElementById('gymScroll').innerHTML =
+          `<div class="gym-empty">${escHtml(e.message)}</div>`;
+      }
+    }
+
+    function gymRowCount(item) {
+      let max = item.sets;
+      for (const key of gymSession.entries.keys()) {
+        const [itemId, setNo] = key.split('#');
+        if (itemId === item.id) max = Math.max(max, Number(setNo));
+      }
+      return max;
+    }
+
+    function gymLoadLabel(item) {
+      const target = item.targetLoad;
+      if (item.loadType === 'bodyweight') return 'bodyweight';
+      if (item.loadType === 'setting') return target ? `setting ${target}` : 'cable setting';
+      if (item.loadType === 'bodyweight_plus_kg') return target ? `bw + ${target} kg` : 'bw + load';
+      if (target === null || target === undefined) {
+        return item.targetPct ? `${item.targetPct}% of 1RM — not set yet` : 'your call';
+      }
+      if (item.loadType === 'kg_total_pair') return `${target} kg total (${target / 2}/hand)`;
+      return `${target} kg`;
+    }
+
+    const GYM_UNITS = { reps: 'reps', reps_per_side: 'reps/side', seconds: 's', cm: 'cm', metres: 'm' };
+
+    function gymRepLabel(item) {
+      return `${item.sets}${item.setsAreOptional ? ' max' : ''} × ${item.reps} ${GYM_UNITS[item.resultType]}`;
+    }
+
+    // The middle column holds whatever the exercise is measured in: reps for a
+    // squat, centimetres for a broad jump, seconds for a plank.
+    function gymResultPlaceholder(item) {
+      return item.resultType === 'reps' || item.resultType === 'reps_per_side'
+        ? String(item.reps)
+        : GYM_UNITS[item.resultType];
+    }
+
+    function renderGymSession() {
+      const s = gymSession.data;
+      const done = s.log.status === 'complete';
+
+      const items = s.day.items.map(item => {
+        const rows = [];
+        for (let n = 1; n <= gymRowCount(item); n += 1) {
+          const e = gymSession.entries.get(gymEntryKey(item.id, n)) || {};
+          const val = v => (v === null || v === undefined ? '' : v);
+          const filled = v => (v === null || v === undefined || v === '' ? '' : 'filled');
+          rows.push(`
+            <div class="gym-setrow">
+              <div class="sr-n">${n}</div>
+              <input inputmode="decimal" placeholder="${item.loadType === 'bodyweight' ? 'bw' : 'load'}"
+                     class="${filled(e.load)}" value="${val(e.load)}" ${done ? 'disabled' : ''}
+                     onchange="gymSetInput('${escJsAttr(item.id)}', ${n}, 'load', this.value)">
+              <input inputmode="numeric" placeholder="${escHtml(gymResultPlaceholder(item))}"
+                     class="${filled(e.reps)}" value="${val(e.reps)}" ${done ? 'disabled' : ''}
+                     onchange="gymSetInput('${escJsAttr(item.id)}', ${n}, 'reps', this.value)">
+              <input inputmode="decimal" placeholder="RPE"
+                     class="${filled(e.rpe)}" value="${val(e.rpe)}" ${done ? 'disabled' : ''}
+                     onchange="gymSetInput('${escJsAttr(item.id)}', ${n}, 'rpe', this.value)">
+            </div>`);
+        }
+
+        const paired = item.pairedWith
+          ? ` · then ${item.pairedWith.reps} ${item.pairedWith.exerciseKey.replace(/-/g, ' ')} within ${item.pairedWith.withinSec}s`
+          : '';
+        const rpe = item.targetRpe ? ` · RPE ${item.targetRpe}` : '';
+        const ctl = (item.setsAreOptional && !done) ? `
+          <div class="gym-setctl">
+            <button onclick="gymAddSet('${escJsAttr(item.id)}')">+ set</button>
+            <button onclick="gymRemoveSet('${escJsAttr(item.id)}')">− set</button>
+          </div>` : '';
+
+        return `
+          <div class="gym-item">
+            <div class="gi-head">
+              <span class="gi-block">${item.block}</span>
+              <span class="gi-name" onclick="gymShowExercise('${escJsAttr(item.exerciseKey)}')">${escHtml(item.label)}</span>
+            </div>
+            <div class="gi-presc">${escHtml(gymRepLabel(item))} · ${escHtml(gymLoadLabel(item))}${rpe} · rest ${item.restSec}s${escHtml(paired)}
+              ${item.loadNote ? `<br>${escHtml(item.loadNote)}` : ''}</div>
+            <div class="gym-sets">
+              <div class="gym-setrow head"><div></div><div>Load</div><div>Reps</div><div>RPE</div></div>
+              ${rows.join('')}
+            </div>
+            ${ctl}
+          </div>`;
+      }).join('');
+
+      const retry = gymSession.assessmentFailed
+        ? '<button class="gym-finish" onclick="retryGymAssessment()">Retry the assessment</button>'
+        : '';
+      const assessment = gymSession.assessment
+        ? `<div class="gym-assess">${marked.parse(gymSession.assessment)}</div>${retry}`
+        : gymSession.job
+          ? '<div class="gym-assess">Assessing the session… this takes a minute or two.</div>'
+          : '';
+
+      document.getElementById('gymScroll').innerHTML = `
+        <button class="gym-back" onclick="loadGymWeek(${gymSession.week}, true)">‹ W${gymSession.week}</button>
+        <div class="gym-weekbar">
+          <div class="gw-label">
+            <div class="gw-title">D${s.day.day} · ${escHtml(s.day.title)}</div>
+            <div class="gw-sub">${s.day.estMinutes} min · ${escHtml(s.week.blockLabel)}${done ? ` · done ${gymShortDate(s.log.performedOn)}` : ''}</div>
+          </div>
+        </div>
+        <div class="gym-warmup"><b>Warm-up</b> · ${s.day.warmup.map(escHtml).join(' · ')}</div>
+        ${items}
+        <textarea class="gym-notes" placeholder="Day notes — sleep, ride load, anything sore"
+                  ${done ? 'disabled' : ''}
+                  onchange="gymSetNotes(this.value)">${escHtml(gymSession.dayNotes)}</textarea>
+        ${done
+          ? `<button class="gym-back" onclick="reopenGymSession()">Reopen to correct a number</button>`
+          : `<button class="gym-finish" onclick="finishGymWorkout()">Finish workout</button>`}
+        ${assessment}`;
+    }
+
+    function gymCollectEntries() {
+      return [...gymSession.entries.values()].filter(e =>
+        e.load !== null || e.reps !== null || e.rpe !== null);
+    }
+
+    function gymQueueSave() {
+      clearTimeout(gymSession.saveTimer);
+      gymSession.saveTimer = setTimeout(async () => {
+        try {
+          await api(`/api/gym/session/${gymSession.week}/${gymSession.day}?profile=${encodeURIComponent(gym.profileId)}`, {
+            method: 'PUT',
+            body: JSON.stringify({ entries: gymCollectEntries(), dayNotes: gymSession.dayNotes }),
+          });
+        } catch (e) {
+          showToast(`Not saved: ${e.message}`, 'error', 4200);
+        }
+      }, 800);
+    }
+
+    function gymSetInput(itemId, setNo, field, raw) {
+      const item = gymSession.data.day.items.find(i => i.id === itemId);
+      const key = gymEntryKey(itemId, setNo);
+      const entry = gymSession.entries.get(key)
+        || { itemId, set: setNo, load: null, loadType: item.loadType, reps: null, rpe: null, note: '' };
+      const text = String(raw).trim();
+      entry[field] = text === '' ? null : Number(text);
+      if (Number.isNaN(entry[field])) entry[field] = null;
+      gymSession.entries.set(key, entry);
+      gymQueueSave();
+    }
+
+    function gymSetNotes(value) {
+      gymSession.dayNotes = value;
+      gymQueueSave();
+    }
+
+    function gymAddSet(itemId) {
+      const item = gymSession.data.day.items.find(i => i.id === itemId);
+      const next = gymRowCount(item) + 1;
+      gymSession.entries.set(gymEntryKey(itemId, next),
+        { itemId, set: next, load: null, loadType: item.loadType, reps: null, rpe: null, note: '' });
+      renderGymSession();
+    }
+
+    function gymRemoveSet(itemId) {
+      const item = gymSession.data.day.items.find(i => i.id === itemId);
+      const last = gymRowCount(item);
+      if (last <= 1) return;
+      gymSession.entries.delete(gymEntryKey(itemId, last));
+      gymQueueSave();
+      renderGymSession();
+    }
+
+    function gymShowExercise(key) {
+      const ex = (gym.exercises || {})[key];
+      if (!ex) return showToast('No entry for that exercise.', 'error');
+      showModal({
+        title: ex.name,
+        html: `<div class="gym-sheet-body">
+          <p><b>Why</b> ${escHtml(ex.why)}</p>
+          <p><b>How</b> ${escHtml(ex.how)}</p>
+          <p><b>Cues</b> ${escHtml(ex.cues)}</p>
+          <p><a href="${escHtml(ex.video)}" target="_blank" rel="noopener">Watch the tutorial ›</a></p>
+        </div>`,
+        confirmLabel: 'Close',
+        showCancel: false,
+      });
+    }
+
+    async function reopenGymSession() {
+      const ok = await showModal({
+        title: 'Reopen this session?',
+        message: 'It goes back to editable so you can correct a number. Finishing it again '
+               + 'recomputes your maxes and re-runs the assessment.',
+        confirmLabel: 'Reopen',
+      });
+      if (!ok?.confirmed) return;
+      try {
+        await api(`/api/gym/session/${gymSession.week}/${gymSession.day}/reopen?profile=${encodeURIComponent(gym.profileId)}`, {
+          method: 'POST',
+          body: JSON.stringify({}),
+        });
+        await openGymSession(gymSession.week, gymSession.day);
+      } catch (e) {
+        showToast(`Could not reopen: ${e.message}`, 'error', 4200);
+      }
+    }
+
+    async function retryGymAssessment() {
+      gymSession.assessment = null;
+      gymSession.assessmentFailed = false;
+      renderGymSession();
+      try {
+        const res = await api(`/api/gym/session/${gymSession.week}/${gymSession.day}/reopen?profile=${encodeURIComponent(gym.profileId)}`, {
+          method: 'POST', body: JSON.stringify({}),
+        });
+        void res;
+        const finish = await api(`/api/gym/session/${gymSession.week}/${gymSession.day}/finish?profile=${encodeURIComponent(gym.profileId)}`, {
+          method: 'POST', body: JSON.stringify({}),
+        });
+        gymSession.data.log = finish.log;
+        gymSession.job = finish.jobId || null;
+        renderGymSession();
+        if (finish.jobId) pollGymJob(finish.jobId);
+      } catch (e) {
+        showToast(`Retry failed: ${e.message}`, 'error', 4200);
+      }
+    }
+
+    async function finishGymWorkout() {
+      if (gymCollectEntries().length === 0) {
+        return showToast('Log at least one set first.', 'error');
+      }
+      clearTimeout(gymSession.saveTimer);
+      const btn = document.querySelector('.gym-finish');
+      if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+      try {
+        await api(`/api/gym/session/${gymSession.week}/${gymSession.day}?profile=${encodeURIComponent(gym.profileId)}`, {
+          method: 'PUT',
+          body: JSON.stringify({ entries: gymCollectEntries(), dayNotes: gymSession.dayNotes }),
+        });
+        const res = await api(`/api/gym/session/${gymSession.week}/${gymSession.day}/finish?profile=${encodeURIComponent(gym.profileId)}`, {
+          method: 'POST',
+          body: JSON.stringify({}),
+        });
+        gymSession.data.log = res.log;
+        gymSession.job = res.jobId || null;
+        showToast('Workout saved.', 'success');
+        if (!res.jobId) {
+          // The skill is not installed on this machine. The log is still saved.
+          gymSession.assessment = res.assessmentSkipped || 'No assessment was run.';
+          renderGymSession();
+          return;
+        }
+        renderGymSession();
+        pollGymJob(res.jobId);
+      } catch (e) {
+        showToast(`Finish failed: ${e.message}`, 'error', 5000);
+        if (btn) { btn.disabled = false; btn.textContent = 'Finish workout'; }
+      }
+    }
+
+    async function pollGymJob(jobId) {
+      // The log is already saved server-side, so a failure here costs the
+      // assessment only. Give up after ten minutes rather than polling forever.
+      const deadline = Date.now() + 10 * 60 * 1000;
+      while (Date.now() < deadline) {
+        await new Promise(r => setTimeout(r, 4000));
+        if (gymSession.job !== jobId) return;      // user navigated away
+        let job;
+        try { job = await api(`/api/jobs/${jobId}`); } catch { continue; }
+        if (job.status === 'done') {
+          gymSession.assessment = job.result || job.text || 'Assessment finished with no text.';
+          gymSession.job = null;
+          return renderGymSession();
+        }
+        if (job.status === 'error') {
+          gymSession.assessment = `Assessment failed: ${job.error}\n\nYour log is saved either way.`;
+          gymSession.assessmentFailed = true;
+          gymSession.job = null;
+          return renderGymSession();
+        }
+      }
+      gymSession.assessment = 'Assessment timed out. Your log is saved.';
+      gymSession.assessmentFailed = true;
+      gymSession.job = null;
+      renderGymSession();
     }
     function renderGymStats() {
       document.getElementById('gymScroll').innerHTML = '<div class="gym-empty">Stats coming next.</div>';
