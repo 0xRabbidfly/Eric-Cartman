@@ -499,6 +499,9 @@
     .tab-btn .tab-icon { font-size: 19px; line-height: 1; }
     .tab-btn.active { color: var(--accent); }
     .tab-btn.active .tab-icon { transform: translateY(-1px); }
+    /* The tab bar sets display:flex, which beats the UA stylesheet's [hidden] rule.
+       Without this, hiding the Gym tab on a clone with no gym data silently fails. */
+    .tab-btn[hidden] { display: none; }
 
     /* ── Research reader ── */
     .lib-search-wrap { padding: 0 16px 8px; flex-shrink: 0; }
@@ -2011,10 +2014,11 @@
       // No token yet — show prompt first, then load skills after
       setTimeout(async () => {
         await promptSetToken();
-        if (API_TOKEN) loadSkills();
+        if (API_TOKEN) { loadSkills(); loadGymProfiles(); }
       }, 150);
     } else {
       loadSkills();
+      loadGymProfiles();
     }
   </script>
 </body>
