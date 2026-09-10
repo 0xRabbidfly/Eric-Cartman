@@ -259,6 +259,7 @@ function createGymStore(dataRoot) {
     return history;
   }
 
+  /** Which key a baseline's result is stored under, chosen by the unit it is measured in. */
   const BASELINE_UNITS = { cm: 'cm', seconds: 'seconds' };
 
   function recomputeMaxes(profileId, week, day, now = new Date()) {
@@ -266,7 +267,10 @@ function createGymStore(dataRoot) {
     const maxes = readJson(file, {});
     const log = readLog(profileId, week, day);
     if (!log) return maxes;
-    const testedOn = now.toISOString().slice(0, 10);
+    // A max was tested on the day the workout happened, not on the day the
+    // finish button was pressed. Re-finishing a corrected session must not
+    // redate it. Only an unfinished log can be missing performedOn.
+    const testedOn = log.performedOn || now.toISOString().slice(0, 10);
 
     let changed = false;
     for (const item of dayItems(profileId, week, day)) {
@@ -289,6 +293,13 @@ function createGymStore(dataRoot) {
 
       // Jump distance, box height and plank hold are baselines, not maxes. They
       // have no load, so bestCleanSet cannot see them.
+      //
+      // `isBaseline` is the discriminator, not the unit. Plenty of prescribed
+      // accessory work is measured in seconds or centimetres — a 2×30 s side
+      // plank, a box jump in a training week — and promoting those would file
+      // the prescription itself as a tested result and build a "trend" out of
+      // the programme climbing week to week.
+      if (!item.isBaseline) continue;
       const unit = BASELINE_UNITS[item.resultType];
       if (!unit) continue;
       const best = bestResult(log.entries, item);
@@ -334,7 +345,10 @@ function createGymStore(dataRoot) {
     const finished = {
       ...log,
       status: 'complete',
-      performedOn: now.toISOString().slice(0, 10),
+      // The day it was performed, kept. Reopening to correct a transcribed
+      // number — or the UI's retry, which reopens purely to re-run the model —
+      // must not silently move a Monday session to whatever today is.
+      performedOn: log.performedOn || now.toISOString().slice(0, 10),
       completedAt: now.toISOString(),
     };
     writeJson(at(profileId, 'logs', `W${week}D${day}.json`), finished);
@@ -343,6 +357,15 @@ function createGymStore(dataRoot) {
   }
 
   const TONNAGE_TYPES = new Set(['kg', 'kg_total_pair']);
+
+  /**
+   * Tonnage is kilograms lifted, so the number multiplied by the load has to be
+   * a rep count. A farmer's carry is `kg_total_pair` with `resultType: metres`
+   * and puts its distance in the reps column — 60 kg × 30 m would add 1800 to a
+   * figure meant to be kilograms. `reps_per_side` counts double: eight per side
+   * is sixteen reps against that load.
+   */
+  const TONNAGE_RESULTS = new Set(['reps', 'reps_per_side']);
 
   function getStats(profileId) {
     requireProfile(profileId);
@@ -364,9 +387,13 @@ function createGymStore(dataRoot) {
         const log = readLog(profileId, week, day.day);
         if (!log) continue;
         if (log.status === 'complete') completed += 1;
+        const items = new Map((day.items || []).map((i) => [i.id, i]));
         for (const entry of log.entries) {
-          if (TONNAGE_TYPES.has(entry.loadType) && typeof entry.load === 'number') {
-            tonnage += entry.load * (entry.reps || 0);
+          const item = items.get(entry.itemId);
+          if (item && TONNAGE_RESULTS.has(item.resultType)
+              && TONNAGE_TYPES.has(entry.loadType) && typeof entry.load === 'number') {
+            const sides = item.resultType === 'reps_per_side' ? 2 : 1;
+            tonnage += entry.load * (entry.reps || 0) * sides;
           }
           if (typeof entry.rpe === 'number') {
             rpeSum += entry.rpe;

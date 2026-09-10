@@ -1608,6 +1608,10 @@ app.post('/api/gym/session/:week/:day/reopen', auth, gymHandler((req, res) => {
 }));
 
 app.get('/api/gym/exercises', auth, gymHandler((req, res) => {
+  // The library itself is shared, but every gym route except /profiles states a
+  // profile — the client always has one, and an unnamed or unknown profile is a
+  // bug worth surfacing rather than quietly serving.
+  gymStore._requireProfile(gymProfileId(req));
   res.json(gymStore.getExercises());
 }));
 

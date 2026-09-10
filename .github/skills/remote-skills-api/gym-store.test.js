@@ -307,7 +307,7 @@ test('finishSession records a baseline result that has no load', () => {
     id: 'e-front-plank', block: 'E', exerciseKey: 'front-plank', label: 'Front plank — baseline',
     sets: 1, reps: 120, resultType: 'seconds', loadType: 'bodyweight', targetLoad: null,
     targetPct: null, loadNote: '', targetRpe: null, restSec: 0,
-    isRamp: false, setsAreOptional: false, pairedWith: null,
+    isRamp: false, isBaseline: true, setsAreOptional: false, pairedWith: null,
   }];
   fs.writeFileSync(path.join(root, 'athlete-b', 'weeks', 'W1.json'), JSON.stringify(week), 'utf8');
   const store = createGymStore(root);
@@ -568,7 +568,7 @@ test('a first-ever test archives nothing, and a baseline archives its own unit',
     id: 'a-standing-broad-jump', block: 'A', exerciseKey: 'standing-broad-jump',
     label: 'Standing broad jump', sets: 3, reps: 1, resultType: 'cm', loadType: 'bodyweight',
     targetLoad: null, targetPct: null, loadNote: '', targetRpe: null, restSec: 60,
-    isRamp: false, setsAreOptional: false, pairedWith: null,
+    isRamp: false, isBaseline: true, setsAreOptional: false, pairedWith: null,
   }];
   fs.writeFileSync(path.join(root, 'athlete-b', 'weeks', 'W9.json'), JSON.stringify(week), 'utf8');
   const s2 = createGymStore(root);
@@ -581,4 +581,84 @@ test('a first-ever test archives nothing, and a baseline archives its own unit',
   const { maxes } = s2.finishSession('athlete-b', 9, 1, new Date('2026-11-03T19:00:00Z'));
   assert.equal(maxes['standing-broad-jump'].cm, 218);
   assert.deepEqual(maxes['standing-broad-jump'].history, [{ week: 1, cm: 205 }]);
+});
+
+test('a seconds item without the baseline flag is prescribed work, not a max', () => {
+  const root = fixture();
+  const week = JSON.parse(fs.readFileSync(path.join(root, 'athlete-b', 'weeks', 'W1.json'), 'utf8'));
+  // Side plank is 2×30 s of prescribed accessory work. The unit says seconds,
+  // the intent does not say baseline — so nothing about it belongs in maxes.json.
+  week.days[2].items = [{
+    id: 'd-side-plank', block: 'D', exerciseKey: 'side-plank', label: 'Side plank',
+    sets: 2, reps: 30, resultType: 'seconds', loadType: 'bodyweight', targetLoad: null,
+    targetPct: null, loadNote: 'Per side.', targetRpe: null, restSec: 30,
+    isRamp: false, isBaseline: false, setsAreOptional: false, pairedWith: null,
+  }];
+  fs.writeFileSync(path.join(root, 'athlete-b', 'weeks', 'W1.json'), JSON.stringify(week), 'utf8');
+  const store = createGymStore(root);
+  store.saveSession('athlete-b', 1, 3, {
+    entries: [{ itemId: 'd-side-plank', set: 1, load: null, loadType: 'bodyweight', reps: 45, rpe: null, note: '' }],
+  });
+  const { maxes } = store.finishSession('athlete-b', 1, 3, new Date('2026-09-12T19:00:00Z'));
+  assert.equal(maxes['side-plank'], undefined);
+});
+
+test('re-finishing a corrected session keeps the date it was actually performed', () => {
+  const store = createGymStore(fixture());
+  store.saveSession('athlete-b', 1, 2, {
+    entries: [{ itemId: 'a-back-squat', set: 1, load: 60, loadType: 'kg', reps: 3, rpe: 9, note: '' }],
+  });
+  const first = store.finishSession('athlete-b', 1, 2, new Date('2026-09-09T19:00:00Z'));
+  assert.equal(first.log.performedOn, '2026-09-09');
+  assert.equal(first.maxes['back-squat'].testedOn, '2026-09-09');
+
+  // Two days later the transcribed load is corrected, or the assessment is retried.
+  store.reopenSession('athlete-b', 1, 2);
+  store.saveSession('athlete-b', 1, 2, {
+    entries: [{ itemId: 'a-back-squat', set: 1, load: 62.5, loadType: 'kg', reps: 3, rpe: 9, note: 'read the paper properly' }],
+  });
+  const again = store.finishSession('athlete-b', 1, 2, new Date('2026-09-11T08:30:00Z'));
+  assert.equal(again.log.performedOn, '2026-09-09');
+  assert.equal(again.maxes['back-squat'].threeRm, 62.5);
+  assert.equal(again.maxes['back-squat'].testedOn, '2026-09-09');
+  // completedAt is the audit trail of when the record was last written, so it does move.
+  assert.ok(again.log.completedAt.startsWith('2026-09-11T'));
+});
+
+test('tonnage ignores a distance carry and counts a per-side item on both sides', () => {
+  const root = fixture();
+  const week = JSON.parse(fs.readFileSync(path.join(root, 'athlete-b', 'weeks', 'W1.json'), 'utf8'));
+  week.days[1].items = [
+    {
+      id: 'e-farmers-carry', block: 'E', exerciseKey: 'farmers-carry', label: "Farmer's carry",
+      sets: 3, reps: 30, resultType: 'metres', loadType: 'kg_total_pair', targetLoad: null,
+      targetPct: null, loadNote: 'Heavy.', targetRpe: 8, restSec: 60,
+      isRamp: false, isBaseline: false, setsAreOptional: false, pairedWith: null,
+    },
+    {
+      id: 'b-bulgarian-split-squat', block: 'B', exerciseKey: 'bulgarian-split-squat',
+      label: 'Bulgarian split squat', sets: 2, reps: 8, resultType: 'reps_per_side',
+      loadType: 'kg_total_pair', targetLoad: null, targetPct: null, loadNote: '',
+      targetRpe: 7, restSec: 90, isRamp: false, isBaseline: false,
+      setsAreOptional: false, pairedWith: null,
+    },
+  ];
+  fs.writeFileSync(path.join(root, 'athlete-b', 'weeks', 'W1.json'), JSON.stringify(week), 'utf8');
+  const store = createGymStore(root);
+  store.saveSession('athlete-b', 1, 2, {
+    entries: [
+      // 60 kg carried 30 m is 1800 kg·m, and 0 kg lifted.
+      { itemId: 'e-farmers-carry', set: 1, load: 60, loadType: 'kg_total_pair', reps: 30, rpe: 8, note: '' },
+      // 8 per side against 50 kg is 16 reps, so 800 kg.
+      { itemId: 'b-bulgarian-split-squat', set: 1, load: 50, loadType: 'kg_total_pair', reps: 8, rpe: 7, note: '' },
+    ],
+  });
+  store.finishSession('athlete-b', 1, 2, new Date('2026-09-11T19:00:00Z'));
+  assert.equal(store.getStats('athlete-b').weeks.find((w) => w.week === 1).tonnage, 800);
+});
+
+test('estimateOneRm rounds a half-way case up, the way gymlib.py does', () => {
+  // 18.75 × 1.08 is exactly 20.25. Half-to-even would give 20.2 and disagree
+  // with the Stats view, which shows whatever this function wrote.
+  assert.equal(createGymStore(fixture()).estimateOneRm(18.75), 20.3);
 });

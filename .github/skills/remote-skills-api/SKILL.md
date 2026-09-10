@@ -116,7 +116,7 @@ Phone (Safari/Chrome)
 | PUT | `/api/gym/session/:week/:day` | Save a partial log (`?profile=`) |
 | POST | `/api/gym/session/:week/:day/finish` | Complete the session and start the assessment; returns `{jobId}` (`?profile=`) |
 | POST | `/api/gym/session/:week/:day/reopen` | Make a finished session editable again (`?profile=`) |
-| GET | `/api/gym/exercises` | Exercise library with how-tos and videos |
+| GET | `/api/gym/exercises` | Exercise library with how-tos and videos (`?profile=`) |
 | GET | `/api/gym/stats` | Week-by-week tonnage, RPE, adherence and 1RM trend (`?profile=`) |
 | GET | `/api/gym/assessments` | Past session assessments, newest first (`?profile=`) |
 

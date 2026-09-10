@@ -1310,10 +1310,11 @@
       const days = w.days.map(d => {
         const cls = d.logStatus === 'complete' ? 'done'
                   : d.logStatus === 'in_progress' ? 'partial' : '';
+        const sets = `${d.loggedSets} set${d.loggedSets === 1 ? '' : 's'} logged`;
         const meta = d.logStatus === 'complete'
-          ? `Done ${gymShortDate(d.performedOn)} · ${d.loggedSets} sets logged`
+          ? `Done ${gymShortDate(d.performedOn)} · ${sets}`
           : d.logStatus === 'in_progress'
-            ? `In progress · ${d.loggedSets} sets logged`
+            ? `In progress · ${sets}`
             : `${d.estMinutes} min · ${d.items.length} exercises`;
         return `
           <div class="gym-day ${cls}" onclick="openGymSession(${w.week}, ${d.day})">
@@ -1410,6 +1411,18 @@
       return `${item.sets}${item.setsAreOptional ? ' max' : ''} × ${item.reps} ${GYM_UNITS[item.resultType]}`;
     }
 
+    // The prescribed load, shown in the box the athlete is about to type into,
+    // so logging is mostly confirming a number rather than recalling one.
+    //
+    // Deliberately a placeholder and not a pre-filled `value`. A filled box
+    // reads as already logged when nothing has been logged, and `onchange`
+    // does not fire on a field the user taps and leaves unchanged — so
+    // "confirming" a pre-filled target would silently record nothing.
+    function gymLoadPlaceholder(item) {
+      if (item.targetLoad !== null && item.targetLoad !== undefined) return String(item.targetLoad);
+      return item.loadType === 'bodyweight' ? 'bw' : 'load';
+    }
+
     // The middle column holds whatever the exercise is measured in: reps for a
     // squat, centimetres for a broad jump, seconds for a plank.
     function gymResultPlaceholder(item) {
@@ -1432,7 +1445,7 @@
           rows.push(`
             <div class="gym-setrow">
               <div class="sr-n">${n}</div>
-              <input inputmode="decimal" placeholder="${item.loadType === 'bodyweight' ? 'bw' : 'load'}"
+              <input inputmode="decimal" placeholder="${escHtml(gymLoadPlaceholder(item))}"
                      class="${filled(e.load)}" value="${val(e.load)}" ${done ? 'disabled' : ''}
                      onchange="gymSetInput('${escJsAttr(item.id)}', ${n}, 'load', this.value, this)">
               <input inputmode="numeric" placeholder="${escHtml(gymResultPlaceholder(item))}"
@@ -1620,15 +1633,20 @@
     }
 
     async function retryGymAssessment() {
+      // Pinned once, like pollGymJob does. The profile switcher lives in the
+      // fixed header and stays tappable across these awaits; re-reading
+      // gym.profileId per request could reopen one athlete's session and
+      // finish the other's.
+      const profileId = gym.profileId;
       gymSession.assessment = null;
       gymSession.assessmentFailed = false;
       renderGymSession();
       try {
-        const res = await api(`/api/gym/session/${gymSession.week}/${gymSession.day}/reopen?profile=${encodeURIComponent(gym.profileId)}`, {
+        const res = await api(`/api/gym/session/${gymSession.week}/${gymSession.day}/reopen?profile=${encodeURIComponent(profileId)}`, {
           method: 'POST', body: JSON.stringify({}),
         });
         void res;
-        const finish = await api(`/api/gym/session/${gymSession.week}/${gymSession.day}/finish?profile=${encodeURIComponent(gym.profileId)}`, {
+        const finish = await api(`/api/gym/session/${gymSession.week}/${gymSession.day}/finish?profile=${encodeURIComponent(profileId)}`, {
           method: 'POST', body: JSON.stringify({}),
         });
         gymSession.data.log = finish.log;
@@ -1644,15 +1662,20 @@
       if (gymCollectEntries().length === 0) {
         return showToast('Log at least one set first.', 'error');
       }
+      // Pinned before the first await. Both profiles' week files are
+      // byte-identical, so itemId validation would happily accept Athlete A's sets
+      // into Athlete B's log if the switcher were tapped mid-finish — and then
+      // recompute her maxes from them.
+      const profileId = gym.profileId;
       await gymFlushSave();
       const btn = document.querySelector('.gym-finish');
       if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
       try {
-        await api(`/api/gym/session/${gymSession.week}/${gymSession.day}?profile=${encodeURIComponent(gym.profileId)}`, {
+        await api(`/api/gym/session/${gymSession.week}/${gymSession.day}?profile=${encodeURIComponent(profileId)}`, {
           method: 'PUT',
           body: JSON.stringify({ entries: gymCollectEntries(), dayNotes: gymSession.dayNotes }),
         });
-        const res = await api(`/api/gym/session/${gymSession.week}/${gymSession.day}/finish?profile=${encodeURIComponent(gym.profileId)}`, {
+        const res = await api(`/api/gym/session/${gymSession.week}/${gymSession.day}/finish?profile=${encodeURIComponent(profileId)}`, {
           method: 'POST',
           body: JSON.stringify({}),
         });

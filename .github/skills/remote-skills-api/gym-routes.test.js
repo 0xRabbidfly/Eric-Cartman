@@ -132,6 +132,15 @@ test('exercises returns the library', async () => {
   assert.equal(body['back-squat'].name, 'Back squat');
 });
 
+test('exercises rejects a missing or unknown profile like every other gym route', async () => {
+  const missing = await get('/api/gym/exercises');
+  assert.equal(missing.status, 400);
+  assert.equal((await missing.json()).code, 'gym_profile_required');
+  const unknown = await get('/api/gym/exercises?profile=stan');
+  assert.equal(unknown.status, 400);
+  assert.equal((await unknown.json()).code, 'gym_profile_required');
+});
+
 test('stats reflects the saved partial session', async () => {
   const body = await (await get('/api/gym/stats?profile=athlete-a')).json();
   const week1 = body.weeks.find((w) => w.week === 1);
