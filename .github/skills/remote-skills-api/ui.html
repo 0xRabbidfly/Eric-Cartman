@@ -668,6 +668,49 @@
     @media (min-width: 600px) {
       body { max-width: 500px; margin: 0 auto; border-left: 1px solid var(--border); border-right: 1px solid var(--border); }
     }
+
+    /* ── Gym tracker ── */
+    .gym-weekbar {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 8px; margin: 0 16px 10px; padding: 8px 10px;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 10px; flex-shrink: 0;
+    }
+    .gym-weekbar button {
+      background: none; border: none; color: var(--text);
+      font-size: 18px; line-height: 1; padding: 4px 8px; cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .gym-weekbar button:disabled { opacity: .25; }
+    .gym-weekbar .gw-label { text-align: center; flex: 1; }
+    .gym-weekbar .gw-title { font-weight: 700; font-size: 14px; }
+    .gym-weekbar .gw-sub { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+    .gym-banner {
+      margin: 0 16px 10px; padding: 9px 11px;
+      background: #f59e0b18; border: 1px solid #f59e0b55;
+      border-radius: 10px; font-size: 12px; line-height: 1.45; color: #f6c66b;
+    }
+    .gym-day {
+      display: flex; align-items: center; gap: 12px;
+      padding: 13px 14px; margin-bottom: 9px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .gym-day:active { background: var(--surface2); }
+    .gym-day .gd-num {
+      width: 34px; height: 34px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 9px; background: var(--surface2);
+      font-weight: 700; font-size: 13px; color: var(--text-dim);
+    }
+    .gym-day.done .gd-num { background: var(--success); color: #06210f; }
+    .gym-day.partial .gd-num { background: var(--warn); color: #2a1c00; }
+    .gym-day .gd-body { flex: 1; min-width: 0; }
+    .gym-day .gd-title { font-weight: 600; font-size: 14px; }
+    .gym-day .gd-meta { font-size: 11.5px; color: var(--text-dim); margin-top: 3px; }
+    .gym-day .gd-chev { color: var(--text-dim); font-size: 18px; }
+    .gym-empty { text-align: center; color: var(--text-dim); padding: 40px 20px; font-size: 13px; }
   </style>
 </head>
 <body>
@@ -793,6 +836,23 @@
       </div>
     </div>
 
+    <!-- ── Gym ── -->
+    <div id="viewGym" class="view">
+      <div class="view-head">
+        <div class="view-title">🏋️ Gym</div>
+        <button class="notes-refresh-btn" onclick="loadGymWeek(gym.week, true)" title="Refresh">🔄</button>
+      </div>
+      <div class="seg" id="gymProfileSeg"></div>
+      <div class="seg">
+        <button class="seg-btn active" data-gym="week" onclick="setGymView('week')">Week</button>
+        <button class="seg-btn" data-gym="stats" onclick="setGymView('stats')">Stats</button>
+        <button class="seg-btn" data-gym="notes" onclick="setGymView('notes')">Notes</button>
+      </div>
+      <div id="gymScroll" class="view-scroll">
+        <div class="gym-empty">Loading…</div>
+      </div>
+    </div>
+
   </div>
 
   <!-- ── Bottom tab bar ── -->
@@ -805,6 +865,9 @@
     </button>
     <button class="tab-btn" data-tab="skills" onclick="setTab('skills')">
       <span class="tab-icon">⚡</span>Skills
+    </button>
+    <button class="tab-btn" data-tab="gym" onclick="setTab('gym')" id="gymTabBtn" hidden>
+      <span class="tab-icon">🏋️</span>Gym
     </button>
     <button class="tab-btn" data-tab="settings" onclick="setTab('settings')">
       <span class="tab-icon">⚙️</span>Settings
@@ -999,6 +1062,7 @@
 
     function skillIcon(name) {
       const icons = {
+        'gym-cyclist': '🏋️',
         'obsidian': '💎', 'last30days': '📰', 'visual-explainer': '🎨',
         'project-guide': '🗺️', 'content-research-writer': '✍️',
         'skill-reflection': '🪞', 'health-audit': '🩺',
@@ -1059,6 +1123,142 @@
       renderSkillList();
     }
 
+    // ── Gym tracker ──
+    // The tab hides itself when the server has no gym data, so a clone of this
+    // repo shows the four tabs it always had.
+    const gym = {
+      loaded: false,
+      enabled: false,
+      profiles: [],
+      profileId: localStorage.getItem('gym_profile') || null,
+      week: 1,
+      currentWeek: 1,
+      weekData: null,
+      view: 'week',
+      exercises: null,
+    };
+
+    async function loadGymProfiles() {
+      try {
+        const data = await api('/api/gym/profiles');
+        gym.loaded = true;
+        gym.enabled = !!data.enabled;
+        gym.profiles = data.profiles || [];
+        document.getElementById('gymTabBtn').hidden = !gym.enabled;
+        if (!gym.enabled) return;
+        if (!gym.profiles.some(p => p.id === gym.profileId)) {
+          gym.profileId = gym.profiles[0]?.id || null;
+        }
+        renderGymProfileSeg();
+        const me = gym.profiles.find(p => p.id === gym.profileId);
+        gym.currentWeek = me ? me.currentWeek : 1;
+        gym.week = Math.min(gym.currentWeek, 12);
+        await loadGymWeek(gym.week);
+      } catch (e) {
+        document.getElementById('gymScroll').innerHTML =
+          `<div class="gym-empty">Could not load gym data.<br>${escHtml(e.message)}</div>`;
+      }
+    }
+
+    function renderGymProfileSeg() {
+      document.getElementById('gymProfileSeg').innerHTML = gym.profiles.map(p => `
+        <button class="seg-btn ${p.id === gym.profileId ? 'active' : ''}"
+                onclick="setGymProfile('${p.id}')">${escHtml(p.name)}</button>
+      `).join('');
+    }
+
+    async function setGymProfile(id) {
+      if (id === gym.profileId) return;
+      gym.profileId = id;
+      localStorage.setItem('gym_profile', id);
+      const me = gym.profiles.find(p => p.id === id);
+      gym.currentWeek = me ? me.currentWeek : 1;
+      gym.week = Math.min(gym.currentWeek, 12);
+      renderGymProfileSeg();
+      if (gym.view === 'week') await loadGymWeek(gym.week);
+      else setGymView(gym.view);
+    }
+
+    async function loadGymWeek(n, force) {
+      gym.week = Math.min(Math.max(n, 1), 12);
+      const scroll = document.getElementById('gymScroll');
+      if (force || !gym.weekData) scroll.innerHTML = '<div class="gym-empty">Loading…</div>';
+      try {
+        gym.weekData = await api(`/api/gym/week/${gym.week}?profile=${encodeURIComponent(gym.profileId)}`);
+        renderGymWeek();
+      } catch (e) {
+        scroll.innerHTML = `<div class="gym-empty">${escHtml(e.message)}</div>`;
+      }
+    }
+
+    const GYM_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    function gymShortDate(iso) {
+      const d = new Date(`${iso}T00:00:00Z`);
+      return `${GYM_MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}`;
+    }
+
+    function renderGymWeek() {
+      const w = gym.weekData;
+      if (!w) return;
+      const bounds = `${gymShortDate(w.bounds.start)} – ${gymShortDate(w.bounds.end)}`;
+      const isNow = w.week === gym.currentWeek;
+
+      const banner = w.loadsResolved ? '' : `
+        <div class="gym-banner">Loads for this week are not set yet. They are
+        calculated once week ${w.week - 1} is fully logged and the tests it depends on exist.
+        You can still log whatever you lift.</div>`;
+
+      const days = w.days.map(d => {
+        const cls = d.logStatus === 'complete' ? 'done'
+                  : d.logStatus === 'in_progress' ? 'partial' : '';
+        const meta = d.logStatus === 'complete'
+          ? `Done ${gymShortDate(d.performedOn)} · ${d.loggedSets} sets logged`
+          : d.logStatus === 'in_progress'
+            ? `In progress · ${d.loggedSets} sets logged`
+            : `${d.estMinutes} min · ${d.items.length} exercises`;
+        return `
+          <div class="gym-day ${cls}" onclick="openGymSession(${w.week}, ${d.day})">
+            <div class="gd-num">D${d.day}</div>
+            <div class="gd-body">
+              <div class="gd-title">${escHtml(d.title)}</div>
+              <div class="gd-meta">${escHtml(meta)}</div>
+            </div>
+            <div class="gd-chev">›</div>
+          </div>`;
+      }).join('');
+
+      document.getElementById('gymScroll').innerHTML = `
+        <div class="gym-weekbar">
+          <button onclick="loadGymWeek(${w.week - 1})" ${w.week <= 1 ? 'disabled' : ''}>‹</button>
+          <div class="gw-label">
+            <div class="gw-title">W${w.week} · ${escHtml(w.blockLabel)}</div>
+            <div class="gw-sub">${bounds}${isNow ? ' · this week' : ''}</div>
+          </div>
+          <button onclick="loadGymWeek(${w.week + 1})" ${w.week >= 12 ? 'disabled' : ''}>›</button>
+        </div>
+        ${banner}
+        ${days}`;
+    }
+
+    function setGymView(view) {
+      gym.view = view;
+      document.querySelectorAll('#viewGym .seg-btn[data-gym]').forEach(b =>
+        b.classList.toggle('active', b.dataset.gym === view));
+      if (view === 'week') renderGymWeek();
+      if (view === 'stats') renderGymStats();
+      if (view === 'notes') renderGymNotes();
+    }
+
+    function openGymSession(week, day) {
+      showToast(`Session W${week} D${day} — coming in the next task.`, 'info');
+    }
+    function renderGymStats() {
+      document.getElementById('gymScroll').innerHTML = '<div class="gym-empty">Stats coming next.</div>';
+    }
+    function renderGymNotes() {
+      document.getElementById('gymScroll').innerHTML = '<div class="gym-empty">Notes coming next.</div>';
+    }
+
     // ── Tabs ──
     // The tab bar already shows which section is active, so the header title
     // stays fixed — each view carries its own heading.
@@ -1066,11 +1266,13 @@
 
     function setTab(tab) {
       currentTab = tab;
-      const viewId = { chat: 'viewChat', library: 'viewLibrary', skills: 'viewSkills', settings: 'viewSettings' }[tab];
+      const viewId = { chat: 'viewChat', library: 'viewLibrary', skills: 'viewSkills',
+                       gym: 'viewGym', settings: 'viewSettings' }[tab];
       document.querySelectorAll('#views .view').forEach(v => v.classList.toggle('active', v.id === viewId));
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
       if (tab === 'library' && !libData.loaded) loadLibrary();
       if (tab === 'settings') refreshSettings();
+      if (tab === 'gym' && !gym.loaded) loadGymProfiles();
       if (tab === 'chat') {
         const area = document.getElementById('chatArea');
         area.scrollTop = area.scrollHeight;
