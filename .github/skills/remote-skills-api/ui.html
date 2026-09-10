@@ -1676,7 +1676,8 @@
     async function pollGymJob(jobId) {
       // The log is already saved server-side, so a failure here costs the
       // assessment only. Give up after ten minutes rather than polling forever.
-      const week = gymSession.week, day = gymSession.day;
+      const week = gymSession.week, day = gymSession.day, profileId = gym.profileId;
+      const key = `${profileId}/${week}/${day}`;
       const stillHere = () => gym.showing === 'session'
         && gymSession.week === week && gymSession.day === day;
       const deadline = Date.now() + 10 * 60 * 1000;
@@ -1687,7 +1688,7 @@
         try { job = await api(`/api/jobs/${jobId}`); } catch { continue; }
         if (job.status === 'done') {
           const text = job.result || job.text || 'Assessment finished with no text.';
-          gym.assessmentCache[`${gym.profileId}/${week}/${day}`] = text;
+          gym.assessmentCache[key] = text;
           gymSession.job = null;
           if (stillHere()) { gymSession.assessment = text; renderGymSession(); }
           else showToast('Assessment ready. Open the session to read it.', 'success', 5000);
@@ -1695,7 +1696,7 @@
         }
         if (job.status === 'error') {
           const text = `Assessment failed: ${job.error}\n\nYour log is saved either way.`;
-          gym.assessmentCache[`${gym.profileId}/${week}/${day}`] = text;
+          gym.assessmentCache[key] = text;
           gymSession.assessmentFailed = true;
           gymSession.job = null;
           if (stillHere()) { gymSession.assessment = text; renderGymSession(); }
@@ -1704,7 +1705,7 @@
         }
       }
       const text = 'Assessment timed out. Your log is saved.';
-      gym.assessmentCache[`${gym.profileId}/${week}/${day}`] = text;
+      gym.assessmentCache[key] = text;
       gymSession.assessmentFailed = true;
       gymSession.job = null;
       if (stillHere()) { gymSession.assessment = text; renderGymSession(); }
