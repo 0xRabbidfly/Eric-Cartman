@@ -104,9 +104,27 @@
           "note_path": "Podcasts/Raoul Pal The Journey Man/2026-08-27 - Scott Bessent Could Change Everything w Andreas Steno.md",
           "processed_at": "2026-08-28T06:13:43.013478+00:00",
           "status": "completed"
+        },
+        "e1816006-ac9b-11f1-ab9c-5f2ff9b82705": {
+          "title": "The Best Trade Is Still Ahead with Jordi Visser | Raoul Pal The Jounry Man",
+          "published": "2026-09-10",
+          "audio_url": "https://www.podtrac.com/pts/redirect.mp3/chrt.fm/track/1B146C/pscrb.fm/rss/p/traffic.megaphone.fm/ADV6643725908.mp3",
+          "transcript_path": "Podcasts/Raoul Pal The Journey Man/transcripts/2026-09-10 - The Best Trade Is Still Ahead with Jordi Visser  Raoul Pal The Jounry Man.md",
+          "note_path": "Podcasts/Raoul Pal The Journey Man/2026-09-10 - The Best Trade Is Still Ahead with Jordi Visser  Raoul Pal The Jounry Man.md",
+          "processed_at": "2026-09-11T06:29:38.707186+00:00",
+          "status": "completed"
+        },
+        "43f39f16-ac7d-11f1-95af-f33171302494": {
+          "title": "Crypto, Stocks, and Liquidity: The Truth They Won't Tell You | Drinks With Raoul Pal - September 3, 2026",
+          "published": "2026-09-04",
+          "audio_url": "https://www.podtrac.com/pts/redirect.mp3/chrt.fm/track/1B146C/pscrb.fm/rss/p/traffic.megaphone.fm/ADV7546297390.mp3",
+          "transcript_path": "Podcasts/Raoul Pal The Journey Man/transcripts/2026-09-04 - Crypto, Stocks, and Liquidity The Truth They Won't Tell You  Drinks With Raoul Pal - September 3, 2026.md",
+          "note_path": "Podcasts/Raoul Pal The Journey Man/2026-09-04 - Crypto, Stocks, and Liquidity The Truth They Won't Tell You  Drinks With Raoul Pal - September 3, 2026.md",
+          "processed_at": "2026-09-11T06:29:38.755729+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-08-27"
+      "latest_published": "2026-09-10"
     },
     "lex-fridman-podcast": {
       "name": "Lex Fridman Podcast",
