@@ -389,9 +389,27 @@
           "note_path": "Podcasts/Limitless/2026-09-04 - THIS WEEK IN AI GPT Astra, OpenAI vs Cursor, The Truth About Data Centers.md",
           "processed_at": "2026-09-05T06:12:50.410475+00:00",
           "status": "completed"
+        },
+        "e4003c13-3856-4dec-b526-e10cc6d3d2ad": {
+          "title": "THIS WEEK IN AI: Viral Doomer Tweet, Apple's New Releases, AI is Solving Math",
+          "published": "2026-09-11",
+          "audio_url": "https://media.transistor.fm/86feb5f5/bd8c0ffc.mp3",
+          "transcript_path": "Podcasts/Limitless/transcripts/2026-09-11 - THIS WEEK IN AI Viral Doomer Tweet, Apple's New Releases, AI is Solving Math.md",
+          "note_path": "Podcasts/Limitless/2026-09-11 - THIS WEEK IN AI Viral Doomer Tweet, Apple's New Releases, AI is Solving Math.md",
+          "processed_at": "2026-09-12T06:18:44.430857+00:00",
+          "status": "completed"
+        },
+        "9070846c-59b7-4598-9610-0f08af47a2d5": {
+          "title": "OpenAI's GPT-6 Astra (Part II): Is This Thing AGI?",
+          "published": "2026-09-09",
+          "audio_url": "https://media.transistor.fm/fde2f50d/8c6bd91a.mp3",
+          "transcript_path": "Podcasts/Limitless/transcripts/2026-09-09 - OpenAI's GPT-6 Astra (Part II) Is This Thing AGI.md",
+          "note_path": "Podcasts/Limitless/2026-09-09 - OpenAI's GPT-6 Astra (Part II) Is This Thing AGI.md",
+          "processed_at": "2026-09-12T06:18:44.459858+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-09-04"
+      "latest_published": "2026-09-11"
     },
     "the-pomp-podcast": {
       "name": "The Pomp Podcast",
