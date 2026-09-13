@@ -126,3 +126,6 @@ scratch/
 
 # Local generated work artifacts
 .work/
+
+# Agent workflow scratch: plans, review packages and reports. Never committed.
+.superpowers/
