@@ -27,6 +27,12 @@ THESES_FILE = VAULT_PATH / "Research" / "theses.json"
 XAI_API_URL = "https://api.x.ai/v1/chat/completions"
 MODEL = "grok-4.5"
 EVIDENCE_THRESHOLD = 5  # connections needed for "mature" status
+MIN_CLUSTER_SIZE = 3    # fewer notes than this isn't a thesis, it's a pair
+MAX_CLUSTER_SIZE = 70   # larger than this gets recursively split. Louvain at
+                        # resolution 1.0 gives ~8 communities of 6-64 notes on the
+                        # current graph; splitting below ~60 produced near-duplicate
+                        # theses ("harness > model" eight different ways).
+MIN_EVIDENCE_FOR_THESIS = 3  # supporting/extending edges needed to even be "emerging"
 
 CLAUDE_CLI = r"C:\Users\nuno_\.local\bin\claude.exe"
 
@@ -98,6 +104,80 @@ def save_theses(data: dict) -> None:
 # Graph building and clustering
 # ---------------------------------------------------------------------------
 
+def _louvain(nodes: list[str], weights: dict, resolution: float = 1.0,
+             max_passes: int = 20) -> list[set[str]]:
+    """Pure-Python Louvain community detection (no networkx dependency).
+
+    Two phases repeated until modularity stops improving:
+      1. local moving — each node joins the neighbouring community that gives
+         the largest modularity gain;
+      2. aggregation — communities become super-nodes and phase 1 repeats.
+    Deterministic given sorted `nodes`.
+    """
+    # Current-level graph: node -> {neighbor: weight}
+    g = {n: dict(weights.get(n, {})) for n in nodes}
+    # Each current-level node maps to the set of original nodes it contains
+    members = {n: {n} for n in nodes}
+
+    m2 = sum(sum(nb.values()) for nb in g.values())  # 2m (each edge counted twice)
+    if m2 == 0:
+        return [{n} for n in nodes]
+
+    while True:
+        # ---- Phase 1: local moving ----
+        comm = {n: n for n in g}                      # node -> community id
+        deg = {n: sum(nb.values()) for n, nb in g.items()}
+        tot = dict(deg)                               # community -> total degree
+
+        improved_any = False
+        for _ in range(max_passes):
+            moved = False
+            for n in sorted(g):
+                c_old = comm[n]
+                k_n = deg[n]
+                # weights from n to each neighbouring community (self-loops
+                # count toward degree but are not a link to a neighbour)
+                to_comm: dict[str, float] = defaultdict(float)
+                for nb, w in g[n].items():
+                    if nb != n:
+                        to_comm[comm[nb]] += w
+                # remove n from its community
+                tot[c_old] -= k_n
+                best_c, best_gain = c_old, 0.0
+                base = to_comm.get(c_old, 0.0) - resolution * tot[c_old] * k_n / m2
+                for c, w_in in sorted(to_comm.items()):
+                    gain = (w_in - resolution * tot[c] * k_n / m2) - base
+                    if gain > best_gain + 1e-12:
+                        best_c, best_gain = c, gain
+                tot[best_c] += k_n
+                if best_c != c_old:
+                    comm[n] = best_c
+                    moved = True
+                    improved_any = True
+            if not moved:
+                break
+
+        if not improved_any:
+            break
+
+        # ---- Phase 2: aggregation ----
+        new_members: dict[str, set[str]] = defaultdict(set)
+        for n, c in comm.items():
+            new_members[c] |= members[n]
+        new_g: dict[str, dict[str, float]] = {c: defaultdict(float) for c in new_members}
+        for n, nb in g.items():
+            cn = comm[n]
+            for m_, w in nb.items():
+                cm = comm[m_]
+                new_g[cn][cm] += w  # cn == cm becomes a self-loop (kept for degree)
+        if len(new_g) == len(g):  # no aggregation happened
+            break
+        g = {c: dict(nb) for c, nb in new_g.items()}
+        members = dict(new_members)
+
+    return sorted((set(s) for s in members.values()), key=lambda s: (-len(s), sorted(s)[0]))
+
+
 class ConnectionGraph:
     """Simple undirected graph for connection analysis."""
 
@@ -117,30 +197,56 @@ class ConnectionGraph:
             self.adjacency[tgt].add(src)
             self.edges.append(connection)
 
-    def find_clusters(self) -> list[set[str]]:
-        """Find connected components using BFS."""
-        visited: set[str] = set()
-        clusters: list[set[str]] = []
+    # -- Weighted edges for community detection -----------------------------
+    # confidence is the edge weight; "bridges" edges deliberately span domains,
+    # so they are down-weighted to keep them from gluing communities together.
+    _REL_WEIGHT = {"supports": 1.0, "extends": 1.0, "contradicts": 1.0, "bridges": 0.4}
 
-        for node in self.adjacency:
-            if node in visited:
+    def _weights(self) -> dict[str, dict[str, float]]:
+        w: dict[str, dict[str, float]] = defaultdict(lambda: defaultdict(float))
+        for e in self.edges:
+            s, t = e["source"], e["target"]
+            if s == t:
                 continue
-            # BFS from this node
-            cluster: set[str] = set()
-            queue = [node]
-            while queue:
-                current = queue.pop(0)
-                if current in visited:
-                    continue
-                visited.add(current)
-                cluster.add(current)
-                for neighbor in self.adjacency[current]:
-                    if neighbor not in visited:
-                        queue.append(neighbor)
-            if len(cluster) >= 2:  # Only meaningful clusters
-                clusters.append(cluster)
+            wt = float(e.get("confidence", 0.5)) * self._REL_WEIGHT.get(e.get("relationship"), 1.0)
+            w[s][t] += wt
+            w[t][s] += wt
+        return w
 
-        return clusters
+    def find_clusters(self, max_size: int = MAX_CLUSTER_SIZE, min_size: int = MIN_CLUSTER_SIZE) -> list[set[str]]:
+        """Find topical communities with Louvain modularity optimisation.
+
+        Connected components stop working once the graph is dense (1,600+
+        connections collapse 300+ notes into one component), so we optimise
+        modularity instead and recursively split anything still over max_size.
+        Deterministic: nodes are visited in sorted order, no randomness.
+        """
+        weights = self._weights()
+        nodes = sorted(weights.keys())
+        if not nodes:
+            return []
+
+        communities = _louvain(nodes, weights)
+
+        # Recursively split oversized communities at a higher resolution.
+        out: list[set[str]] = []
+        for comm in communities:
+            out.extend(self._split_if_large(comm, weights, max_size, depth=0))
+
+        return [c for c in out if len(c) >= min_size]
+
+    def _split_if_large(self, comm: set[str], weights, max_size: int, depth: int) -> list[set[str]]:
+        if len(comm) <= max_size or depth >= 4:
+            return [comm]
+        sub_w = {n: {m: w for m, w in weights[n].items() if m in comm} for n in comm}
+        sub_nodes = sorted(comm)
+        subs = _louvain(sub_nodes, sub_w, resolution=1.0 + 0.5 * (depth + 1))
+        if len(subs) <= 1:  # couldn't split further
+            return [comm]
+        out: list[set[str]] = []
+        for s in subs:
+            out.extend(self._split_if_large(s, weights, max_size, depth + 1))
+        return out
 
     def get_cluster_edges(self, cluster: set[str]) -> list[dict]:
         """Get all edges within a cluster."""
@@ -186,11 +292,11 @@ def extract_dominant_topics(cluster_notes: set[str]) -> list[str]:
                         tag = line[2:].strip().strip("#")
                         if tag:
                             tag_counts[tag] += 1
-                    elif "tags:" in line:
-                        parts = line.split(":", 1)[1].strip()
+                    elif line.startswith("tags:"):
+                        parts = line.split(":", 1)[1].strip().strip("[]")
                         if parts:
                             for t in parts.split(","):
-                                t = t.strip().strip("#")
+                                t = t.strip().strip("#").strip("\"'")
                                 if t:
                                     tag_counts[t] += 1
 
@@ -203,9 +309,15 @@ def generate_thesis_statement(
     api_key: str, notes: set[str], edges: list[dict], topics: list[str]
 ) -> str:
     """Use xAI API to generate a thesis statement for a cluster."""
-    # Collect note titles
+    # Collect note titles — the most-connected notes in the cluster, so a
+    # 60-note community is described by its centre, not an arbitrary sample.
+    degree: dict[str, int] = defaultdict(int)
+    for e in edges:
+        degree[e["source"]] += 1
+        degree[e["target"]] += 1
+    ranked = sorted(notes, key=lambda n: (-degree.get(n, 0), n))
     note_titles = []
-    for slug in list(notes)[:10]:  # Limit to avoid token overflow
+    for slug in ranked[:15]:  # Limit to avoid token overflow
         note_path = VAULT_PATH / (slug + ".md")
         if note_path.exists():
             try:
@@ -223,9 +335,9 @@ def generate_thesis_statement(
             except (OSError, UnicodeDecodeError):
                 pass
 
-    # Collect relationship summaries
+    # Collect relationship summaries — highest-confidence edges first
     rel_summaries = []
-    for e in edges[:15]:
+    for e in sorted(edges, key=lambda e: -float(e.get("confidence", 0)))[:20]:
         rel_summaries.append(
             f"  {e['source'].split('/')[-1]} --[{e['relationship']}]--> "
             f"{e['target'].split('/')[-1]}: {e.get('explanation', '')}"
@@ -247,8 +359,9 @@ Respond with just the thesis statement, nothing else."""
         system = "You are a research analyst. Generate concise thesis statements."
         combined = f"{system}\n\n{prompt}"
         result = subprocess.run(
-            [CLAUDE_CLI, "--print", "-p", combined],
-            capture_output=True, text=True, encoding="utf-8", timeout=120,
+            [CLAUDE_CLI, "--print"],
+            input=combined,  # stdin: avoids Windows' ~32K command-line limit
+            capture_output=True, text=True, encoding="utf-8", timeout=300,
         )
         content = result.stdout.strip()
         if content and "Failed to authenticate" not in content:
@@ -303,21 +416,32 @@ def generate_thesis_id(existing_theses: list[dict]) -> str:
 
 def find_existing_thesis(theses: list[dict], cluster_notes: set[str]) -> dict | None:
     """Find an existing thesis that overlaps significantly with this cluster."""
+    best, best_score = None, 0.0
     for thesis in theses:
         existing_notes = set(thesis.get("notes", []))
+        if not existing_notes:
+            continue
         overlap = existing_notes & cluster_notes
-        # If more than half the notes overlap, it's the same thesis
-        if len(overlap) > len(cluster_notes) * 0.5:
-            return thesis
-    return None
+        # Match if the cluster still contains most of the thesis's original
+        # notes (thesis survived the graph growing around it), or vice versa.
+        # The old rule (>50% of the *cluster*) silently orphaned theses as
+        # soon as their cluster gained new notes.
+        score = max(len(overlap) / len(existing_notes), len(overlap) / max(len(cluster_notes), 1))
+        if score >= 0.5 and score > best_score:
+            best, best_score = thesis, score
+    return best
 
 
 # ---------------------------------------------------------------------------
 # Main analysis
 # ---------------------------------------------------------------------------
 
-def analyze_theses(api_key: str) -> dict:
-    """Analyze connections and update theses."""
+def analyze_theses(api_key: str, dry_run: bool = False) -> dict:
+    """Analyze connections and update theses.
+
+    dry_run: print what clusters would become theses, without calling any
+    model or writing theses.json.
+    """
     connections = load_connections()
     if not connections:
         print("No connections to analyze.")
@@ -330,17 +454,18 @@ def analyze_theses(api_key: str) -> dict:
 
     # Find clusters
     clusters = graph.find_clusters()
-    print(f"Found {len(clusters)} note clusters")
+    print(f"Found {len(clusters)} note clusters (community detection, "
+          f"{MIN_CLUSTER_SIZE}-{MAX_CLUSTER_SIZE} notes each)")
 
     # Load existing theses
     theses_data = load_theses()
     existing_theses = theses_data["theses"]
     today = date.today().isoformat()
+    matched_ids: set[str] = set()
 
     for i, cluster in enumerate(clusters):
         edges = graph.get_cluster_edges(cluster)
         edge_types = count_edge_types(edges)
-        topics = extract_dominant_topics(cluster)
 
         evidence_count = (
             edge_types.get("supports", 0)
@@ -352,7 +477,33 @@ def analyze_theses(api_key: str) -> dict:
         # Check if this cluster matches an existing thesis
         existing = find_existing_thesis(existing_theses, cluster)
 
+        if not existing and evidence_count < MIN_EVIDENCE_FOR_THESIS:
+            continue  # too thin to be a thesis yet
+
+        topics = extract_dominant_topics(cluster)
+
+        if dry_run:
+            tag = f"EXISTING {existing['id']}" if existing else "NEW"
+            anchors = sorted(cluster, key=lambda n: -sum(1 for e in edges if n in (e["source"], e["target"])))[:3]
+            print(f"\n  [{tag}] {len(cluster)} notes, {evidence_count} evidence, "
+                  f"{contradiction_count} contradictions; topics: {', '.join(topics)}")
+            for a in anchors:
+                print(f"      - {a.split('/')[-1]}")
+            if existing:
+                matched_ids.add(existing["id"])
+            continue
+
         if existing:
+            matched_ids.add(existing["id"])
+            # If the cluster has grown a lot since the statement was written,
+            # the statement probably describes a subset. Regenerate, keep the old.
+            prev_n = len(existing.get("notes", [])) or 1
+            if len(cluster) >= 3 * prev_n:
+                print(f"  Cluster for {existing['id']} grew {prev_n}->{len(cluster)} notes; regenerating statement")
+                new_stmt = generate_thesis_statement(api_key, cluster, edges, topics)
+                if new_stmt and not new_stmt.startswith("Cluster of "):
+                    existing["previous_statement"] = existing.get("statement", "")
+                    existing["statement"] = new_stmt
             # Update existing thesis
             existing["notes"] = sorted(cluster)
             existing["connections"] = [
@@ -364,10 +515,15 @@ def analyze_theses(api_key: str) -> dict:
             existing["contradiction_count"] = contradiction_count
             existing["last_updated"] = today
 
-            # Check for status upgrade
-            if existing["status"] == "emerging" and evidence_count >= EVIDENCE_THRESHOLD:
-                existing["status"] = "mature"
-                print(f"  UPGRADED: Thesis '{existing['id']}' is now mature")
+            # Check for status upgrade (also re-adopts orphaned / legacy
+            # "draft-generated" theses whose cluster re-formed)
+            if existing["status"] in ("emerging", "orphaned", "draft-generated"):
+                if evidence_count >= EVIDENCE_THRESHOLD:
+                    if existing["status"] != "mature":
+                        print(f"  UPGRADED: Thesis '{existing['id']}' is now mature")
+                    existing["status"] = "mature"
+                else:
+                    existing["status"] = "emerging"
 
             print(f"  Updated thesis {existing['id']}: {existing['statement'][:60]}...")
         else:
@@ -394,7 +550,21 @@ def analyze_theses(api_key: str) -> dict:
                 "report_path": None,
             }
             existing_theses.append(new_thesis)
+            matched_ids.add(thesis_id)
             print(f"  NEW thesis {thesis_id}: {statement[:60]}...")
+
+    # Theses whose cluster dissolved: mark, don't delete (the weekly brain
+    # surfaces these as DECAYING rather than silently dropping them).
+    for t in existing_theses:
+        if t.get("id") not in matched_ids and t.get("status") not in ("orphaned", "archived"):
+            t["status"] = "orphaned"
+            t["last_updated"] = today
+            print(f"  ORPHANED: {t['id']} no longer maps to a cluster")
+
+    if dry_run:
+        print(f"\n[dry-run] {len(existing_theses)} theses on disk; "
+              f"{len(matched_ids)} matched a cluster; nothing written.")
+        return theses_data
 
     save_theses(theses_data)
     return theses_data
@@ -560,6 +730,10 @@ def main():
         "--auto-report", action="store_true",
         help="Auto-generate reports for mature theses",
     )
+    parser.add_argument(
+        "--dry-run", action="store_true",
+        help="Show the clusters that would become theses; no model calls, no writes",
+    )
 
     args = parser.parse_args()
 
@@ -569,6 +743,10 @@ def main():
 
     if args.auto_report:
         auto_generate_reports()
+        return
+
+    if args.dry_run:
+        analyze_theses(api_key="", dry_run=True)
         return
 
     # Default: analyze and update
