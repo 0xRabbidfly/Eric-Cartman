@@ -555,6 +555,20 @@ python -c "import sys; sys.path.insert(0,'.github/skills/obsidian-linked-researc
 Images will be saved as `{slug}-1.jpg`, `{slug}-2.png`, etc.
 Use `![[{slug}-1.jpg]]` in the note to embed them.
 
+> **PowerShell `$` gotcha (Substack/Cloudinary CDN URLs)**: `substackcdn.com` image URLs contain a
+> signature segment like `$s_!5LAd!,w_1456,...`. PowerShell interpolates `$s_` as a variable and
+> mangles the URL, producing a 404 even though the URL is valid. Do **not** pass these URLs inside a
+> `python -c "..."` one-liner from PowerShell. Two fixes, in order of preference:
+> 1. Use the underlying origin URL instead — strip the `https://substackcdn.com/image/fetch/<sig>/`
+>    prefix and URL-decode the remainder to get the plain
+>    `https://substack-post-media.s3.amazonaws.com/public/images/<uuid>_<WxH>.png` URL. No `$`, no
+>    resizing params, full resolution.
+> 2. If you must keep the CDN URL, write the URL list into a temp `.py` file with the `Write` tool
+>    and run `python _tmp_dl.py` — never inline it in a shell argument.
+>
+> Same rule applies to any one-liner: prefer a temp script over `python -c` whenever the payload
+> contains `$`, backticks, or nested quotes.
+
 ### Step 4 — Write to Vault
 
 **Primary pattern (works in all environments, including Claude Code on Windows):**
