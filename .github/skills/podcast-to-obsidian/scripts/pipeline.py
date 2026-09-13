@@ -400,6 +400,27 @@ def step_detect_episodes(
     return new_episodes
 
 
+def _with_retry(fn, what: str, attempts: int = 3, delay: float = 3.0):
+    """Run ``fn`` with retries and linear backoff. Returns None if all fail.
+
+    Downloads and transcription each had exactly one shot before this; a
+    dropped connection or a transient GPU error silently cost the episode
+    until someone noticed and re-ran the pipeline by hand.
+    """
+    for attempt in range(1, attempts + 1):
+        try:
+            return fn()
+        except Exception as e:
+            if attempt == attempts:
+                print(f"  [error] Failed to {what} after {attempts} attempt(s): {e}")
+                return None
+            wait = delay * attempt
+            print(f"  [retry] {what} failed (attempt {attempt}/{attempts}): {e}")
+            print(f"  [retry] Retrying in {wait:.0f}s...")
+            time.sleep(wait)
+    return None
+
+
 def step_download(
     episodes: List[Episode],
     work_dir: Path,
@@ -413,16 +434,19 @@ def step_download(
     results = []
 
     for ep in episodes:
-        try:
-            filename = ep.safe_filename()
-            audio_path = download_audio(
+        # Podcast CDNs drop connections on large files often enough that a
+        # single attempt loses episodes to transient errors.
+        audio_path = _with_retry(
+            lambda: download_audio(
                 audio_url=ep.audio_url,
                 output_dir=audio_dir,
-                filename=filename,
-            )
+                filename=ep.safe_filename(),
+            ),
+            what=f"download '{ep.title}'",
+            attempts=3,
+        )
+        if audio_path is not None:
             results.append((ep, audio_path))
-        except Exception as e:
-            print(f"  [error] Failed to download '{ep.title}': {e}")
 
     print(f"\n  Downloaded: {len(results)}/{len(episodes)}")
     return results
@@ -450,17 +474,23 @@ def step_transcribe(
     print(f"  Device: {device}\n")
 
     for ep, audio_path in downloaded:
-        try:
-            transcript_path, meta = transcriber.transcribe(
+        # GPU/driver hiccups are usually transient; one retry costs a re-run of
+        # the model but saves the episode from being dropped for the day.
+        outcome = _with_retry(
+            lambda: transcriber.transcribe(
                 audio_path=audio_path,
                 output_dir=transcript_dir,
                 model_name=model,
                 device=device,
                 language=language,
-            )
+            ),
+            what=f"transcribe '{ep.title}'",
+            attempts=2,
+            delay=10.0,
+        )
+        if outcome is not None:
+            transcript_path, meta = outcome
             results.append((ep, audio_path, transcript_path, meta))
-        except Exception as e:
-            print(f"  [error] Failed to transcribe '{ep.title}': {e}")
 
     print(f"\n  Transcribed: {len(results)}/{len(downloaded)}")
     return results
@@ -518,6 +548,9 @@ def step_generate_notes(
                     episode_title=ep.title,
                     show_name=ep.show_name,
                     api_key=api_key,
+                    # Real runtime scales how much coverage is requested; falls
+                    # back to a word-count estimate when metadata is missing.
+                    duration_seconds=float((meta or {}).get("duration") or 0),
                 )
 
             if use_ai and ai_summary is None:
@@ -800,12 +833,66 @@ def step_write_to_vault(
 # Cleanup
 # ---------------------------------------------------------------------------
 
+# Extensions download_audio / yt-dlp can produce. The old cleanup globbed
+# "*.mp3" only, so every other format leaked.
+AUDIO_EXTENSIONS = (".mp3", ".m4a", ".ogg", ".opus", ".wav", ".aac", ".flac")
+
+# How long a file may sit in .work/audio before a later run treats it as
+# abandoned. Comfortably longer than the slowest end-to-end episode.
+ORPHAN_AUDIO_AGE_HOURS = 24.0
+
+
+def _iter_audio_files(audio_dir: Path):
+    """Yield audio files of every format the downloaders can produce."""
+    for path in sorted(audio_dir.iterdir()):
+        if path.is_file() and path.suffix.lower() in AUDIO_EXTENSIONS:
+            yield path
+
+
+def sweep_orphan_audio(
+    audio_dir: Path,
+    max_age_hours: float = ORPHAN_AUDIO_AGE_HOURS,
+    force: bool = False,
+) -> Tuple[int, float]:
+    """Delete audio and .part files left behind by killed or crashed runs.
+
+    Run-scoped cleanup only purges the episodes a run actually processed, so a
+    run that died mid-flight leaks its audio permanently — nothing afterwards
+    considers those files in scope. This sweeps by age instead, which is safe
+    because the run lock guarantees no other pipeline is mid-download.
+
+    Returns (files_removed, megabytes_freed).
+    """
+    if not audio_dir.exists():
+        return 0, 0.0
+
+    cutoff = time.time() - (max_age_hours * 3600)
+    removed = 0
+    freed_mb = 0.0
+
+    candidates = list(_iter_audio_files(audio_dir)) + list(audio_dir.glob("*.part"))
+    for path in candidates:
+        try:
+            if not force and path.stat().st_mtime > cutoff:
+                continue
+            size_mb = path.stat().st_size / (1024 * 1024)
+            path.unlink()
+            removed += 1
+            freed_mb += size_mb
+            print(f"  [orphan] Removed abandoned {path.name} ({size_mb:.1f} MB)")
+        except OSError as e:
+            print(f"  [warn] Could not remove orphan {path.name}: {e}")
+
+    return removed, freed_mb
+
+
 def step_cleanup(
     work_dir: Path,
     written_episodes: Optional[List[str]] = None,
     keep_audio: bool = False,
 ) -> None:
     """Purge audio files and intermediate build artifacts after a successful run.
+
 
     Audio files are large (100+ MB) and not needed once the transcript exists.
     Intermediate .md files (pre-transcript) are superseded by .final.md.
@@ -825,17 +912,23 @@ def step_cleanup(
 
     if not keep_audio and audio_dir.exists():
         stems = set(written_episodes) if written_episodes is not None else None
-        for mp3 in audio_dir.glob("*.mp3"):
-            if stems is not None and mp3.stem not in stems:
+        for audio in _iter_audio_files(audio_dir):
+            if stems is not None and audio.stem not in stems:
                 continue
-            size_mb = mp3.stat().st_size / (1024 * 1024)
+            size_mb = audio.stat().st_size / (1024 * 1024)
             try:
-                mp3.unlink()
+                audio.unlink()
                 removed += 1
                 freed_mb += size_mb
-                print(f"  [purge] {mp3.name} ({size_mb:.1f} MB)")
+                print(f"  [purge] {audio.name} ({size_mb:.1f} MB)")
             except OSError as e:
-                print(f"  [warn] Could not remove {mp3.name}: {e}")
+                print(f"  [warn] Could not remove {audio.name}: {e}")
+
+        # Sweep anything a killed run left behind. Run-scoped purging alone
+        # can never reclaim these, so they accumulate indefinitely.
+        n, mb = sweep_orphan_audio(audio_dir)
+        removed += n
+        freed_mb += mb
 
     # Remove intermediate .md files (keep .final.md only)
     if notes_dir.exists():
@@ -1093,6 +1186,120 @@ def _inject_source_url(note_content: str, source_url: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Run lock
+# ---------------------------------------------------------------------------
+
+class RunLock:
+    """Prevent two pipeline runs from operating on the same manifest at once.
+
+    Concurrent runs race on the manifest, duplicate downloads, and compete for
+    the same GPU. The lock is a PID file: if the recorded process is gone the
+    lock is stale and gets reclaimed, so a killed run doesn't wedge the
+    scheduler forever.
+    """
+
+    def __init__(self, path: Path, stale_after_hours: float = 8.0):
+        self.path = Path(path)
+        self.stale_after = stale_after_hours * 3600
+        self.acquired = False
+
+    @staticmethod
+    def _pid_alive(pid: int) -> bool:
+        if pid <= 0:
+            return False
+        if sys.platform == "win32":
+            try:
+                out = subprocess.run(
+                    ["tasklist", "/FI", f"PID eq {pid}", "/NH"],
+                    capture_output=True, text=True, timeout=15,
+                )
+                return str(pid) in (out.stdout or "")
+            except Exception:
+                return True  # can't tell — assume alive, safer than stomping
+        try:
+            os.kill(pid, 0)
+            return True
+        except (ProcessLookupError, PermissionError):
+            return False
+        except Exception:
+            return True
+
+    def _read(self) -> Optional[Dict[str, Any]]:
+        try:
+            # utf-8-sig: a lock written by PowerShell's Set-Content carries a
+            # BOM, and a lock we cannot read must never look like no lock.
+            data = json.loads(self.path.read_text(encoding="utf-8-sig"))
+            return data if isinstance(data, dict) else None
+        except Exception:
+            return None
+
+    def acquire(self) -> bool:
+        """Try to take the lock. Returns False if another run holds it."""
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+
+        if self.path.exists():
+            existing = self._read()
+            if existing is None:
+                # Unreadable lock: fail SAFE, not open. Fall back to the file's
+                # own mtime so a corrupt or half-written lock still blocks a
+                # concurrent run until it ages out.
+                try:
+                    age = max(0.0, time.time() - self.path.stat().st_mtime)
+                except OSError:
+                    age = 0.0
+                if age < self.stale_after:
+                    print(f"\n  [lock] Found an unreadable lock file "
+                          f"({int(age // 60)}min old) at {self.path}")
+                    print("  [lock] Treating it as held — refusing to run. "
+                          "Delete it manually if you know no run is active.")
+                    return False
+                print(f"  [lock] Discarding unreadable lock older than "
+                      f"{self.stale_after / 3600:.0f}h")
+            else:
+                pid = int(existing.get("pid") or 0)
+                started = float(existing.get("started_at") or 0)
+                age = max(0.0, time.time() - started)
+                alive = self._pid_alive(pid)
+                if alive and age < self.stale_after:
+                    print(f"\n  [lock] Another pipeline run is already active "
+                          f"(PID {pid}, started {int(age // 60)}min ago).")
+                    print(f"  [lock] Lock file: {self.path}")
+                    print("  [lock] Refusing to run concurrently — "
+                          "manifest writes would race. Exiting.")
+                    return False
+                reason = "process gone" if not alive else "older than max age"
+                print(f"  [lock] Reclaiming stale lock from PID {pid} ({reason})")
+
+        payload = {
+            "pid": os.getpid(),
+            "started_at": time.time(),
+            "started_iso": datetime.now(timezone.utc).isoformat(),
+        }
+        self.path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        self.acquired = True
+        return True
+
+    def release(self) -> None:
+        if not self.acquired:
+            return
+        current = self._read()
+        # Only remove our own lock, never one a later run installed.
+        if current and int(current.get("pid") or 0) != os.getpid():
+            return
+        try:
+            self.path.unlink(missing_ok=True)
+        except Exception:
+            pass
+        self.acquired = False
+
+    def __enter__(self) -> bool:
+        return self.acquire()
+
+    def __exit__(self, *exc) -> None:
+        self.release()
+
+
+# ---------------------------------------------------------------------------
 # Main pipeline
 # ---------------------------------------------------------------------------
 
@@ -1130,6 +1337,17 @@ def run_pipeline(args: argparse.Namespace) -> None:
     # Work directory
     work_dir = SKILL_DIR / config.get("work_dir", ".work")
     work_dir.mkdir(parents=True, exist_ok=True)
+
+    # Reclaim audio abandoned by a killed run before doing anything else.
+    # Run-scoped cleanup can never see these, and the run lock guarantees no
+    # other pipeline is mid-download right now.
+    n_orphans, mb_orphans = sweep_orphan_audio(
+        work_dir / "audio",
+        force=getattr(args, "purge_orphans", False),
+    )
+    if n_orphans:
+        print(f"\n  [orphan] Reclaimed {n_orphans} abandoned file(s), "
+              f"{mb_orphans:.1f} MB")
 
     # --- Step 1: Detect ---
     new_episodes = step_detect_episodes(
@@ -1585,6 +1803,9 @@ def main() -> None:
                         help="Retry failed episodes")
     parser.add_argument("--keep-audio", action="store_true",
                         help="Don't purge .mp3 files after successful run")
+    parser.add_argument("--purge-orphans", action="store_true",
+                        help="Remove ALL leftover audio in .work/audio at startup, "
+                             "ignoring the 24h age check (audio abandoned by killed runs)")
     parser.add_argument("--no-commit-manifest", action="store_true",
                         help="Don't git-commit the manifest after a run that changed it "
                              "(default: commit it, so runs stop dirtying the working tree)")
@@ -1653,7 +1874,15 @@ def main() -> None:
         elif args.url:
             run_url_pipeline(args)
         else:
-            run_pipeline(args)
+            # Only the manifest-mutating full pipeline needs the lock. Read-only
+            # maintenance commands above can safely run alongside it.
+            lock = RunLock(SKILL_DIR / ".work" / "pipeline.lock")
+            if not lock.acquire():
+                sys.exit(75)  # EX_TEMPFAIL — scheduler should retry later
+            try:
+                run_pipeline(args)
+            finally:
+                lock.release()
     except Exception:
         # Make sure the traceback reaches the log file, not just the console.
         import traceback

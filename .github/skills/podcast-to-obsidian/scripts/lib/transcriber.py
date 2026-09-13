@@ -11,8 +11,79 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
+import time
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
+
+
+# Wall-clock ceiling for a single transcription. Long-form podcasts on a
+# mid-range GPU run ~25 min for a 2h45m episode, so 30 min was too tight to be
+# a safety net and too loose to catch a hang quickly.
+TRANSCRIBE_TIMEOUT = 5400  # 90 minutes
+
+# Rough floor for how many words a real transcript should contain per minute of
+# audio. Below this the transcript is almost certainly truncated.
+MIN_WORDS_PER_MINUTE = 40
+
+
+def _transcript_meta_path(transcript_path: Path) -> Path:
+    """Sidecar path recording that a transcript completed, and its metadata."""
+    return transcript_path.with_suffix(".meta.json")
+
+
+def _write_transcript_meta(transcript_path: Path, meta: Dict[str, Any]) -> None:
+    """Record completion metadata beside the transcript.
+
+    The sidecar is what makes the 'already transcribed, skip it' shortcut safe:
+    a transcript with no sidecar was never confirmed complete, so it gets
+    redone rather than trusted.
+    """
+    try:
+        payload = dict(meta or {})
+        payload["completed_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        _transcript_meta_path(transcript_path).write_text(
+            json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8",
+        )
+    except Exception as e:
+        print(f"  [warn] Could not write transcript metadata sidecar: {e}")
+
+
+def _read_transcript_meta(transcript_path: Path) -> Optional[Dict[str, Any]]:
+    """Load the completion sidecar, or None if absent/unreadable."""
+    p = _transcript_meta_path(transcript_path)
+    if not p.exists():
+        return None
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else None
+    except Exception:
+        return None
+
+
+def _check_transcript_coverage(
+    transcript_path: Path, meta: Optional[Dict[str, Any]],
+) -> None:
+    """Warn when a transcript looks too short for the audio it came from.
+
+    Whisper can terminate early on a corrupt or misdetected stream and still
+    write a well-formed file. Comparing word count against the audio duration
+    catches that before a confidently wrong note gets generated.
+    """
+    duration = float((meta or {}).get("duration") or 0)
+    if duration <= 0:
+        return
+    try:
+        words = len(transcript_path.read_text(encoding="utf-8").split())
+    except Exception:
+        return
+    minutes = duration / 60
+    expected = minutes * MIN_WORDS_PER_MINUTE
+    if words < expected:
+        print(f"  [warn] Transcript looks short: {words:,} words for "
+              f"{minutes:.0f} min of audio "
+              f"(expected at least {expected:,.0f}). "
+              f"Transcription may have stopped early.")
 
 
 # ---------------------------------------------------------------------------
@@ -266,11 +337,18 @@ def transcribe(
     # Output filename matches audio filename but .txt
     transcript_path = output_dir / (audio_path.stem + ".txt")
 
-    # Skip if already transcribed
+    # Skip if already transcribed — but only when a completion sidecar proves
+    # the transcript finished. A file left behind by a killed run is
+    # indistinguishable by size alone, and reusing one silently produces a
+    # note for half an episode.
     if transcript_path.exists() and transcript_path.stat().st_size > 0:
-        print(f"  [skip] Already transcribed: {transcript_path.name}")
-        meta = {"language": language or "unknown", "duration": 0, "segments_count": 0}
-        return transcript_path, meta
+        prior = _read_transcript_meta(transcript_path)
+        if prior:
+            print(f"  [skip] Already transcribed: {transcript_path.name} "
+                  f"({prior.get('segments_count', '?')} segments)")
+            return transcript_path, prior
+        print(f"  [redo] Found {transcript_path.name} with no completion record "
+              f"— re-transcribing rather than trusting it")
 
     print(f"  [transcribe] {audio_path.name} (engine={engine}, model={model_name})")
 
@@ -353,65 +431,81 @@ def _transcribe_faster_whisper(
     print(f"  [transcribe] Spawning worker subprocess...")
     print(f"  [transcribe] model={model_name}, audio={audio_path.name}")
 
+    # Stream the worker's output line by line instead of capturing it all and
+    # dumping it at exit. A 25-minute transcription used to log nothing until
+    # it finished, and a killed worker lost its output entirely.
+    meta: Optional[dict] = None
+    stdout_lines: List[str] = []
+    stderr_lines: List[str] = []
+    timed_out = False
+
     try:
-        result = subprocess.run(
+        proc = subprocess.Popen(
             cmd,
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
-            timeout=1800,  # 30 minutes
+            encoding="utf-8",
+            errors="replace",
+            bufsize=1,  # line-buffered
             env=env,
         )
 
-        # Relay worker stdout (progress messages)
-        if result.stdout:
-            for line in result.stdout.splitlines():
-                if not line.startswith("__META__"):
-                    print(f"  {line}")
+        # Drain stderr on a thread so a chatty worker can't deadlock on a full pipe.
+        def _drain_stderr() -> None:
+            assert proc.stderr is not None
+            for line in proc.stderr:
+                stderr_lines.append(line.rstrip())
 
-        # Parse metadata from __META__ markers
-        meta = {
-            "language": language or "unknown",
-            "duration": 0,
-            "segments_count": 0,
-            "vocabulary_corrections": 0,
-        }
-        if result.stdout:
-            m = re.search(r"__META__(.+?)__META__", result.stdout)
+        err_thread = threading.Thread(target=_drain_stderr, daemon=True)
+        err_thread.start()
+
+        deadline = time.monotonic() + TRANSCRIBE_TIMEOUT
+        assert proc.stdout is not None
+        for line in proc.stdout:
+            line = line.rstrip()
+            stdout_lines.append(line)
+            m = re.search(r"__META__(.+?)__META__", line)
             if m:
                 try:
                     meta = json.loads(m.group(1))
                 except json.JSONDecodeError:
                     print("  [warn] Could not parse worker metadata")
+            elif line:
+                print(f"  {line}", flush=True)
+            if time.monotonic() > deadline:
+                timed_out = True
+                proc.kill()
+                break
 
-        if result.returncode != 0:
-            # Worker crashed -- check if transcript was written before crash
-            if transcript_path.exists() and transcript_path.stat().st_size > 0:
-                print(f"  [warn] Worker exited with code {result.returncode}, "
-                      f"but transcript was written successfully")
-                if result.stderr:
-                    # Print last few lines of stderr for diagnostics
-                    err_lines = result.stderr.strip().splitlines()[-5:]
-                    for line in err_lines:
-                        print(f"  [worker-stderr] {line}")
-            else:
-                stderr_msg = result.stderr.strip() if result.stderr else "no stderr"
-                raise RuntimeError(
-                    f"Transcription worker failed (exit code {result.returncode}):\n"
-                    f"{stderr_msg}"
-                )
+        returncode = proc.wait(timeout=60)
+        err_thread.join(timeout=5)
 
-    except subprocess.TimeoutExpired:
-        # Check if transcript was partially written
-        if transcript_path.exists() and transcript_path.stat().st_size > 0:
-            print("  [warn] Worker timed out after 30 min, but transcript file exists")
-            meta = {
-                "language": language or "unknown",
-                "duration": 0,
-                "segments_count": 0,
-                "vocabulary_corrections": 0,
-            }
-        else:
-            raise RuntimeError("Transcription worker timed out after 30 minutes")
+        if timed_out:
+            raise RuntimeError(
+                f"Transcription worker timed out after "
+                f"{TRANSCRIBE_TIMEOUT // 60} minutes"
+            )
+
+        # Completeness is decided by the worker's __META__ marker, which it
+        # emits only after the transcript file is fully written. Testing
+        # "file exists and is non-empty" instead used to accept a stale
+        # transcript from an earlier killed run as a successful result.
+        if meta is None:
+            tail = "\n".join(stderr_lines[-5:]) or "no stderr"
+            raise RuntimeError(
+                f"Transcription worker did not complete (exit code {returncode}); "
+                f"no metadata marker emitted.\n{tail}"
+            )
+
+        if returncode != 0:
+            # Transcript was written and metadata emitted, so the non-zero exit
+            # is a teardown crash (CUDA/ctranslate2 commonly exit 0xC0000409).
+            print(f"  [warn] Worker exited with code {returncode} after writing "
+                  f"the transcript — treating as a teardown crash")
+            for line in stderr_lines[-5:]:
+                print(f"  [worker-stderr] {line}")
+
     finally:
         # Clean up temp corrections file
         if corrections_tmp:
@@ -419,6 +513,15 @@ def _transcribe_faster_whisper(
                 os.unlink(corrections_tmp.name)
             except OSError:
                 pass
+
+    if not transcript_path.exists() or transcript_path.stat().st_size == 0:
+        raise RuntimeError(
+            f"Worker reported success but transcript is missing or empty: "
+            f"{transcript_path}"
+        )
+
+    _check_transcript_coverage(transcript_path, meta)
+    _write_transcript_meta(transcript_path, meta)
 
     size_kb = transcript_path.stat().st_size / 1024
     print(f"  [done] {transcript_path.name} ({size_kb:.1f} KB)")

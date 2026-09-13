@@ -248,38 +248,265 @@ SUMMARIZE_SYSTEM_PROMPT = """\
 You are an expert podcast summarizer. Given a transcript, produce a structured JSON summary.
 
 Output JSON with these exact keys:
-{
+{{
   "tldr": "2-3 sentence TL;DR",
   "key_ideas": [
-    {"idea": "Bold idea title", "explanation": "1-2 sentence explanation"}
+    {{"idea": "Bold idea title", "explanation": "1-2 sentence explanation"}}
   ],
   "deep_dives": [
-    {"title": "Concept Title", "body": "2-4 paragraph mini-essay analyzing this concept in depth — implications, connections, what wasn't said, why it matters beyond the podcast"}
+    {{"title": "Concept Title", "body": "2-4 paragraph mini-essay analyzing this concept in depth — implications, connections, what wasn't said, why it matters beyond the podcast"}}
   ],
   "actionables": ["Action item 1", "Action item 2"],
   "quotes": [
-    {"text": "Exact quote from transcript", "speaker": "Speaker name if identifiable"}
+    {{"text": "Exact quote from transcript", "speaker": "Speaker name if identifiable"}}
   ],
-  "backlinks": {
+  "backlinks": {{
     "people": ["Person Name 1", "Person Name 2"],
     "topics": ["Topic 1", "Topic 2"],
     "companies": ["Company 1"]
-  }
-}
+  }}
+}}
 
 Rules:
-- Key ideas: 5-15 items, each with a bold-worthy title and concise 1-2 sentence explanation
-- Deep dives: 3-5 items. Pick the most important/surprising concepts and go DEEP.
+- Key ideas: {n_key_ideas} items, each with a bold-worthy title and concise 1-2 sentence explanation
+- Deep dives: {n_deep_dives} items. Pick the most important/surprising concepts and go DEEP.
   Each deep dive is a mini-essay (2-4 paragraphs) that goes beyond summarizing — analyze
   implications, draw connections between ideas, note what was left unsaid, explain why it
   matters to the listener. Do NOT repeat the key ideas — add new depth and perspective.
-  For longer podcasts (>1h), use 4-5 deep dives.
-- Actionables: 2-5 concrete, actionable takeaways (not vague)
-- Quotes: 3-10 memorable/impactful quotes with speaker attribution if possible
-- Backlinks: 5-15 total across people/topics/companies
+- Actionables: {n_actionables} concrete, actionable takeaways (not vague)
+- Quotes: {n_quotes} memorable/impactful quotes with speaker attribution if possible
+- Backlinks: 8-25 total across people/topics/companies
 - Be specific, not generic. Reference actual content from the transcript.
 - If you can't identify speakers, use "Host" or "Guest"
+
+COVERAGE REQUIREMENTS (critical — this episode runs about {minutes} minutes):
+- Cover the ENTIRE episode, start to finish. Distribute key ideas and quotes across the
+  whole runtime, not just the opening. Summaries reliably under-cover the final third —
+  do not make that mistake.
+- Before you answer, identify every distinct segment or topic change in the material and
+  make sure each one is represented by at least one key idea.
+- The closing segments (Q&A / AMA, listener questions, final stories, closing predictions)
+  are real content and must be covered, not dropped as filler.
+- Ad reads, sponsor spots and event promos are NOT content — skip those.
+- At least one deep dive must draw on material from the back half of the episode.
 """
+
+
+# Per-chunk extraction prompt used in the map phase of long-transcript handling.
+MAP_SEGMENT_PROMPT = """\
+You are analyzing ONE SEGMENT of a longer podcast transcript. This is segment {i} of {n},
+covering roughly the {position} of the episode.
+
+Extract what this segment actually contains. Do not summarize the whole episode — you are
+only seeing part of it, and another pass will combine your notes with the other segments.
+
+Output JSON with these exact keys:
+{{
+  "segment_summary": "3-5 sentence summary of what happens in THIS segment",
+  "topics_covered": ["Short label for each distinct topic or story in this segment"],
+  "key_ideas": [
+    {{"idea": "Bold idea title", "explanation": "1-2 sentence explanation"}}
+  ],
+  "quotes": [
+    {{"text": "Exact quote from this segment", "speaker": "Speaker name if identifiable"}}
+  ],
+  "backlinks": {{
+    "people": ["Person Name"],
+    "topics": ["Topic"],
+    "companies": ["Company"]
+  }}
+}}
+
+Rules:
+- key_ideas: 4-10 items drawn ONLY from this segment
+- quotes: 3-6 verbatim quotes from this segment
+- topics_covered: list every distinct topic, story or question handled here
+- Skip ad reads, sponsor spots and event promotion — they are not content
+- Be specific. Use real names, numbers and claims from the text.
+- If you can't identify a speaker, use "Host" or "Guest"
+
+Respond with ONLY valid JSON. No markdown code fences, no explanation.
+
+---
+
+Podcast: {show_name} — {episode_title}
+Segment {i} of {n} ({position} of the episode):
+
+{chunk}
+"""
+
+
+# Reduce prompt: combines per-segment notes into the final structured summary.
+REDUCE_PROMPT = """\
+{system_prompt}
+
+---
+
+You are combining per-segment notes from a single {minutes}-minute podcast episode into
+one final summary. The segment notes below were produced by reading the episode in order,
+and together they cover the ENTIRE episode.
+
+Your job is to synthesize, not to select a favourite segment. Every segment below must be
+represented in the output. Check explicitly that the final segments are covered before you
+answer — that is where summaries usually fail.
+
+Podcast: {show_name} — {episode_title}
+
+SEGMENT NOTES (in chronological order):
+
+{segment_notes}
+
+---
+
+Respond with ONLY valid JSON matching the schema above. No markdown code fences, no explanation.
+"""
+
+
+# ---------------------------------------------------------------------------
+# Long-transcript handling: chunking + coverage targets
+# ---------------------------------------------------------------------------
+
+# Words per chunk in the map phase. ~9k words is roughly 12k tokens, which keeps
+# each request comfortably inside every backend's context window while needing
+# only a handful of chunks for even a 3-hour episode.
+CHUNK_WORDS = 9000
+CHUNK_OVERLAP_WORDS = 200
+
+# Average speaking rate used to estimate episode length when the real duration
+# isn't available. Conversational podcasts run faster than prose narration;
+# measured against this vault's Moonshots episodes, ~175 wpm is close.
+WORDS_PER_MINUTE = 175
+
+
+def _estimate_minutes(word_count: int, duration_seconds: float = 0) -> int:
+    """Episode runtime in minutes — from real duration when known, else estimated."""
+    if duration_seconds and duration_seconds > 0:
+        return max(1, round(duration_seconds / 60))
+    return max(1, round(word_count / WORDS_PER_MINUTE))
+
+
+def _coverage_targets(word_count: int, duration_seconds: float = 0) -> Dict[str, Any]:
+    """Scale requested item counts to episode length.
+
+    A three-hour panel show and a twenty-minute interview should not get the
+    same 5-15 key ideas. Counts grow with runtime so long episodes get
+    proportionate coverage instead of a summary of their first half.
+    """
+    minutes = _estimate_minutes(word_count, duration_seconds)
+
+    n_ideas_lo = max(6, min(24, round(minutes / 9)))
+    n_ideas_hi = max(10, min(32, round(minutes / 6)))
+
+    if minutes < 45:
+        deep_dives = "3-4"
+    elif minutes < 90:
+        deep_dives = "4-5"
+    elif minutes < 150:
+        deep_dives = "5-6"
+    else:
+        deep_dives = "6-7"
+
+    n_quotes_lo = max(4, min(12, round(minutes / 18)))
+    n_quotes_hi = max(8, min(18, round(minutes / 10)))
+
+    n_act_lo = 3 if minutes < 60 else 4
+    n_act_hi = 5 if minutes < 60 else 8
+
+    return {
+        "minutes": minutes,
+        "n_key_ideas": f"{n_ideas_lo}-{n_ideas_hi}",
+        "n_deep_dives": deep_dives,
+        "n_quotes": f"{n_quotes_lo}-{n_quotes_hi}",
+        "n_actionables": f"{n_act_lo}-{n_act_hi}",
+    }
+
+
+def _build_system_prompt(word_count: int, duration_seconds: float = 0) -> str:
+    """Fill the summarizer prompt with length-scaled coverage targets."""
+    return SUMMARIZE_SYSTEM_PROMPT.format(
+        **_coverage_targets(word_count, duration_seconds))
+
+
+def _chunk_transcript(
+    text: str,
+    chunk_words: int = CHUNK_WORDS,
+    overlap_words: int = CHUNK_OVERLAP_WORDS,
+) -> List[str]:
+    """Split a transcript into overlapping word-count chunks, preserving lines.
+
+    Splits on line boundaries so sentences and speaker turns stay intact, and
+    carries a small overlap between chunks so an idea spanning a boundary isn't
+    lost. Returns a single-element list when the transcript already fits.
+    """
+    lines = text.splitlines()
+    total_words = sum(len(ln.split()) for ln in lines)
+    if total_words <= chunk_words:
+        return [text]
+
+    chunks: List[str] = []
+    current: List[str] = []
+    current_words = 0
+
+    for line in lines:
+        lw = len(line.split())
+        if current_words + lw > chunk_words and current:
+            chunks.append("\n".join(current))
+            # Carry the tail of this chunk into the next for continuity.
+            tail: List[str] = []
+            tail_words = 0
+            for prev in reversed(current):
+                pw = len(prev.split())
+                if tail_words + pw > overlap_words:
+                    break
+                tail.insert(0, prev)
+                tail_words += pw
+            current = tail
+            current_words = tail_words
+        current.append(line)
+        current_words += lw
+
+    if current:
+        chunks.append("\n".join(current))
+    return chunks
+
+
+def _position_label(i: int, n: int) -> str:
+    """Human-readable description of where a chunk sits in the episode."""
+    if n == 1:
+        return "whole"
+    if i == 1:
+        return "opening"
+    if i == n:
+        return "final portion"
+    frac = (i - 0.5) / n
+    if frac < 0.4:
+        return "early-middle"
+    if frac < 0.65:
+        return "middle"
+    return "late-middle"
+
+
+REQUIRED_SUMMARY_KEYS = ("tldr", "key_ideas", "deep_dives", "quotes", "backlinks")
+
+
+def _validate_summary(summary: Any) -> List[str]:
+    """Return a list of problems with a parsed summary. Empty list means OK.
+
+    Guards against a response that was cut off by an output-token limit and
+    then salvaged into valid-but-incomplete JSON by ``_loads_llm_json``.
+    """
+    problems: List[str] = []
+    if not isinstance(summary, dict):
+        return ["response was not a JSON object"]
+    for key in REQUIRED_SUMMARY_KEYS:
+        value = summary.get(key)
+        if value is None:
+            problems.append(f"missing '{key}'")
+        elif isinstance(value, (list, dict, str)) and len(value) == 0:
+            problems.append(f"empty '{key}'")
+    if isinstance(summary.get("key_ideas"), list) and len(summary["key_ideas"]) < 3:
+        problems.append("suspiciously few key_ideas (<3) — response may be truncated")
+    return problems
 
 
 # ---------------------------------------------------------------------------
@@ -342,52 +569,18 @@ def _call_xai_chat(api_key: str, model: str, prompt: str, max_tokens: int = 4096
     return data.get("choices", [{}])[0].get("message", {}).get("content", "")
 
 
-def _generate_summary_xai(
-    transcript_text: str,
-    episode_title: str = "",
-    show_name: str = "",
-    model: str = "grok-4.5",
-) -> Optional[Dict[str, Any]]:
-    """Generate summary using xAI API (Grok)."""
+def _backend_xai(prompt: str, model: str = "grok-4.5") -> Optional[str]:
+    """Raw xAI call. Returns response text, or None if unavailable/failed."""
     api_key = _load_xai_api_key()
     if not api_key:
-        print("  [warn] No XAI_API_KEY found — cannot generate summary via xAI")
         return None
-
-    # Truncate transcript if too long
-    words = transcript_text.split()
-    if len(words) > 12000:
-        transcript_text = " ".join(words[:12000])
-        truncation_note = f" (truncated to 12k of {len(words)} words)"
-    else:
-        truncation_note = ""
-
-    prompt = (
-        f"{SUMMARIZE_SYSTEM_PROMPT}\n\n"
-        f"---\n\n"
-        f"Podcast: {show_name} — {episode_title}{truncation_note}\n\n"
-        f"Transcript:\n\n{transcript_text}\n\n"
-        f"---\n\n"
-        f"Respond with ONLY valid JSON. No markdown code fences, no explanation."
-    )
-
     try:
-        print(f"  [ai] Generating summary with xAI API ({model})...")
-        content = _call_xai_chat(api_key, model, prompt, max_tokens=4096)
-
-        if not content:
-            print("  [warn] xAI API returned empty response")
-            return None
-
-        summary = _loads_llm_json(content)
-        print("  [ai] Summary generated successfully via xAI API")
-        return summary
-
-    except json.JSONDecodeError as e:
-        print(f"  [warn] xAI API returned invalid JSON: {e}")
-        return None
+        # 16k output budget: a long episode's summary (20+ key ideas, 6 deep
+        # dives, 15 quotes) does not fit in the old 4096-token ceiling, and
+        # overflow used to be silently salvaged into a truncated note.
+        return _call_xai_chat(api_key, model, prompt, max_tokens=16384)
     except Exception as e:
-        print(f"  [warn] xAI API summary failed: {e}")
+        print(f"  [warn] xAI API call failed: {e}")
         return None
 
 
@@ -395,41 +588,22 @@ def _generate_summary_xai(
 # OpenAI API summary (fallback)
 # ---------------------------------------------------------------------------
 
-def _generate_summary_openai(
-    transcript_text: str,
-    episode_title: str = "",
-    show_name: str = "",
+def _backend_openai(
+    prompt: str,
     api_key: Optional[str] = None,
     model: str = "gpt-4o-mini",
     base_url: str = "https://api.openai.com/v1",
-) -> Optional[Dict[str, Any]]:
-    """Generate summary via OpenAI-compatible API (requires API key)."""
+) -> Optional[str]:
+    """Raw OpenAI-compatible call. Returns response text, or None."""
     api_key = api_key or os.environ.get("OPENAI_API_KEY", "")
     if not api_key:
         return None
 
-    # Truncate transcript if too long (keep ~12k words for context window)
-    words = transcript_text.split()
-    if len(words) > 12000:
-        truncated = " ".join(words[:12000])
-        user_msg = (
-            f"Podcast: {show_name} — {episode_title}\n\n"
-            f"Transcript (truncated to 12k words of {len(words)} total):\n\n"
-            f"{truncated}"
-        )
-    else:
-        user_msg = (
-            f"Podcast: {show_name} — {episode_title}\n\n"
-            f"Transcript:\n\n{transcript_text}"
-        )
-
     payload = json.dumps({
         "model": model,
-        "messages": [
-            {"role": "system", "content": SUMMARIZE_SYSTEM_PROMPT},
-            {"role": "user", "content": user_msg},
-        ],
+        "messages": [{"role": "user", "content": prompt}],
         "temperature": 0.3,
+        "max_tokens": 16384,
         "response_format": {"type": "json_object"},
     }).encode("utf-8")
 
@@ -445,17 +619,15 @@ def _generate_summary_openai(
     )
 
     try:
-        print(f"  [ai] Generating summary with {model} (OpenAI API)...")
-        with urllib.request.urlopen(req, timeout=120) as resp:
+        with urllib.request.urlopen(req, timeout=300) as resp:
             result = json.loads(resp.read().decode("utf-8"))
-
-        content = result["choices"][0]["message"]["content"]
-        summary = _loads_llm_json(content)
-        print("  [ai] Summary generated successfully via OpenAI API")
-        return summary
-
+        choice = result["choices"][0]
+        # A response cut off by the token cap must not be treated as complete.
+        if choice.get("finish_reason") == "length":
+            print("  [warn] OpenAI response hit the output token limit")
+        return choice["message"]["content"]
     except Exception as e:
-        print(f"  [warn] OpenAI API summary failed: {e}")
+        print(f"  [warn] OpenAI API call failed: {e}")
         return None
 
 
@@ -463,54 +635,145 @@ def _generate_summary_openai(
 # Unified summary entrypoint
 # ---------------------------------------------------------------------------
 
-def _generate_summary_claude(
-    transcript_text: str,
-    episode_title: str = "",
-    show_name: str = "",
-) -> Optional[Dict[str, Any]]:
-    """Generate summary using Claude CLI (Max subscription, free)."""
+def _backend_claude(prompt: str, timeout: int = 600) -> Optional[str]:
+    """Raw Claude CLI call. Returns response text, or None.
+
+    Unlike the previous implementation this checks ``returncode`` — a CLI that
+    errored out mid-stream used to have its partial stdout accepted as a
+    successful response.
+    """
     import subprocess
 
-    # Truncate transcript if too long
-    words = transcript_text.split()
-    if len(words) > 12000:
-        transcript_text = " ".join(words[:12000])
-        truncation_note = f" (truncated to 12k of {len(words)} words)"
-    else:
-        truncation_note = ""
-
-    prompt = (
-        f"{SUMMARIZE_SYSTEM_PROMPT}\n\n"
-        f"---\n\n"
-        f"Podcast: {show_name} — {episode_title}{truncation_note}\n\n"
-        f"Transcript:\n\n{transcript_text}\n\n"
-        f"---\n\n"
-        f"Respond with ONLY valid JSON. No markdown code fences, no explanation."
-    )
+    if not Path(CLAUDE_CLI).exists():
+        return None
 
     try:
-        print(f"  [ai] Generating summary with Claude CLI...")
-        # Pipe prompt via stdin — no length limit, no temp file
         result = subprocess.run(
             [CLAUDE_CLI, "--print"],
             input=prompt,
-            capture_output=True, text=True, encoding="utf-8", timeout=180,
+            capture_output=True, text=True, encoding="utf-8", timeout=timeout,
         )
-        content = result.stdout.strip()
-        if not content or "Failed to authenticate" in content:
-            print(f"  [claude-cli] Failed: {result.stderr[:100]}")
-            return None
-
-        summary = _loads_llm_json(content)
-        print("  [ai] [claude] Summary generated successfully")
-        return summary
-
-    except json.JSONDecodeError as e:
-        print(f"  [warn] Claude CLI returned invalid JSON: {e}")
+    except subprocess.TimeoutExpired:
+        print(f"  [warn] Claude CLI timed out after {timeout}s")
         return None
     except Exception as e:
-        print(f"  [warn] Claude CLI summary failed: {e}")
+        print(f"  [warn] Claude CLI call failed: {e}")
         return None
+
+    content = (result.stdout or "").strip()
+    if result.returncode != 0:
+        err = (result.stderr or "").strip()[:200]
+        print(f"  [warn] Claude CLI exited {result.returncode}: {err}")
+        return None
+    if not content or "Failed to authenticate" in content:
+        print(f"  [claude-cli] Failed: {(result.stderr or '')[:100]}")
+        return None
+    return content
+
+
+# ---------------------------------------------------------------------------
+# Map-reduce summarization
+# ---------------------------------------------------------------------------
+
+def _summarize_with_backend(
+    call_fn,
+    label: str,
+    transcript_text: str,
+    episode_title: str,
+    show_name: str,
+    duration_seconds: float = 0,
+) -> Optional[Dict[str, Any]]:
+    """Summarize a transcript of any length using one backend.
+
+    Short transcripts go through a single call. Long ones are chunked and
+    processed map-reduce style: each chunk is read on its own, then the
+    per-segment notes are synthesized into the final summary. This replaces the
+    old behaviour of slicing the transcript to its first 12k words, which
+    silently discarded the back half of long episodes.
+    """
+    word_count = len(transcript_text.split())
+    targets = _coverage_targets(word_count, duration_seconds)
+    system_prompt = _build_system_prompt(word_count, duration_seconds)
+    chunks = _chunk_transcript(transcript_text)
+
+    def _parse(raw: Optional[str], what: str) -> Optional[Dict[str, Any]]:
+        if not raw:
+            return None
+        try:
+            return _loads_llm_json(raw)
+        except json.JSONDecodeError as e:
+            print(f"  [warn] {label} returned invalid JSON for {what}: {e}")
+            return None
+
+    # --- Single-call path (transcript already fits) ---------------------
+    if len(chunks) == 1:
+        print(f"  [ai] Generating summary with {label} "
+              f"({word_count:,} words, ~{targets['minutes']}min, single pass)...")
+        prompt = (
+            f"{system_prompt}\n\n"
+            f"---\n\n"
+            f"Podcast: {show_name} — {episode_title}\n\n"
+            f"Transcript:\n\n{transcript_text}\n\n"
+            f"---\n\n"
+            f"Respond with ONLY valid JSON. No markdown code fences, no explanation."
+        )
+        summary = _parse(call_fn(prompt), "summary")
+        if summary is None:
+            return None
+        problems = _validate_summary(summary)
+        if problems:
+            print(f"  [warn] {label} summary incomplete: {'; '.join(problems)}")
+            return None
+        print(f"  [ai] [{label}] Summary generated successfully")
+        return summary
+
+    # --- Map phase ------------------------------------------------------
+    n = len(chunks)
+    print(f"  [ai] Generating summary with {label} "
+          f"({word_count:,} words, ~{targets['minutes']}min, {n} segments)...")
+
+    segment_notes: List[str] = []
+    for i, chunk in enumerate(chunks, start=1):
+        position = _position_label(i, n)
+        print(f"  [ai] [{label}] Reading segment {i}/{n} ({position})...")
+        prompt = MAP_SEGMENT_PROMPT.format(
+            i=i, n=n, position=position,
+            show_name=show_name, episode_title=episode_title,
+            chunk=chunk,
+        )
+        note = _parse(call_fn(prompt), f"segment {i}/{n}")
+        if note is None:
+            # A dropped segment means a hole in coverage — which is the exact
+            # failure this rewrite exists to prevent. Fail loudly instead.
+            print(f"  [warn] {label} failed on segment {i}/{n} — aborting this backend")
+            return None
+        segment_notes.append(
+            f"### Segment {i} of {n} ({position})\n"
+            + json.dumps(note, ensure_ascii=False, indent=2)
+        )
+
+    # --- Reduce phase ---------------------------------------------------
+    print(f"  [ai] [{label}] Synthesizing {n} segments into final summary...")
+    reduce_prompt = REDUCE_PROMPT.format(
+        system_prompt=system_prompt,
+        minutes=targets["minutes"],
+        show_name=show_name,
+        episode_title=episode_title,
+        segment_notes="\n\n".join(segment_notes),
+    )
+    summary = _parse(call_fn(reduce_prompt), "final synthesis")
+    if summary is None:
+        return None
+    problems = _validate_summary(summary)
+    if problems:
+        print(f"  [warn] {label} synthesis incomplete: {'; '.join(problems)}")
+        return None
+
+    print(f"  [ai] [{label}] Summary generated successfully "
+          f"({len(summary.get('key_ideas', []))} key ideas, "
+          f"{len(summary.get('deep_dives', []))} deep dives, "
+          f"{len(summary.get('quotes', []))} quotes across {n} segments)")
+    return summary
 
 
 def generate_ai_summary(
@@ -520,34 +783,31 @@ def generate_ai_summary(
     api_key: Optional[str] = None,
     model: str = "gpt-4o-mini",
     base_url: str = "https://api.openai.com/v1",
+    duration_seconds: float = 0,
 ) -> Optional[Dict[str, Any]]:
     """Generate a structured summary. Tries Claude CLI first, then xAI, then OpenAI.
+
+    The full transcript is always used — long episodes are chunked and
+    map-reduced rather than truncated. ``duration_seconds``, when known, is
+    used to scale how much coverage is requested.
 
     Returns:
         Parsed summary dict, or None on failure.
     """
-    # 1. Try Claude CLI (Max subscription, free)
-    summary = _generate_summary_claude(
-        transcript_text, episode_title, show_name,
-    )
-    if summary:
-        return summary
+    backends = [
+        ("claude", _backend_claude),
+        ("xai", lambda p: _backend_xai(p, model="grok-4.5")),
+        ("openai", lambda p: _backend_openai(
+            p, api_key=api_key, model=model, base_url=base_url)),
+    ]
 
-    # 2. Try xAI API (Grok — primary backend)
-    summary = _generate_summary_xai(
-        transcript_text, episode_title, show_name,
-        model="grok-4.5",
-    )
-    if summary:
-        return summary
-
-    # 3. Fall back to OpenAI API
-    summary = _generate_summary_openai(
-        transcript_text, episode_title, show_name,
-        api_key=api_key, model=model, base_url=base_url,
-    )
-    if summary:
-        return summary
+    for label, call_fn in backends:
+        summary = _summarize_with_backend(
+            call_fn, label, transcript_text, episode_title, show_name,
+            duration_seconds=duration_seconds,
+        )
+        if summary:
+            return summary
 
     print("  [warn] No AI backend available")
     print("  [hint] Claude CLI (Max), xAI API, or OpenAI API are all unavailable.")

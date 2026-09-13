@@ -75,13 +75,75 @@ class Manifest:
         return self._empty()
 
     def save(self) -> None:
-        """Persist manifest to disk."""
+        """Persist manifest to disk, merging in any concurrent changes.
+
+        A run holds its in-memory manifest for the whole session, which can be
+        hours. Writing that snapshot verbatim would clobber episodes another
+        process recorded in the meantime — a last-writer-wins race that
+        silently loses completed work. So re-read from disk first and merge
+        episode-level, then write atomically via a process-unique temp file.
+        """
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = self.path.with_suffix(".json.tmp")
-        with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(self._data, f, indent=2, ensure_ascii=False)
-            f.write("\n")
-        tmp.replace(self.path)
+
+        merged = self._merge_with_disk(self._data)
+        self._data = merged
+
+        # Process-unique temp name: two concurrent writers sharing one temp
+        # path can replace() each other's half-written file.
+        tmp = self.path.with_suffix(f".json.tmp{os.getpid()}")
+        try:
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(merged, f, indent=2, ensure_ascii=False)
+                f.write("\n")
+            tmp.replace(self.path)
+        except Exception:
+            tmp.unlink(missing_ok=True)
+            raise
+
+    def _merge_with_disk(self, mine: Dict[str, Any]) -> Dict[str, Any]:
+        """Merge the in-memory manifest over whatever is currently on disk.
+
+        Disk wins for shows/episodes this process never touched; memory wins
+        for entries it did. Watermarks take the later of the two so a
+        concurrent run can't roll one backwards.
+        """
+        if not self.path.exists():
+            return mine
+        try:
+            with open(self.path, "r", encoding="utf-8") as f:
+                disk = json.load(f)
+        except (json.JSONDecodeError, OSError):
+            return mine
+        if not isinstance(disk, dict) or "shows" not in disk:
+            return mine
+
+        merged = dict(disk)
+        merged["version"] = MANIFEST_VERSION
+        merged_shows = dict(disk.get("shows") or {})
+
+        for show_id, my_show in (mine.get("shows") or {}).items():
+            disk_show = merged_shows.get(show_id)
+            if not isinstance(disk_show, dict):
+                merged_shows[show_id] = my_show
+                continue
+            combined = dict(disk_show)
+            combined.update({
+                k: v for k, v in my_show.items() if k not in ("episodes", "latest_published")
+            })
+            episodes = dict(disk_show.get("episodes") or {})
+            episodes.update(my_show.get("episodes") or {})
+            combined["episodes"] = episodes
+            # Watermark only ever moves forward.
+            watermarks = [
+                w for w in (disk_show.get("latest_published"),
+                            my_show.get("latest_published")) if w
+            ]
+            if watermarks:
+                combined["latest_published"] = max(watermarks)
+            merged_shows[show_id] = combined
+
+        merged["shows"] = merged_shows
+        return merged
 
     @staticmethod
     def _empty() -> Dict[str, Any]:

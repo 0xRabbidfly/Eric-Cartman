@@ -107,6 +107,20 @@ Spotify MCP (`SpotifyGetInfo`) **does not support episode URIs** — it returns
 
 ### Step 6 — GENERATE: Structured Note from Transcript
 
+**Long transcripts are chunked, never truncated.** Each backend used to slice
+the transcript to its first 12,000 words, so a 2h45m episode (~29k words) was
+summarized from its first 41% and the back half silently vanished from the
+note. Now `note_generator` splits anything over ~9k words into overlapping
+segments, extracts per-segment notes (the map phase), then synthesizes them
+into the final summary (the reduce phase). Requested item counts also scale
+with runtime — a three-hour panel show asks for ~22-32 key ideas and 6-7 deep
+dives, where a 20-minute interview asks for far fewer.
+
+If a segment fails, the whole backend is abandoned rather than producing a
+summary with a hole in it. The parsed result is validated for required keys
+before use, so a response cut off by an output-token limit can no longer be
+salvaged into a quietly incomplete note.
+
 **This step is automatic.** `step_generate_notes()` resolves a summary in this
 order and writes the note itself:
 
@@ -127,10 +141,12 @@ transcript**, not by regenerating it. Do not write a second note — the manifes
 is already marked `completed` and the vault file already exists. Instead:
 
 1. Read the generated note and the full transcript
-2. Check the back third of the episode specifically — summaries reliably
-   under-cover the final segments
+2. Spot-check the back third. Chunked summarization means the model now sees
+   the whole episode, so wholesale gaps should be gone — but verify, since
+   this is where failures historically showed up
 3. Verify speaker attribution on quotes (small models produce bare or wrong
-   first names)
+   first names, and panel shows referred to only by first name — "Alex",
+   "Dave" — need resolving to full names for the `[[People/...]]` links)
 4. Verify `[[People/...]]` links resolve to real people, not homophones
 5. Patch gaps in place with targeted edits
 
@@ -403,10 +419,11 @@ or the repo root.** With the default `.work`, everything lives under:
 ```
 .github/skills/podcast-to-obsidian/.work/
 ├── audio/         # .mp3 (+ .part during download), purged after success
-├── transcripts/   # raw .txt from whisper
+├── transcripts/   # raw .txt from whisper + .meta.json completion sidecars
 ├── summaries/     # optional pre-generated summary JSON (see Step 6)
 ├── notes/         # intermediate .final.md build artifacts
-└── logs/          # timestamped run logs, newest 30 retained
+├── logs/          # timestamped run logs, newest 30 retained
+└── pipeline.lock  # PID lock held for the duration of a full run
 ```
 
 Running `python .../pipeline.py` from the repo root does **not** create
@@ -506,7 +523,12 @@ Restart VS Code after configuration.
 | AI summarization fails when neither Claude CLI nor OpenAI API is configured | **P1** | The pipeline fails that episode instead of silently writing a template-only note; install Claude CLI or set `OPENAI_API_KEY`. Pass `--no-ai` only if you truly want a skeleton note |
 | Pipeline downloads all new episodes per show, not just the target | **P1** | Use `--episode "title substring"` to filter, or `--max-episodes 1` |
 | Small Whisper models mangle domain jargon and proper nouns | **P1** | Default model is now `large-v3`. `base` produced "opioid models" for "open-weight models" throughout an entire episode, which then propagated into the generated note. Extend `config/vocabulary.json` for show-specific names |
-| Pipeline may exit with code 1 during large batch downloads | **P2** | Re-run with `--retry-failed` or `--transcribe-only` if audio already downloaded |
+| Pipeline may exit with code 1 during large batch downloads | **P2** | Downloads and transcription now retry automatically (3x / 2x with backoff). Re-run with `--retry-failed` if they still fail |
+| Two runs at once corrupt the manifest | **Fixed** | A PID lock at `.work/pipeline.lock` refuses a second concurrent run (exit code 75). Stale locks from killed runs are reclaimed automatically. `Manifest.save()` also re-reads and merges before writing, so no run can clobber another's episodes |
+| Long episodes were summarized from their first 12k words only | **Fixed** | Transcripts are chunked and map-reduced. See Step 6 |
+| Worker exit code ignored; "file exists" treated as success | **Fixed** | Completion is now decided by the worker's `__META__` marker, written only after the transcript is complete. A `.meta.json` sidecar records it, and the "already transcribed, skip" shortcut requires that sidecar — a transcript left by a killed run is redone, not trusted |
+| Audio abandoned by a killed run was never cleaned up | **Fixed** | `sweep_orphan_audio()` runs at startup and removes audio and `.part` files older than 24h, across all audio formats. `--purge-orphans` ignores the age check |
+| Feeds served as ISO-8859-1/cp1252 got mojibake titles | **Fixed** | `rss._decode_feed()` honours the declared charset and treats ISO-8859-1 as cp1252 (the HTML5 rule), so curly apostrophes survive instead of becoming U+FFFD. Pre-existing `?Ts` artifacts in the manifest are historical and unaffected |
 
 ## CLI Flag Reference
 
@@ -522,6 +544,7 @@ Restart VS Code after configuration.
 | `--model <size>` | Sets whisper model (base/large-v3) | — |
 | `--retry-failed` | Re-processes failed episodes | Already-completed episodes |
 | `--keep-audio` | Keeps .mp3 files after successful run | Cleanup step |
+| `--purge-orphans` | Removes ALL leftover audio in `.work/audio` at startup, ignoring the 24h age check | — |
 | `--no-commit-manifest` | Leaves the manifest uncommitted after a run | The automatic manifest commit |
 | `--set-watermark <date\|today>` | Forces the release watermark, then exits | Everything else — it's a maintenance command |
 | `--seed-watermarks` | Seeds watermarks from newest completed episode, then exits | Everything else |

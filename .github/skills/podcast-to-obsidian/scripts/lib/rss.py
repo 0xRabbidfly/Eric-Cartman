@@ -92,7 +92,65 @@ def fetch_feed(rss_url: str, timeout: int = 30) -> str:
         },
     )
     with urllib.request.urlopen(req, timeout=timeout) as resp:
-        return resp.read().decode("utf-8", errors="replace")
+        raw = resp.read()
+        charset = resp.headers.get_content_charset()
+
+    return _decode_feed(raw, charset)
+
+
+def _normalize_charset(enc: str) -> str:
+    """Map declared charsets to the one publishers actually meant.
+
+    Feeds routinely declare ISO-8859-1 while emitting Windows-1252 bytes. In
+    latin-1, 0x91-0x97 are unused control codes; in cp1252 they are the smart
+    quotes and dashes that show up in nearly every episode title. Decoding as
+    latin-1 "succeeds" and yields invisible control characters, so follow the
+    HTML5 rule and treat the two as cp1252.
+    """
+    key = enc.strip().lower().replace("_", "-")
+    if key in ("iso-8859-1", "latin-1", "latin1", "iso8859-1", "ascii", "us-ascii"):
+        return "cp1252"
+    return enc
+
+
+def _decode_feed(raw: bytes, http_charset: Optional[str] = None) -> str:
+    """Decode feed bytes using the charset the feed actually declares.
+
+    Decoding everything as UTF-8 with ``errors="replace"`` corrupts feeds
+    served as cp1252/ISO-8859-1: byte 0x92 is a curly apostrophe there but
+    invalid UTF-8, so it became U+FFFD and the mojibake was baked into episode
+    titles, filenames and the manifest before anything else could see it.
+
+    Order of preference: the XML declaration, then the HTTP Content-Type
+    charset, then UTF-8, then cp1252 (a superset of latin-1 that covers the
+    smart-quote range most publishers emit).
+    """
+    candidates: List[str] = []
+
+    # <?xml version="1.0" encoding="ISO-8859-1"?>
+    m = re.match(rb'^\s*<\?xml[^>]*encoding=["\']([\w\-]+)["\']', raw[:200], re.I)
+    if m:
+        candidates.append(m.group(1).decode("ascii", "ignore"))
+    if http_charset:
+        candidates.append(http_charset)
+    candidates.extend(["utf-8", "cp1252"])
+
+    seen = set()
+    for enc in candidates:
+        if not enc:
+            continue
+        enc = _normalize_charset(enc)
+        key = enc.lower().replace("_", "-")
+        if key in seen:
+            continue
+        seen.add(key)
+        try:
+            return raw.decode(enc)
+        except (UnicodeDecodeError, LookupError):
+            continue
+
+    # Everything failed — fall back to lossy UTF-8 rather than raising.
+    return raw.decode("utf-8", errors="replace")
 
 
 def parse_feed(rss_url: str, max_episodes: int = 50) -> List[Episode]:
