@@ -1148,3 +1148,154 @@ test('listProfiles gives every profile a compact pace object', () => {
   assert.equal(profiles[1].pace.behindWeeks, 1);
   assert.equal(profiles[1].pace.projectedFinish, null);
 });
+
+// ── Second program type: strength-tone ──
+//
+// A strength-tone athlete never ramps to a max. Their W1 records working sets
+// and a handful of isBaseline measurements, some of them rep counts, so the
+// store has to file a rep baseline (including a result of 0) and the stats
+// view has to show something other than empty 3RM cards.
+
+function toneItem(id, key, extra = {}) {
+  return {
+    id, block: id.charAt(0).toUpperCase(), exerciseKey: key, label: key, sets: 3, reps: 8,
+    repsMax: 10, resultType: 'reps', loadType: 'kg', targetLoad: null, targetPct: null,
+    loadNote: '', targetRpe: 7, restSec: 90, isRamp: false, isBaseline: false,
+    setsAreOptional: false, pairedWith: null, ...extra,
+  };
+}
+
+function toneFixture() {
+  const root = fixture();
+  const write = (rel, obj) => {
+    const target = path.join(root, rel);
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(target, JSON.stringify(obj), 'utf8');
+  };
+  const profiles = JSON.parse(fs.readFileSync(path.join(root, 'profiles.json'), 'utf8'));
+  profiles.profiles.push({ id: 'athlete-c', name: 'Athlete C', startDate: '2026-09-14', program: 'strength-tone' });
+  write('profiles.json', profiles);
+  const baseline = (id, key, resultType) => toneItem(id, key, {
+    sets: 2, reps: 1, repsMax: undefined, resultType, loadType: 'bodyweight', targetRpe: null, isBaseline: true,
+  });
+  const week = (n) => ({
+    week: n, block: n === 1 ? 'baseline' : 'foundation', blockLabel: n === 1 ? 'Baseline week' : 'Foundation',
+    goal: 'g', retest: n === 1 || n === 5, loadsResolved: n === 1, generatedAt: null,
+    days: [
+      { day: 1, title: 'Lower + core · knee', estMinutes: 50, warmup: ['rower'], items: [
+        toneItem('a-goblet-squat', 'goblet-squat'),
+        toneItem('b-dumbbell-step-up', 'dumbbell-step-up', { loadType: 'kg_total_pair', resultType: 'reps_per_side' }),
+        toneItem('d-hip-abduction', 'hip-abduction', { loadType: 'setting', reps: 12, repsMax: 15 }),
+        baseline('e-front-plank', 'front-plank', 'seconds'),
+      ] },
+      { day: 2, title: 'Upper + core · pull-up', estMinutes: 55, warmup: ['arm circles'], items: [
+        baseline('a-dead-hang', 'dead-hang', 'seconds'),
+        baseline('b-band-assisted-pull-up', 'band-assisted-pull-up', 'reps'),
+        baseline('b-pull-up', 'pull-up', 'reps'),
+        toneItem('c-lat-pulldown', 'lat-pulldown', { loadType: 'setting' }),
+      ] },
+      { day: 3, title: 'Lower + core · hip', estMinutes: 50, warmup: ['rower'], items: [
+        toneItem('a-dumbbell-romanian-deadlift', 'dumbbell-romanian-deadlift', { loadType: 'kg_total_pair' }),
+      ] },
+    ],
+  });
+  for (let n = 1; n <= 12; n += 1) write(`athlete-c/weeks/W${n}.json`, week(n));
+  write('athlete-c/maxes.json', {});
+  return root;
+}
+
+const toneSet = (itemId, n, load, loadType, reps, rpe = null) => ({ itemId, set: n, load, loadType, reps, rpe, note: '' });
+
+test('listProfiles passes the program through and treats a missing one as cycling', () => {
+  const profiles = createGymStore(toneFixture()).listProfiles('2026-09-13');
+  assert.deepEqual(profiles.map((p) => [p.id, p.program]), [
+    ['athlete-a', 'cycling'], ['athlete-b', 'cycling'], ['athlete-c', 'strength-tone'],
+  ]);
+  const c = profiles[2];
+  assert.deepEqual(c.nextSession, { week: 1, day: 1 });
+  assert.equal(c.pace.status, 'onPlan');
+});
+
+test('a strength-tone week keeps the sequence rules: D1 up next, D2 and D3 locked', () => {
+  const week = createGymStore(toneFixture()).getWeek('athlete-c', 1);
+  assert.deepEqual(week.days.map((d) => [d.upNext, d.locked]), [[true, false], [false, true], [false, true]]);
+  assert.equal(week.days[0].items[0].repsMax, 10);
+});
+
+test('rep-count baselines are filed, and a strict pull-up result of 0 is kept rather than dropped', () => {
+  const root = toneFixture();
+  const store = createGymStore(root);
+  const days = {
+    1: [toneSet('a-goblet-squat', 1, 12, 'kg', 10, 7), toneSet('e-front-plank', 1, null, 'bodyweight', 45)],
+    2: [
+      toneSet('a-dead-hang', 1, null, 'bodyweight', 18), toneSet('a-dead-hang', 2, null, 'bodyweight', 22),
+      toneSet('b-band-assisted-pull-up', 1, null, 'bodyweight', 6),
+      toneSet('b-pull-up', 1, null, 'bodyweight', 0), toneSet('b-pull-up', 2, null, 'bodyweight', 0),
+      toneSet('c-lat-pulldown', 1, 5, 'setting', 10, 7),
+    ],
+  };
+  for (const day of [1, 2]) {
+    store.saveSession('athlete-c', 1, day, { entries: days[day] });
+    store.finishSession('athlete-c', 1, day, new Date(`2026-09-1${4 + day}T18:00:00`));
+  }
+  const maxes = JSON.parse(fs.readFileSync(path.join(root, 'athlete-c', 'maxes.json'), 'utf8'));
+  assert.deepEqual(Object.keys(maxes).sort(), ['band-assisted-pull-up', 'dead-hang', 'front-plank', 'pull-up']);
+  assert.equal(maxes['dead-hang'].seconds, 22);
+  assert.equal(maxes['band-assisted-pull-up'].reps, 6);
+  assert.equal(maxes['pull-up'].reps, 0);
+  assert.equal(maxes['front-plank'].seconds, 45);
+  // Working sets are never promoted: no 3RM, no estimated 1RM, nothing for goblet squat.
+  for (const value of Object.values(maxes)) {
+    assert.equal(value.threeRm, undefined);
+    assert.equal(value.e1rm, undefined);
+  }
+});
+
+test('a re-checked rep baseline archives the earlier count onto history', () => {
+  const root = toneFixture();
+  const store = createGymStore(root);
+  store._writeJson(path.join(root, 'athlete-c', 'maxes.json'), {
+    'pull-up': { reps: 0, testedWeek: 1, testedOn: '2026-09-16', history: [] },
+  });
+  // W5 D2 reuses the same item shapes in this fixture.
+  store.saveSession('athlete-c', 5, 2, { entries: [toneSet('b-pull-up', 1, null, 'bodyweight', 1)] });
+  store.finishSession('athlete-c', 5, 2, new Date('2026-10-14T18:00:00'));
+  const maxes = JSON.parse(fs.readFileSync(path.join(root, 'athlete-c', 'maxes.json'), 'utf8'));
+  assert.deepEqual(maxes['pull-up'].history, [{ week: 1, reps: 0 }]);
+  assert.equal(maxes['pull-up'].reps, 1);
+  const trend = createGymStore(root).getStats('athlete-c', '2026-10-14').baselineTrend['pull-up'];
+  assert.deepEqual(trend, { unit: 'reps', points: [{ week: 1, value: 0 }, { week: 5, value: 1 }] });
+});
+
+test('getStats for a strength-tone athlete has no 1RM trend but a working-load trend and baselines', () => {
+  const root = toneFixture();
+  const store = createGymStore(root);
+  store.saveSession('athlete-c', 1, 1, { entries: [
+    toneSet('a-goblet-squat', 1, 10, 'kg', 10, 6),
+    toneSet('a-goblet-squat', 2, 12, 'kg', 10, 7),
+    toneSet('a-goblet-squat', 3, 12, 'kg', 9, 7),
+    toneSet('b-dumbbell-step-up', 1, 8, 'kg_total_pair', 10, 7),
+    toneSet('d-hip-abduction', 1, 6, 'setting', 15, 7),
+    toneSet('e-front-plank', 1, null, 'bodyweight', 40),
+  ] });
+  store.finishSession('athlete-c', 1, 1, new Date('2026-09-15T18:00:00'));
+  const stats = createGymStore(root).getStats('athlete-c', '2026-09-15');
+  assert.equal(stats.program, 'strength-tone');
+  assert.deepEqual(stats.maxTrend, {});
+  assert.deepEqual(stats.loadTrend['goblet-squat'],
+    { label: 'goblet-squat', loadType: 'kg', points: [{ week: 1, load: 12, reps: 10 }] });
+  assert.deepEqual(stats.loadTrend['dumbbell-step-up'].points, [{ week: 1, load: 8, reps: 10 }]);
+  // A machine pin is not kilograms, so it has no load trend.
+  assert.equal(stats.loadTrend['hip-abduction'], undefined);
+  assert.equal(stats.baselines['front-plank'].seconds, 40);
+  assert.deepEqual(stats.baselineTrend['front-plank'], { unit: 'seconds', points: [{ week: 1, value: 40 }] });
+  // 12×10 + 10×10 + 12×9 on the squat, 8×10 per side on the step-up.
+  assert.equal(stats.weeks[0].tonnage, 120 + 100 + 108 + 160);
+});
+
+test('a cycling athlete reports its program too, and its stats keep the 1RM trend', () => {
+  const stats = createGymStore(toneFixture()).getStats('athlete-a', '2026-09-13');
+  assert.equal(stats.program, 'cycling');
+  assert.deepEqual(stats.maxTrend['back-squat'], [{ week: 1, e1rm: 75.6, threeRm: 70 }]);
+  assert.deepEqual(stats.baselineTrend, {});
+});

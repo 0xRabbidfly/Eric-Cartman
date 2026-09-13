@@ -109,6 +109,8 @@ test('profiles places each athlete by the sessions they have done, not the calen
   assert.deepEqual(b.nextSession, { week: 2, day: 1 });
   assert.equal(b.sessionsDone, 10);
   for (const p of body.profiles) {
+    // Neither fixture profile names a program, so both read as the original one.
+    assert.equal(p.program, 'cycling');
     assert.ok(['behind', 'onPlan', 'ahead'].includes(p.pace.status));
     assert.equal(typeof p.pace.gap, 'number');
     assert.equal('delta' in p.pace, false);

@@ -103,6 +103,15 @@ function createGymStore(dataRoot) {
     return profiles.find((p) => p.id === id) || null;
   }
 
+  /**
+   * Which program a profile follows. `cycling` is the original 3RM-tested
+   * strength block; `strength-tone` never tests a max and progresses working
+   * sets by reps and RPE. Profiles written before the field existed are cycling.
+   */
+  function programOf(profile) {
+    return (profile && profile.program) || 'cycling';
+  }
+
   function requireProfile(id) {
     const profile = getProfile(id);
     if (!profile) {
@@ -312,6 +321,7 @@ function createGymStore(dataRoot) {
       const state = sequenceState(p.id);
       return {
         ...p,
+        program: programOf(p),
         currentWeek: state.next ? state.next.week : PROGRAM_WEEKS + 1,
         nextSession: state.next,
         sessionsDone: state.performed.length,
@@ -503,6 +513,7 @@ function createGymStore(dataRoot) {
     if (typeof prev.threeRm === 'number') { point.threeRm = prev.threeRm; point.e1rm = prev.e1rm; }
     if (typeof prev.cm === 'number') point.cm = prev.cm;
     if (typeof prev.seconds === 'number') point.seconds = prev.seconds;
+    if (typeof prev.reps === 'number') point.reps = prev.reps;
     // A bodyweight rep count is a tested result like any other, and it is the
     // only record that an athlete who ends up with a real 3RM started without
     // one. Archiving it is what lets the trend span both measures.
@@ -512,8 +523,14 @@ function createGymStore(dataRoot) {
     return history;
   }
 
-  /** Which key a baseline's result is stored under, chosen by the unit it is measured in. */
-  const BASELINE_UNITS = { cm: 'cm', seconds: 'seconds' };
+  /**
+   * Which key a baseline's result is stored under, chosen by the unit it is
+   * measured in. `reps` is a rep-count baseline such as strict pull-ups, where
+   * 0 is a real result. Only strength-tone weeks flag one today; every cycling
+   * baseline is a distance or a hold.
+   */
+  const BASELINE_UNITS = { cm: 'cm', seconds: 'seconds', reps: 'reps' };
+  const BASELINE_UNIT_KEYS = Object.values(BASELINE_UNITS);
 
   function recomputeMaxes(profileId, week, day, now = new Date()) {
     const file = at(profileId, 'maxes.json');
@@ -703,20 +720,82 @@ function createGymStore(dataRoot) {
 
     const maxTrend = {};
     const baselines = {};
+    const baselineTrend = {};
     for (const [key, value] of Object.entries(maxes)) {
       if (key.startsWith('_')) continue;
+      const history = Array.isArray(value.history) ? value.history : [];
       if (typeof value.threeRm === 'number') {
-        const history = Array.isArray(value.history) ? value.history : [];
         maxTrend[key] = [...history, { week: value.testedWeek, e1rm: value.e1rm, threeRm: value.threeRm }]
           .sort((a, b) => a.week - b.week);
       }
-      if (typeof value.cm === 'number' || typeof value.seconds === 'number') {
+      const unit = BASELINE_UNIT_KEYS.find((u) => typeof value[u] === 'number');
+      if (unit) {
         baselines[key] = value;
+        // Every re-check of the same measurement, oldest first, in the unit the
+        // current value uses. A strength-tone athlete has no 3RM, so this is
+        // the trend the Stats view draws for the pull-up path and the plank.
+        baselineTrend[key] = {
+          unit,
+          points: [...history, { week: value.testedWeek, [unit]: value[unit] }]
+            .filter((p) => typeof p[unit] === 'number')
+            .map((p) => ({ week: p.week, value: p[unit] }))
+            .sort((a, b) => a.week - b.week),
+        };
       }
     }
 
     const pace = paceFor(profile, sequenceState(profileId), localToday);
-    return { profileId, weeks, maxTrend, baselines, maxes, pace };
+    return {
+      profileId,
+      program: programOf(profile),
+      weeks,
+      maxTrend,
+      loadTrend: workingLoadTrend(profileId),
+      baselines,
+      baselineTrend,
+      maxes,
+      pace,
+    };
+  }
+
+  /**
+   * Heaviest working set per exercise per week, in kilograms.
+   *
+   * The strength-tone program never estimates a 1RM, so progress is the load
+   * actually lifted for its prescribed reps. Only kg and kg_total_pair loads
+   * count: a machine pin or a band is not a weight that can be compared week to
+   * week, and a ramp's top set is a test, not a working set. A tie on load goes
+   * to the set with more reps. Computed for every program; the cycling view
+   * simply does not draw it.
+   */
+  function workingLoadTrend(profileId) {
+    const trend = {};
+    for (let week = 1; week <= PROGRAM_WEEKS; week += 1) {
+      const meta = readJson(at(profileId, 'weeks', `W${week}.json`), null);
+      if (!meta || !Array.isArray(meta.days)) continue;
+      const best = {};
+      for (const day of meta.days) {
+        const log = readLog(profileId, week, day.day);
+        if (!log) continue;
+        const items = new Map((day.items || []).map((i) => [i.id, i]));
+        for (const entry of log.entries) {
+          const item = items.get(entry.itemId);
+          if (!item || item.isRamp || item.isBaseline) continue;
+          if (!TONNAGE_TYPES.has(item.loadType) || !TONNAGE_RESULTS.has(item.resultType)) continue;
+          if (typeof entry.load !== 'number' || typeof entry.reps !== 'number' || entry.reps <= 0) continue;
+          const key = item.exerciseKey;
+          const prev = best[key];
+          if (!prev || entry.load > prev.load || (entry.load === prev.load && entry.reps > prev.reps)) {
+            best[key] = { load: entry.load, reps: entry.reps, label: item.label, loadType: item.loadType };
+          }
+        }
+      }
+      for (const [key, point] of Object.entries(best)) {
+        if (!trend[key]) trend[key] = { label: point.label, loadType: point.loadType, points: [] };
+        trend[key].points.push({ week, load: point.load, reps: point.reps });
+      }
+    }
+    return trend;
   }
 
   function writeAssessment(profileId, week, day, body) {
