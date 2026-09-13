@@ -273,6 +273,10 @@ function createGymStore(dataRoot) {
     if (typeof prev.threeRm === 'number') { point.threeRm = prev.threeRm; point.e1rm = prev.e1rm; }
     if (typeof prev.cm === 'number') point.cm = prev.cm;
     if (typeof prev.seconds === 'number') point.seconds = prev.seconds;
+    // A bodyweight rep count is a tested result like any other, and it is the
+    // only record that an athlete who ends up with a real 3RM started without
+    // one. Archiving it is what lets the trend span both measures.
+    if (typeof prev.bodyweightReps === 'number') point.bodyweightReps = prev.bodyweightReps;
     if (Object.keys(point).length === 1) return history;   // nothing worth keeping
     history.push(point);
     return history;
