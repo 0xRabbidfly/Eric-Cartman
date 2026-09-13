@@ -1097,44 +1097,54 @@ def pass_zeitgeist(vault: dict, api_key: str) -> str:
     # Last week's read, for continuity
     previous = last_report_section(now, "Zeitgeist")
     prev_block = (
-        "=== LAST WEEK'S ZEITGEIST (for comparison — do not repeat it) ===\n" + previous + "\n\n"
+        "=== YOUR ESSAY FROM LAST WEEK (your prior position; build on it or revise it, don't recap it) ===\n"
+        + previous + "\n\n"
         if previous else ""
+    )
+    faded_block = (
+        f"Topics that were active 4-6 weeks ago and have gone quiet (tag, then → now): {', '.join(faded[:6])}. "
+        "Use this only if it tells you something about the main argument; otherwise ignore it.\n\n"
+        if faded else ""
     )
 
     prompt = (
-        "You are analyzing a researcher's note collection from the last 2 weeks. "
-        "Synthesize the zeitgeist — what the collective voice of these sources is saying.\n\n"
-        "Produce 4-5 paragraphs, each starting with a short bold lead-in, covering:\n"
-        "1. The dominant tension pair (e.g., 'speed vs safety') — what opposing forces are at play\n"
-        "2. What everyone is talking about — the convergent themes\n"
-        "3. What has gone quiet — these topics were active 4-6 weeks ago and have faded "
-        f"(tag, mentions then → now): {', '.join(faded[:6]) if faded else 'none detected'}. "
-        "Say whether each faded because it resolved, got absorbed into something bigger, or was just a spike.\n"
-        "4. The overall mood/direction — optimistic, cautious, fragmented, etc.\n"
-        + ("5. What shifted since last week — compare against last week's zeitgeist below: which tension "
-           "moved, what new entered, what last week's read got wrong or right in hindsight. Be specific.\n"
-           if previous else "")
-        + "\nGround claims in the notes given: name sources and dates. "
-        "Write in an analytical but engaging style. No bullet points, just prose.\n\n"
+        "You are writing the weekly Zeitgeist essay for a researcher's private vault. The reader has "
+        "already seen the raw material below — they do not need it summarised back to them. What they "
+        "want is thinking: what does this fortnight actually mean, and what should they believe "
+        "differently because of it?\n\n"
+        "Write an ESSAY of roughly 500-700 words:\n"
+        "- Open with one bold sentence stating the fortnight's central idea — a claim, not a topic.\n"
+        "- Then 3-4 paragraphs of continuous argument developing ONE or at most TWO ideas. Choose the "
+        "questions the week genuinely forces, and reason about them: what follows if this is true, what "
+        "would have to be true for it to be wrong, where the second-order effects land, what it changes "
+        "about how the reader should act or think. Depth over coverage.\n"
+        "- Close with one open question worth sitting with for the coming week.\n\n"
+        "Rules of the form:\n"
+        "- This is not an audit. Do NOT inventory the week, enumerate items, or walk through sources. "
+        "If a paragraph reads as 'X said A, then Y said B, then Z reported C', it is wrong — rewrite it "
+        "as an argument.\n"
+        "- Attribute sparingly. Name a person only when their specific claim carries the argument; "
+        "aim for no more than 5 attributions in the whole essay, and never inline dates.\n"
+        "- No bullet points, no per-paragraph headers or bold lead-ins after the opening sentence, no "
+        "'what everyone is talking about' / 'the mood is' scaffolding.\n"
+        "- Leave out whatever doesn't serve the central idea, however interesting. Anything you drop is "
+        "still in the vault.\n"
+        + ("- Last week's essay is your own prior position. Where this week changes it, say so inside "
+           "the argument — one or two sentences — not as a separate section.\n" if previous else "")
+        + "\n" + faded_block
         + prev_block
-        + f"=== RECENT NOTES ({len(note_summaries)}) ===\n"
+        + f"=== RAW MATERIAL: recent notes ({len(note_summaries)}) ===\n"
         + "\n".join(note_summaries)
     )
 
-    result = claude_chat(
-        "You are an intellectual trends analyst synthesizing research notes into a zeitgeist narrative.",
-        prompt,
-    )
+    system = ("You are an essayist and analyst. You think in arguments, not lists. You would rather say "
+              "one thing that changes the reader's mind than ten things they already know.")
+    result = claude_chat(system, prompt)
     if result is None:
-        result = xai_chat(
-            api_key,
-            "You are an intellectual trends analyst synthesizing research notes into a zeitgeist narrative.",
-            prompt,
-            effort="high",
-        )
+        result = xai_chat(api_key, system, prompt, effort="high")
     else:
         print("  [claude] Used for zeitgeist synthesis")
-    return result + "\n"
+    return (result or "_Zeitgeist synthesis failed._").strip() + "\n"
 
 
 # ---------------------------------------------------------------------------
