@@ -1787,17 +1787,30 @@
       const trend = Object.entries(LIFT_NAMES).map(([key, name]) => {
         const points = data.maxTrend[key];
         if (!points || !points.length) {
+          // No tested 3RM — but a pull-up ramp that never cleared a triple
+          // still produced a real measurement, max clean bodyweight reps, and
+          // "not tested yet" misreports it. Still dimmed: not a loaded max.
+          const entry = (data.maxes && data.maxes[key]) || {};
+          const reps = entry.bodyweightReps;
+          const mid = typeof reps === 'number'
+            ? `${reps} strict rep${reps === 1 ? '' : 's'}${entry.testedWeek ? ` · W${entry.testedWeek}` : ''}`
+            : 'not tested yet';
           return `<div class="gym-statrow dim"><div class="sr-label" style="width:auto">${name}</div>
-                  <div class="sr-label">not tested yet</div><div class="sr-value">—</div></div>`;
+                  <div class="sr-label">${mid}</div><div class="sr-value">—</div></div>`;
         }
         const latest = points[points.length - 1];
-        const first = points[0];
-        const delta = latest.e1rm - first.e1rm;
+        // Only points carrying a numeric e1rm can form a delta. A history point
+        // may be a bodyweight rep count, which has no estimated 1RM to subtract
+        // — differencing against it renders NaN. Fewer than two, omit the
+        // clause entirely, the same as the single-point case always did.
+        const measured = points.filter(p => typeof p.e1rm === 'number');
+        const showDelta = measured.length > 1;
+        const delta = showDelta ? latest.e1rm - measured[0].e1rm : 0;
         const sign = delta > 0 ? '+' : '';
         return `<div class="gym-statrow">
           <div class="sr-label" style="width:auto">${name}</div>
           <div class="sr-label">3RM ${latest.threeRm} · W${latest.testedWeek || latest.week}${
-            points.length > 1 ? ` · ${sign}${delta.toFixed(1)} kg` : ''}</div>
+            showDelta ? ` · ${sign}${delta.toFixed(1)} kg` : ''}</div>
           <div class="sr-value">${latest.e1rm} kg</div>
         </div>`;
       }).join('');
