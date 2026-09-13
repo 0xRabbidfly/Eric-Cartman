@@ -229,6 +229,25 @@ function createGymStore(dataRoot) {
       .reduce((best, e) => (best === null || e.load > best.load ? e : best), null);
   }
 
+  /**
+   * Best rep count logged with no added load.
+   *
+   * Week 1 tells an athlete who cannot do five strict pull-ups to log max clean
+   * bodyweight reps instead of ramping to a triple. That is a real measurement —
+   * the one the progression ladder reads — so it needs somewhere to live. A
+   * max-reps set is RPE 10 by definition, so this deliberately does not apply
+   * bestCleanSet's RPE 9.5 ceiling; the ceiling exists to keep a grinding triple
+   * out of a 3RM, which is a different question.
+   */
+  function bestBodyweightReps(entries, item) {
+    return entries
+      .filter((e) => e.itemId === item.id)
+      .filter((e) => e.load === 0)
+      .map((e) => e.reps)
+      .filter((v) => typeof v === 'number')
+      .reduce((best, v) => (best === null || v > best ? v : best), null);
+  }
+
   /** Best result on a baseline item — the longest hold, the furthest jump, the tallest box. */
   function bestResult(entries, item) {
     return entries
@@ -276,9 +295,32 @@ function createGymStore(dataRoot) {
     for (const item of dayItems(profileId, week, day)) {
       if (item.isRamp) {
         const best = bestCleanSet(log.entries, item);
-        if (!best) continue;
+        if (!best) {
+          // A bodyweight_plus_kg ramp with no clean triple is not a failed test.
+          // The week-1 prescription anticipates it and asks for max clean
+          // bodyweight reps instead, so keep that count. threeRm stays null —
+          // there is still no tested 3RM — but the athlete is no longer
+          // invisible to the generator, which now has a number to progress from.
+          const reps = item.loadType === 'bodyweight_plus_kg'
+            ? bestBodyweightReps(log.entries, item)
+            : null;
+          if (reps === null) continue;
+          const prev = maxes[item.exerciseKey] || {};
+          maxes[item.exerciseKey] = {
+            ...prev,
+            history: archiveMax(prev, week),
+            threeRm: null,
+            loadType: item.loadType,
+            e1rm: null,
+            bodyweightReps: reps,
+            testedWeek: week,
+            testedOn,
+          };
+          changed = true;
+          continue;
+        }
         const prev = maxes[item.exerciseKey] || {};
-        maxes[item.exerciseKey] = {
+        const entry = {
           ...prev,
           history: archiveMax(prev, week),
           threeRm: best.load,
@@ -287,6 +329,10 @@ function createGymStore(dataRoot) {
           testedWeek: week,
           testedOn,
         };
+        // A tested triple supersedes the bodyweight rep count: leaving a stale
+        // one behind would keep the progression ladder on the assisted rung.
+        delete entry.bodyweightReps;
+        maxes[item.exerciseKey] = entry;
         changed = true;
         continue;
       }

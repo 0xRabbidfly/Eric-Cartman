@@ -662,3 +662,67 @@ test('estimateOneRm rounds a half-way case up, the way gymlib.py does', () => {
   // with the Stats view, which shows whatever this function wrote.
   assert.equal(createGymStore(fixture()).estimateOneRm(18.75), 20.3);
 });
+
+/**
+ * Week 1 tells an athlete who cannot do five strict pull-ups to log max clean
+ * bodyweight reps instead of ramping. Until now that number had nowhere to go:
+ * the ramp found no clean triple, recomputeMaxes wrote nothing, and the entry
+ * sat at `threeRm: null` forever with no record of what the athlete could do.
+ */
+function pullUpFixture() {
+  const root = fixture();
+  const file = path.join(root, 'athlete-b', 'weeks', 'W1.json');
+  const week = JSON.parse(fs.readFileSync(file, 'utf8'));
+  for (const day of week.days) {
+    day.items.push({
+      id: 'c-pull-up-weighted', block: 'C', exerciseKey: 'pull-up-weighted',
+      label: 'Weighted pull-up — 3RM ramp', sets: 4, reps: 3, resultType: 'reps',
+      loadType: 'bodyweight_plus_kg', targetLoad: null, targetPct: null,
+      loadNote: 'If you cannot do 5 clean bodyweight pull-ups, log max clean reps instead.',
+      targetRpe: 9.5, restSec: 120, isRamp: true, isBaseline: false,
+      setsAreOptional: true, pairedWith: null,
+    });
+  }
+  fs.writeFileSync(file, JSON.stringify(week), 'utf8');
+  return root;
+}
+
+test('a pull-up ramp that clears three reps sets a 3RM and clears any bodyweightReps', () => {
+  const root = pullUpFixture();
+  const store = createGymStore(root);
+  store._writeJson(path.join(root, 'athlete-b', 'maxes.json'), {
+    'pull-up-weighted': {
+      threeRm: null, loadType: 'bodyweight_plus_kg', e1rm: null,
+      bodyweightReps: 2, testedWeek: null, testedOn: null, note: '', watch: false,
+    },
+  });
+  store.saveSession('athlete-b', 1, 2, {
+    entries: [
+      { itemId: 'c-pull-up-weighted', set: 1, load: 0, loadType: 'bodyweight_plus_kg', reps: 3, rpe: 8, note: '' },
+      { itemId: 'c-pull-up-weighted', set: 2, load: 5, loadType: 'bodyweight_plus_kg', reps: 3, rpe: 9, note: '' },
+    ],
+  });
+  const { maxes } = store.finishSession('athlete-b', 1, 2, new Date('2026-09-12T19:00:00Z'));
+  assert.equal(maxes['pull-up-weighted'].threeRm, 5);
+  assert.equal(maxes['pull-up-weighted'].e1rm, 5.4);
+  assert.equal('bodyweightReps' in maxes['pull-up-weighted'], false);
+});
+
+test('a pull-up ramp that never clears three records the best bodyweight rep count', () => {
+  const root = pullUpFixture();
+  const store = createGymStore(root);
+  store.saveSession('athlete-b', 1, 2, {
+    entries: [
+      { itemId: 'c-pull-up-weighted', set: 1, load: 0, loadType: 'bodyweight_plus_kg', reps: 2, rpe: 10, note: '' },
+      { itemId: 'c-pull-up-weighted', set: 2, load: 0, loadType: 'bodyweight_plus_kg', reps: 2, rpe: 10, note: '' },
+      { itemId: 'c-pull-up-weighted', set: 3, load: 0, loadType: 'bodyweight_plus_kg', reps: 1, rpe: 10, note: '' },
+      { itemId: 'c-pull-up-weighted', set: 4, load: 0, loadType: 'bodyweight_plus_kg', reps: 1, rpe: 10, note: '' },
+    ],
+  });
+  const { maxes } = store.finishSession('athlete-b', 1, 2, new Date('2026-09-12T19:00:00Z'));
+  assert.equal(maxes['pull-up-weighted'].bodyweightReps, 2);
+  assert.equal(maxes['pull-up-weighted'].threeRm, null);
+  assert.equal(maxes['pull-up-weighted'].e1rm, null);
+  assert.equal(maxes['pull-up-weighted'].testedWeek, 1);
+  assert.equal(maxes['pull-up-weighted'].testedOn, '2026-09-12');
+});
