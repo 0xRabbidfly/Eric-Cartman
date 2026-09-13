@@ -364,6 +364,9 @@ def _claude_classify(prompt: str) -> dict | None:
             content = re.sub(r"\s*```$", "", content)
         parsed = json.loads(content)
         print("[claude] ", end="")
+        # Claude CLI runs on the Max subscription: no per-call charge.
+        parsed["_engine"] = "claude-cli"
+        parsed["_cost_usd"] = 0.0
         return parsed
     except Exception:
         return None
@@ -422,6 +425,10 @@ Return JSON only, no other text: {{"relationship": "supports|contradicts|extends
             content = re.sub(r"^```(?:json)?\s*", "", content)
             content = re.sub(r"\s*```$", "", content)
         result = json.loads(content)
+        # xAI returns the exact charge as cost_in_usd_ticks (1 tick = 1e-10 USD).
+        result["_engine"] = MODEL
+        ticks = (body.get("usage") or {}).get("cost_in_usd_ticks")
+        result["_cost_usd"] = (ticks / 10_000_000_000) if ticks else None
         return result
     except (urllib.error.URLError, json.JSONDecodeError, KeyError, IndexError) as e:
         print(f"  WARNING: API call failed: {e}")
@@ -664,8 +671,16 @@ def detect_connections(
         relationship = result.get("relationship", "unrelated")
         confidence = float(result.get("confidence", 0.0))
         explanation = result.get("explanation", "")
+        engine = result.get("_engine", "unknown")
+        call_cost = result.get("_cost_usd")
 
         if relationship == "unrelated" or confidence < CONFIDENCE_THRESHOLD:
+            # Rejected pairs still cost money — bank it against the run so the
+            # weekly cost report reflects calls made, not connections kept.
+            data.setdefault("run_costs", []).append({
+                "at": datetime.now(timezone.utc).isoformat(),
+                "engine": engine, "cost_usd": call_cost, "kept": False,
+            })
             print(f"{relationship} ({confidence:.0%}) - skipped")
             continue
 
@@ -678,10 +693,18 @@ def detect_connections(
             "confidence": confidence,
             "explanation": explanation,
             "detected_at": datetime.now(timezone.utc).isoformat(),
+            "engine": engine,
+            "cost_usd": call_cost,
         }
         data["connections"].append(connection)
         new_connections.append(connection)
+        data.setdefault("run_costs", []).append({
+            "at": connection["detected_at"],
+            "engine": engine, "cost_usd": call_cost, "kept": True,
+        })
 
+    if data.get("run_costs"):
+        save_connections(data)
     if new_connections:
         save_connections(data)
         print(f"  Saved {len(new_connections)} new connections")
