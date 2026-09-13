@@ -713,6 +713,43 @@
     .gym-day .gd-title { font-weight: 600; font-size: 14px; }
     .gym-day .gd-meta { font-size: 11.5px; color: var(--text-dim); margin-top: 3px; }
     .gym-day .gd-chev { color: var(--text-dim); font-size: 18px; }
+    /* Sessions go in order: the next one is the primary action, later ones wait. */
+    .gym-day.upnext { border-color: var(--accent); background: var(--accent-soft); }
+    .gym-day.upnext:not(.partial) .gd-num { background: var(--accent); color: #fff; }
+    .gym-day.upnext .gd-meta { color: var(--text); }
+    .gym-day .gd-go {
+      flex-shrink: 0; padding: 6px 12px; border-radius: 8px;
+      background: var(--accent); color: #fff; font-size: 12px; font-weight: 700;
+    }
+    .gym-day.locked { opacity: .45; }
+    .gym-day .gd-lock { font-size: 13px; }
+    .gym-tracker {
+      margin: 0 16px 10px; padding: 10px 12px;
+      background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    }
+    .gym-tracker .gt-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+    .gym-tracker .gt-title { font-weight: 700; font-size: 14px; }
+    .gym-tracker .gt-count { font-size: 11px; color: var(--text-dim); font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .gym-tracker .gt-bar {
+      position: relative; height: 8px; margin: 9px 0 8px;
+      border-radius: 4px; background: var(--surface2);
+    }
+    .gym-tracker .gt-fill {
+      position: absolute; left: 0; top: 0; bottom: 0;
+      background: var(--accent); border-radius: 4px;
+    }
+    .gym-tracker .gt-mark {
+      position: absolute; top: -4px; bottom: -4px; width: 2px; margin-left: -1px;
+      background: var(--text); border-radius: 1px;
+    }
+    .gym-tracker .gt-sub { font-size: 11.5px; color: var(--text-dim); line-height: 1.45; }
+    .gym-tracker .gt-other { font-size: 11px; color: var(--text-dim); margin-top: 4px; opacity: .8; }
+    .gym-locked-note {
+      margin: 0 16px 10px; padding: 9px 11px;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 10px; font-size: 12px; line-height: 1.45; color: var(--text-dim);
+    }
+    .gym-pace { font-size: 12.5px; line-height: 1.5; }
     .gym-empty { text-align: center; color: var(--text-dim); padding: 40px 20px; font-size: 13px; }
     .gym-back {
       display: inline-flex; align-items: center; gap: 6px;
@@ -1265,7 +1302,7 @@
         renderGymProfileSeg();
         const me = gym.profiles.find(p => p.id === gym.profileId);
         gym.currentWeek = me ? me.currentWeek : 1;
-        gym.week = Math.min(gym.currentWeek, 12);
+        gym.week = gymStartWeek(me);
         await loadGymWeek(gym.week);
       } catch (e) {
         document.getElementById('gymScroll').innerHTML =
@@ -1287,10 +1324,32 @@
       localStorage.setItem('gym_profile', id);
       const me = gym.profiles.find(p => p.id === id);
       gym.currentWeek = me ? me.currentWeek : 1;
-      gym.week = Math.min(gym.currentWeek, 12);
+      gym.week = gymStartWeek(me);
       renderGymProfileSeg();
       if (gym.view === 'week') await loadGymWeek(gym.week);
       else setGymView(gym.view);
+    }
+
+    // Position in the program follows the sessions done, not the calendar: the
+    // week holding the next session, or the last week once all 36 are done.
+    const GYM_SESSIONS = 36;
+    function gymStartWeek(profile) {
+      if (!profile) return 1;
+      return profile.nextSession ? profile.nextSession.week : 12;
+    }
+
+    // The session before this one in program order. Finishing it unlocks this one.
+    function gymPrevSession(week, day) {
+      return day > 1 ? { week, day: day - 1 } : { week: week - 1, day: 3 };
+    }
+
+    // Quietly re-read both athletes' positions. A finish moves the next session
+    // and the tracker, and the Week tab should show that on the way back.
+    async function gymRefreshProfiles() {
+      try {
+        const data = await api('/api/gym/profiles');
+        if (data.enabled) gym.profiles = data.profiles || [];
+      } catch { /* keep the last numbers rather than blanking the tracker */ }
     }
 
     async function loadGymWeek(n, force) {
@@ -1299,7 +1358,11 @@
       const scroll = document.getElementById('gymScroll');
       if (force || !gym.weekData) scroll.innerHTML = '<div class="gym-empty">Loading…</div>';
       try {
-        gym.weekData = await api(`/api/gym/week/${gym.week}?profile=${encodeURIComponent(gym.profileId)}`);
+        const [weekData] = await Promise.all([
+          api(`/api/gym/week/${gym.week}?profile=${encodeURIComponent(gym.profileId)}`),
+          force ? gymRefreshProfiles() : Promise.resolve(),
+        ]);
+        gym.weekData = weekData;
         renderGymWeek();
       } catch (e) {
         scroll.innerHTML = `<div class="gym-empty">${escHtml(e.message)}</div>`;
@@ -1309,15 +1372,77 @@
     const GYM_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     function gymShortDate(iso) {
       const d = new Date(`${iso}T00:00:00Z`);
-      return `${GYM_MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}`;
+      return `${d.getUTCDate()} ${GYM_MONTHS[d.getUTCMonth()]}`;
+    }
+
+    // Adds the year only when the two dates being compared fall in different years.
+    function gymFinishDate(iso, other) {
+      const year = iso.slice(0, 4);
+      return other && other.slice(0, 4) !== year ? `${gymShortDate(iso)} ${year}` : gymShortDate(iso);
+    }
+
+    function gymPaceHeadline(pace) {
+      if (pace.sessionsDone >= GYM_SESSIONS) return `All ${GYM_SESSIONS} sessions done`;
+      const n = Math.abs(pace.delta);
+      const count = `${n} session${n === 1 ? '' : 's'}`;
+      if (pace.delta === 0) return 'On plan';
+      if (pace.delta > 0) return `${count} ahead`;
+      if (n < 3) return `${count} behind`;
+      return `${count} behind, about ${pace.behindWeeks} week${pace.behindWeeks === 1 ? '' : 's'}`;
+    }
+
+    function gymProjection(pace) {
+      if (!pace.projectedFinish || pace.sessionsDone >= GYM_SESSIONS) return '';
+      return `finishing ${gymFinishDate(pace.projectedFinish, pace.plannedFinish)} at this pace, `
+           + `planned ${gymFinishDate(pace.plannedFinish, pace.projectedFinish)}`;
+    }
+
+    // How far the selected athlete is from the plan, with the other athlete in
+    // one line. The bar fills to sessions done; the marker is where the plan
+    // expects them, counting only calendar weeks that have already ended.
+    function renderGymTracker() {
+      const me = gym.profiles.find(p => p.id === gym.profileId);
+      const pace = me && me.pace;
+      if (!pace) return '';
+      const donePct = Math.min(100, (pace.sessionsDone / GYM_SESSIONS) * 100);
+      const planPct = Math.min(100, (pace.expectedByNow / GYM_SESSIONS) * 100);
+      const thisWeek = `This week ${pace.thisWeekDone}${pace.thisWeekDone <= 3 ? ' of 3' : ''}`;
+      const projection = gymProjection(pace);
+      const sub = projection ? `${thisWeek} · ${projection}` : thisWeek;
+      const others = gym.profiles
+        .filter(p => p.id !== gym.profileId && p.pace)
+        .map(p => {
+          const h = gymPaceHeadline(p.pace);
+          return `${escHtml(p.name)}: ${escHtml(h.charAt(0).toLowerCase() + h.slice(1))}`;
+        })
+        .join(' · ');
+      return `
+        <div class="gym-tracker">
+          <div class="gt-head">
+            <span class="gt-title">${escHtml(gymPaceHeadline(pace))}</span>
+            <span class="gt-count">${pace.sessionsDone} of ${GYM_SESSIONS} done</span>
+          </div>
+          <div class="gt-bar" title="Filled to sessions done. The line is where the plan expects you by now.">
+            <span class="gt-fill" style="width:${donePct}%"></span>
+            <span class="gt-mark" style="left:${planPct}%"></span>
+          </div>
+          <div class="gt-sub">${escHtml(sub)}</div>
+          ${others ? `<div class="gt-other">${others}</div>` : ''}
+        </div>`;
     }
 
     function renderGymWeek() {
       gym.showing = 'week';
       const w = gym.weekData;
       if (!w) return;
-      const bounds = `${gymShortDate(w.bounds.start)} – ${gymShortDate(w.bounds.end)}`;
-      const isNow = w.week === gym.currentWeek;
+
+      // When the week's sessions actually happened, not its calendar dates.
+      const total = w.days.length;
+      const doneCount = w.days.filter(d => d.performedOn).length;
+      const span = !w.span ? 'Not started'
+        : doneCount < total ? `Started ${gymShortDate(w.span.first)} · ${doneCount} of ${total} done`
+        : w.span.first === w.span.last ? `All ${total} done ${gymShortDate(w.span.first)}`
+        : `${gymShortDate(w.span.first)} to ${gymShortDate(w.span.last)} · all ${total} done`;
 
       const banner = w.loadsResolved ? '' : `
         <div class="gym-banner">Loads for this week are not set yet. They are
@@ -1325,14 +1450,26 @@
         You can still log whatever you lift.</div>`;
 
       const days = w.days.map(d => {
-        const cls = d.logStatus === 'complete' ? 'done'
-                  : d.logStatus === 'in_progress' ? 'partial' : '';
         const sets = `${d.loggedSets} set${d.loggedSets === 1 ? '' : 's'} logged`;
-        const meta = d.logStatus === 'complete'
-          ? `Done ${gymShortDate(d.performedOn)} · ${sets}`
-          : d.logStatus === 'in_progress'
-            ? `In progress · ${sets}`
-            : `${d.estMinutes} min · ${d.items.length} exercises`;
+        const plan = `${d.estMinutes} min · ${d.items.length} exercises`;
+        let cls = '', meta = plan, tail = '<div class="gd-chev">›</div>';
+        if (d.logStatus === 'complete') {
+          cls = 'done';
+          meta = `Done ${gymShortDate(d.performedOn)} · ${sets}`;
+        } else if (d.locked) {
+          const prev = gymPrevSession(w.week, d.day);
+          cls = 'locked';
+          meta = `Unlocks after W${prev.week} D${prev.day}`;
+          tail = '<div class="gd-lock">🔒</div>';
+        } else if (d.logStatus === 'in_progress') {
+          cls = d.upNext ? 'partial upnext' : 'partial';
+          meta = `In progress · ${sets}`;
+          if (d.upNext) tail = '<div class="gd-go">Continue</div>';
+        } else if (d.upNext) {
+          cls = 'upnext';
+          meta = `Up next · ${plan}`;
+          tail = '<div class="gd-go">Start</div>';
+        }
         return `
           <div class="gym-day ${cls}" onclick="openGymSession(${w.week}, ${d.day})">
             <div class="gd-num">D${d.day}</div>
@@ -1340,16 +1477,17 @@
               <div class="gd-title">${escHtml(d.title)}</div>
               <div class="gd-meta">${escHtml(meta)}</div>
             </div>
-            <div class="gd-chev">›</div>
+            ${tail}
           </div>`;
       }).join('');
 
       document.getElementById('gymScroll').innerHTML = `
+        ${renderGymTracker()}
         <div class="gym-weekbar">
           <button onclick="loadGymWeek(${w.week - 1})" ${w.week <= 1 ? 'disabled' : ''}>‹</button>
           <div class="gw-label">
             <div class="gw-title">W${w.week} · ${escHtml(w.blockLabel)}</div>
-            <div class="gw-sub">${bounds}${isNow ? ' · this week' : ''}</div>
+            <div class="gw-sub">${escHtml(span)}</div>
           </div>
           <button onclick="loadGymWeek(${w.week + 1})" ${w.week >= 12 ? 'disabled' : ''}>›</button>
         </div>
@@ -1452,6 +1590,14 @@
       gym.showing = 'session';
       const s = gymSession.data;
       const done = s.log.status === 'complete';
+      // A session past the next one opens as a preview: same prescription, no
+      // inputs, no Finish. The server would refuse the write anyway.
+      const locked = !done && !!s.locked;
+      const readOnly = done || locked;
+      const prev = gymPrevSession(gymSession.week, gymSession.day);
+      const lockedNote = locked
+        ? `<div class="gym-locked-note">${escHtml(`Unlocks after W${prev.week} D${prev.day}. Sessions go in order, so this one is read-only until then.`)}</div>`
+        : '';
 
       const items = s.day.items.map(item => {
         const rows = [];
@@ -1463,13 +1609,13 @@
             <div class="gym-setrow">
               <div class="sr-n">${n}</div>
               <input inputmode="decimal" placeholder="${escHtml(gymLoadPlaceholder(item))}"
-                     class="${filled(e.load)}" value="${val(e.load)}" ${done ? 'disabled' : ''}
+                     class="${filled(e.load)}" value="${val(e.load)}" ${readOnly ? 'disabled' : ''}
                      onchange="gymSetInput('${escJsAttr(item.id)}', ${n}, 'load', this.value, this)">
               <input inputmode="numeric" placeholder="${escHtml(gymResultPlaceholder(item))}"
-                     class="${filled(e.reps)}" value="${val(e.reps)}" ${done ? 'disabled' : ''}
+                     class="${filled(e.reps)}" value="${val(e.reps)}" ${readOnly ? 'disabled' : ''}
                      onchange="gymSetInput('${escJsAttr(item.id)}', ${n}, 'reps', this.value, this)">
               <input inputmode="decimal" placeholder="RPE"
-                     class="${filled(e.rpe)}" value="${val(e.rpe)}" ${done ? 'disabled' : ''}
+                     class="${filled(e.rpe)}" value="${val(e.rpe)}" ${readOnly ? 'disabled' : ''}
                      onchange="gymSetInput('${escJsAttr(item.id)}', ${n}, 'rpe', this.value, this)">
             </div>`);
         }
@@ -1478,7 +1624,7 @@
           ? ` · then ${item.pairedWith.reps} ${item.pairedWith.exerciseKey.replace(/-/g, ' ')} within ${item.pairedWith.withinSec}s`
           : '';
         const rpe = item.targetRpe ? ` · RPE ${item.targetRpe}` : '';
-        const ctl = (item.setsAreOptional && !done) ? `
+        const ctl = (item.setsAreOptional && !readOnly) ? `
           <div class="gym-setctl">
             <button onclick="gymAddSet('${escJsAttr(item.id)}')">+ set</button>
             <button onclick="gymRemoveSet('${escJsAttr(item.id)}')">− set</button>
@@ -1517,15 +1663,17 @@
             <div class="gw-sub">${s.day.estMinutes} min · ${escHtml(s.week.blockLabel)}${done ? ` · done ${gymShortDate(s.log.performedOn)}` : ''}</div>
           </div>
         </div>
+        ${lockedNote}
         <div class="gym-warmup"><b>Warm-up</b> · ${s.day.warmup.map(escHtml).join(' · ')}</div>
         ${items}
         <textarea class="gym-notes" placeholder="Day notes — sleep, ride load, anything sore"
-                  ${done ? 'disabled' : ''}
+                  ${readOnly ? 'disabled' : ''}
                   onchange="gymSetNotes(this.value)">${escHtml(gymSession.dayNotes)}</textarea>
-        ${done
-          ? `<button class="gym-back" onclick="reopenGymSession()">Reopen to correct a number</button>`
-          : `<button class="gym-finish" onclick="finishGymWorkout()">Finish workout</button>`}
-        ${assessment}`;
+        ${locked ? ''
+          : done
+            ? `<button class="gym-back" onclick="reopenGymSession()">Reopen to correct a number</button>`
+            : `<button class="gym-finish" onclick="finishGymWorkout()">Finish workout</button>`}
+        ${locked ? '' : assessment}`;
     }
 
     function gymCollectEntries() {
@@ -1848,7 +1996,19 @@
                 <div></div><div class="sr-value">${shown}</div></div>`;
       }).join('') || '<div class="gym-empty">Recorded on day 3 of a test week.</div>';
 
+      const pace = data.pace;
+      const paceLine = !pace ? ''
+        : pace.sessionsDone >= GYM_SESSIONS
+          ? `All ${GYM_SESSIONS} sessions done, the last on ${gymFinishDate(pace.projectedFinish, pace.plannedFinish)}. Planned finish was ${gymFinishDate(pace.plannedFinish, pace.projectedFinish)}.`
+        : pace.sessionsDone === 0
+          ? `No sessions done yet. Planned finish ${gymShortDate(pace.plannedFinish)}.`
+          : `${pace.sessionsPerWeek.toFixed(1)} sessions a week so far, ${gymProjection(pace)}.`;
+      const paceCard = paceLine
+        ? `<div class="gym-statcard"><h3>Pace</h3><div class="gym-pace">${escHtml(paceLine)}</div></div>`
+        : '';
+
       scroll.innerHTML = `
+        ${paceCard}
         <div class="gym-statcard"><h3>Estimated 1RM</h3>${trend}</div>
         <div class="gym-statcard"><h3>Weekly tonnage</h3>${weeks}</div>
         <div class="gym-statcard"><h3>Sessions and average RPE</h3>${adherence}</div>

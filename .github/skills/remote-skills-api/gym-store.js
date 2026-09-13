@@ -11,7 +11,10 @@ const fs = require('fs');
 const path = require('path');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+const WEEK_MS = 7 * DAY_MS;
 const PROGRAM_WEEKS = 12;
+const SESSIONS_PER_WEEK = 3;
+const PROGRAM_SESSIONS = PROGRAM_WEEKS * SESSIONS_PER_WEEK;
 
 function fail(code, message) {
   const err = new Error(message);
@@ -106,41 +109,185 @@ function createGymStore(dataRoot) {
     return profile;
   }
 
-  /** Calendar weeks elapsed since the start Monday, 1-based. PROGRAM_WEEKS+1 means maintenance. */
-  function currentWeekFor(startDate, today = new Date()) {
-    const parsed = new Date(`${startDate}T00:00:00Z`);
-    if (Number.isNaN(parsed.getTime())) {
-      throw fail('gym_data_corrupt', `profiles.json has an unusable startDate: ${JSON.stringify(startDate)}`);
-    }
-    const start = mondayOf(parsed);
-    const elapsed = Math.floor((mondayOf(today) - start) / (7 * DAY_MS));
-    return Math.min(Math.max(elapsed + 1, 1), PROGRAM_WEEKS + 1);
+  function readLog(profileId, week, day) {
+    return readJson(at(profileId, 'logs', `W${week}D${day}.json`), null);
   }
 
-  function weekBounds(startDate, week) {
-    const startMs = new Date(`${startDate}T00:00:00Z`).getTime();
-    if (Number.isNaN(startMs)) {
-      throw fail('gym_data_corrupt', `profiles.json has an unusable startDate: ${JSON.stringify(startDate)}`);
-    }
-    const start = mondayOf(new Date(startMs)) + (week - 1) * 7 * DAY_MS;
-    return { start: isoDate(start), end: isoDate(start + 6 * DAY_MS) };
+  // ── Program position ──
+  //
+  // Position in the program is by session sequence, never by calendar. The
+  // athletes often manage two sessions in a week and do the third the week
+  // after rather than skipping it, so W1 D3 stays next until it is done,
+  // however many Mondays pass. The owner chose this on 2026-09-13, replacing a
+  // calendar anchor that rolled the week over every Monday.
+
+  /** 0-based position of a session in program order: W1 D1 is 0, W12 D3 is 35. */
+  function sessionIndex(week, day) {
+    return (week - 1) * SESSIONS_PER_WEEK + (day - 1);
+  }
+
+  function sessionAt(index) {
+    return { week: Math.floor(index / SESSIONS_PER_WEEK) + 1, day: (index % SESSIONS_PER_WEEK) + 1 };
   }
 
   /**
+   * Every session that has ever been finished, and the first one that has not.
+   *
+   * Done means the log carries a performedOn date, not that its status is
+   * complete. Reopening a finished session to fix a transcribed number keeps
+   * performedOn, so it must not move the athlete backwards in the program.
+   */
+  function sequenceState(profileId) {
+    const done = new Set();
+    const performed = [];
+    for (let index = 0; index < PROGRAM_SESSIONS; index += 1) {
+      const { week, day } = sessionAt(index);
+      const log = readLog(profileId, week, day);
+      if (log && log.performedOn) {
+        done.add(index);
+        performed.push({ week, day, performedOn: log.performedOn });
+      }
+    }
+    let nextIndex = null;
+    for (let index = 0; index < PROGRAM_SESSIONS; index += 1) {
+      if (!done.has(index)) { nextIndex = index; break; }
+    }
+    return { done, performed, nextIndex, next: nextIndex === null ? null : sessionAt(nextIndex) };
+  }
+
+  /** The first `{week, day}` in program order not yet done, or null when all 36 are. */
+  function nextSession(profileId) {
+    requireProfile(profileId);
+    return sequenceState(profileId).next;
+  }
+
+  /**
+   * Any done session and the next one may be written. Anything later is locked.
+   * The routes call this; saveSession and finishSession stay free of it, so
+   * the data layer can still be exercised session by session in tests.
+   */
+  function assertInSequence(profileId, week, day) {
+    requireProfile(profileId);
+    if (!Number.isInteger(week) || week < 1 || week > PROGRAM_WEEKS) {
+      throw fail('gym_week_not_found', `Week ${week} is outside 1-${PROGRAM_WEEKS}.`);
+    }
+    if (!Number.isInteger(day) || day < 1 || day > SESSIONS_PER_WEEK) {
+      throw fail('gym_session_not_found', `Day ${day} is outside 1-${SESSIONS_PER_WEEK}.`);
+    }
+    const state = sequenceState(profileId);
+    const index = sessionIndex(week, day);
+    if (state.done.has(index) || index === state.nextIndex) return;
+    const before = sessionAt(index - 1);
+    throw fail('gym_session_out_of_sequence',
+      `W${week} D${day} unlocks after W${before.week} D${before.day}. `
+      + `Sessions go in order, and W${state.next.week} D${state.next.day} is up next.`);
+  }
+
+  function startMondayMs(profile) {
+    const parsed = new Date(`${profile.startDate}T00:00:00Z`);
+    if (Number.isNaN(parsed.getTime())) {
+      throw fail('gym_data_corrupt', `profiles.json has an unusable startDate: ${JSON.stringify(profile.startDate)}`);
+    }
+    return mondayOf(parsed);
+  }
+
+  /**
+   * How the athlete is moving through the block against the calendar.
+   *
    * `localToday` is a YYYY-MM-DD date on the athletes' calendar, injectable so
-   * tests do not depend on the machine's timezone. currentWeekFor does UTC
-   * calendar arithmetic, so the local date is handed to it as UTC midnight;
-   * passing `new Date()` would turn the week over at 8pm on Sunday in Toronto.
+   * tests never depend on the machine clock or timezone. It is handled as UTC
+   * midnight, so every day here is a whole calendar day.
+   *
+   * Pace is reported, not enforced: nothing here changes a load or the
+   * sequence. It exists so a slower block is visible as a fact.
+   */
+  function paceFor(profile, state, localToday) {
+    const startMs = startMondayMs(profile);
+    const plannedStartMs = Date.parse(`${profile.startDate}T00:00:00Z`);
+    const todayMs = Date.parse(`${localToday}T00:00:00Z`);
+    const todayMonday = mondayOf(new Date(todayMs));
+
+    const sessionsDone = state.performed.length;
+    const remainingSessions = PROGRAM_SESSIONS - sessionsDone;
+
+    // Whole days from the start Monday through today inclusive, as weeks. A
+    // fraction rather than a count, so the rate does not halve at midnight on
+    // a Monday; floored at one so the first days cannot report 21 a week.
+    const daysElapsed = Math.floor((todayMs - startMs) / DAY_MS) + 1;
+    const elapsedDays = Math.max(7, daysElapsed);
+    const calendarWeeksElapsed = elapsedDays / 7;
+    const rate = sessionsDone / calendarWeeksElapsed;
+
+    let projectedFinish = null;
+    if (remainingSessions === 0) {
+      // Finished: the block ended on its last session, not on whatever today is.
+      projectedFinish = state.performed.map((s) => s.performedOn).sort().pop();
+    } else if (sessionsDone > 0) {
+      // Days per session is elapsedDays / sessionsDone. Kept in integers so a
+      // float like 136.00000000000003 cannot round the finish a day later.
+      projectedFinish = isoDate(todayMs + Math.ceil((remainingSessions * elapsedDays) / sessionsDone) * DAY_MS);
+    }
+
+    // A week's three sessions are owed only once that week has ended, so the
+    // current week never counts against the athlete before its Sunday is over.
+    const endedWeeks = Math.max(0, Math.min(PROGRAM_WEEKS, Math.floor((todayMonday - startMs) / WEEK_MS)));
+    const expectedByNow = endedWeeks * SESSIONS_PER_WEEK;
+    const delta = sessionsDone - expectedByNow;
+    const behindWeeks = delta < 0 ? Math.round((-delta / SESSIONS_PER_WEEK) * 10) / 10 : 0;
+
+    const mondayOfYmd = (ymd) => mondayOf(new Date(`${ymd}T00:00:00Z`));
+    const thisWeekDone = state.performed.filter((s) => mondayOfYmd(s.performedOn) === todayMonday).length;
+
+    const performedMondays = state.performed.map((s) => mondayOfYmd(s.performedOn))
+      .filter((ms) => !Number.isNaN(ms));
+    const firstMonday = Math.min(startMs, ...performedMondays);
+    const lastMonday = Math.max(todayMonday, ...performedMondays);
+    const sessionsPerCalendarWeek = [];
+    for (let ms = firstMonday; ms <= lastMonday; ms += WEEK_MS) {
+      sessionsPerCalendarWeek.push({
+        weekStart: isoDate(ms),
+        count: performedMondays.filter((m) => m === ms).length,
+      });
+    }
+
+    return {
+      sessionsDone,
+      remainingSessions,
+      calendarWeeksElapsed: Math.round(calendarWeeksElapsed * 100) / 100,
+      sessionsPerWeek: Math.round(rate * 100) / 100,
+      plannedFinish: isoDate(plannedStartMs + PROGRAM_WEEKS * WEEK_MS),
+      projectedFinish,
+      expectedByNow,
+      delta,
+      behindWeeks,
+      thisWeekDone,
+      sessionsPerCalendarWeek,
+    };
+  }
+
+  /** The subset of pace the Week tab shows for every athlete at once. */
+  function compactPace(pace) {
+    const { sessionsDone, expectedByNow, delta, behindWeeks, thisWeekDone, plannedFinish, projectedFinish } = pace;
+    return { sessionsDone, expectedByNow, delta, behindWeeks, thisWeekDone, plannedFinish, projectedFinish };
+  }
+
+  /**
+   * `currentWeek` is the week holding the next session, or PROGRAM_WEEKS+1 once
+   * every session is done. `localToday` feeds only the pace figures.
    */
   function listProfiles(localToday = localDateString(new Date())) {
     requireEnabled();
-    const today = new Date(`${localToday}T00:00:00Z`);
     const { profiles = [] } = readJson(at('profiles.json'), { profiles: [] });
-    return profiles.map((p) => ({ ...p, currentWeek: currentWeekFor(p.startDate, today) }));
-  }
-
-  function readLog(profileId, week, day) {
-    return readJson(at(profileId, 'logs', `W${week}D${day}.json`), null);
+    return profiles.map((p) => {
+      const state = sequenceState(p.id);
+      return {
+        ...p,
+        currentWeek: state.next ? state.next.week : PROGRAM_WEEKS + 1,
+        nextSession: state.next,
+        sessionsDone: state.performed.length,
+        pace: compactPace(paceFor(p, state, localToday)),
+      };
+    });
   }
 
   function emptyLog(profileId, week, day) {
@@ -168,9 +315,22 @@ function createGymStore(dataRoot) {
     return data;
   }
 
+  /** Where a session sits against the sequence: the one to do next, or locked behind it. */
+  function sequenceFlags(state, week, day) {
+    const index = sessionIndex(week, day);
+    const upNext = index === state.nextIndex;
+    return { upNext, locked: !upNext && !state.done.has(index) };
+  }
+
+  /**
+   * `span` is the first and last date a session of this week was actually
+   * performed, or null before any was. It replaces calendar bounds: a week
+   * lasts as long as its three sessions take.
+   */
   function getWeek(profileId, week) {
-    const profile = requireProfile(profileId);
+    requireProfile(profileId);
     const data = readWeekFile(profileId, week);
+    const state = sequenceState(profileId);
     const days = data.days.map((day) => {
       const log = readLog(profileId, week, day.day);
       return {
@@ -178,11 +338,15 @@ function createGymStore(dataRoot) {
         logStatus: log ? log.status : 'not_started',
         performedOn: log ? log.performedOn : null,
         loggedSets: log ? log.entries.length : 0,
+        ...sequenceFlags(state, week, day.day),
       };
     });
-    return { ...data, days, profileId, bounds: weekBounds(profile.startDate, week) };
+    const dates = days.map((d) => d.performedOn).filter(Boolean).sort();
+    const span = dates.length ? { first: dates[0], last: dates[dates.length - 1] } : null;
+    return { ...data, days, profileId, span };
   }
 
+  /** A locked session stays readable, so the app can show its prescription read-only. */
   function getSession(profileId, week, day) {
     requireProfile(profileId);
     if (!Number.isInteger(day) || day < 1 || day > 3) {
@@ -198,6 +362,7 @@ function createGymStore(dataRoot) {
       day: dayData,
       log: readLog(profileId, week, day) || emptyLog(profileId, week, day),
       maxes: readJson(at(profileId, 'maxes.json'), {}),
+      ...sequenceFlags(sequenceState(profileId), week, day),
     };
   }
 
@@ -459,8 +624,9 @@ function createGymStore(dataRoot) {
    */
   const TONNAGE_RESULTS = new Set(['reps', 'reps_per_side']);
 
-  function getStats(profileId) {
-    requireProfile(profileId);
+  /** `localToday` is injectable for the same reason as in listProfiles: it drives `pace`. */
+  function getStats(profileId, localToday = localDateString(new Date())) {
+    const profile = requireProfile(profileId);
     const maxes = readJson(at(profileId, 'maxes.json'), {});
     const weeks = [];
 
@@ -519,7 +685,8 @@ function createGymStore(dataRoot) {
       }
     }
 
-    return { profileId, weeks, maxTrend, baselines, maxes };
+    const pace = paceFor(profile, sequenceState(profileId), localToday);
+    return { profileId, weeks, maxTrend, baselines, maxes, pace };
   }
 
   function writeAssessment(profileId, week, day, body) {
@@ -555,8 +722,8 @@ function createGymStore(dataRoot) {
     isEnabled,
     getProfile,
     listProfiles,
-    currentWeekFor,
-    weekBounds,
+    nextSession,
+    assertInSequence,
     getWeek,
     getSession,
     getExercises,
@@ -580,4 +747,4 @@ function createGymStore(dataRoot) {
   };
 }
 
-module.exports = { createGymStore, localDateString, PROGRAM_WEEKS };
+module.exports = { createGymStore, localDateString, PROGRAM_WEEKS, PROGRAM_SESSIONS };

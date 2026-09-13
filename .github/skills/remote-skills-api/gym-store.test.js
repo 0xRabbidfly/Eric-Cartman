@@ -72,28 +72,6 @@ test('listProfiles returns both profiles with a current week', () => {
   assert.equal(profiles[0].currentWeek, 1);
 });
 
-test('currentWeekFor counts calendar weeks from the start Monday', () => {
-  const store = createGymStore(fixture());
-  const at = (iso) => store.currentWeekFor('2026-09-07', new Date(iso));
-  assert.equal(at('2026-09-07T00:00:00Z'), 1);
-  assert.equal(at('2026-09-09T23:00:00Z'), 1);
-  assert.equal(at('2026-09-13T23:59:00Z'), 1);
-  assert.equal(at('2026-09-14T00:00:00Z'), 2);
-  assert.equal(at('2026-10-05T00:00:00Z'), 5);
-});
-
-test('currentWeekFor clamps before the start and past the program', () => {
-  const store = createGymStore(fixture());
-  assert.equal(store.currentWeekFor('2026-09-07', new Date('2026-08-01T00:00:00Z')), 1);
-  assert.equal(store.currentWeekFor('2026-09-07', new Date('2027-01-01T00:00:00Z')), 13);
-});
-
-test('weekBounds gives the Monday and Sunday of that week', () => {
-  const store = createGymStore(fixture());
-  assert.deepEqual(store.weekBounds('2026-09-07', 1), { start: '2026-09-07', end: '2026-09-13' });
-  assert.deepEqual(store.weekBounds('2026-09-07', 3), { start: '2026-09-21', end: '2026-09-27' });
-});
-
 test('getWeek annotates each day with its log status', () => {
   const store = createGymStore(fixture());
   const week = store.getWeek('athlete-a', 1);
@@ -101,7 +79,8 @@ test('getWeek annotates each day with its log status', () => {
   assert.deepEqual(week.days.map((d) => d.logStatus), ['complete', 'not_started', 'not_started']);
   assert.equal(week.days[0].performedOn, '2026-09-09');
   assert.equal(week.days[0].loggedSets, 1);
-  assert.deepEqual(week.bounds, { start: '2026-09-07', end: '2026-09-13' });
+  assert.equal(week.bounds, undefined);
+  assert.deepEqual(week.span, { first: '2026-09-09', last: '2026-09-09' });
 });
 
 test('getWeek reports a profile with no logs as untouched', () => {
@@ -175,9 +154,14 @@ test('a profiles file holding null is reported as corrupt, not a TypeError', () 
 });
 
 test('an unusable startDate throws a coded error instead of returning NaN', () => {
-  const store = createGymStore(fixture());
-  assert.throws(() => store.currentWeekFor('not-a-date', new Date('2026-09-09T00:00:00Z')),
-    (err) => err.code === 'gym_data_corrupt');
+  const root = fixture();
+  fs.writeFileSync(path.join(root, 'profiles.json'), JSON.stringify({
+    programWeeks: 12,
+    profiles: [{ id: 'athlete-a', name: 'Athlete A', startDate: 'not-a-date' }],
+  }), 'utf8');
+  const store = createGymStore(root);
+  assert.throws(() => store.listProfiles('2026-09-09'), (err) => err.code === 'gym_data_corrupt');
+  assert.throws(() => store.getStats('athlete-a', '2026-09-09'), (err) => err.code === 'gym_data_corrupt');
 });
 
 test('a session file that is valid JSON but not an object is reported as corrupt', () => {
@@ -337,11 +321,6 @@ test('reopenSession makes a finished session editable again', () => {
 test('reopenSession refuses a session that was never logged', () => {
   const store = createGymStore(fixture());
   expectCode(() => store.reopenSession('athlete-b', 4, 2), 'gym_session_not_found');
-});
-
-test('weekBounds rejects an unusable startDate rather than throwing a RangeError', () => {
-  const store = createGymStore(fixture());
-  assert.throws(() => store.weekBounds('not-a-date', 1), (err) => err.code === 'gym_data_corrupt');
 });
 
 test('a ramp set logged with no load is ignored when picking the max', () => {
@@ -865,9 +844,222 @@ test('reopen and refinish keeps the original date even when the phone sends a ne
   assert.equal(again.maxes['back-squat'].testedOn, '2026-09-11');
 });
 
-test('listProfiles turns the week over on the local Monday, not on Sunday evening', () => {
+// Program position is by session sequence, not by calendar.
+// A session is done once it has ever been finished: its log carries a
+// performedOn date. Every date below is injected, so none of these tests
+// depends on the machine clock or its timezone.
+
+/** Write a finished log straight into the fixture, dated `performedOn`. */
+function markDone(root, profile, week, day, performedOn) {
+  const target = path.join(root, profile, 'logs', `W${week}D${day}.json`);
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  fs.writeFileSync(target, JSON.stringify({
+    profileId: profile, week, day, status: 'complete', performedOn,
+    startedAt: `${performedOn}T17:00:00Z`, completedAt: `${performedOn}T18:00:00Z`,
+    entries: [], dayNotes: '',
+  }), 'utf8');
+}
+
+test('listProfiles keeps an unfinished week current after its Sunday has passed', () => {
   const store = createGymStore(fixture());
-  const weeks = (ymd) => store.listProfiles(ymd).map((p) => p.currentWeek);
-  assert.deepEqual(weeks('2026-09-13'), [1, 1]);   // Sunday, however late
-  assert.deepEqual(weeks('2026-09-14'), [2, 2]);   // the following Monday
+  // athlete-a has done W1 D1 only. Months later, W1 is still where they are.
+  for (const today of ['2026-09-13', '2026-09-14', '2026-12-25']) {
+    const [a, b] = store.listProfiles(today);
+    assert.equal(a.currentWeek, 1, today);
+    assert.deepEqual(a.nextSession, { week: 1, day: 2 }, today);
+    assert.equal(a.sessionsDone, 1);
+    assert.deepEqual(b.nextSession, { week: 1, day: 1 });
+    assert.equal(b.sessionsDone, 0);
+  }
+});
+
+test('nextSession is W1 D1 when nothing is logged', () => {
+  assert.deepEqual(createGymStore(fixture()).nextSession('athlete-b'), { week: 1, day: 1 });
+});
+
+test('nextSession is W1 D3 once W1 D1 and D2 are done', () => {
+  const root = fixture();
+  markDone(root, 'athlete-a', 1, 2, '2026-09-11');
+  assert.deepEqual(createGymStore(root).nextSession('athlete-a'), { week: 1, day: 3 });
+});
+
+test('nextSession is null once all 36 sessions are done, and the profile moves past week 12', () => {
+  const root = fixture();
+  for (let week = 1; week <= 12; week += 1) {
+    for (let day = 1; day <= 3; day += 1) markDone(root, 'athlete-b', week, day, '2026-11-20');
+  }
+  markDone(root, 'athlete-b', 12, 3, '2026-11-29');
+  const store = createGymStore(root);
+  assert.equal(store.nextSession('athlete-b'), null);
+  const b = store.listProfiles('2026-12-01')[1];
+  assert.equal(b.currentWeek, 13);
+  assert.equal(b.nextSession, null);
+  assert.equal(b.sessionsDone, 36);
+  // Finished: the block ended on its last session, not on today.
+  assert.equal(b.pace.projectedFinish, '2026-11-29');
+});
+
+test('a session saved but never finished is not done, so it stays next', () => {
+  const store = createGymStore(fixture());
+  store.saveSession('athlete-a', 1, 2, {
+    entries: [{ itemId: 'a-back-squat', set: 1, load: 60, loadType: 'kg', reps: 3, rpe: 8, note: '' }],
+  });
+  assert.deepEqual(store.nextSession('athlete-a'), { week: 1, day: 2 });
+});
+
+test('reopening a finished earlier session does not move the athlete backwards', () => {
+  const root = fixture();
+  const store = createGymStore(root);
+  store.saveSession('athlete-a', 1, 2, {
+    entries: [{ itemId: 'a-back-squat', set: 1, load: 60, loadType: 'kg', reps: 3, rpe: 8, note: '' }],
+  });
+  store.finishSession('athlete-a', 1, 2, new Date('2026-09-11T19:00:00Z'), '2026-09-11');
+  assert.deepEqual(store.nextSession('athlete-a'), { week: 1, day: 3 });
+
+  store.reopenSession('athlete-a', 1, 1);
+  assert.equal(store.getSession('athlete-a', 1, 1).log.status, 'in_progress');
+  assert.deepEqual(store.nextSession('athlete-a'), { week: 1, day: 3 });
+  // Still writable, because it was done before it was reopened.
+  store.assertInSequence('athlete-a', 1, 1);
+});
+
+test('assertInSequence allows the next session and any done one, and locks anything later', () => {
+  const root = fixture();
+  markDone(root, 'athlete-a', 1, 2, '2026-09-11');
+  const store = createGymStore(root);
+  store.assertInSequence('athlete-a', 1, 3);   // next
+  store.assertInSequence('athlete-a', 1, 1);   // done
+  store.assertInSequence('athlete-a', 1, 2);   // done
+  for (const [week, day] of [[2, 1], [2, 3], [12, 3]]) {
+    assert.throws(() => store.assertInSequence('athlete-a', week, day), (err) => {
+      assert.equal(err.code, 'gym_session_out_of_sequence');
+      assert.match(err.message, /W1 D3 is up next/);
+      return true;
+    }, `W${week} D${day}`);
+  }
+  assert.throws(() => store.assertInSequence('athlete-a', 2, 2), /unlocks after W2 D1/);
+});
+
+test('assertInSequence reports an unknown profile or a session outside the program as such', () => {
+  const store = createGymStore(fixture());
+  expectCode(() => store.assertInSequence('stan', 1, 1), 'gym_profile_required');
+  expectCode(() => store.assertInSequence('athlete-a', 13, 1), 'gym_week_not_found');
+  expectCode(() => store.assertInSequence('athlete-a', Number.NaN, 1), 'gym_week_not_found');
+  expectCode(() => store.assertInSequence('athlete-a', 1, 4), 'gym_session_not_found');
+});
+
+test('getWeek marks exactly one day up next and every later day locked', () => {
+  const store = createGymStore(fixture());
+  const week1 = store.getWeek('athlete-a', 1);
+  assert.deepEqual(week1.days.map((d) => d.upNext), [false, true, false]);
+  assert.deepEqual(week1.days.map((d) => d.locked), [false, false, true]);
+  const week2 = store.getWeek('athlete-a', 2);
+  assert.deepEqual(week2.days.map((d) => d.upNext), [false, false, false]);
+  assert.deepEqual(week2.days.map((d) => d.locked), [true, true, true]);
+  assert.equal(week2.span, null);
+});
+
+test('getWeek span runs from the first to the last session performed that week', () => {
+  const root = fixture();
+  markDone(root, 'athlete-a', 1, 2, '2026-09-11');
+  markDone(root, 'athlete-a', 1, 3, '2026-09-15');
+  const week = createGymStore(root).getWeek('athlete-a', 1);
+  assert.deepEqual(week.span, { first: '2026-09-09', last: '2026-09-15' });
+  assert.deepEqual(week.days.map((d) => d.locked), [false, false, false]);
+  assert.equal(createGymStore(root).getWeek('athlete-a', 2).days[0].upNext, true);
+});
+
+test('getSession says whether the session is locked or up next, and stays readable when locked', () => {
+  const store = createGymStore(fixture());
+  const next = store.getSession('athlete-a', 1, 2);
+  assert.equal(next.upNext, true);
+  assert.equal(next.locked, false);
+  const later = store.getSession('athlete-a', 1, 3);
+  assert.equal(later.locked, true);
+  assert.equal(later.upNext, false);
+  assert.equal(later.day.title, 'Day 3');
+  assert.equal(store.getSession('athlete-a', 1, 1).locked, false);
+});
+
+test('pace on the Sunday ending week 1 with two sessions done', () => {
+  const root = fixture();
+  markDone(root, 'athlete-a', 1, 2, '2026-09-11');
+  const { pace } = createGymStore(root).getStats('athlete-a', '2026-09-13');
+  assert.equal(pace.sessionsDone, 2);
+  assert.equal(pace.remainingSessions, 34);
+  assert.equal(pace.calendarWeeksElapsed, 1);
+  assert.equal(pace.sessionsPerWeek, 2);
+  assert.equal(pace.plannedFinish, '2026-11-30');        // 7 Sep plus 12 weeks
+  assert.equal(pace.projectedFinish, '2027-01-10');      // 34 sessions at 2 a week is 119 days
+  assert.deepEqual(pace.sessionsPerCalendarWeek, [{ weekStart: '2026-09-07', count: 2 }]);
+  // Week 1 has not ended, so nothing is owed yet.
+  assert.equal(pace.expectedByNow, 0);
+  assert.equal(pace.delta, 2);
+  assert.equal(pace.behindWeeks, 0);
+  assert.equal(pace.thisWeekDone, 2);
+});
+
+test('pace on the Monday after, with the same two sessions done', () => {
+  const root = fixture();
+  markDone(root, 'athlete-a', 1, 2, '2026-09-11');
+  const { pace } = createGymStore(root).getStats('athlete-a', '2026-09-14');
+  assert.equal(pace.calendarWeeksElapsed, 1.14);         // 8 days
+  assert.equal(pace.sessionsPerWeek, 1.75);
+  assert.equal(pace.projectedFinish, '2027-01-28');      // 34 sessions at 1.75 a week is 136 days
+  assert.equal(pace.plannedFinish, '2026-11-30');
+  assert.deepEqual(pace.sessionsPerCalendarWeek, [
+    { weekStart: '2026-09-07', count: 2 },
+    { weekStart: '2026-09-14', count: 0 },
+  ]);
+  assert.equal(pace.expectedByNow, 3);
+  assert.equal(pace.delta, -1);
+  assert.equal(pace.behindWeeks, 0.3);
+  assert.equal(pace.thisWeekDone, 0);
+});
+
+test('pace with nothing done has no projection rather than an infinite one', () => {
+  const { pace } = createGymStore(fixture()).getStats('athlete-b', '2026-09-21');
+  assert.equal(pace.sessionsDone, 0);
+  assert.equal(pace.sessionsPerWeek, 0);
+  assert.equal(pace.projectedFinish, null);
+  assert.equal(pace.plannedFinish, '2026-11-30');
+  assert.equal(pace.expectedByNow, 6);
+  assert.equal(pace.delta, -6);
+  assert.equal(pace.behindWeeks, 2);
+  assert.ok(Object.values(pace).every((v) => v === null || typeof v !== 'number' || Number.isFinite(v)));
+});
+
+test('pace before the start date does not divide by less than one week', () => {
+  const { pace } = createGymStore(fixture()).getStats('athlete-a', '2026-09-01');
+  assert.equal(pace.calendarWeeksElapsed, 1);
+  assert.equal(pace.sessionsPerWeek, 1);
+  assert.equal(pace.expectedByNow, 0);
+});
+
+test('thisWeekDone counts only sessions performed in the current calendar week', () => {
+  const root = fixture();
+  markDone(root, 'athlete-a', 1, 2, '2026-09-13');       // Sunday of week 1
+  markDone(root, 'athlete-a', 1, 3, '2026-09-14');       // Monday of week 2
+  markDone(root, 'athlete-a', 2, 1, '2026-09-20');       // Sunday of week 2
+  const { pace } = createGymStore(root).getStats('athlete-a', '2026-09-17');
+  assert.equal(pace.thisWeekDone, 2);
+  assert.deepEqual(pace.sessionsPerCalendarWeek.map((w) => w.count), [2, 2]);
+  assert.equal(pace.expectedByNow, 3);
+  assert.equal(pace.delta, 1);
+});
+
+test('listProfiles gives every profile a compact pace object', () => {
+  const root = fixture();
+  markDone(root, 'athlete-a', 1, 2, '2026-09-11');
+  const profiles = createGymStore(root).listProfiles('2026-09-14');
+  assert.equal(profiles.length, 2);
+  for (const p of profiles) {
+    assert.deepEqual(Object.keys(p.pace).sort(), [
+      'behindWeeks', 'delta', 'expectedByNow', 'plannedFinish', 'projectedFinish', 'sessionsDone', 'thisWeekDone',
+    ]);
+  }
+  assert.equal(profiles[0].pace.delta, -1);
+  assert.equal(profiles[1].pace.delta, -3);
+  assert.equal(profiles[1].pace.behindWeeks, 1);
+  assert.equal(profiles[1].pace.projectedFinish, null);
 });

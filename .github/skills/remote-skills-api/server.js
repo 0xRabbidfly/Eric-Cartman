@@ -1534,6 +1534,7 @@ const GYM_ERROR_STATUS = {
   gym_session_not_found: 404,
   gym_invalid_entry: 400,
   gym_session_complete: 409,
+  gym_session_out_of_sequence: 409,
   gym_session_empty: 400,
   gym_data_corrupt: 500,
 };
@@ -1565,15 +1566,23 @@ app.get('/api/gym/session/:week/:day', auth, gymHandler((req, res) => {
     parseInt(req.params.week, 10), parseInt(req.params.day, 10)));
 }));
 
+// Sessions are done in program order. Writing and finishing are allowed on any
+// session already done and on the next one; anything later is locked with 409.
+// GET stays open for a locked session so the app can show it read-only, and
+// reopen needs no check because it only applies to a session already finished.
 app.put('/api/gym/session/:week/:day', auth, gymHandler((req, res) => {
-  res.json(gymStore.saveSession(gymProfileId(req),
-    parseInt(req.params.week, 10), parseInt(req.params.day, 10), req.body || {}));
+  const profileId = gymProfileId(req);
+  const week = parseInt(req.params.week, 10);
+  const day = parseInt(req.params.day, 10);
+  gymStore.assertInSequence(profileId, week, day);
+  res.json(gymStore.saveSession(profileId, week, day, req.body || {}));
 }));
 
 app.post('/api/gym/session/:week/:day/finish', auth, gymHandler((req, res) => {
   const profileId = gymProfileId(req);
   const week = parseInt(req.params.week, 10);
   const day = parseInt(req.params.day, 10);
+  gymStore.assertInSequence(profileId, week, day);
 
   // Save and recompute first, synchronously. The log must survive even if the
   // model run fails, times out, or the phone drops off the network.

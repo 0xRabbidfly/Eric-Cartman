@@ -110,7 +110,7 @@ Phone (Safari/Chrome)
 | GET | `/api/recent-notes` | Vault notes touched in the last 7 days (`?days=N`, `?days=all`) |
 | GET | `/api/notes-by-topic` | Notes grouped by Library subfolder / podcast show |
 | GET | `/api/notes-by-week` | Notes grouped by ISO week, newest first |
-| GET | `/api/gym/profiles` | Gym profiles and each one's current program week (`{enabled:false}` when no gym data) |
+| GET | `/api/gym/profiles` | Gym profiles with each one's next session, program week and pace against the plan (`{enabled:false}` when no gym data) |
 | GET | `/api/gym/week/:n` | Week prescription plus per-day log status (`?profile=`) |
 | GET | `/api/gym/session/:week/:day` | One day's prescription merged with its log (`?profile=`) |
 | PUT | `/api/gym/session/:week/:day` | Save a partial log (`?profile=`) |
@@ -128,6 +128,12 @@ The gym routes read a private data store outside version control. When it is
 absent, `/api/gym/profiles` reports `enabled: false`, every other gym route
 returns 404 `gym_not_configured`, and the UI hides the Gym tab, so a fresh clone
 behaves exactly as it did before this feature existed.
+
+Gym sessions are done in program order: W1 D1, D2, D3, then W2 D1. The PUT and
+finish routes accept any session already done and the next one, and answer
+`409` with code `gym_session_out_of_sequence` for anything later. A locked
+session can still be read with GET, and reopen is unaffected, since it only
+applies to a session already finished.
 
 ## Environment Variables
 
@@ -182,12 +188,21 @@ old crowded header icon bar. The Gym tab appears only when gym data is present.
 - **Skills tab**: Full skill list with All / 🌐 Public / 🔒 Private filters
 - **Gym tab**: The 12-week cycling strength program for two profiles
   - Profile switcher, then Week, Stats and Notes views
-  - Week view shows the three sessions with completion status and the date each was
-    actually performed, so a Monday session done on Thursday reads correctly
+  - Program position follows the sessions done, not the calendar. Sessions go in
+    order, W1 D1 to W12 D3, so a week that takes ten days stays the current week
+    until its third session is done rather than rolling over on Monday
+  - Week view opens on the week holding the next session. Each day card reads done,
+    in progress, up next or locked, and a locked session opens read-only with the
+    session that unlocks it. The week shows when its sessions actually happened
+    ("Started 9 Sep · 2 of 3 done") instead of a calendar date range
+  - A tracker above the week shows sessions done against where the plan expects them
+    by now, this week's count, the projected finish at the current pace against the
+    planned one, and the other athlete's position in one line
   - Session view logs load, reps and RPE per set with a numeric keypad, autosaves
     every change, and links each exercise to its how-to and video
   - Finish workout runs the `gym-cyclist` skill and shows the assessment inline
-  - Stats shows estimated 1RM trend, weekly tonnage, adherence and average RPE
+  - Stats shows pace (sessions per week so far, projected against planned finish),
+    estimated 1RM trend, weekly tonnage, adherence and average RPE
   - A finished session is read-only until reopened for safety and audit purposes
 - **Skill chip**: Pin a skill to scope your messages
 - **Settings tab**: API token, server restart, cancel request, live server status

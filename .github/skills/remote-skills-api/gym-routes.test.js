@@ -20,25 +20,46 @@ function seedDataRoot() {
   };
   write('profiles.json', {
     programWeeks: 12,
-    profiles: [{ id: 'athlete-a', name: 'Athlete A', startDate: '2026-09-07' }],
+    profiles: [
+      { id: 'athlete-a', name: 'Athlete A', startDate: '2026-09-07' },
+      { id: 'athlete-b', name: 'Athlete B', startDate: '2026-09-07' },
+    ],
   });
   write('exercises.json', { 'back-squat': { key: 'back-squat', name: 'Back squat', video: 'https://v' } });
-  for (let n = 1; n <= 12; n += 1) {
-    write(`athlete-a/weeks/W${n}.json`, {
-      week: n, block: 'test', blockLabel: 'Test week', goal: 'g', retest: true,
-      loadsResolved: n === 1, generatedAt: null,
-      days: [1, 2, 3].map((day) => ({
-        day, title: `Day ${day}`, estMinutes: 50, warmup: ['bike'],
-        items: [{
-          id: 'a-back-squat', block: 'A', exerciseKey: 'back-squat', label: 'Back squat',
-          sets: 3, reps: 3, resultType: 'reps', loadType: 'kg', targetLoad: null,
-          targetPct: null, loadNote: '', targetRpe: 9.5, restSec: 180,
-          isRamp: true, setsAreOptional: true, pairedWith: null,
-        }],
-      })),
+  for (const profile of ['athlete-a', 'athlete-b']) {
+    for (let n = 1; n <= 12; n += 1) {
+      write(`${profile}/weeks/W${n}.json`, {
+        week: n, block: 'test', blockLabel: 'Test week', goal: 'g', retest: true,
+        loadsResolved: n === 1, generatedAt: null,
+        days: [1, 2, 3].map((day) => ({
+          day, title: `Day ${day}`, estMinutes: 50, warmup: ['bike'],
+          items: [{
+            id: 'a-back-squat', block: 'A', exerciseKey: 'back-squat', label: 'Back squat',
+            sets: 3, reps: 3, resultType: 'reps', loadType: 'kg', targetLoad: null,
+            targetPct: null, loadNote: '', targetRpe: 9.5, restSec: 180,
+            isRamp: true, setsAreOptional: true, pairedWith: null,
+          }],
+        })),
+      });
+    }
+    write(`${profile}/maxes.json`, { 'back-squat': { threeRm: 70, e1rm: 75.6, loadType: 'kg', testedWeek: 1 } });
+  }
+
+  // Sessions are done in order and the server refuses to write past the next
+  // one. athlete-a starts untouched, for the tests that begin at W1 D1.
+  // athlete-b arrives with earlier sessions already finished, so the finish
+  // and reopen tests can work on W2 D1, W3 D1 and W5 D1, each of which is the
+  // next session by the time its test runs.
+  const seededDone = [[1, 1], [1, 2], [1, 3], [2, 2], [2, 3], [3, 2], [3, 3], [4, 1], [4, 2], [4, 3]];
+  for (const [week, day] of seededDone) {
+    const performedOn = new Date(Date.UTC(2026, 8, 7 + (week - 1) * 7 + (day - 1) * 2)).toISOString().slice(0, 10);
+    write(`athlete-b/logs/W${week}D${day}.json`, {
+      profileId: 'athlete-b', week, day, status: 'complete', performedOn,
+      startedAt: `${performedOn}T17:00:00Z`, completedAt: `${performedOn}T18:00:00Z`,
+      entries: [{ itemId: 'a-back-squat', set: 1, load: 50, loadType: 'kg', reps: 5, rpe: 7, note: '' }],
+      dayNotes: '',
     });
   }
-  write('athlete-a/maxes.json', { 'back-squat': { threeRm: 70, e1rm: 75.6, loadType: 'kg', testedWeek: 1 } });
   return root;
 }
 
@@ -76,20 +97,29 @@ test('gym routes require the bearer token', async () => {
   assert.equal(res.status, 401);
 });
 
-test('profiles lists the seeded profile as enabled and on week 1', async () => {
+test('profiles places each athlete by the sessions they have done, not the calendar', async () => {
   const body = await (await get('/api/gym/profiles')).json();
   assert.equal(body.enabled, true);
-  assert.equal(body.profiles.length, 1);
-  assert.equal(body.profiles[0].id, 'athlete-a');
-  assert.ok(body.profiles[0].currentWeek >= 1);
+  assert.deepEqual(body.profiles.map((p) => p.id), ['athlete-a', 'athlete-b']);
+  const [a, b] = body.profiles;
+  assert.equal(a.currentWeek, 1);
+  assert.deepEqual(a.nextSession, { week: 1, day: 1 });
+  assert.equal(a.sessionsDone, 0);
+  assert.equal(b.currentWeek, 2);
+  assert.deepEqual(b.nextSession, { week: 2, day: 1 });
+  assert.equal(b.sessionsDone, 10);
+  for (const p of body.profiles) assert.equal(typeof p.pace.delta, 'number');
 });
 
-test('week returns three days with log status', async () => {
+test('week returns three days with log status, the next one up and the rest locked', async () => {
   const body = await (await get('/api/gym/week/1?profile=athlete-a')).json();
   assert.equal(body.week, 1);
   assert.equal(body.days.length, 3);
   assert.equal(body.days[0].logStatus, 'not_started');
-  assert.deepEqual(body.bounds, { start: '2026-09-07', end: '2026-09-13' });
+  assert.equal(body.bounds, undefined);
+  assert.equal(body.span, null);
+  assert.deepEqual(body.days.map((d) => d.upNext), [true, false, false]);
+  assert.deepEqual(body.days.map((d) => d.locked), [false, true, true]);
 });
 
 test('week rejects a missing or unknown profile', async () => {
@@ -121,8 +151,45 @@ test('put saves a partial log and reads back identical', async () => {
   assert.equal(reread.log.dayNotes, 'slept 7h');
 });
 
+test('a PUT past the next session is refused with 409 and writes nothing', async () => {
+  const entries = [{ itemId: 'a-back-squat', set: 1, load: 50, loadType: 'kg', reps: 3, rpe: 7, note: '' }];
+  const res = await put('/api/gym/session/1/3?profile=athlete-a', { entries });
+  assert.equal(res.status, 409);
+  assert.equal((await res.json()).code, 'gym_session_out_of_sequence');
+  // Still readable, so the app can show the prescription read-only.
+  const locked = await get('/api/gym/session/1/3?profile=athlete-a');
+  assert.equal(locked.status, 200);
+  const body = await locked.json();
+  assert.equal(body.locked, true);
+  assert.equal(body.upNext, false);
+  assert.deepEqual(body.log.entries, []);
+});
+
+test('finishing a session past the next one is refused with 409', async () => {
+  // W1 D1 is saved but not finished, so W1 D2 is still locked.
+  const res = await fetch(`${BASE}/api/gym/session/1/2/finish?profile=athlete-a`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${SECRET}`, 'Content-Type': 'application/json' },
+    body: '{}',
+  });
+  assert.equal(res.status, 409);
+  assert.equal((await res.json()).code, 'gym_session_out_of_sequence');
+  const reread = await (await get('/api/gym/session/1/2?profile=athlete-a')).json();
+  assert.equal(reread.log.status, 'in_progress');
+  assert.equal(reread.log.performedOn, null);
+});
+
+test('the next session still saves while later ones are locked', async () => {
+  const res = await put('/api/gym/session/1/1?profile=athlete-a', { dayNotes: 'slept 7h, easy spin' });
+  assert.equal(res.status, 200);
+  const reread = await (await get('/api/gym/session/1/1?profile=athlete-a')).json();
+  assert.equal(reread.upNext, true);
+  assert.equal(reread.log.dayNotes, 'slept 7h, easy spin');
+});
+
 test('put rejects an entry that is not in the day', async () => {
-  const res = await put('/api/gym/session/1/2?profile=athlete-a', {
+  // athlete-b's next session, so the sequence check passes and validation answers.
+  const res = await put('/api/gym/session/2/1?profile=athlete-b', {
     entries: [{ itemId: 'nope', set: 1, load: 10, loadType: 'kg', reps: 3, rpe: 7, note: '' }],
   });
   assert.equal(res.status, 400);
@@ -148,6 +215,9 @@ test('stats reflects the saved partial session', async () => {
   const week1 = body.weeks.find((w) => w.week === 1);
   assert.equal(week1.sessionsCompleted, 0);
   assert.equal(week1.tonnage, 128);        // 42.5 × 3, rounded
+  assert.equal(body.pace.sessionsDone, 0);
+  assert.equal(body.pace.projectedFinish, null);
+  assert.equal(body.pace.plannedFinish, '2026-11-30');
 });
 
 test('assessments is an empty list before any run', async () => {
@@ -156,10 +226,11 @@ test('assessments is an empty list before any run', async () => {
 });
 
 test('finish saves the log even when the gym-cyclist skill is absent', async () => {
-  await put('/api/gym/session/2/1?profile=athlete-a', {
+  const saved = await put('/api/gym/session/2/1?profile=athlete-b', {
     entries: [{ itemId: 'a-back-squat', set: 1, load: 55, loadType: 'kg', reps: 3, rpe: 8, note: '' }],
   });
-  const res = await fetch(`${BASE}/api/gym/session/2/1/finish?profile=athlete-a`, {
+  assert.equal(saved.status, 200);
+  const res = await fetch(`${BASE}/api/gym/session/2/1/finish?profile=athlete-b`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${SECRET}`, 'Content-Type': 'application/json' },
     body: '{}',
@@ -187,8 +258,8 @@ test('reopen refuses a session that was never logged', async () => {
 
 test('a finished session can be reopened and edited again over HTTP', async () => {
   const entries = [{ itemId: 'a-back-squat', set: 1, load: 70, loadType: 'kg', reps: 3, rpe: 9, note: '' }];
-  await put('/api/gym/session/3/1?profile=athlete-a', { entries });
-  const finished = await (await fetch(`${BASE}/api/gym/session/3/1/finish?profile=athlete-a`, {
+  assert.equal((await put('/api/gym/session/3/1?profile=athlete-b', { entries })).status, 200);
+  const finished = await (await fetch(`${BASE}/api/gym/session/3/1/finish?profile=athlete-b`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${SECRET}`, 'Content-Type': 'application/json' },
     body: '{}',
@@ -196,16 +267,21 @@ test('a finished session can be reopened and edited again over HTTP', async () =
   assert.equal(finished.log.status, 'complete');
 
   // A finished session refuses edits until it is reopened.
-  assert.equal((await put('/api/gym/session/3/1?profile=athlete-a', { dayNotes: 'x' })).status, 409);
+  const refused = await put('/api/gym/session/3/1?profile=athlete-b', { dayNotes: 'x' });
+  assert.equal(refused.status, 409);
+  assert.equal((await refused.json()).code, 'gym_session_complete');
 
-  const reopened = await fetch(`${BASE}/api/gym/session/3/1/reopen?profile=athlete-a`, {
+  const reopened = await fetch(`${BASE}/api/gym/session/3/1/reopen?profile=athlete-b`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${SECRET}`, 'Content-Type': 'application/json' },
     body: '{}',
   });
   assert.equal(reopened.status, 200);
   assert.equal((await reopened.json()).status, 'in_progress');
-  assert.equal((await put('/api/gym/session/3/1?profile=athlete-a', { dayNotes: 'corrected' })).status, 200);
+  assert.equal((await put('/api/gym/session/3/1?profile=athlete-b', { dayNotes: 'corrected' })).status, 200);
+  // Reopening did not send the athlete back: W4 is seeded done, so W5 D1 is next.
+  const profiles = await (await get('/api/gym/profiles')).json();
+  assert.deepEqual(profiles.profiles[1].nextSession, { week: 5, day: 1 });
 });
 
 test('assessments come back newest first once they exist', async () => {
@@ -226,16 +302,17 @@ test('finish stores the calendar date the phone sends', async () => {
   yesterday.setDate(yesterday.getDate() - 1);
   const performedOn = localDateString(yesterday);
 
-  await put('/api/gym/session/5/1?profile=athlete-a', {
+  const saved = await put('/api/gym/session/5/1?profile=athlete-b', {
     entries: [{ itemId: 'a-back-squat', set: 1, load: 60, loadType: 'kg', reps: 3, rpe: 8, note: '' }],
   });
-  const res = await fetch(`${BASE}/api/gym/session/5/1/finish?profile=athlete-a`, {
+  assert.equal(saved.status, 200);
+  const res = await fetch(`${BASE}/api/gym/session/5/1/finish?profile=athlete-b`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${SECRET}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ performedOn }),
   });
   assert.equal(res.status, 200);
   assert.equal((await res.json()).log.performedOn, performedOn);
-  const reread = await (await get('/api/gym/session/5/1?profile=athlete-a')).json();
+  const reread = await (await get('/api/gym/session/5/1?profile=athlete-b')).json();
   assert.equal(reread.log.performedOn, performedOn);
 });
