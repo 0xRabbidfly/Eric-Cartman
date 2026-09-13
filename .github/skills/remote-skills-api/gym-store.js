@@ -31,6 +31,34 @@ function isoDate(ms) {
   return new Date(ms).toISOString().slice(0, 10);
 }
 
+/**
+ * The calendar date on this machine's clock, as YYYY-MM-DD.
+ *
+ * A workout's date is a wall-calendar fact, not an instant. toISOString gives
+ * the UTC date, which in Toronto rolls over at 8pm (7pm in winter): a Friday
+ * evening session would be filed as Saturday, and the 48-hour ride-placement
+ * check would measure it from the wrong day.
+ */
+function localDateString(date = new Date()) {
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+/**
+ * The phone's calendar date for a finished session, or null when it cannot be
+ * trusted. The phone is where the workout happened, so it knows the day, but a
+ * bad client clock must not be able to write a nonsense date: the hint has to
+ * be a real calendar date within one day of this machine's own.
+ */
+function validPerformedOnHint(hint, now) {
+  if (typeof hint !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(hint)) return null;
+  const hintMs = Date.parse(`${hint}T00:00:00Z`);
+  // Round-tripping catches 2026-02-30, which Date may quietly roll into March.
+  if (Number.isNaN(hintMs) || isoDate(hintMs) !== hint) return null;
+  const serverMs = Date.parse(`${localDateString(now)}T00:00:00Z`);
+  return Math.abs(hintMs - serverMs) <= DAY_MS ? hint : null;
+}
+
 function createGymStore(dataRoot) {
   const at = (...parts) => path.join(dataRoot, ...parts);
 
@@ -98,8 +126,15 @@ function createGymStore(dataRoot) {
     return { start: isoDate(start), end: isoDate(start + 6 * DAY_MS) };
   }
 
-  function listProfiles(today = new Date()) {
+  /**
+   * `localToday` is a YYYY-MM-DD date on the athletes' calendar, injectable so
+   * tests do not depend on the machine's timezone. currentWeekFor does UTC
+   * calendar arithmetic, so the local date is handed to it as UTC midnight;
+   * passing `new Date()` would turn the week over at 8pm on Sunday in Toronto.
+   */
+  function listProfiles(localToday = localDateString(new Date())) {
     requireEnabled();
+    const today = new Date(`${localToday}T00:00:00Z`);
     const { profiles = [] } = readJson(at('profiles.json'), { profiles: [] });
     return profiles.map((p) => ({ ...p, currentWeek: currentWeekFor(p.startDate, today) }));
   }
@@ -293,7 +328,7 @@ function createGymStore(dataRoot) {
     // A max was tested on the day the workout happened, not on the day the
     // finish button was pressed. Re-finishing a corrected session must not
     // redate it. Only an unfinished log can be missing performedOn.
-    const testedOn = log.performedOn || now.toISOString().slice(0, 10);
+    const testedOn = log.performedOn || localDateString(now);
 
     let changed = false;
     for (const item of dayItems(profileId, week, day)) {
@@ -383,7 +418,12 @@ function createGymStore(dataRoot) {
     return reopened;
   }
 
-  function finishSession(profileId, week, day, now = new Date()) {
+  /**
+   * `performedOnHint` is the phone's local calendar date. It is used only when
+   * the log has no date yet and the hint passes validPerformedOnHint; otherwise
+   * the date falls back to this machine's local calendar, never the UTC one.
+   */
+  function finishSession(profileId, week, day, now = new Date(), performedOnHint = undefined) {
     requireProfile(profileId);
     const log = readLog(profileId, week, day);
     if (log && log.status === 'complete') {
@@ -398,7 +438,9 @@ function createGymStore(dataRoot) {
       // The day it was performed, kept. Reopening to correct a transcribed
       // number — or the UI's retry, which reopens purely to re-run the model —
       // must not silently move a Monday session to whatever today is.
-      performedOn: log.performedOn || now.toISOString().slice(0, 10),
+      performedOn: log.performedOn
+        || validPerformedOnHint(performedOnHint, now)
+        || localDateString(now),
       completedAt: now.toISOString(),
     };
     writeJson(at(profileId, 'logs', `W${week}D${day}.json`), finished);
@@ -538,4 +580,4 @@ function createGymStore(dataRoot) {
   };
 }
 
-module.exports = { createGymStore, PROGRAM_WEEKS };
+module.exports = { createGymStore, localDateString, PROGRAM_WEEKS };

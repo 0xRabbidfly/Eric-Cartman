@@ -4,7 +4,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const { createGymStore } = require('./gym-store');
+const { createGymStore, localDateString } = require('./gym-store');
 
 function fixture() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'gym-'));
@@ -66,7 +66,7 @@ test('every read throws gym_not_configured when disabled', () => {
 
 test('listProfiles returns both profiles with a current week', () => {
   const store = createGymStore(fixture());
-  const profiles = store.listProfiles(new Date('2026-09-09T12:00:00Z'));
+  const profiles = store.listProfiles('2026-09-09');
   assert.deepEqual(profiles.map((p) => p.id), ['athlete-a', 'athlete-b']);
   assert.equal(profiles[0].name, 'Athlete A');
   assert.equal(profiles[0].currentWeek, 1);
@@ -779,4 +779,95 @@ test('a pull-up that progresses from bodyweight reps to a real 3RM archives the 
   assert.equal(maxes['pull-up-weighted'].threeRm, 5);
   assert.equal(maxes['pull-up-weighted'].e1rm, 5.4);
   assert.equal('bodyweightReps' in maxes['pull-up-weighted'], false);
+});
+
+// Calendar dates are local, not UTC.
+// Athlete A finished a session at 21:28 EDT on Friday 11 September, which is 01:28
+// UTC on Saturday. None of these tests depend on the machine's timezone: the
+// phone's date is injected as a hint, and any server-side fallback is compared
+// against localDateString rather than a hard-coded day.
+
+const FRIDAY_EVENING_TORONTO = new Date('2026-09-12T01:28:00Z');
+
+function logOneTriple(store) {
+  store.saveSession('athlete-b', 1, 2, {
+    entries: [{ itemId: 'a-back-squat', set: 1, load: 60, loadType: 'kg', reps: 3, rpe: 9, note: '' }],
+  });
+}
+
+const shiftDays = (ymd, days) => new Date(Date.parse(`${ymd}T00:00:00Z`) + days * 86400000)
+  .toISOString().slice(0, 10);
+
+test('localDateString reads the local calendar, not the UTC one', () => {
+  // Built from local components, so it is 21:28 on the 11th on every machine.
+  assert.equal(localDateString(new Date(2026, 8, 11, 21, 28)), '2026-09-11');
+  assert.equal(localDateString(new Date(2026, 0, 5, 0, 0)), '2026-01-05');
+});
+
+test('finishing with the phone date of a late evening stores that date, not the UTC one', () => {
+  const store = createGymStore(fixture());
+  logOneTriple(store);
+  const { log, maxes } = store.finishSession('athlete-b', 1, 2, FRIDAY_EVENING_TORONTO, '2026-09-11');
+  assert.equal(log.performedOn, '2026-09-11');
+  assert.equal(maxes['back-squat'].testedOn, log.performedOn);
+  assert.equal(store.getWeek('athlete-b', 1).days[1].performedOn, '2026-09-11');
+});
+
+test('an untrustworthy phone date falls back to the server calendar rather than being stored', () => {
+  const cases = [
+    ['garbage', FRIDAY_EVENING_TORONTO],
+    ['2026-9-11', FRIDAY_EVENING_TORONTO],
+    [20260911, FRIDAY_EVENING_TORONTO],
+    ['2026-09-09', FRIDAY_EVENING_TORONTO],          // two or more days before
+    ['2026-09-15', FRIDAY_EVENING_TORONTO],          // days ahead
+    // An impossible date beside a real one. Rolled over it would be 2 March,
+    // within a day of this clock in every timezone, so only the calendar check
+    // can reject it.
+    ['2026-02-30', new Date('2026-03-01T12:00:00Z')],
+  ];
+  for (const [hint, now] of cases) {
+    const store = createGymStore(fixture());
+    logOneTriple(store);
+    const { log, maxes } = store.finishSession('athlete-b', 1, 2, now, hint);
+    assert.notEqual(log.performedOn, hint, `hint ${hint} should have been rejected`);
+    assert.equal(log.performedOn, localDateString(now), `hint ${hint} should fall back to the server date`);
+    assert.equal(maxes['back-squat'].testedOn, log.performedOn);
+  }
+});
+
+test('a phone date one day either side of the server date is accepted, two is not', () => {
+  const now = FRIDAY_EVENING_TORONTO;
+  const server = localDateString(now);
+  for (const [offset, accepted] of [[-1, true], [1, true], [-2, false], [2, false]]) {
+    const store = createGymStore(fixture());
+    logOneTriple(store);
+    const hint = shiftDays(server, offset);
+    const { log } = store.finishSession('athlete-b', 1, 2, now, hint);
+    assert.equal(log.performedOn, accepted ? hint : server, `offset ${offset}`);
+  }
+});
+
+test('with no phone date the fallback is the server local date', () => {
+  const store = createGymStore(fixture());
+  logOneTriple(store);
+  const { log } = store.finishSession('athlete-b', 1, 2, FRIDAY_EVENING_TORONTO);
+  assert.equal(log.performedOn, localDateString(FRIDAY_EVENING_TORONTO));
+});
+
+test('reopen and refinish keeps the original date even when the phone sends a new one', () => {
+  const store = createGymStore(fixture());
+  logOneTriple(store);
+  store.finishSession('athlete-b', 1, 2, FRIDAY_EVENING_TORONTO, '2026-09-11');
+  store.reopenSession('athlete-b', 1, 2);
+  const later = new Date('2026-09-14T19:00:00Z');
+  const again = store.finishSession('athlete-b', 1, 2, later, localDateString(later));
+  assert.equal(again.log.performedOn, '2026-09-11');
+  assert.equal(again.maxes['back-squat'].testedOn, '2026-09-11');
+});
+
+test('listProfiles turns the week over on the local Monday, not on Sunday evening', () => {
+  const store = createGymStore(fixture());
+  const weeks = (ymd) => store.listProfiles(ymd).map((p) => p.currentWeek);
+  assert.deepEqual(weeks('2026-09-13'), [1, 1]);   // Sunday, however late
+  assert.deepEqual(weeks('2026-09-14'), [2, 2]);   // the following Monday
 });

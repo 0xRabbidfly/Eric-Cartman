@@ -1654,6 +1654,14 @@
       }
     }
 
+    // The phone's own calendar date, sent with every finish. Built from local
+    // getters on purpose: toISOString is the UTC date, which in Toronto is
+    // already tomorrow after 8pm and would file a Friday evening as Saturday.
+    function gymLocalDate(date = new Date()) {
+      const pad = (n) => String(n).padStart(2, '0');
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+    }
+
     async function retryGymAssessment() {
       // Pinned once, like pollGymJob does. The header stays live across these
       // awaits: the profile switcher could reopen one athlete's session and
@@ -1671,7 +1679,7 @@
         });
         void res;
         const finish = await api(`/api/gym/session/${week}/${day}/finish?profile=${encodeURIComponent(profileId)}`, {
-          method: 'POST', body: JSON.stringify({}),
+          method: 'POST', body: JSON.stringify({ performedOn: gymLocalDate() }),
         });
         gymSession.data.log = finish.log;
         gymSession.job = finish.jobId || null;
@@ -1708,7 +1716,7 @@
         });
         const res = await api(`/api/gym/session/${week}/${day}/finish?profile=${encodeURIComponent(profileId)}`, {
           method: 'POST',
-          body: JSON.stringify({}),
+          body: JSON.stringify({ performedOn: gymLocalDate() }),
         });
         gymSession.data.log = res.log;
         gymSession.job = res.jobId || null;

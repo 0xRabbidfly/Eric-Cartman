@@ -5,6 +5,8 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
+const { localDateString } = require('./gym-store');
+
 const SECRET = 'test-secret-for-gym-routes';
 const PORT = 3947;
 const BASE = `http://127.0.0.1:${PORT}`;
@@ -214,4 +216,26 @@ test('assessments come back newest first once they exist', async () => {
   const body = await (await get('/api/gym/assessments?profile=athlete-a')).json();
   assert.deepEqual(body.assessments.map((a) => `${a.week}-${a.day}`), ['2-1', '1-1']);
   assert.match(body.assessments[1].body, /Baseline/);
+});
+
+test('finish stores the calendar date the phone sends', async () => {
+  // Yesterday on this machine's calendar: inside the store's one-day window, and
+  // not the date the server would fall back to, so a pass proves the hint was
+  // used. The spawned server inherits this process's timezone.
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const performedOn = localDateString(yesterday);
+
+  await put('/api/gym/session/5/1?profile=athlete-a', {
+    entries: [{ itemId: 'a-back-squat', set: 1, load: 60, loadType: 'kg', reps: 3, rpe: 8, note: '' }],
+  });
+  const res = await fetch(`${BASE}/api/gym/session/5/1/finish?profile=athlete-a`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${SECRET}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ performedOn }),
+  });
+  assert.equal(res.status, 200);
+  assert.equal((await res.json()).log.performedOn, performedOn);
+  const reread = await (await get('/api/gym/session/5/1?profile=athlete-a')).json();
+  assert.equal(reread.log.performedOn, performedOn);
 });

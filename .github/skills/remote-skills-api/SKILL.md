@@ -114,7 +114,7 @@ Phone (Safari/Chrome)
 | GET | `/api/gym/week/:n` | Week prescription plus per-day log status (`?profile=`) |
 | GET | `/api/gym/session/:week/:day` | One day's prescription merged with its log (`?profile=`) |
 | PUT | `/api/gym/session/:week/:day` | Save a partial log (`?profile=`) |
-| POST | `/api/gym/session/:week/:day/finish` | Complete the session and start the assessment; returns `{jobId}` (`?profile=`) |
+| POST | `/api/gym/session/:week/:day/finish` | Complete the session and start the assessment; body `{performedOn: "YYYY-MM-DD"}` is the phone's local date, used when the log has none and within a day of the server's; returns `{jobId}` (`?profile=`) |
 | POST | `/api/gym/session/:week/:day/reopen` | Make a finished session editable again (`?profile=`) |
 | GET | `/api/gym/exercises` | Exercise library with how-tos and videos (`?profile=`) |
 | GET | `/api/gym/stats` | Week-by-week tonnage, RPE, adherence and 1RM trend (`?profile=`) |

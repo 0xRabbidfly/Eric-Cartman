@@ -1577,7 +1577,11 @@ app.post('/api/gym/session/:week/:day/finish', auth, gymHandler((req, res) => {
 
   // Save and recompute first, synchronously. The log must survive even if the
   // model run fails, times out, or the phone drops off the network.
-  const { log, maxes } = gymStore.finishSession(profileId, week, day);
+  // The phone sends its own calendar date: it is where the workout happened, and
+  // the UTC date is already tomorrow after 8pm in Toronto. The store validates
+  // the hint and ignores it when the log already carries a date.
+  const { performedOn } = req.body || {};
+  const { log, maxes } = gymStore.finishSession(profileId, week, day, new Date(), performedOn);
 
   // buildInvokePrompt reads the skill file off the registry, so it throws when
   // gym-cyclist is not installed — which is every clone that lacks the private
