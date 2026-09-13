@@ -108,7 +108,11 @@ test('profiles places each athlete by the sessions they have done, not the calen
   assert.equal(b.currentWeek, 2);
   assert.deepEqual(b.nextSession, { week: 2, day: 1 });
   assert.equal(b.sessionsDone, 10);
-  for (const p of body.profiles) assert.equal(typeof p.pace.delta, 'number');
+  for (const p of body.profiles) {
+    assert.ok(['behind', 'onPlan', 'ahead'].includes(p.pace.status));
+    assert.equal(typeof p.pace.gap, 'number');
+    assert.equal('delta' in p.pace, false);
+  }
 });
 
 test('week returns three days with log status, the next one up and the rest locked', async () => {

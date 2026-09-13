@@ -1381,13 +1381,14 @@
       return other && other.slice(0, 4) !== year ? `${gymShortDate(iso)} ${year}` : gymShortDate(iso);
     }
 
+    // Status comes from the server, so the app and the assessment notes use the
+    // same rule: the current week's three sessions are never judged until it ends.
     function gymPaceHeadline(pace) {
       if (pace.sessionsDone >= GYM_SESSIONS) return `All ${GYM_SESSIONS} sessions done`;
-      const n = Math.abs(pace.delta);
-      const count = `${n} session${n === 1 ? '' : 's'}`;
-      if (pace.delta === 0) return 'On plan';
-      if (pace.delta > 0) return `${count} ahead`;
-      if (n < 3) return `${count} behind`;
+      if (pace.status !== 'behind' && pace.status !== 'ahead') return 'On plan';
+      const count = `${pace.gap} session${pace.gap === 1 ? '' : 's'}`;
+      if (pace.status === 'ahead') return `${count} ahead`;
+      if (pace.gap < 3) return `${count} behind`;
       return `${count} behind, about ${pace.behindWeeks} week${pace.behindWeeks === 1 ? '' : 's'}`;
     }
 
@@ -1407,7 +1408,8 @@
       const donePct = Math.min(100, (pace.sessionsDone / GYM_SESSIONS) * 100);
       const planPct = Math.min(100, (pace.expectedByNow / GYM_SESSIONS) * 100);
       const thisWeek = `This week ${pace.thisWeekDone}${pace.thisWeekDone <= 3 ? ' of 3' : ''}`;
-      const projection = gymProjection(pace);
+      const projection = gymProjection(pace)
+        || (pace.sessionsDone < GYM_SESSIONS ? pace.projectionNote || '' : '');
       const sub = projection ? `${thisWeek} · ${projection}` : thisWeek;
       const others = gym.profiles
         .filter(p => p.id !== gym.profileId && p.pace)
@@ -2002,7 +2004,15 @@
           ? `All ${GYM_SESSIONS} sessions done, the last on ${gymFinishDate(pace.projectedFinish, pace.plannedFinish)}. Planned finish was ${gymFinishDate(pace.plannedFinish, pace.projectedFinish)}.`
         : pace.sessionsDone === 0
           ? `No sessions done yet. Planned finish ${gymShortDate(pace.plannedFinish)}.`
-          : `${pace.sessionsPerWeek.toFixed(1)} sessions a week so far, ${gymProjection(pace)}.`;
+        : pace.sessionsPerWeek === null
+          ? `Pace appears after the first full week. Planned finish ${gymShortDate(pace.plannedFinish)}.`
+        : (() => {
+            const weeks = `${pace.calendarWeeksElapsed} full week${pace.calendarWeeksElapsed === 1 ? '' : 's'}`;
+            const rate = `${pace.sessionsPerWeek.toFixed(1)} sessions a week over ${weeks}`;
+            return pace.projectedFinish
+              ? `${rate}, ${gymProjection(pace)}.`
+              : `${rate}. ${pace.projectionNote || ''} Planned finish ${gymShortDate(pace.plannedFinish)}.`;
+          })();
       const paceCard = paceLine
         ? `<div class="gym-statcard"><h3>Pace</h3><div class="gym-pace">${escHtml(paceLine)}</div></div>`
         : '';

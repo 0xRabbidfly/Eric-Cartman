@@ -15,6 +15,8 @@ const WEEK_MS = 7 * DAY_MS;
 const PROGRAM_WEEKS = 12;
 const SESSIONS_PER_WEEK = 3;
 const PROGRAM_SESSIONS = PROGRAM_WEEKS * SESSIONS_PER_WEEK;
+/** One full week is not a pace. Two is the least the projection is shown on. */
+const PROJECTION_MIN_ENDED_WEEKS = 2;
 
 function fail(code, message) {
   const err = new Error(message);
@@ -207,35 +209,54 @@ function createGymStore(dataRoot) {
     const todayMs = Date.parse(`${localToday}T00:00:00Z`);
     const todayMonday = mondayOf(new Date(todayMs));
 
+    const mondayOfYmd = (ymd) => mondayOf(new Date(`${ymd}T00:00:00Z`));
+
     const sessionsDone = state.performed.length;
     const remainingSessions = PROGRAM_SESSIONS - sessionsDone;
 
-    // Whole days from the start Monday through today inclusive, as weeks. A
-    // fraction rather than a count, so the rate does not halve at midnight on
-    // a Monday; floored at one so the first days cannot report 21 a week.
-    const daysElapsed = Math.floor((todayMs - startMs) / DAY_MS) + 1;
-    const elapsedDays = Math.max(7, daysElapsed);
-    const calendarWeeksElapsed = elapsedDays / 7;
-    const rate = sessionsDone / calendarWeeksElapsed;
+    // Calendar weeks, Monday to Sunday, whose Sunday is already behind today.
+    const endedWeeks = Math.max(0, Math.floor((todayMonday - startMs) / WEEK_MS));
+
+    // Pace comes from ended weeks only. A partial week says nothing yet: two
+    // sessions by Wednesday is on plan, not a rate of four a week, and none by
+    // Monday morning is not a rate of zero.
+    const doneInEndedWeeks = state.performed
+      .filter((s) => mondayOfYmd(s.performedOn) < todayMonday).length;
+    const sessionsPerWeek = endedWeeks > 0
+      ? Math.round((doneInEndedWeeks / endedWeeks) * 100) / 100
+      : null;
 
     let projectedFinish = null;
+    let projectionNote = null;
     if (remainingSessions === 0) {
       // Finished: the block ended on its last session, not on whatever today is.
       projectedFinish = state.performed.map((s) => s.performedOn).sort().pop();
-    } else if (sessionsDone > 0) {
-      // Days per session is elapsedDays / sessionsDone. Kept in integers so a
-      // float like 136.00000000000003 cannot round the finish a day later.
-      projectedFinish = isoDate(todayMs + Math.ceil((remainingSessions * elapsedDays) / sessionsDone) * DAY_MS);
+    } else if (endedWeeks < PROJECTION_MIN_ENDED_WEEKS) {
+      projectionNote = 'Projected finish appears after two full weeks.';
+    } else if (doneInEndedWeeks === 0) {
+      projectionNote = 'No sessions in the full weeks so far, so there is no pace to project from.';
+    } else {
+      // Days per session is (endedWeeks × 7) / doneInEndedWeeks. Kept in
+      // integers so a float cannot round the finish a day later.
+      projectedFinish = isoDate(todayMs
+        + Math.ceil((remainingSessions * endedWeeks * 7) / doneInEndedWeeks) * DAY_MS);
     }
 
-    // A week's three sessions are owed only once that week has ended, so the
-    // current week never counts against the athlete before its Sunday is over.
-    const endedWeeks = Math.max(0, Math.min(PROGRAM_WEEKS, Math.floor((todayMonday - startMs) / WEEK_MS)));
-    const expectedByNow = endedWeeks * SESSIONS_PER_WEEK;
-    const delta = sessionsDone - expectedByNow;
-    const behindWeeks = delta < 0 ? Math.round((-delta / SESSIONS_PER_WEEK) * 10) / 10 : 0;
+    // A week's three sessions are owed only once that week has ended, and the
+    // current week is granted its full three without judgement. So sessions
+    // done inside the current week are that week's quota, never "ahead".
+    const expectedByNow = Math.min(endedWeeks, PROGRAM_WEEKS) * SESSIONS_PER_WEEK;
+    let status = 'onPlan';
+    let gap = 0;
+    if (sessionsDone < expectedByNow) {
+      status = 'behind';
+      gap = expectedByNow - sessionsDone;
+    } else if (sessionsDone > expectedByNow + SESSIONS_PER_WEEK) {
+      status = 'ahead';
+      gap = sessionsDone - (expectedByNow + SESSIONS_PER_WEEK);
+    }
+    const behindWeeks = status === 'behind' ? Math.round((gap / SESSIONS_PER_WEEK) * 10) / 10 : null;
 
-    const mondayOfYmd = (ymd) => mondayOf(new Date(`${ymd}T00:00:00Z`));
     const thisWeekDone = state.performed.filter((s) => mondayOfYmd(s.performedOn) === todayMonday).length;
 
     const performedMondays = state.performed.map((s) => mondayOfYmd(s.performedOn))
@@ -253,12 +274,15 @@ function createGymStore(dataRoot) {
     return {
       sessionsDone,
       remainingSessions,
-      calendarWeeksElapsed: Math.round(calendarWeeksElapsed * 100) / 100,
-      sessionsPerWeek: Math.round(rate * 100) / 100,
+      // Ended calendar weeks: the denominator of sessionsPerWeek.
+      calendarWeeksElapsed: endedWeeks,
+      sessionsPerWeek,
       plannedFinish: isoDate(plannedStartMs + PROGRAM_WEEKS * WEEK_MS),
       projectedFinish,
+      projectionNote,
       expectedByNow,
-      delta,
+      status,
+      gap,
       behindWeeks,
       thisWeekDone,
       sessionsPerCalendarWeek,
@@ -267,8 +291,14 @@ function createGymStore(dataRoot) {
 
   /** The subset of pace the Week tab shows for every athlete at once. */
   function compactPace(pace) {
-    const { sessionsDone, expectedByNow, delta, behindWeeks, thisWeekDone, plannedFinish, projectedFinish } = pace;
-    return { sessionsDone, expectedByNow, delta, behindWeeks, thisWeekDone, plannedFinish, projectedFinish };
+    const {
+      sessionsDone, expectedByNow, status, gap, behindWeeks, thisWeekDone,
+      plannedFinish, projectedFinish, projectionNote,
+    } = pace;
+    return {
+      sessionsDone, expectedByNow, status, gap, behindWeeks, thisWeekDone,
+      plannedFinish, projectedFinish, projectionNote,
+    };
   }
 
   /**

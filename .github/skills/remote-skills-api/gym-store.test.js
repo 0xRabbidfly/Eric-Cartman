@@ -897,6 +897,8 @@ test('nextSession is null once all 36 sessions are done, and the profile moves p
   assert.equal(b.sessionsDone, 36);
   // Finished: the block ended on its last session, not on today.
   assert.equal(b.pace.projectedFinish, '2026-11-29');
+  assert.equal(b.pace.projectionNote, null);
+  assert.equal(b.pace.status, 'onPlan');
 });
 
 test('a session saved but never finished is not done, so it stays next', () => {
@@ -981,40 +983,121 @@ test('getSession says whether the session is locked or up next, and stays readab
   assert.equal(store.getSession('athlete-a', 1, 1).locked, false);
 });
 
-test('pace on the Sunday ending week 1 with two sessions done', () => {
+// Tracker semantics. Three sessions are owed for each calendar week that has
+// ended; the current week is granted its three without judgement. Behind means
+// fewer than owed, ahead means more than owed plus the current week's three.
+
+/** athlete-a's W1 D1 is in the fixture on 2026-09-09; add these after it, in order. */
+function doneOn(root, dates) {
+  let index = 1;                                          // W1 D2 is index 1
+  for (const date of dates) {
+    markDone(root, 'athlete-a', Math.floor(index / 3) + 1, (index % 3) + 1, date);
+    index += 1;
+  }
+}
+
+test('pace on the Sunday ending week 1 with two sessions done is on plan', () => {
   const root = fixture();
-  markDone(root, 'athlete-a', 1, 2, '2026-09-11');
+  doneOn(root, ['2026-09-11']);
   const { pace } = createGymStore(root).getStats('athlete-a', '2026-09-13');
   assert.equal(pace.sessionsDone, 2);
   assert.equal(pace.remainingSessions, 34);
-  assert.equal(pace.calendarWeeksElapsed, 1);
-  assert.equal(pace.sessionsPerWeek, 2);
-  assert.equal(pace.plannedFinish, '2026-11-30');        // 7 Sep plus 12 weeks
-  assert.equal(pace.projectedFinish, '2027-01-10');      // 34 sessions at 2 a week is 119 days
-  assert.deepEqual(pace.sessionsPerCalendarWeek, [{ weekStart: '2026-09-07', count: 2 }]);
-  // Week 1 has not ended, so nothing is owed yet.
-  assert.equal(pace.expectedByNow, 0);
-  assert.equal(pace.delta, 2);
-  assert.equal(pace.behindWeeks, 0);
+  assert.equal(pace.expectedByNow, 0);                  // week 1 has not ended
+  assert.equal(pace.status, 'onPlan');
+  assert.equal(pace.gap, 0);
+  assert.equal(pace.behindWeeks, null);
   assert.equal(pace.thisWeekDone, 2);
+  assert.equal('delta' in pace, false);
+  // No week has ended, so there is no pace and no projection yet.
+  assert.equal(pace.calendarWeeksElapsed, 0);
+  assert.equal(pace.sessionsPerWeek, null);
+  assert.equal(pace.projectedFinish, null);
+  assert.match(pace.projectionNote, /two full weeks/);
+  assert.equal(pace.plannedFinish, '2026-11-30');       // 7 Sep plus 12 weeks
+  assert.deepEqual(pace.sessionsPerCalendarWeek, [{ weekStart: '2026-09-07', count: 2 }]);
 });
 
-test('pace on the Monday after, with the same two sessions done', () => {
+test('pace on the Monday of week 2 with the same two sessions is one behind', () => {
   const root = fixture();
-  markDone(root, 'athlete-a', 1, 2, '2026-09-11');
+  doneOn(root, ['2026-09-11']);
   const { pace } = createGymStore(root).getStats('athlete-a', '2026-09-14');
-  assert.equal(pace.calendarWeeksElapsed, 1.14);         // 8 days
-  assert.equal(pace.sessionsPerWeek, 1.75);
-  assert.equal(pace.projectedFinish, '2027-01-28');      // 34 sessions at 1.75 a week is 136 days
-  assert.equal(pace.plannedFinish, '2026-11-30');
+  assert.equal(pace.expectedByNow, 3);
+  assert.equal(pace.status, 'behind');
+  assert.equal(pace.gap, 1);
+  assert.equal(pace.behindWeeks, 0.3);
+  assert.equal(pace.thisWeekDone, 0);
+  assert.equal(pace.calendarWeeksElapsed, 1);
+  assert.equal(pace.sessionsPerWeek, 2);
+  // One ended week is not enough to project from.
+  assert.equal(pace.projectedFinish, null);
+  assert.match(pace.projectionNote, /two full weeks/);
   assert.deepEqual(pace.sessionsPerCalendarWeek, [
     { weekStart: '2026-09-07', count: 2 },
     { weekStart: '2026-09-14', count: 0 },
   ]);
+});
+
+test('seven sessions during week 2 is one ahead', () => {
+  const root = fixture();
+  doneOn(root, ['2026-09-10', '2026-09-11', '2026-09-14', '2026-09-15', '2026-09-15', '2026-09-16']);
+  const { pace } = createGymStore(root).getStats('athlete-a', '2026-09-16');
+  assert.equal(pace.sessionsDone, 7);
   assert.equal(pace.expectedByNow, 3);
-  assert.equal(pace.delta, -1);
-  assert.equal(pace.behindWeeks, 0.3);
-  assert.equal(pace.thisWeekDone, 0);
+  assert.equal(pace.status, 'ahead');
+  assert.equal(pace.gap, 1);
+  assert.equal(pace.behindWeeks, null);
+  assert.equal(pace.thisWeekDone, 4);
+});
+
+test('three sessions owed and three done is on plan, and so is six done during that week', () => {
+  const root = fixture();
+  doneOn(root, ['2026-09-10', '2026-09-11']);
+  const store = createGymStore(root);
+  const three = store.getStats('athlete-a', '2026-09-15').pace;
+  assert.equal(three.expectedByNow, 3);
+  assert.equal(three.status, 'onPlan');
+  assert.equal(three.gap, 0);
+  doneOn(root, ['2026-09-10', '2026-09-11', '2026-09-14', '2026-09-15', '2026-09-15']);
+  const six = createGymStore(root).getStats('athlete-a', '2026-09-15').pace;
+  assert.equal(six.sessionsDone, 6);
+  assert.equal(six.status, 'onPlan');
+});
+
+test('the projected finish appears once two calendar weeks have ended', () => {
+  const root = fixture();
+  // Four sessions in the two ended weeks, one on the Monday of week 3.
+  doneOn(root, ['2026-09-11', '2026-09-16', '2026-09-18', '2026-09-21']);
+  const store = createGymStore(root);
+  const sunday = store.getStats('athlete-a', '2026-09-20').pace;
+  assert.equal(sunday.calendarWeeksElapsed, 1);
+  assert.equal(sunday.projectedFinish, null);
+  const monday = store.getStats('athlete-a', '2026-09-21').pace;
+  assert.equal(monday.calendarWeeksElapsed, 2);
+  assert.equal(monday.sessionsPerWeek, 2);              // 4 sessions over 2 ended weeks
+  assert.equal(monday.remainingSessions, 31);           // every session done counts here
+  // 31 sessions at 14 days per 4 sessions is 108.5, so 109 days after 21 Sep.
+  assert.equal(monday.projectedFinish, '2027-01-08');
+  assert.equal(monday.projectionNote, null);
+  assert.equal(monday.expectedByNow, 6);
+  assert.equal(monday.status, 'behind');
+  assert.equal(monday.gap, 1);
+});
+
+test('pace ignores sessions performed in the current, unfinished week', () => {
+  const ended = ['2026-09-11', '2026-09-16', '2026-09-18'];   // with W1 D1, four in ended weeks
+  const without = fixture();
+  doneOn(without, ended);
+  const withCurrent = fixture();
+  doneOn(withCurrent, [...ended, '2026-09-21', '2026-09-22']);
+
+  const a = createGymStore(without).getStats('athlete-a', '2026-09-23').pace;
+  const b = createGymStore(withCurrent).getStats('athlete-a', '2026-09-23').pace;
+  assert.equal(a.sessionsPerWeek, 2);
+  assert.equal(b.sessionsPerWeek, 2);
+  assert.equal(b.thisWeekDone, 2);
+  // Remaining sessions still count everything done: 32 against 30.
+  assert.equal(a.projectedFinish, '2027-01-13');        // ceil(32 × 14 / 4) = 112 days
+  assert.equal(b.projectedFinish, '2027-01-06');        // ceil(30 × 14 / 4) = 105 days
 });
 
 test('pace with nothing done has no projection rather than an infinite one', () => {
@@ -1022,44 +1105,46 @@ test('pace with nothing done has no projection rather than an infinite one', () 
   assert.equal(pace.sessionsDone, 0);
   assert.equal(pace.sessionsPerWeek, 0);
   assert.equal(pace.projectedFinish, null);
+  assert.match(pace.projectionNote, /no pace to project from/);
   assert.equal(pace.plannedFinish, '2026-11-30');
   assert.equal(pace.expectedByNow, 6);
-  assert.equal(pace.delta, -6);
+  assert.equal(pace.status, 'behind');
+  assert.equal(pace.gap, 6);
   assert.equal(pace.behindWeeks, 2);
   assert.ok(Object.values(pace).every((v) => v === null || typeof v !== 'number' || Number.isFinite(v)));
 });
 
-test('pace before the start date does not divide by less than one week', () => {
+test('pace before the start date owes nothing and divides by nothing', () => {
   const { pace } = createGymStore(fixture()).getStats('athlete-a', '2026-09-01');
-  assert.equal(pace.calendarWeeksElapsed, 1);
-  assert.equal(pace.sessionsPerWeek, 1);
+  assert.equal(pace.calendarWeeksElapsed, 0);
+  assert.equal(pace.sessionsPerWeek, null);
   assert.equal(pace.expectedByNow, 0);
+  assert.equal(pace.status, 'onPlan');
 });
 
 test('thisWeekDone counts only sessions performed in the current calendar week', () => {
   const root = fixture();
-  markDone(root, 'athlete-a', 1, 2, '2026-09-13');       // Sunday of week 1
-  markDone(root, 'athlete-a', 1, 3, '2026-09-14');       // Monday of week 2
-  markDone(root, 'athlete-a', 2, 1, '2026-09-20');       // Sunday of week 2
+  doneOn(root, ['2026-09-13', '2026-09-14', '2026-09-20']);   // Sunday wk 1, Monday and Sunday wk 2
   const { pace } = createGymStore(root).getStats('athlete-a', '2026-09-17');
   assert.equal(pace.thisWeekDone, 2);
   assert.deepEqual(pace.sessionsPerCalendarWeek.map((w) => w.count), [2, 2]);
   assert.equal(pace.expectedByNow, 3);
-  assert.equal(pace.delta, 1);
+  assert.equal(pace.status, 'onPlan');
 });
 
 test('listProfiles gives every profile a compact pace object', () => {
   const root = fixture();
-  markDone(root, 'athlete-a', 1, 2, '2026-09-11');
+  doneOn(root, ['2026-09-11']);
   const profiles = createGymStore(root).listProfiles('2026-09-14');
   assert.equal(profiles.length, 2);
   for (const p of profiles) {
     assert.deepEqual(Object.keys(p.pace).sort(), [
-      'behindWeeks', 'delta', 'expectedByNow', 'plannedFinish', 'projectedFinish', 'sessionsDone', 'thisWeekDone',
+      'behindWeeks', 'expectedByNow', 'gap', 'plannedFinish', 'projectedFinish', 'projectionNote',
+      'sessionsDone', 'status', 'thisWeekDone',
     ]);
   }
-  assert.equal(profiles[0].pace.delta, -1);
-  assert.equal(profiles[1].pace.delta, -3);
+  assert.deepEqual([profiles[0].pace.status, profiles[0].pace.gap], ['behind', 1]);
+  assert.deepEqual([profiles[1].pace.status, profiles[1].pace.gap], ['behind', 3]);
   assert.equal(profiles[1].pace.behindWeeks, 1);
   assert.equal(profiles[1].pace.projectedFinish, null);
 });
