@@ -110,14 +110,14 @@ Phone (Safari/Chrome)
 | GET | `/api/recent-notes` | Vault notes touched in the last 7 days (`?days=N`, `?days=all`) |
 | GET | `/api/notes-by-topic` | Notes grouped by Library subfolder / podcast show |
 | GET | `/api/notes-by-week` | Notes grouped by ISO week, newest first |
-| GET | `/api/gym/profiles` | Gym profiles with each one's next session, program week and pace against the plan (`{enabled:false}` when no gym data) |
+| GET | `/api/gym/profiles` | Gym profiles with each one's `program`, next session, program week and pace against the plan (`{enabled:false}` when no gym data) |
 | GET | `/api/gym/week/:n` | Week prescription plus per-day log status (`?profile=`) |
 | GET | `/api/gym/session/:week/:day` | One day's prescription merged with its log (`?profile=`) |
 | PUT | `/api/gym/session/:week/:day` | Save a partial log (`?profile=`) |
 | POST | `/api/gym/session/:week/:day/finish` | Complete the session and start the assessment; body `{performedOn: "YYYY-MM-DD"}` is the phone's local date, used when the log has none and within a day of the server's; returns `{jobId}` (`?profile=`) |
 | POST | `/api/gym/session/:week/:day/reopen` | Make a finished session editable again (`?profile=`) |
 | GET | `/api/gym/exercises` | Exercise library with how-tos and videos (`?profile=`) |
-| GET | `/api/gym/stats` | Week-by-week tonnage, RPE, adherence and 1RM trend (`?profile=`) |
+| GET | `/api/gym/stats` | The athlete's `program`, week-by-week tonnage, RPE and adherence, 1RM trend, working-load trend and baseline re-checks (`?profile=`) |
 | GET | `/api/gym/assessments` | Past session assessments, newest first (`?profile=`) |
 
 All three note endpoints scan `Research/Library` and `Podcasts` in the vault
@@ -134,6 +134,19 @@ finish routes accept any session already done and the next one, and answer
 `409` with code `gym_session_out_of_sequence` for anything later. A locked
 session can still be read with GET, and reopen is unaffected, since it only
 applies to a session already finished.
+
+Each profile in `profiles.json` names its `program`, and a profile without one
+is `cycling`. Both programs share the 12 weeks × 3 sessions structure, so
+sequence, locking and pace work the same way for every athlete:
+
+- `cycling` opens with 3RM ramps and derives loads from the estimated 1RM.
+- `strength-tone` never tests a max. Its working sets stop at RPE 8 and
+  progress by reps and load. Its only tested numbers are `isBaseline` checks
+  in weeks 1, 5, 9 and 12, including rep-count baselines where 0 is a valid
+  result. Stats reports those as `baselineTrend` and the heaviest working set
+  per exercise per week as `loadTrend`.
+- A week item may carry an optional `repsMax`, which makes its prescription a
+  range: 3 × 10–12.
 
 ## Environment Variables
 
@@ -186,8 +199,13 @@ old crowded header icon bar. The Gym tab appears only when gym data is present.
   - Search box filters across every note regardless of the active view;
     pull-to-refresh re-scans the vault; every note deep-links into Obsidian mobile
 - **Skills tab**: Full skill list with All / 🌐 Public / 🔒 Private filters
-- **Gym tab**: The 12-week cycling strength program for two profiles
-  - Profile switcher, then Week, Stats and Notes views
+- **Gym tab**: 12-week programs for any number of profiles, each following
+  either the cycling strength block or the strength-tone block
+  - A compact athlete menu sits beside the Gym title. It is a native select
+    filled from `/api/gym/profiles`, so it takes any number of athletes and
+    opens the phone's own picker. The choice is remembered on the device, and
+    a remembered athlete who no longer exists falls back to the first without
+    losing the saved choice. Below it are the Week, Stats and Notes views
   - Program position follows the sessions done, not the calendar. Sessions go in
     order, W1 D1 to W12 D3, so a week that takes ten days stays the current week
     until its third session is done rather than rolling over on Monday
@@ -197,12 +215,18 @@ old crowded header icon bar. The Gym tab appears only when gym data is present.
     ("Started 9 Sep · 2 of 3 done") instead of a calendar date range
   - A tracker above the week shows sessions done against where the plan expects them
     by now, this week's count, the projected finish at the current pace against the
-    planned one, and the other athlete's position in one line
+    planned one, and every other athlete's position in one line. An athlete whose
+    block hasn't started yet shows its start date instead
   - Session view logs load, reps and RPE per set with a numeric keypad, autosaves
-    every change, and links each exercise to its how-to and video
+    every change, shows rep ranges ("3 × 10–12") where the week has them, and
+    links each exercise to its how-to and video
   - Finish workout runs the `gym-cyclist` skill and shows the assessment inline
   - Stats shows pace (sessions per week so far, projected against planned finish),
-    estimated 1RM trend, weekly tonnage, adherence and average RPE
+    weekly tonnage, adherence and average RPE. A cycling athlete also sees the
+    estimated 1RM trend and power baselines. A strength-tone athlete sees the
+    pull-up path checks, working loads and core re-checks instead
+  - Text uses high-contrast tokens, and every number (loads, reps, RPE, stats,
+    tracker counts) is drawn in the primary text colour
   - A finished session is read-only until reopened for safety and audit purposes
 - **Skill chip**: Pin a skill to scope your messages
 - **Settings tab**: API token, server restart, cancel request, live server status
