@@ -1697,8 +1697,8 @@
       // Pinned before the first await — profile, week and day together, because
       // all three are read off live state that the header and the day list can
       // change mid-finish. Both profiles' week files are byte-identical, so
-      // itemId validation would happily accept Athlete A's sets into Athlete B's log if
-      // the switcher were tapped — and then recompute her maxes from them.
+      // itemId validation would happily accept one athlete's sets into the other's log if
+      // the switcher were tapped — and then recompute their maxes from them.
       const profileId = gym.profileId;
       const week = gymSession.week, day = gymSession.day;
       // The body is snapshotted here too, not read back after the flush. Pinning

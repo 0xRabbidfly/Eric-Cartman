@@ -361,7 +361,7 @@ test('recomputing a max leaves a sibling exercise and its injury flags untouched
   const store = createGymStore(root);
   const bench = {
     threeRm: 80, loadType: 'kg_total_pair', e1rm: 86.4, testedWeek: 1, testedOn: '2026-09-09',
-    watch: true, note: 'Shoulder discomfort on the back-off set; swap if it recurs.',
+    watch: true, note: 'Watch note carried through recompute.',
   };
   store._writeJson(path.join(root, 'athlete-b', 'maxes.json'), {
     'back-squat': { threeRm: 70, loadType: 'kg', e1rm: 75.6, testedWeek: 1, watch: false, note: '' },
