@@ -685,9 +685,27 @@
           "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-09-05 - GPT-6 Astra Saturates ARC-AGI-3, Tesla's $30K Cybercab Floods Austin, Anthropic Proves Fermat's Last Theorem  EP 286.md",
           "processed_at": "2026-09-06T06:28:19.064324+00:00",
           "status": "completed"
+        },
+        "79bf833e-adff-11f1-97f7-27b8419686ad": {
+          "title": "Should we slow down AI progress? | MOONSHOTS #288",
+          "published": "2026-09-11",
+          "audio_url": "https://traffic.megaphone.fm/DVVTS9102767695.mp3",
+          "transcript_path": "Podcasts/Moonshots with Peter Diamandis/transcripts/2026-09-11 - Should we slow down AI progress  MOONSHOTS 288.md",
+          "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-09-11 - Should we slow down AI progress  MOONSHOTS 288.md",
+          "processed_at": "2026-09-13T06:49:36.703674+00:00",
+          "status": "completed"
+        },
+        "a3d21db6-ac70-11f1-b56c-733b4d57ca80": {
+          "title": "Why Jensen Huang Believes We’ve Reached AGI and Inside OpenAI’s German Website Hijack | #287",
+          "published": "2026-09-09",
+          "audio_url": "https://traffic.megaphone.fm/DVVTS6594767855.mp3",
+          "transcript_path": "Podcasts/Moonshots with Peter Diamandis/transcripts/2026-09-09 - Why Jensen Huang Believes We’ve Reached AGI and Inside OpenAI’s German Website Hijack  287.md",
+          "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-09-09 - Why Jensen Huang Believes We’ve Reached AGI and Inside OpenAI’s German Website Hijack  287.md",
+          "processed_at": "2026-09-13T06:49:36.806312+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-09-05"
+      "latest_published": "2026-09-11"
     },
     "dwarkesh-podcast": {
       "name": "Dwarkesh Podcast",
