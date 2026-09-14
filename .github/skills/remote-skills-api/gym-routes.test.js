@@ -69,7 +69,7 @@ let dataRoot;
 test.before(async () => {
   dataRoot = seedDataRoot();
   server = spawn(process.execPath, [path.join(__dirname, 'server.js')], {
-    env: { ...process.env, API_SECRET: SECRET, SKILLS_PORT: String(PORT), GYM_DATA_ROOT: dataRoot, GYM_ASSESSMENT_DISABLED: '1' },
+    env: { ...process.env, API_SECRET: SECRET, SKILLS_PORT: String(PORT), GYM_DATA_ROOT: dataRoot, GYM_LIBRARY_PATH: path.join(dataRoot, 'exercises.json'), GYM_ASSESSMENT_DISABLED: '1' },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   const deadline = Date.now() + 20000;

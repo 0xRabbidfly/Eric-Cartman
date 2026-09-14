@@ -64,7 +64,10 @@ function validPerformedOnHint(hint, now) {
   return Math.abs(hintMs - serverMs) <= DAY_MS ? hint : null;
 }
 
-function createGymStore(dataRoot) {
+/** The exercise library is generic and tracked; athlete data under dataRoot is private. */
+const DEFAULT_LIBRARY_PATH = path.join(__dirname, 'gym-library', 'exercises.json');
+
+function createGymStore(dataRoot, { libraryPath = DEFAULT_LIBRARY_PATH } = {}) {
   const at = (...parts) => path.join(dataRoot, ...parts);
 
   function readJson(file, fallback) {
@@ -408,7 +411,7 @@ function createGymStore(dataRoot) {
 
   function getExercises() {
     requireEnabled();
-    return readJson(at('exercises.json'), {});
+    return readJson(libraryPath, {});
   }
 
   function estimateOneRm(threeRm) {

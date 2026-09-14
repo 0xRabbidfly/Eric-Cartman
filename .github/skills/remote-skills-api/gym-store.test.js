@@ -119,9 +119,18 @@ test('getSession rejects a day outside 1 to 3', () => {
   expectCode(() => store.getSession('athlete-a', 1, 4), 'gym_session_not_found');
 });
 
-test('getExercises returns the library', () => {
-  const store = createGymStore(fixture());
+test('getExercises reads the library path it is given, not the data root', () => {
+  const root = fixture();
+  const store = createGymStore(root, { libraryPath: path.join(root, 'exercises.json') });
   assert.equal(store.getExercises()['back-squat'].name, 'Back squat');
+});
+
+test('getExercises defaults to the tracked library, which has a video for every exercise', () => {
+  const entries = Object.values(createGymStore(fixture()).getExercises());
+  assert.ok(entries.length >= 42);
+  for (const entry of entries) {
+    assert.match(entry.video, /^https:\/\/www\.youtube\.com\/watch\?v=/, entry.key);
+  }
 });
 
 test('corrupt JSON reports the file rather than throwing a parse error', () => {

@@ -73,7 +73,10 @@ const USAGE_FILE = path.join(__dirname, 'usage-stats.json');
 // GYM_DATA_ROOT lets the route tests point at a temp directory.
 const GYM_DATA_ROOT = process.env.GYM_DATA_ROOT
   || path.join(PROJECT_DIR, '.claude', 'skills', 'gym-cyclist', 'data');
-const gymStore = createGymStore(GYM_DATA_ROOT);
+// The exercise library ships with the app in gym-library/. GYM_LIBRARY_PATH lets
+// the route tests swap in a fixture.
+const gymStore = createGymStore(GYM_DATA_ROOT,
+  process.env.GYM_LIBRARY_PATH ? { libraryPath: process.env.GYM_LIBRARY_PATH } : {});
 // Lets a caller log or backfill sessions without triggering a model run. The route
 // tests set it, so a test run can never spend a real Claude call by accident.
 const GYM_ASSESSMENT_DISABLED = /^(1|true|yes)$/i.test(process.env.GYM_ASSESSMENT_DISABLED || '');

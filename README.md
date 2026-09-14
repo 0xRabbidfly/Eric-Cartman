@@ -817,6 +817,8 @@ Every skill in `.github/skills/` (28 total). ⭐ marks the ones with a deep-dive
 > shared here. Local-only files — `CLAUDE.md`, `mcp.json`, personal skills that touch
 > private accounts or personal records (banking, groceries, car search, training logs),
 > and agent workflow scratch under `.superpowers/` — are gitignored and stay on the machine.
+> The gym tracker's exercise library is generic, so it is public: it ships in
+> `.github/skills/remote-skills-api/gym-library/`, while athletes' logs stay private.
 
 ---
 

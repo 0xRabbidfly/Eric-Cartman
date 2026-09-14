@@ -116,7 +116,7 @@ Phone (Safari/Chrome)
 | PUT | `/api/gym/session/:week/:day` | Save a partial log (`?profile=`) |
 | POST | `/api/gym/session/:week/:day/finish` | Complete the session and start the assessment; body `{performedOn: "YYYY-MM-DD"}` is the phone's local date, used when the log has none and within a day of the server's; returns `{jobId}` (`?profile=`) |
 | POST | `/api/gym/session/:week/:day/reopen` | Make a finished session editable again (`?profile=`) |
-| GET | `/api/gym/exercises` | Exercise library with how-tos and videos (`?profile=`) |
+| GET | `/api/gym/exercises` | Exercise library with how-tos and videos, from the tracked `gym-library/exercises.json` (`?profile=`) |
 | GET | `/api/gym/stats` | The athlete's `program`, week-by-week tonnage, RPE and adherence, 1RM trend, working-load trend and baseline re-checks (`?profile=`) |
 | GET | `/api/gym/assessments` | Past session assessments, newest first (`?profile=`) |
 
