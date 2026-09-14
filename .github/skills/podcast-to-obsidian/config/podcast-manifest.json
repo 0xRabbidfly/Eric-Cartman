@@ -703,9 +703,18 @@
           "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-09-09 - Why Jensen Huang Believes We’ve Reached AGI and Inside OpenAI’s German Website Hijack  287.md",
           "processed_at": "2026-09-13T06:49:36.806312+00:00",
           "status": "completed"
+        },
+        "127a7240-ad48-11f1-b62b-bfe6dd52d2bd": {
+          "title": "Ask the Mates anything | MOONSHOTS AMA  #289",
+          "published": "2026-09-13",
+          "audio_url": "https://traffic.megaphone.fm/DVVTS8141798281.mp3",
+          "transcript_path": "Podcasts/Moonshots with Peter Diamandis/transcripts/2026-09-13 - Ask the Mates anything  MOONSHOTS AMA  289.md",
+          "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-09-13 - Ask the Mates anything  MOONSHOTS AMA  289.md",
+          "processed_at": "2026-09-14T06:42:41.351003+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-09-11"
+      "latest_published": "2026-09-13"
     },
     "dwarkesh-podcast": {
       "name": "Dwarkesh Podcast",
@@ -794,9 +803,18 @@
           "note_path": "Podcasts/The Pragmatic Engineer/2026-08-26 - Why performant code matters (but gets widely ignored), with Casey Muratori.md",
           "processed_at": "2026-08-27T06:28:43.147716+00:00",
           "status": "completed"
+        },
+        "substack:post:214748970": {
+          "title": "Building Codex with Tibo Sottiaux",
+          "published": "2026-09-09",
+          "audio_url": "https://api.substack.com/feed/podcast/214748970/2fca285ca573bdf5071b7bd87185a3cf.mp3",
+          "transcript_path": "Podcasts/The Pragmatic Engineer/transcripts/2026-09-09 - Building Codex with Tibo Sottiaux.md",
+          "note_path": "Podcasts/The Pragmatic Engineer/2026-09-09 - Building Codex with Tibo Sottiaux.md",
+          "processed_at": "2026-09-14T07:04:55.142401+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-08-26"
+      "latest_published": "2026-09-09"
     },
     "naval": {
       "name": "Naval",
