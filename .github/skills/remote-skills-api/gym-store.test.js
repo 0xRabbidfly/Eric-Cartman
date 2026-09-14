@@ -114,6 +114,17 @@ test('getSession returns an empty in-progress log when nothing is saved', () => 
   assert.equal(session.log.dayNotes, '');
 });
 
+test('a podcast picked for a session shows on that day only, for that profile only', () => {
+  const root = fixture();
+  const pick = { show: 'Show', title: 'Episode', url: 'https://open.spotify.com/episode/x', why: 'w' };
+  fs.writeFileSync(path.join(root, 'athlete-a', 'podcasts.json'), JSON.stringify({ W1D2: pick }), 'utf8');
+  const store = createGymStore(root);
+  assert.deepEqual(store.getWeek('athlete-a', 1).days.map((d) => d.podcast), [null, pick, null]);
+  assert.deepEqual(store.getSession('athlete-a', 1, 2).podcast, pick);
+  assert.equal(store.getSession('athlete-a', 1, 1).podcast, null);
+  assert.equal(store.getSession('athlete-b', 1, 2).podcast, null);
+});
+
 test('getSession rejects a day outside 1 to 3', () => {
   const store = createGymStore(fixture());
   expectCode(() => store.getSession('athlete-a', 1, 4), 'gym_session_not_found');

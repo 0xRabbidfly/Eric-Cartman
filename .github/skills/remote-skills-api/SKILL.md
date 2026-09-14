@@ -111,7 +111,7 @@ Phone (Safari/Chrome)
 | GET | `/api/notes-by-topic` | Notes grouped by Library subfolder / podcast show |
 | GET | `/api/notes-by-week` | Notes grouped by ISO week, newest first |
 | GET | `/api/gym/profiles` | Gym profiles with each one's `program`, next session, program week and pace against the plan (`{enabled:false}` when no gym data) |
-| GET | `/api/gym/week/:n` | Week prescription plus per-day log status (`?profile=`) |
+| GET | `/api/gym/week/:n` | Week prescription plus per-day log status and any podcast picked for the day from `<profile>/podcasts.json` (`?profile=`) |
 | GET | `/api/gym/session/:week/:day` | One day's prescription merged with its log (`?profile=`) |
 | PUT | `/api/gym/session/:week/:day` | Save a partial log (`?profile=`) |
 | POST | `/api/gym/session/:week/:day/finish` | Complete the session and start the assessment; body `{performedOn: "YYYY-MM-DD"}` is the phone's local date, used when the log has none and within a day of the server's; returns `{jobId}` (`?profile=`) |

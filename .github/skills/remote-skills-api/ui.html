@@ -767,6 +767,17 @@
       border-radius: 10px; font-size: 12px; line-height: 1.5; color: var(--text-dim);
     }
     .gym-warmup b { color: var(--text); }
+    .gym-podcast {
+      display: block; margin-bottom: 12px; padding: 10px 12px;
+      background: var(--surface); border: 1px solid var(--border); border-left: 3px solid #1db954;
+      border-radius: 10px; font-size: 12px; line-height: 1.45; color: var(--text-dim); text-decoration: none;
+    }
+    .gym-podcast .gp-title { color: var(--text); font-weight: 600; font-size: 13px; }
+    .gym-podcast .gp-why { margin-top: 4px; }
+    .gym-day .gd-pod {
+      font-size: 11.5px; color: var(--text-dim); margin-top: 3px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
     .gym-item {
       margin-bottom: 12px; padding: 12px;
       background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
@@ -1551,6 +1562,7 @@
             <div class="gd-body">
               <div class="gd-title">${escHtml(d.title)}</div>
               <div class="gd-meta">${escHtml(meta)}</div>
+              ${d.podcast ? `<div class="gd-pod">🎧 ${escHtml(d.podcast.title)}</div>` : ''}
             </div>
             ${tail}
           </div>`;
@@ -1745,6 +1757,12 @@
           </div>
         </div>
         ${lockedNote}
+        ${s.podcast && /^https:\/\//.test(s.podcast.url) ? `
+          <a class="gym-podcast" href="${escHtml(s.podcast.url)}" target="_blank" rel="noopener">
+            <div class="gp-title">🎧 ${escHtml(s.podcast.title)}</div>
+            <div>${escHtml(s.podcast.show)}${s.podcast.duration ? ` · ${escHtml(s.podcast.duration)}` : ''} · Spotify</div>
+            ${s.podcast.why ? `<div class="gp-why">${escHtml(s.podcast.why)}</div>` : ''}
+          </a>` : ''}
         <div class="gym-warmup"><b>Warm-up</b> · ${s.day.warmup.map(escHtml).join(' · ')}</div>
         ${items}
         <textarea class="gym-notes" placeholder="${gymProgram() === 'cycling'

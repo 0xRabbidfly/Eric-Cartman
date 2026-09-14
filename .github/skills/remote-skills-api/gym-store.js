@@ -127,6 +127,11 @@ function createGymStore(dataRoot, { libraryPath = DEFAULT_LIBRARY_PATH } = {}) {
     return readJson(at(profileId, 'logs', `W${week}D${day}.json`), null);
   }
 
+  /** Optional podcast picks, keyed `W<week>D<day>`. Kept out of the week files so regenerating a week never drops them. */
+  function readPodcasts(profileId) {
+    return readJson(at(profileId, 'podcasts.json'), {});
+  }
+
   // ── Program position ──
   //
   // Position in the program is by session sequence, never by calendar. The
@@ -374,10 +379,12 @@ function createGymStore(dataRoot, { libraryPath = DEFAULT_LIBRARY_PATH } = {}) {
     requireProfile(profileId);
     const data = readWeekFile(profileId, week);
     const state = sequenceState(profileId);
+    const podcasts = readPodcasts(profileId);
     const days = data.days.map((day) => {
       const log = readLog(profileId, week, day.day);
       return {
         ...day,
+        podcast: podcasts[`W${week}D${day.day}`] || null,
         logStatus: log ? log.status : 'not_started',
         performedOn: log ? log.performedOn : null,
         loggedSets: log ? log.entries.length : 0,
@@ -405,6 +412,7 @@ function createGymStore(dataRoot, { libraryPath = DEFAULT_LIBRARY_PATH } = {}) {
       day: dayData,
       log: readLog(profileId, week, day) || emptyLog(profileId, week, day),
       maxes: readJson(at(profileId, 'maxes.json'), {}),
+      podcast: readPodcasts(profileId)[`W${week}D${day}`] || null,
       ...sequenceFlags(sequenceState(profileId), week, day),
     };
   }
