@@ -55,8 +55,11 @@ if errorlevel 1 (
 node ".github\skills\remote-skills-api\server.js" >> "%LOG%" 2>&1
 set "EXITCODE=%ERRORLEVEL%"
 echo [%date% %time%] Remote Skills API exited with code %EXITCODE% >> "%LOG%"
+:: Keep parentheses and :: comments out of this block. An unescaped ")" in the
+:: echoed text once closed it early: cmd aborted the whole launcher on the syntax
+:: error, so no exit - crash, kill or the exit-75 restart - ever relaunched.
 if "%EXITCODE%"=="0" (
-	echo [%date% %time%] Clean shutdown (exit 0); not restarting >> "%LOG%"
+	echo [%date% %time%] Clean shutdown with exit 0, not restarting >> "%LOG%"
 	popd
 	exit /b 0
 )
