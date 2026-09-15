@@ -641,6 +641,55 @@ function createGymStore(dataRoot, { libraryPath = DEFAULT_LIBRARY_PATH } = {}) {
     return reopened;
   }
 
+  const KG_PER_LB = 0.45359237;
+  const ASSUMABLE_RESULTS = new Set(['reps', 'reps_per_side', 'seconds']);
+
+  /** The app-wide weight unit people type and read. Storage is always kilograms. */
+  function getUnits() {
+    requireEnabled();
+    const { units } = readJson(at('profiles.json'), {});
+    return units === 'lb' ? 'lb' : 'kg';
+  }
+
+  /**
+   * What a blank means once a set is finished, so the athlete types only what
+   * differs from the plan:
+   * - a barbell set (the library gives the exercise a `barLb`) left blank or at
+   *   0 is the empty bar. A typed load is a full total and is never touched.
+   *   On a max-test ramp only a typed 0 is the bar: a blank there is a set
+   *   whose weight went unrecorded, and filling it in would test a fake max.
+   * - blank reps are the prescribed reps, or the prescribed hold for seconds.
+   *   Never on a max-test ramp or a baseline, where the number is the
+   *   measurement, and never on centimetres or metres, which are not a count.
+   * - a weighted pull-up with no added load is bodyweight.
+   * Filled-in values carry `assumed`, so the assessment can tell them apart.
+   */
+  function applyFinishDefaults(items, entries) {
+    const byId = new Map(items.map((i) => [i.id, i]));
+    const library = readJson(libraryPath, {});
+    return entries.map((entry) => {
+      const item = byId.get(entry.itemId);
+      if (!item) return entry;
+      const next = { ...entry };
+      const assumed = [];
+      const { barLb } = library[item.exerciseKey] || {};
+      const blankLoad = next.load === null || next.load === undefined;
+      if (item.loadType === 'kg' && typeof barLb === 'number'
+          && ((blankLoad && !item.isRamp) || next.load === 0)) {
+        next.load = Math.round(barLb * KG_PER_LB * 1000) / 1000;
+        assumed.push('load');
+      }
+      if (item.loadType === 'bodyweight_plus_kg' && blankLoad) next.load = 0;
+      if ((next.reps === null || next.reps === undefined) && typeof item.reps === 'number'
+          && ASSUMABLE_RESULTS.has(item.resultType) && !item.isRamp && !item.isBaseline) {
+        next.reps = item.reps;
+        assumed.push('reps');
+      }
+      if (assumed.length) next.assumed = [...new Set([...(entry.assumed || []), ...assumed])];
+      return next;
+    });
+  }
+
   /**
    * `performedOnHint` is the phone's local calendar date. It is used only when
    * the log has no date yet and the hint passes validPerformedOnHint; otherwise
@@ -657,6 +706,7 @@ function createGymStore(dataRoot, { libraryPath = DEFAULT_LIBRARY_PATH } = {}) {
     }
     const finished = {
       ...log,
+      entries: applyFinishDefaults(dayItems(profileId, week, day), log.entries),
       status: 'complete',
       // The day it was performed, kept. Reopening to correct a transcribed
       // number — or the UI's retry, which reopens purely to re-run the model —
@@ -844,6 +894,7 @@ function createGymStore(dataRoot, { libraryPath = DEFAULT_LIBRARY_PATH } = {}) {
     listProfiles,
     nextSession,
     assertInSequence,
+    getUnits,
     getWeek,
     getSession,
     getExercises,

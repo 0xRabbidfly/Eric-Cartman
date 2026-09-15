@@ -1557,7 +1557,7 @@ const gymProfileId = (req) => String(req.query.profile || '');
 
 app.get('/api/gym/profiles', auth, gymHandler((req, res) => {
   if (!gymStore.isEnabled()) return res.json({ enabled: false, profiles: [] });
-  res.json({ enabled: true, profiles: gymStore.listProfiles() });
+  res.json({ enabled: true, units: gymStore.getUnits(), profiles: gymStore.listProfiles() });
 }));
 
 app.get('/api/gym/week/:n', auth, gymHandler((req, res) => {

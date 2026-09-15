@@ -1347,6 +1347,8 @@
       // at something else is still there when they come back.
       assessmentCache: {},
       exercises: null,
+      // What people type and read. The server stores kilograms either way.
+      units: 'kg',
     };
 
     async function loadGymProfiles() {
@@ -1355,6 +1357,7 @@
         gym.loaded = true;
         gym.enabled = !!data.enabled;
         gym.profiles = data.profiles || [];
+        gym.units = data.units === 'lb' ? 'lb' : 'kg';
         document.getElementById('gymTabBtn').hidden = !gym.enabled;
         if (!gym.enabled) return;
         // A saved id that is no longer in the list falls back to the first
@@ -1424,7 +1427,10 @@
     async function gymRefreshProfiles() {
       try {
         const data = await api('/api/gym/profiles');
-        if (data.enabled) gym.profiles = data.profiles || [];
+        if (data.enabled) {
+          gym.profiles = data.profiles || [];
+          gym.units = data.units === 'lb' ? 'lb' : 'kg';
+        }
       } catch { /* keep the last numbers rather than blanking the tracker */ }
     }
 
@@ -1635,16 +1641,78 @@
       return max;
     }
 
+    // ── Weight units ──
+    // Everything is stored in kilograms. With the app set to pounds, a typed
+    // number is stored as kilograms to three decimals, which reads back as
+    // exactly what was typed, and a prescribed load is shown the way the gym
+    // has it: 5 lb steps, per hand for a dumbbell pair. gymlib.target_lb in the
+    // gym-cyclist skill applies the same rounding, so notes and app agree.
+    const GYM_KG_PER_LB = 0.45359237;
+    const GYM_WEIGHT_TYPES = new Set(['kg', 'kg_total_pair', 'bodyweight_plus_kg']);
+
+    function gymIsLb() { return gym.units === 'lb'; }
+    function gymWeightUnit() { return gymIsLb() ? 'lb' : 'kg'; }
+    function gymIsWeight(item) { return GYM_WEIGHT_TYPES.has(item.loadType); }
+
+    function gymShowWeight(kg) {
+      if (kg === null || kg === undefined || kg === '') return '';
+      const value = gymIsLb() ? kg / GYM_KG_PER_LB : kg;
+      return String(Math.round(value * 10) / 10);
+    }
+
+    function gymStoreWeight(typed) {
+      return gymIsLb() ? Math.round(typed * GYM_KG_PER_LB * 1000) / 1000 : typed;
+    }
+
+    function gymTargetWeight(kg, loadType) {
+      if (!gymIsLb()) return kg;
+      const lb = kg / GYM_KG_PER_LB;
+      const nearest5 = v => Math.round(v / 5) * 5;
+      return loadType === 'kg_total_pair' ? nearest5(lb / 2) * 2 : nearest5(lb);
+    }
+
+    function gymBarLabel(item) {
+      const { barLb } = (gym.exercises || {})[item.exerciseKey] || {};
+      if (typeof barLb !== 'number') return null;
+      return gymIsLb() ? `${barLb} lb` : `${Math.round(barLb * GYM_KG_PER_LB * 10) / 10} kg`;
+    }
+
     function gymLoadLabel(item) {
-      const target = item.targetLoad;
+      const unit = gymWeightUnit();
+      const hasTarget = item.targetLoad !== null && item.targetLoad !== undefined;
+      const target = hasTarget && gymIsWeight(item) ? gymTargetWeight(item.targetLoad, item.loadType) : item.targetLoad;
       if (item.loadType === 'bodyweight') return 'bodyweight';
-      if (item.loadType === 'setting') return target ? `setting ${target}` : 'cable setting';
-      if (item.loadType === 'bodyweight_plus_kg') return target ? `bw + ${target} kg` : 'bw + load';
-      if (target === null || target === undefined) {
-        return item.targetPct ? `${item.targetPct}% of 1RM — not set yet` : 'your call';
+      if (item.loadType === 'setting') return hasTarget ? `setting ${target}` : 'cable setting';
+      if (item.loadType === 'bodyweight_plus_kg') return target ? `bodyweight + ${target} ${unit}` : 'bodyweight';
+      if (!hasTarget) {
+        return item.targetPct ? `${item.targetPct}% of 1RM — not set yet` : 'pick a weight';
       }
-      if (item.loadType === 'kg_total_pair') return `${target} kg total (${target / 2}/hand)`;
-      return `${target} kg`;
+      if (item.loadType === 'kg_total_pair') return `${target} ${unit} both together (${target / 2} each hand)`;
+      return `${target} ${unit}`;
+    }
+
+    // What to type in the load box, said once per exercise.
+    function gymLoadHint(item) {
+      const { loadHint } = (gym.exercises || {})[item.exerciseKey] || {};
+      const bar = gymBarLabel(item);
+      if (item.loadType === 'kg_total_pair') return 'Weight: both dumbbells added together.';
+      if (bar) return `Weight: the total, ${bar} bar included. Blank or 0 is the empty bar.`;
+      if (loadHint) return `Weight: ${loadHint}.`;
+      if (item.loadType === 'bodyweight') return 'Leave the weight blank. It counts as bodyweight.';
+      if (item.loadType === 'bodyweight_plus_kg') return 'Weight: only what you add. Blank is bodyweight.';
+      return '';
+    }
+
+    // Target RPE is how hard the working sets should feel, said in reps left.
+    // On a max test it is the ceiling the ramp builds up to instead.
+    function gymRpeLabel(item) {
+      const rpe = item.targetRpe;
+      if (item.isRamp) return `build up to RPE ${rpe}`;
+      const left = 10 - rpe;
+      const words = left <= 0 ? 'nothing left'
+        : Number.isInteger(left) ? `about ${left} rep${left === 1 ? '' : 's'} left`
+        : `${Math.floor(left)}–${Math.ceil(left)} reps left`;
+      return `RPE ${rpe} · ${words}`;
     }
 
     const GYM_UNITS = { reps: 'reps', reps_per_side: 'reps/side', seconds: 's', cm: 'cm', metres: 'm' };
@@ -1667,8 +1735,12 @@
     // does not fire on a field the user taps and leaves unchanged — so
     // "confirming" a pre-filled target would silently record nothing.
     function gymLoadPlaceholder(item) {
-      if (item.targetLoad !== null && item.targetLoad !== undefined) return String(item.targetLoad);
-      return item.loadType === 'bodyweight' ? 'bw' : 'load';
+      if (item.targetLoad !== null && item.targetLoad !== undefined) {
+        return String(gymIsWeight(item) ? gymTargetWeight(item.targetLoad, item.loadType) : item.targetLoad);
+      }
+      if (item.loadType === 'bodyweight' || item.loadType === 'bodyweight_plus_kg') return 'bw';
+      if (gymBarLabel(item)) return 'bar';
+      return gymIsWeight(item) ? gymWeightUnit() : 'load';
     }
 
     // The middle column holds whatever the exercise is measured in: reps for a
@@ -1702,7 +1774,7 @@
             <div class="gym-setrow">
               <div class="sr-n">${n}</div>
               <input inputmode="decimal" placeholder="${escHtml(gymLoadPlaceholder(item))}"
-                     class="${filled(e.load)}" value="${val(e.load)}" ${readOnly ? 'disabled' : ''}
+                     class="${filled(e.load)}" value="${gymIsWeight(item) ? gymShowWeight(e.load) : val(e.load)}" ${readOnly ? 'disabled' : ''}
                      onchange="gymSetInput('${escJsAttr(item.id)}', ${n}, 'load', this.value, this)">
               <input inputmode="numeric" placeholder="${escHtml(gymResultPlaceholder(item))}"
                      class="${filled(e.reps)}" value="${val(e.reps)}" ${readOnly ? 'disabled' : ''}
@@ -1716,7 +1788,8 @@
         const paired = item.pairedWith
           ? ` · then ${item.pairedWith.reps} ${item.pairedWith.exerciseKey.replace(/-/g, ' ')} within ${item.pairedWith.withinSec}s`
           : '';
-        const rpe = item.targetRpe ? ` · RPE ${item.targetRpe}` : '';
+        const rpe = item.targetRpe ? ` · ${gymRpeLabel(item)}` : '';
+        const hint = readOnly ? '' : gymLoadHint(item);
         const ctl = (item.setsAreOptional && !readOnly) ? `
           <div class="gym-setctl">
             <button onclick="gymAddSet('${escJsAttr(item.id)}')">+ set</button>
@@ -1730,7 +1803,8 @@
               <span class="gi-name" onclick="gymShowExercise('${escJsAttr(item.exerciseKey)}')">${escHtml(item.label)}</span>
             </div>
             <div class="gi-presc"><span class="gi-num">${escHtml(gymRepLabel(item))} · ${escHtml(gymLoadLabel(item))}${rpe}</span> · rest ${item.restSec}s${escHtml(paired)}
-              ${item.loadNote ? `<br>${escHtml(item.loadNote)}` : ''}</div>
+              ${item.loadNote ? `<br>${escHtml(item.loadNote)}` : ''}
+              ${hint ? `<br>${escHtml(hint)}` : ''}</div>
             <div class="gym-sets">
               <div class="gym-setrow head"><div></div><div>Load</div><div>Reps</div><div>RPE</div></div>
               ${rows.join('')}
@@ -1763,6 +1837,7 @@
             <div>${escHtml(s.podcast.show)}${s.podcast.duration ? ` · ${escHtml(s.podcast.duration)}` : ''} · Spotify</div>
             ${s.podcast.why ? `<div class="gp-why">${escHtml(s.podcast.why)}</div>` : ''}
           </a>` : ''}
+        ${readOnly ? '' : `<div class="gym-locked-note">Weights in ${gymWeightUnit()}. Blank reps count as the reps shown when you finish, except on max tests and baselines.</div>`}
         <div class="gym-warmup"><b>Warm-up</b> · ${s.day.warmup.map(escHtml).join(' · ')}</div>
         ${items}
         <textarea class="gym-notes" placeholder="${gymProgram() === 'cycling'
@@ -1825,6 +1900,12 @@
       const text = String(raw).trim();
       entry[field] = text === '' ? null : Number(text);
       if (Number.isNaN(entry[field])) entry[field] = null;
+      if (field === 'load' && entry.load !== null && gymIsWeight(item)) entry.load = gymStoreWeight(entry.load);
+      // A value the athlete types is no longer one the server assumed at finish.
+      if (entry.assumed) {
+        entry.assumed = entry.assumed.filter(f => f !== field);
+        if (!entry.assumed.length) delete entry.assumed;
+      }
       gymSession.entries.set(key, entry);
       // Keep the green "logged" border in step with what was just typed.
       if (el) el.classList.toggle('filled', String(raw).trim() !== '');
@@ -2073,13 +2154,13 @@
       const rows = Object.values(data.loadTrend || {}).map(t => {
         const first = t.points[0];
         const last = t.points[t.points.length - 1];
-        const unit = t.loadType === 'kg_total_pair' ? 'kg pair' : 'kg';
-        const delta = Math.round((last.load - first.load) * 10) / 10;
+        const unit = t.loadType === 'kg_total_pair' ? `${gymWeightUnit()} pair` : gymWeightUnit();
+        const delta = Number(gymShowWeight(last.load - first.load));
         const path = t.points.length > 1
-          ? `W${first.week} ${first.load} → W${last.week} ${last.load} ${unit}${delta ? ` · ${delta > 0 ? '+' : ''}${delta}` : ''}`
+          ? `W${first.week} ${gymShowWeight(first.load)} → W${last.week} ${gymShowWeight(last.load)} ${unit}${delta ? ` · ${delta > 0 ? '+' : ''}${delta}` : ''}`
           : `W${last.week} · ${last.reps} reps`;
         return `<div class="gym-trendrow"><div class="tr-name">${escHtml(t.label)}</div>
-                <div class="tr-value">${escHtml(`${last.load} ${unit}`)}</div>
+                <div class="tr-value">${escHtml(`${gymShowWeight(last.load)} ${unit}`)}</div>
                 <div class="tr-path">${escHtml(path)}</div></div>`;
       }).join('');
       return rows || '<div class="gym-pace">Appears once sets with a weight are logged. Machine pins and bodyweight work are not counted.</div>';
@@ -2107,7 +2188,9 @@
         <div class="gym-statrow ${w.sessionsCompleted === 0 ? 'dim' : ''}">
           <div class="sr-label">W${w.week}</div>
           ${gymBar(w.tonnage, maxTonnage)}
-          <div class="sr-value">${w.tonnage ? `${(w.tonnage / 1000).toFixed(1)}t` : '—'}</div>
+          <div class="sr-value">${!w.tonnage ? '—'
+            : gymIsLb() ? `${(w.tonnage / GYM_KG_PER_LB / 1000).toFixed(1)}k lb`
+            : `${(w.tonnage / 1000).toFixed(1)}t`}</div>
         </div>`).join('');
 
       const adherence = data.weeks.filter(w => w.sessionsCompleted > 0).map(w => `
@@ -2146,9 +2229,9 @@
         const sign = delta > 0 ? '+' : '';
         return `<div class="gym-statrow">
           <div class="sr-label" style="width:auto">${name}</div>
-          <div class="sr-mid">3RM ${latest.threeRm} · W${latest.testedWeek || latest.week}${
-            showDelta ? ` · ${sign}${delta.toFixed(1)} kg` : ''}</div>
-          <div class="sr-value">${latest.e1rm} kg</div>
+          <div class="sr-mid">3RM ${gymShowWeight(latest.threeRm)} · W${latest.testedWeek || latest.week}${
+            showDelta ? ` · ${sign}${gymShowWeight(delta)} ${gymWeightUnit()}` : ''}</div>
+          <div class="sr-value">${gymShowWeight(latest.e1rm)} ${gymWeightUnit()}</div>
         </div>`;
       }).join('');
 

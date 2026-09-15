@@ -6,7 +6,8 @@
     "why": "the single biggest builder of leg strength. Trains quads, glutes and trunk under load in the knee-and-hip pattern behind running, jumping, stairs and pedalling.",
     "how": "bar on upper traps, feet shoulder width, toes slightly out. Big breath, brace, sit down between the hips keeping the chest up and knees tracking over the toes. Depth: thighs at least parallel. Drive the floor away, exhale at the top.",
     "cues": "\"spread the floor\", \"chest up, elbows under\", knees out over the little toe.",
-    "video": "https://www.youtube.com/watch?v=8PMjqgR8Wa8"
+    "video": "https://www.youtube.com/watch?v=8PMjqgR8Wa8",
+    "barLb": 45
   },
   "trap-bar-deadlift": {
     "key": "trap-bar-deadlift",
@@ -15,7 +16,8 @@
     "why": "heavy hip-and-knee extension with less lower-back stress than a straight bar. Builds the glutes, hamstrings and grip that lift anything heavy off the floor.",
     "how": "stand in the middle of the bar, feet hip width. Hinge and grab the high handles, shins near vertical, back flat, chest proud. Push the floor away and stand tall; hips and shoulders rise together. Lower under control, reset every rep.",
     "cues": "\"push, don't pull\", \"long spine\", squeeze the glutes at the top, don't lean back.",
-    "video": "https://www.youtube.com/watch?v=EsqwERaSTMI"
+    "video": "https://www.youtube.com/watch?v=EsqwERaSTMI",
+    "barLb": 45
   },
   "romanian-deadlift-rdl": {
     "key": "romanian-deadlift-rdl",
@@ -24,7 +26,8 @@
     "why": "hamstring and glute strength through the hip hinge; protects the lower back when you bend, lift or hold a forward-leaning position.",
     "how": "bar at the hips, soft knees. Push the hips back and let the bar slide down the thighs, back flat, until you feel a strong hamstring stretch (bar around mid-shin). Drive the hips forward to stand. Knees stay slightly bent the whole time.",
     "cues": "\"hips to the wall behind you\", bar close to the legs, shoulders down and back.",
-    "video": "https://www.youtube.com/watch?v=5bJEigM5iVg"
+    "video": "https://www.youtube.com/watch?v=5bJEigM5iVg",
+    "barLb": 45
   },
   "barbell-hip-thrust": {
     "key": "barbell-hip-thrust",
@@ -33,7 +36,8 @@
     "why": "maximal glute loading with no spinal compression. Strong glutes power sprinting, jumping and standing up from low positions.",
     "how": "upper back on a bench, bar padded over the hips, feet flat so the shins are vertical at the top. Drive through the heels to full hip extension, chin tucked, ribs down. Pause one second at the top, lower without touching down.",
     "cues": "\"ribs down, chin down\", squeeze glutes not lower back, shins vertical at the top.",
-    "video": "https://www.youtube.com/watch?v=S_uZP4UH6J0"
+    "video": "https://www.youtube.com/watch?v=S_uZP4UH6J0",
+    "barLb": 10
   },
   "bulgarian-split-squat": {
     "key": "bulgarian-split-squat",
@@ -105,7 +109,8 @@
     "why": "lats and mid-back plus anti-rotation for the trunk. Balances all the pressing.",
     "how": "one hand and knee on a bench (or a staggered stance), back flat. Row the dumbbell to the hip, elbow close to the body, pause, lower fully.",
     "cues": "\"pull to the hip, not the armpit\", hips level, no torso twist.",
-    "video": "https://www.youtube.com/watch?v=tLnlWj7LQ34"
+    "video": "https://www.youtube.com/watch?v=tLnlWj7LQ34",
+    "loadHint": "one dumbbell"
   },
   "landmine-press-single-arm": {
     "key": "landmine-press-single-arm",
@@ -114,7 +119,8 @@
     "why": "shoulder-safe pressing with a strong core component; the upward arc suits anyone with tight overhead range.",
     "how": "bar in a landmine or a corner. Half-kneeling or standing, hold the end at the shoulder, brace, press up and forward until the arm is straight. Lower with control.",
     "cues": "ribs down, glutes tight, don't lean back.",
-    "video": "https://www.youtube.com/watch?v=9OW4SONxuGI"
+    "video": "https://www.youtube.com/watch?v=9OW4SONxuGI",
+    "loadHint": "plates loaded on the bar end"
   },
   "pallof-press": {
     "key": "pallof-press",
@@ -204,7 +210,8 @@
     "why": "loaded jump without a bar on the spine. Builds explosive hip and knee extension for sprinting and jumping.",
     "how": "trap bar with light load (20–30% of your deadlift). Set up as for a deadlift, then jump as high as possible, land soft with the bar under control, reset fully before the next.",
     "cues": "\"jump, don't lift\", hips through, quiet landing.",
-    "video": "https://www.youtube.com/watch?v=rZGkx5PaZSM"
+    "video": "https://www.youtube.com/watch?v=rZGkx5PaZSM",
+    "barLb": 45
   },
   "kettlebell-swing": {
     "key": "kettlebell-swing",
@@ -213,7 +220,8 @@
     "why": "repeated explosive hip extension; power endurance for the posterior chain.",
     "how": "hinge, hike the bell back between the legs, then snap the hips forward so the bell floats to chest height. Arms are ropes. Let it fall and hinge again.",
     "cues": "\"it's a hinge, not a squat\", stand up hard, glutes finish the swing.",
-    "video": "https://www.youtube.com/watch?v=bDCeXbMJVNs"
+    "video": "https://www.youtube.com/watch?v=bDCeXbMJVNs",
+    "loadHint": "one kettlebell"
   },
   "hang-power-clean": {
     "key": "hang-power-clean",
@@ -222,7 +230,8 @@
     "why": "the highest power-output lift in the gym. Used only in the power block, once technique is clean.",
     "how": "bar at the hips, hinge to just above the knees. Explode the hips forward, shrug, pull the elbows high and fast, and catch the bar on the shoulders in a quarter squat. Stand up. Lower to the hips and repeat.",
     "cues": "\"jump and catch\", elbows fast, bar stays close.",
-    "video": "https://www.youtube.com/watch?v=CQgRkrtJaro"
+    "video": "https://www.youtube.com/watch?v=CQgRkrtJaro",
+    "barLb": 45
   },
   "goblet-squat": {
     "key": "goblet-squat",
@@ -231,7 +240,8 @@
     "why": "teaches the squat pattern with the load held in front, which keeps the chest up and the depth honest. Builds the quads and glutes with very little that can go wrong.",
     "how": "hold one dumbbell or kettlebell vertically against the chest, elbows under it. Feet a little wider than hips, toes slightly out. Sit down between the heels, knees tracking over the toes, until the elbows brush the inside of the knees. Stand up through the whole foot.",
     "cues": "\"elbows inside the knees\", chest proud, heels stay down.",
-    "video": "https://www.youtube.com/watch?v=CkFzgR55gho"
+    "video": "https://www.youtube.com/watch?v=CkFzgR55gho",
+    "loadHint": "one dumbbell"
   },
   "leg-press": {
     "key": "leg-press",
@@ -240,7 +250,8 @@
     "why": "heavy leg work with the back supported, so the quads and glutes can be loaded while balance and bracing are not the limit.",
     "how": "sit with the lower back flat against the pad, feet hip width in the middle of the platform. Release the handles, lower until the knees reach about 90° without the hips rolling off the pad, then press through the whole foot. Stop just short of locking the knees.",
     "cues": "hips stay glued to the seat, knees follow the toes, smooth down and up.",
-    "video": "https://www.youtube.com/watch?v=p5dCqF7wWUw"
+    "video": "https://www.youtube.com/watch?v=p5dCqF7wWUw",
+    "loadHint": "plates on the sled"
   },
   "dumbbell-reverse-lunge": {
     "key": "dumbbell-reverse-lunge",
@@ -267,7 +278,8 @@
     "why": "direct glute work from the floor, the easiest way to learn to finish a hip extension with the glutes rather than the lower back.",
     "how": "lie on your back, knees bent, feet flat and hip width, a dumbbell or plate resting on the hips. Tuck the ribs down, press through the heels and lift the hips until the body is a straight line from knees to shoulders. Squeeze for a second, lower slowly.",
     "cues": "\"ribs down, squeeze and hold\", push through the heels, no arching.",
-    "video": "https://www.youtube.com/watch?v=PhTDzR0TpZs"
+    "video": "https://www.youtube.com/watch?v=PhTDzR0TpZs",
+    "loadHint": "the weight across your hips"
   },
   "leg-curl": {
     "key": "leg-curl",

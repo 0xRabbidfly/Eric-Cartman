@@ -92,6 +92,11 @@ const put = (url, body) => fetch(`${BASE}${url}`, {
   body: JSON.stringify(body),
 });
 
+test('profiles reports the app-wide weight unit, kg when none is set', async () => {
+  const body = await (await get('/api/gym/profiles')).json();
+  assert.equal(body.units, 'kg');
+});
+
 test('gym routes require the bearer token', async () => {
   const res = await fetch(`${BASE}/api/gym/profiles`);
   assert.equal(res.status, 401);

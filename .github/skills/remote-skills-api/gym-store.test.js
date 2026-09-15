@@ -125,6 +125,104 @@ test('a podcast picked for a session shows on that day only, for that profile on
   assert.equal(store.getSession('athlete-b', 1, 2).podcast, null);
 });
 
+// A day carrying one of each kind of item the finish defaults treat differently.
+function defaultsFixture() {
+  const root = fixture();
+  const item = (over) => ({
+    block: 'B', sets: 3, reps: 8, resultType: 'reps', loadType: 'kg', targetLoad: null,
+    targetPct: null, loadNote: '', targetRpe: 7, restSec: 90,
+    isRamp: false, isBaseline: false, setsAreOptional: false, pairedWith: null, ...over,
+  });
+  const weekFile = path.join(root, 'athlete-b', 'weeks', 'W1.json');
+  const week = JSON.parse(fs.readFileSync(weekFile, 'utf8'));
+  week.days[0].items = [
+    item({ id: 'a-back-squat', exerciseKey: 'back-squat', label: 'Back squat', reps: 3, targetRpe: 9.5, isRamp: true, setsAreOptional: true }),
+    item({ id: 'b-hip-thrust', exerciseKey: 'barbell-hip-thrust', label: 'Barbell hip thrust' }),
+    item({ id: 'b-rdl', exerciseKey: 'romanian-deadlift-rdl', label: 'Romanian deadlift' }),
+    item({ id: 'c-row', exerciseKey: 'single-arm-dumbbell-row', label: 'Row', resultType: 'reps_per_side', reps: 10 }),
+    item({ id: 'c-pull-up', exerciseKey: 'pull-up-weighted', label: 'Pull-up', loadType: 'bodyweight_plus_kg', reps: 6 }),
+    item({ id: 'd-side-plank', exerciseKey: 'side-plank', label: 'Side plank', loadType: 'bodyweight', resultType: 'seconds', reps: 45, targetRpe: null }),
+    item({ id: 'd-front-plank', exerciseKey: 'front-plank', label: 'Front plank', loadType: 'bodyweight', resultType: 'seconds', reps: 120, targetRpe: null, isBaseline: true }),
+    item({ id: 'e-carry', exerciseKey: 'farmers-carry', label: 'Carry', loadType: 'kg_total_pair', resultType: 'metres', reps: 30 }),
+  ];
+  fs.writeFileSync(weekFile, JSON.stringify(week), 'utf8');
+  const library = path.join(root, 'exercises.json');
+  fs.writeFileSync(library, JSON.stringify({
+    'back-squat': { key: 'back-squat', name: 'Back squat', barLb: 45 },
+    'barbell-hip-thrust': { key: 'barbell-hip-thrust', name: 'Barbell hip thrust', barLb: 10 },
+    'romanian-deadlift-rdl': { key: 'romanian-deadlift-rdl', name: 'Romanian deadlift', barLb: 45 },
+  }), 'utf8');
+  fs.rmSync(path.join(root, 'athlete-b', 'logs'), { recursive: true, force: true });
+  return { root, store: createGymStore(root, { libraryPath: library }) };
+}
+
+const set = (itemId, n, over) => ({ itemId, set: n, load: null, loadType: 'kg', reps: null, rpe: null, note: '', ...over });
+const findSet = (log, itemId, n) => log.entries.find((e) => e.itemId === itemId && e.set === n);
+
+test('finishing fills blank reps with the prescription and marks them assumed', () => {
+  const { store } = defaultsFixture();
+  store.saveSession('athlete-b', 1, 1, { entries: [
+    set('b-rdl', 1, { load: 60, rpe: 7 }),
+    set('b-rdl', 2, { load: 60, reps: 6, rpe: 8 }),
+    set('c-row', 1, { load: 20, rpe: 7 }),
+    set('d-side-plank', 1, { loadType: 'bodyweight', rpe: 6 }),
+  ] });
+  const { log } = store.finishSession('athlete-b', 1, 1, new Date('2026-09-09T18:00:00'));
+  assert.equal(findSet(log, 'b-rdl', 1).reps, 8);
+  assert.deepEqual(findSet(log, 'b-rdl', 1).assumed, ['reps']);
+  assert.equal(findSet(log, 'b-rdl', 2).reps, 6, 'a typed rep count is never replaced');
+  assert.equal(findSet(log, 'b-rdl', 2).assumed, undefined);
+  assert.equal(findSet(log, 'c-row', 1).reps, 10);
+  assert.equal(findSet(log, 'd-side-plank', 1).reps, 45, 'a prescribed hold counts like prescribed reps');
+});
+
+test('finishing never assumes reps on a max test, a baseline or a distance', () => {
+  const { store } = defaultsFixture();
+  store.saveSession('athlete-b', 1, 1, { entries: [
+    set('a-back-squat', 1, { load: 60, rpe: 9 }),
+    set('d-front-plank', 1, { loadType: 'bodyweight', rpe: 9 }),
+    set('e-carry', 1, { loadType: 'kg_total_pair', load: 40, rpe: 7 }),
+  ] });
+  const { log } = store.finishSession('athlete-b', 1, 1, new Date('2026-09-09T18:00:00'));
+  for (const id of ['a-back-squat', 'd-front-plank', 'e-carry']) {
+    assert.equal(findSet(log, id, 1).reps, null, id);
+    assert.equal(findSet(log, id, 1).assumed, undefined, id);
+  }
+});
+
+test('finishing puts the bar on a barbell set left blank or at 0, using that exercise\'s bar', () => {
+  const { store } = defaultsFixture();
+  store.saveSession('athlete-b', 1, 1, { entries: [
+    set('a-back-squat', 1, { load: 0, reps: 5, rpe: 2 }),
+    set('b-hip-thrust', 1, { reps: 8, rpe: 5 }),
+    set('b-rdl', 1, { load: 61.235, reps: 8, rpe: 7 }),
+    set('c-row', 1, { reps: 10, rpe: 7 }),
+  ] });
+  const { log } = store.finishSession('athlete-b', 1, 1, new Date('2026-09-09T18:00:00'));
+  assert.equal(findSet(log, 'a-back-squat', 1).load, 20.412, '45 lb bar');
+  assert.deepEqual(findSet(log, 'a-back-squat', 1).assumed, ['load']);
+  assert.equal(findSet(log, 'b-hip-thrust', 1).load, 4.536, '10 lb hip-thrust bar');
+  assert.equal(findSet(log, 'b-rdl', 1).load, 61.235, 'a typed total already includes the bar');
+  assert.equal(findSet(log, 'c-row', 1).load, null, 'a dumbbell has no bar to assume');
+});
+
+test('a blank added load on a weighted pull-up means bodyweight', () => {
+  const { store } = defaultsFixture();
+  store.saveSession('athlete-b', 1, 1, { entries: [
+    set('c-pull-up', 1, { loadType: 'bodyweight_plus_kg', reps: 6, rpe: 8 }),
+  ] });
+  const { log } = store.finishSession('athlete-b', 1, 1, new Date('2026-09-09T18:00:00'));
+  assert.equal(findSet(log, 'c-pull-up', 1).load, 0);
+});
+
+test('units are app-wide, read from profiles.json, and default to kg', () => {
+  const root = fixture();
+  assert.equal(createGymStore(root).getUnits(), 'kg');
+  const file = path.join(root, 'profiles.json');
+  fs.writeFileSync(file, JSON.stringify({ ...JSON.parse(fs.readFileSync(file, 'utf8')), units: 'lb' }), 'utf8');
+  assert.equal(createGymStore(root).getUnits(), 'lb');
+});
+
 test('getSession rejects a day outside 1 to 3', () => {
   const store = createGymStore(fixture());
   expectCode(() => store.getSession('athlete-a', 1, 4), 'gym_session_not_found');

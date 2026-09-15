@@ -110,13 +110,13 @@ Phone (Safari/Chrome)
 | GET | `/api/recent-notes` | Vault notes touched in the last 7 days (`?days=N`, `?days=all`) |
 | GET | `/api/notes-by-topic` | Notes grouped by Library subfolder / podcast show |
 | GET | `/api/notes-by-week` | Notes grouped by ISO week, newest first |
-| GET | `/api/gym/profiles` | Gym profiles with each one's `program`, next session, program week and pace against the plan (`{enabled:false}` when no gym data) |
+| GET | `/api/gym/profiles` | The app-wide weight `units` (`kg` or `lb`) and gym profiles with each one's `program`, next session, program week and pace against the plan (`{enabled:false}` when no gym data) |
 | GET | `/api/gym/week/:n` | Week prescription plus per-day log status and any podcast picked for the day from `<profile>/podcasts.json` (`?profile=`) |
 | GET | `/api/gym/session/:week/:day` | One day's prescription merged with its log (`?profile=`) |
 | PUT | `/api/gym/session/:week/:day` | Save a partial log (`?profile=`) |
-| POST | `/api/gym/session/:week/:day/finish` | Complete the session and start the assessment; body `{performedOn: "YYYY-MM-DD"}` is the phone's local date, used when the log has none and within a day of the server's; returns `{jobId}` (`?profile=`) |
+| POST | `/api/gym/session/:week/:day/finish` | Complete the session, fill blank reps, barbell loads and weighted pull-up loads (each marked `assumed`), and start the assessment; body `{performedOn: "YYYY-MM-DD"}` is the phone's local date, used when the log has none and within a day of the server's; returns `{jobId}` (`?profile=`) |
 | POST | `/api/gym/session/:week/:day/reopen` | Make a finished session editable again (`?profile=`) |
-| GET | `/api/gym/exercises` | Exercise library with how-tos and videos, from the tracked `gym-library/exercises.json` (`?profile=`) |
+| GET | `/api/gym/exercises` | Exercise library with how-tos and videos, from the tracked `gym-library/exercises.json`. Barbell lifts carry `barLb`, the empty bar in pounds; single-weight lifts may carry a `loadHint` saying what to type (`?profile=`) |
 | GET | `/api/gym/stats` | The athlete's `program`, week-by-week tonnage, RPE and adherence, 1RM trend, working-load trend and baseline re-checks (`?profile=`) |
 | GET | `/api/gym/assessments` | Past session assessments, newest first (`?profile=`) |
 
@@ -147,6 +147,27 @@ sequence, locking and pace work the same way for every athlete:
   per exercise per week as `loadTrend`.
 - A week item may carry an optional `repsMax`, which makes its prescription a
   range: 3 × 10–12.
+
+Weights are always stored in kilograms. `profiles.json` may set `units: "lb"`
+for the whole app. The UI then takes pounds, stores them as kilograms to three
+decimals so they read back exactly as typed, and shows prescribed loads in
+5 lb steps, per hand for a dumbbell pair. `gymlib.py --lb-target` in the
+gym-cyclist skill rounds the same way, so assessment notes match the app.
+
+Finishing a session fills blanks the athlete skipped because they matched the
+plan, and lists each in the entry's `assumed` array:
+
+- Blank reps become the prescribed reps, or the prescribed hold for seconds.
+  Never on a max-test ramp, a baseline, centimetres or metres.
+- A barbell set (`barLb` in the library) left blank or at 0 becomes the empty
+  bar. On a max-test ramp only a typed 0 does.
+- A weighted pull-up with no added load becomes 0, bodyweight.
+
+Typing into a field the server filled removes that field from `assumed`.
+
+A profile may also have `<profile>/podcasts.json`, keyed `W<week>D<day>`, with
+an episode picked for that session. It is kept out of the week files, so
+regenerating a week never drops it.
 
 ## Environment Variables
 
@@ -220,6 +241,13 @@ old crowded header icon bar. The Gym tab appears only when gym data is present.
   - Session view logs load, reps and RPE per set with a numeric keypad, autosaves
     every change, shows rep ranges ("3 × 10–12") where the week has them, and
     links each exercise to its how-to and video
+  - Weights read and type in the app-wide unit. Each exercise says what to type:
+    both dumbbells together, one dumbbell, or the barbell total with the bar
+    included. Target RPE reads in reps left ("RPE 7 · about 3 reps left"), a max
+    test reads "build up to RPE 9.5", and a lift with no load yet says "pick a
+    weight"
+  - A session with a podcast picked for it shows the episode as a Spotify card,
+    and the week list shows its title under the day
   - Finish workout runs the `gym-cyclist` skill and shows the assessment inline
   - Stats shows pace (sessions per week so far, projected against planned finish),
     weekly tonnage, adherence and average RPE. A cycling athlete also sees the
