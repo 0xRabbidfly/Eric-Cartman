@@ -638,6 +638,10 @@ function scheduleRestart(reason) {
  */
 function claudeEnv() {
   const env = { ...process.env };
+  // Python's UTF-8 mode. Without it a bare open() in a model-written script
+  // reads UTF-8 files as cp1252 on Windows, so "×" is saved back as "Ã—".
+  // That corrupted a gym week file on 2026-09-14.
+  env.PYTHONUTF8 = '1';
   if ((process.env.USE_ANTHROPIC_API_KEY || '').toLowerCase() !== 'true') {
     delete env.ANTHROPIC_API_KEY;
     delete env.ANTHROPIC_AUTH_TOKEN;
@@ -1610,6 +1614,9 @@ app.post('/api/gym/session/:week/:day/finish', auth, gymHandler((req, res) => {
     `Assess the session just completed: profile=${profileId} week=${week} day=${day}. `
     + 'Read the log, write the assessment file, apply the adjustment rules, and if all '
     + 'three days of this week are logged, generate the next week. '
+    + 'The session may have been reopened and finished again, so the log and the maxes can '
+    + 'differ from what any existing assessment or next-week file was built from. Rewrite and '
+    + 'recompute from the current data; never skip a step because its output already exists. '
     + 'Reply with the short summary only.');
   trackSkillUsage('gym-cyclist');
   currentGoal = `/gym-cyclist W${week}D${day} ${profileId}`;

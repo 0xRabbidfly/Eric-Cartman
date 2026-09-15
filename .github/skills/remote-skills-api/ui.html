@@ -1536,10 +1536,19 @@
 
       // Week 1 has no week before it to calculate from, whatever its flag says.
       const waitsOnTests = gymProgram() === 'cycling' ? ' and the tests it depends on exist' : '';
-      const banner = (w.loadsResolved || w.week <= 1) ? '' : `
+      // Not calculated yet (no generatedAt) is a different state from calculated
+      // with a few weights left open, which new exercises always have.
+      const unset = w.days.reduce((n, d) => n + d.items.filter(i =>
+        gymIsWeight(i) && (i.targetLoad === null || i.targetLoad === undefined)).length, 0);
+      const banner = (w.loadsResolved || w.week <= 1) ? ''
+        : !w.generatedAt ? `
         <div class="gym-banner">Loads for this week are not set yet. They are
         calculated once week ${w.week - 1} is fully logged${waitsOnTests}.
-        You can still log whatever you lift.</div>`;
+        You can still log whatever you lift.</div>`
+        : unset ? `
+        <div class="gym-locked-note">${unset} exercise${unset === 1 ? ' has' : 's have'} no weight yet. Pick one at
+        the target RPE; the next week starts from what you log.</div>`
+        : '';
 
       const days = w.days.map(d => {
         const sets = `${d.loggedSets} set${d.loggedSets === 1 ? '' : 's'} logged`;
