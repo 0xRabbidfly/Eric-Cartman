@@ -936,9 +936,18 @@
           "note_path": "Podcasts/No Priors Artificial Intelligence  Technology  Startups/2026-09-03 - Redefining Chip Architecture with Arm CEO Rene Haas.md",
           "processed_at": "2026-09-05T06:19:22.612747+00:00",
           "status": "completed"
+        },
+        "2ecd3b38-aca0-11f1-b6c4-13e4bbce7d30": {
+          "title": "Coinbase’s Everything Exchange: Agentic Finance, Stablecoins, and Tokenization with CEO Brian Armstrong",
+          "published": "2026-09-10",
+          "audio_url": "https://traffic.megaphone.fm/PDP7232498988.mp3",
+          "transcript_path": "Podcasts/No Priors Artificial Intelligence  Technology  Startups/transcripts/2026-09-10 - Coinbase’s Everything Exchange Agentic Finance, Stablecoins, and Tokenization with CEO Brian Armstrong.md",
+          "note_path": "Podcasts/No Priors Artificial Intelligence  Technology  Startups/2026-09-10 - Coinbase’s Everything Exchange Agentic Finance, Stablecoins, and Tokenization with CEO Brian Armstrong.md",
+          "processed_at": "2026-09-15T06:13:56.996522+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-09-03"
+      "latest_published": "2026-09-10"
     },
     "cgi-conversations": {
       "name": "CGI Conversations",
