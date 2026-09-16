@@ -712,9 +712,18 @@
           "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-09-13 - Ask the Mates anything  MOONSHOTS AMA  289.md",
           "processed_at": "2026-09-14T06:42:41.351003+00:00",
           "status": "completed"
+        },
+        "f81c3278-b065-11f1-9f79-d371b57a1086": {
+          "title": "Martine Rothblatt: Growing Unlimited Organs, AI Consciousness, & Digital Personhood by 2030",
+          "published": "2026-09-15",
+          "audio_url": "https://traffic.megaphone.fm/DVVTS3825665281.mp3",
+          "transcript_path": "Podcasts/Moonshots with Peter Diamandis/transcripts/2026-09-15 - Martine Rothblatt Growing Unlimited Organs, AI Consciousness, & Digital Personhood by 2030.md",
+          "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-09-15 - Martine Rothblatt Growing Unlimited Organs, AI Consciousness, & Digital Personhood by 2030.md",
+          "processed_at": "2026-09-16T06:13:50.401846+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-09-13"
+      "latest_published": "2026-09-15"
     },
     "dwarkesh-podcast": {
       "name": "Dwarkesh Podcast",
