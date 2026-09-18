@@ -1171,6 +1171,23 @@
         }
       },
       "latest_published": "2026-05-19"
+    },
+    "lifespan-with-dr-david-sinclair": {
+      "name": "Lifespan with Dr. David Sinclair",
+      "rss_url": "https://feeds.megaphone.fm/NUOAC1101959196",
+      "spotify_id": "",
+      "episodes": {
+        "6631bae4-490f-11f1-b00a-076a3a06bb9b": {
+          "title": "What To Do For Longevity | Lifespan with Dr. David Sinclair Rewind",
+          "published": "2026-05-06",
+          "audio_url": "https://traffic.megaphone.fm/NUOAC2568241786.mp3",
+          "transcript_path": "Podcasts/Lifespan with Dr. David Sinclair/transcripts/2026-05-06 - What To Do For Longevity  Lifespan with Dr. David Sinclair Rewind.md",
+          "note_path": "Podcasts/Lifespan with Dr. David Sinclair/2026-05-06 - What To Do For Longevity  Lifespan with Dr. David Sinclair Rewind.md",
+          "processed_at": "2026-09-18T22:40:20.053862+00:00",
+          "status": "completed"
+        }
+      },
+      "latest_published": "2026-05-06"
     }
   }
 }
