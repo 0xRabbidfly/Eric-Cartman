@@ -839,9 +839,18 @@
           "note_path": "Podcasts/The Pragmatic Engineer/2026-09-09 - Building Codex with Tibo Sottiaux.md",
           "processed_at": "2026-09-14T07:04:55.142401+00:00",
           "status": "completed"
+        },
+        "substack:post:215854309": {
+          "title": "AI Skills with Matt Pocock",
+          "published": "2026-09-17",
+          "audio_url": "https://api.substack.com/feed/podcast/215854309/4ad68d9138821a400b88a71f055cf33a.mp3",
+          "transcript_path": "Podcasts/The Pragmatic Engineer/transcripts/2026-09-17 - AI Skills with Matt Pocock.md",
+          "note_path": "Podcasts/The Pragmatic Engineer/2026-09-17 - AI Skills with Matt Pocock.md",
+          "processed_at": "2026-09-19T06:21:15.832831+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-09-09"
+      "latest_published": "2026-09-17"
     },
     "naval": {
       "name": "Naval",
@@ -972,9 +981,18 @@
           "note_path": "Podcasts/No Priors Artificial Intelligence  Technology  Startups/2026-09-10 - Coinbase’s Everything Exchange Agentic Finance, Stablecoins, and Tokenization with CEO Brian Armstrong.md",
           "processed_at": "2026-09-15T06:13:56.996522+00:00",
           "status": "completed"
+        },
+        "51c4092c-b309-11f1-8603-fb8d30e1277f": {
+          "title": "Why Diffusion Will Win AI Inference with Inception Co-Founder and CEO Stefano Ermon",
+          "published": "2026-09-18",
+          "audio_url": "https://traffic.megaphone.fm/PDP7720707490.mp3",
+          "transcript_path": "Podcasts/No Priors Artificial Intelligence  Technology  Startups/transcripts/2026-09-18 - Why Diffusion Will Win AI Inference with Inception Co-Founder and CEO Stefano Ermon.md",
+          "note_path": "Podcasts/No Priors Artificial Intelligence  Technology  Startups/2026-09-18 - Why Diffusion Will Win AI Inference with Inception Co-Founder and CEO Stefano Ermon.md",
+          "processed_at": "2026-09-19T06:27:39.546343+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-09-10"
+      "latest_published": "2026-09-18"
     },
     "cgi-conversations": {
       "name": "CGI Conversations",
