@@ -739,9 +739,18 @@
           "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-09-17 - Frontier Labs Want to Slow Down, OpenAI Delays Its 2026 IPO, Anthropic Flags 5 Bioweapon Cases  EP 291.md",
           "processed_at": "2026-09-18T06:37:20.576296+00:00",
           "status": "completed"
+        },
+        "d6b87826-b448-11f1-a875-87e392634f16": {
+          "title": "Robinhood's Vlad Tenev on Tokenizing Everything, OpenAI's 6 Misalignment Reports, Figure's Robot Makes Beds | EP #292",
+          "published": "2026-09-19",
+          "audio_url": "https://traffic.megaphone.fm/DVVTS4856020322.mp3",
+          "transcript_path": "Podcasts/Moonshots with Peter Diamandis/transcripts/2026-09-19 - Robinhood's Vlad Tenev on Tokenizing Everything, OpenAI's 6 Misalignment Reports, Figure's Robot Makes Beds  EP 292.md",
+          "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-09-19 - Robinhood's Vlad Tenev on Tokenizing Everything, OpenAI's 6 Misalignment Reports, Figure's Robot Makes Beds  EP 292.md",
+          "processed_at": "2026-09-20T06:25:03.113680+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-09-17"
+      "latest_published": "2026-09-19"
     },
     "dwarkesh-podcast": {
       "name": "Dwarkesh Podcast",
@@ -1203,9 +1212,18 @@
           "note_path": "Podcasts/Lifespan with Dr. David Sinclair/2026-05-06 - What To Do For Longevity  Lifespan with Dr. David Sinclair Rewind.md",
           "processed_at": "2026-09-18T22:40:20.053862+00:00",
           "status": "completed"
+        },
+        "006ad0b0-b408-11f1-b957-4fc4ded59a13": {
+          "title": "This Sugar Substitute May Extend Your Life | Lifespan with Dr. David Sinclair - S2, Ep. 9",
+          "published": "2026-09-19",
+          "audio_url": "https://traffic.megaphone.fm/NUOAC4812816628.mp3",
+          "transcript_path": "Podcasts/Lifespan with Dr. David Sinclair/transcripts/2026-09-19 - This Sugar Substitute May Extend Your Life  Lifespan with Dr. David Sinclair - S2, Ep. 9.md",
+          "note_path": "Podcasts/Lifespan with Dr. David Sinclair/2026-09-19 - This Sugar Substitute May Extend Your Life  Lifespan with Dr. David Sinclair - S2, Ep. 9.md",
+          "processed_at": "2026-09-20T06:33:25.480164+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-05-06"
+      "latest_published": "2026-09-19"
     }
   }
 }
