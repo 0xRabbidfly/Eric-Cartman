@@ -122,7 +122,19 @@ Phone (Safari/Chrome)
 
 All three note endpoints scan `Research/Library` and `Podcasts` in the vault
 (skipping `00 MOC`, `attachments`, `transcripts`, show index files, and stubs
-under 1 KB) and return Obsidian deep links (`obsidian://open?vault=Rabbidfly Vault…`).
+under 1 KB) and return Obsidian deep links.
+
+The vault name in those links is the vault name **on the phone that opens the
+link**, which has nothing to do with this machine's folder name — here the
+folder is `Obsidian Vault` while the phone's vault is `Rabbidfly Vault`.
+Override with `OBSIDIAN_VAULT_NAME` if the phone's vault is renamed.
+
+A link only resolves once the note has reached the device. The server lists
+notes the moment they hit the vault filesystem, so a note written minutes ago
+is listed here and still absent on the phone until Obsidian Sync pushes it —
+the phone then opens Obsidian and reports the file missing, which is true. That
+is a sync delay, not a bad link; the writing pipelines now end by leaving
+Obsidian running so Sync gets a window.
 
 The gym routes read a private data store outside version control. When it is
 absent, `/api/gym/profiles` reports `enabled: false`, every other gym route

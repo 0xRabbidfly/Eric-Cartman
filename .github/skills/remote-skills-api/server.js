@@ -1366,6 +1366,13 @@ const VAULT_PATH = path.join('C:', 'Users', 'nuno_', 'Documents', 'Obsidian Vaul
 const LIBRARY_REL = 'Research/Library';
 const PODCASTS_REL = 'Podcasts';
 
+// The vault name in a deep link is the vault name on the device that OPENS the
+// link — the phone — which is not this machine's folder name. Here the folder is
+// "Obsidian Vault" while the phone's vault is "Rabbidfly Vault", so the two are
+// unrelated strings and reading one off the other sends you chasing ghosts.
+// Override with OBSIDIAN_VAULT_NAME if the phone's vault is ever renamed.
+const VAULT_LINK_NAME = process.env.OBSIDIAN_VAULT_NAME || 'Rabbidfly Vault';
+
 // Scan the vault once and return every note, newest first. Shared by all three
 // note endpoints — they differ only in how they group the result.
 function scanVaultNotes() {
@@ -1398,9 +1405,11 @@ function scanVaultNotes() {
           const folder = path.basename(path.dirname(fullPath));
           const title = entry.name.replace(/\.md$/, '');
           const filePath = relativePath.replace(/\.md$/, '');
-          // Obsidian deep links: vault name unencoded, file path with / preserved but spaces encoded
+          // Deep link: / stays a separator so Obsidian resolves the path, every
+          // segment is encoded, and so is the vault name — a raw space in the
+          // query only worked because the browser silently encoded it for us.
           const encodedFile = filePath.split('/').map(s => encodeURIComponent(s)).join('/');
-          const obsidianUrl = 'obsidian://open?vault=Rabbidfly Vault&file=' + encodedFile;
+          const obsidianUrl = `obsidian://open?vault=${encodeURIComponent(VAULT_LINK_NAME)}&file=${encodedFile}`;
 
           // Topic = first folder below Research/Library (e.g. "01 Agent Harnesses
           // & Architecture"); for podcasts it's the show folder.
