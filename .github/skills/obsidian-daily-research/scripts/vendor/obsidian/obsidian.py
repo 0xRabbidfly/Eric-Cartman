@@ -132,6 +132,154 @@ def _resolve_vault_path(vault_name: Optional[str] = None) -> Optional[Path]:
 
 
 # ---------------------------------------------------------------------------
+# Desktop app presence (Obsidian Sync's only window to push)
+# ---------------------------------------------------------------------------
+#
+# Obsidian Sync runs inside the desktop app. Nothing in this wrapper syncs:
+# every CLI call spawns a short-lived process that exits, and create/append
+# write straight to the vault filesystem. So a vault written by automation
+# while the app is closed stays local, and notes exist on this machine only.
+# On 2026-09-19 that stranded the three newest notes — the phone launched
+# Obsidian from a deep link and correctly reported the file missing.
+#
+# ensure_app_running() leaves the app up so Sync has a window. It does not
+# confirm a push: it cannot, and claiming otherwise would be a lie.
+
+_APP_OFF_VALUES = {"0", "false", "no", "off"}
+
+
+def _find_obsidian_app() -> Optional[Path]:
+    """Locate the Obsidian *desktop app* — not the CLI stub beside it.
+
+    On Windows the CLI is Obsidian.com and the app is Obsidian.exe in the
+    same folder; running the .com would just spawn another short-lived
+    process, which is the problem this is here to solve.
+    """
+    env = os.environ.get("OBSIDIAN_APP")
+    if env and Path(env).exists():
+        return Path(env)
+
+    if sys.platform == "win32":
+        local = os.environ.get("LOCALAPPDATA", "")
+        candidates = [Path(local) / "Programs" / "obsidian" / "Obsidian.exe"]
+        cli = _OBSIDIAN_BINARY
+        if cli:
+            candidates.append(Path(cli).with_name("Obsidian.exe"))
+    elif sys.platform == "darwin":
+        candidates = [Path("/Applications/Obsidian.app")]
+    else:
+        from shutil import which
+
+        found = which("obsidian")
+        candidates = [Path(found)] if found else []
+
+    for candidate in candidates:
+        try:
+            if candidate.exists():
+                return candidate
+        except OSError:
+            continue
+    return None
+
+
+def app_is_running() -> bool:
+    """True when the Obsidian desktop app has a live process.
+
+    Never raises: a missing process tool means "unknown", and an unknown
+    state must not stop a pipeline whose real work already succeeded.
+    """
+    try:
+        if sys.platform == "win32":
+            result = subprocess.run(
+                ["tasklist", "/FI", "IMAGENAME eq Obsidian.exe", "/NH"],
+                stdin=subprocess.DEVNULL,
+                capture_output=True,
+                text=True,
+                timeout=15,
+            )
+            return "obsidian.exe" in (result.stdout or "").lower()
+
+        name = "Obsidian" if sys.platform == "darwin" else "obsidian"
+        result = subprocess.run(
+            ["pgrep", "-x", name],
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+        return result.returncode == 0
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+        return False
+
+
+def launch_app() -> str:
+    """Start the desktop app detached, so it outlives this process.
+
+    Raises OSError/FileNotFoundError on failure — ensure_app_running()
+    turns that into a reported status rather than a crash.
+    """
+    app = _find_obsidian_app()
+    if app is None:
+        raise FileNotFoundError("Obsidian desktop app not found")
+
+    if sys.platform == "darwin":
+        cmd: List[str] = ["open", "-a", str(app)]
+        kwargs: Dict[str, Any] = {"start_new_session": True}
+    elif sys.platform == "win32":
+        cmd = [str(app)]
+        flags = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(
+            subprocess, "CREATE_NEW_PROCESS_GROUP", 0
+        )
+        kwargs = {"creationflags": flags}
+    else:
+        cmd = [str(app)]
+        kwargs = {"start_new_session": True}
+
+    subprocess.Popen(
+        cmd,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        close_fds=True,
+        **kwargs,
+    )
+    return "launched"
+
+
+def ensure_app_running(*, launch: Optional[bool] = None) -> str:
+    """Leave the Obsidian desktop app running so Sync can push vault writes.
+
+    Call once after a batch of writes, not per note — launching is cheap but
+    process checks are not free, and one window is all Sync needs.
+
+    Args:
+        launch: force the launch decision, overriding OBSIDIAN_AUTOLAUNCH.
+
+    Returns a status string, never raising:
+        "running"              — app was already up, nothing done
+        "launched"             — app was down and has been started
+        "disabled"             — OBSIDIAN_AUTOLAUNCH is off, app left down
+        "unavailable: <why>"   — app could not be located
+        "failed: <why>"        — launch attempted and refused
+    """
+    if app_is_running():
+        return "running"
+
+    if launch is None:
+        launch = os.environ.get("OBSIDIAN_AUTOLAUNCH", "1").strip().lower() not in _APP_OFF_VALUES
+    if not launch:
+        return "disabled"
+
+    if _find_obsidian_app() is None:
+        return "unavailable: Obsidian desktop app not found (set OBSIDIAN_APP)"
+
+    try:
+        return launch_app()
+    except (OSError, FileNotFoundError) as exc:
+        return f"failed: {exc}"
+
+
+# ---------------------------------------------------------------------------
 # Result types
 # ---------------------------------------------------------------------------
 
@@ -779,6 +927,14 @@ class Obsidian:
     def vaults(self, *, verbose: bool = True) -> CLIResult:
         """List all known vaults."""
         return self.run("vaults", verbose=verbose or None)
+
+    def ensure_app_running(self, *, launch: Optional[bool] = None) -> str:
+        """Leave the desktop app up so Obsidian Sync can push what we wrote.
+
+        See the module-level ensure_app_running() for the status strings and
+        why writes made while the app is closed never leave this machine.
+        """
+        return ensure_app_running(launch=launch)
 
     # ------------------------------------------------------------------
     # Workspace

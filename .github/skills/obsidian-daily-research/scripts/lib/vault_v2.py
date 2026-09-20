@@ -16,7 +16,7 @@ _VENDOR_DIR = Path(__file__).resolve().parents[1] / "vendor" / "obsidian"
 if str(_VENDOR_DIR) not in sys.path:
     sys.path.insert(0, str(_VENDOR_DIR))
 
-from obsidian import Obsidian
+from obsidian import Obsidian, ensure_app_running
 
 # Module-level client (lazy init)
 _ob: Obsidian | None = None
@@ -37,6 +37,23 @@ def _client() -> Obsidian:
     if _ob is None:
         _ob = Obsidian()
     return _ob
+
+
+def hand_off_to_sync() -> str:
+    """Leave Obsidian running so Sync can push what this run wrote.
+
+    Writes here land on the vault filesystem, and Obsidian Sync only pushes
+    while the desktop app runs — so a scheduled run with the app closed keeps
+    its notes on this machine, where a phone's deep link to them fails with
+    "file not found". Call once at the end of a run. Reports, never raises;
+    OBSIDIAN_AUTOLAUNCH=0 opts out.
+    """
+    status = ensure_app_running()
+    if status in ("running", "launched"):
+        print(f"[sync] Obsidian {status} - Sync has a window to push")
+    else:
+        print(f"[sync] Obsidian not running ({status}) - note stays on this machine")
+    return status
 
 
 def _init_fs(config: dict) -> None:

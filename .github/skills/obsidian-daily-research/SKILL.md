@@ -55,6 +55,7 @@ python .github/skills/obsidian-daily-research/scripts/run.py --force-rerun
 11. **Batched Synthesis** — One Claude CLI call producing the POW briefing and lab pulse summary, reading topic scans, news, prominent voices and lab posts together
 12. **Article Capture** — Article URLs linked from the day's posts are offered to the synthesis call, which picks any worth a permanent note. Those run through the `obsidian-linked-research` skill into `Research/Library`. Capped by `auto_capture_max`, validated against the candidate list, and skipped on `--dry-run`.
 13. **Write Daily Note** — Outputs structured markdown to `Research/Dailies/YYYY/MM/YYYY-MM-DD.md`
+14. **Sync Hand-off** — Leaves Obsidian running so Sync can push the note off this machine. Writes land on the vault filesystem and Sync only pushes while the desktop app runs, so a scheduled run with the app closed keeps its note local, where any other device asked to open it reports the file missing. Prints one `[sync]` line, never raises; `OBSIDIAN_AUTOLAUNCH=0` opts out and accepts the lag.
 
 ### Same-Day Run Protection
 

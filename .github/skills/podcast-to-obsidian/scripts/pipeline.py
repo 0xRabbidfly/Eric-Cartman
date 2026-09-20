@@ -212,6 +212,7 @@ _obsidian_mod = _load_module(
     SCRIPT_DIR / "vendor" / "obsidian" / "obsidian.py",
 )
 Obsidian = _obsidian_mod.Obsidian
+ensure_app_running = _obsidian_mod.ensure_app_running
 
 # Classes / functions
 Manifest = manifest_mod.Manifest
@@ -1170,7 +1171,9 @@ def run_url_pipeline(args: argparse.Namespace) -> None:
 
     print(f"\n{'='*60}")
     print(f"  URL Pipeline Complete — {written}/{len(notes)} note(s) written")
-    print(f"{'='*60}\n")
+    print(f"{'='*60}")
+    hand_off_to_sync(written)
+    print()
 
 
 def _inject_source_url(note_content: str, source_url: str) -> str:
@@ -1498,6 +1501,8 @@ def run_pipeline(args: argparse.Namespace) -> None:
     print(f"  Episodes written this run: {total_written}")
     print(f"  Manifest totals: {stats['shows']} shows, {stats['completed']} completed, {stats['failed']} failed")
 
+    hand_off_to_sync(total_written, dry_run=args.dry_run)
+
     if not args.dry_run:
         commit_manifest(
             manifest,
@@ -1505,6 +1510,37 @@ def run_pipeline(args: argparse.Namespace) -> None:
             enabled=not args.no_commit_manifest,
         )
     print()
+
+
+# ---------------------------------------------------------------------------
+# Sync hand-off
+# ---------------------------------------------------------------------------
+
+def hand_off_to_sync(notes_written: int, *, dry_run: bool = False) -> None:
+    """Leave Obsidian running so Sync can push the notes this run wrote.
+
+    Notes land on the vault filesystem, and Obsidian Sync only pushes while
+    the desktop app is running. A 02:30 run with the app closed therefore
+    leaves them on this machine alone: the phone's reader lists them anyway
+    and every deep link fails with "file not found" — Obsidian telling the
+    truth about a file that really isn't there.
+
+    This gives Sync a window. It does not prove a push happened, and it does
+    not pretend to. Set OBSIDIAN_AUTOLAUNCH=0 to keep the app closed and
+    accept the lag instead.
+    """
+    if notes_written <= 0 or dry_run:
+        return
+
+    status = ensure_app_running()
+    if status == "running":
+        print("  [sync] Obsidian already running - Sync has a window to push")
+    elif status == "launched":
+        print("  [sync] Obsidian launched - Sync now has a window to push")
+    elif status == "disabled":
+        print("  [sync] Obsidian closed, OBSIDIAN_AUTOLAUNCH=0 - notes stay on this machine")
+    else:
+        print(f"  [sync] Obsidian could not be started ({status}) - notes stay on this machine")
 
 
 # ---------------------------------------------------------------------------

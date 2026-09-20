@@ -2948,6 +2948,10 @@ def main():
         tag = "" if data["has_exact"] else "~"
         print(f"  {model}: {data['calls']}× | {data['total']:,} tokens | {tag}${data['cost']:.4f}")
 
+    # Hand the writes to Obsidian Sync before we exit — a scheduled run leaves
+    # the app closed otherwise, and the note never leaves this machine.
+    vault.hand_off_to_sync()
+
     # Final summary
     total_x = sum(len(tr["x_items"]) for tr in topic_results)
     mf_total = sum(len(r["items"]) for r in must_follow_results)

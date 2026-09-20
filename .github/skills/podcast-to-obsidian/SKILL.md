@@ -92,7 +92,22 @@ python .github/skills/podcast-to-obsidian/scripts/pipeline.py --url "https://you
 7. WRITE     → Obsidian skill pipes note to vault
 8. MANIFEST  → Update manifest only after successful write
 9. CLEANUP   → Purge .mp3 audio files + intermediate build artifacts
+10. SYNC     → Leave Obsidian running so Sync can push the new notes
 ```
+
+### Step 10 — SYNC: hand the notes to Obsidian Sync
+
+Notes are written to the vault filesystem, and Obsidian Sync only pushes while
+the desktop app runs. A 02:30 scheduled run finds the app closed, so without
+this step the notes stay on the machine that wrote them — and a phone opening a
+deep link to one gets "file not found", correctly, because the file is not
+there. That is precisely what happened on 2026-09-19.
+
+`hand_off_to_sync()` runs after the writes and prints one `[sync]` line. It is
+skipped on `--dry-run` and when nothing was written, never raises, and gives
+Sync a *window* rather than a guarantee — do not report a push as confirmed on
+the strength of it. Set `OBSIDIAN_AUTOLAUNCH=0` to keep the app closed and
+accept the lag.
 
 ### Step 1 — DETECT: Fallback Detection
 

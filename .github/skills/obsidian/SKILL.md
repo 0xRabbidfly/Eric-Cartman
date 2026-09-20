@@ -124,6 +124,37 @@ python -c "import sys; sys.path.insert(0,'.github/skills/obsidian/scripts'); fro
 > **IMPORTANT**: Always use `@'...'@` (single-quoted heredoc), never `@"..."@`
 > (double-quoted). Double-quoted heredocs still interpret backticks and `$`.
 
+### Writes are local until Obsidian runs
+
+Obsidian Sync lives inside the desktop app. Nothing in this wrapper syncs:
+every CLI call spawns a short-lived process that exits, and `create`/`append`
+write straight to the vault filesystem. **A vault written while the app is
+closed stays on that machine** — other devices never see those notes.
+
+This is not theoretical. On 2026-09-19 an unattended run wrote notes with the
+app closed; the phone's reader listed them, and every deep link produced
+"file not found" because the file genuinely was not on the phone.
+
+So any automation that writes notes ends with one hand-off call:
+
+```python
+ob.ensure_app_running()        # or the module-level ensure_app_running()
+```
+
+It returns a status string and never raises: `running`, `launched`,
+`disabled`, `unavailable: …`, `failed: …`. Call it **once per batch**, not per
+note. It gives Sync a window; it does not prove a push happened, so never
+report a sync as confirmed on the strength of it.
+
+| Env var | Effect |
+|---|---|
+| `OBSIDIAN_AUTOLAUNCH=0` | Never launch the app; accept that writes stay local |
+| `OBSIDIAN_APP` | Path to the desktop app, when it is not in the default location |
+
+Note `OBSIDIAN_APP` points at the **app** (`Obsidian.exe`), not the CLI stub
+(`Obsidian.com`) beside it. Launching the stub just spawns another
+short-lived process, which is the problem, not the fix.
+
 ### Unicode / UTF-8
 
 The wrapper auto-configures UTF-8 on Windows (`sys.stdin.reconfigure`),
