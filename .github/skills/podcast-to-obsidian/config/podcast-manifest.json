@@ -748,9 +748,18 @@
           "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-09-19 - Robinhood's Vlad Tenev on Tokenizing Everything, OpenAI's 6 Misalignment Reports, Figure's Robot Makes Beds  EP 292.md",
           "processed_at": "2026-09-20T06:25:03.113680+00:00",
           "status": "completed"
+        },
+        "4595d30c-b6af-11f1-b52f-b7a3cf6fb34d": {
+          "title": "Ask the Mates Anything Round #2 | MOONSHOTS AMA  #293",
+          "published": "2026-09-22",
+          "audio_url": "https://traffic.megaphone.fm/DVVTS4072450564.mp3",
+          "transcript_path": "Podcasts/Moonshots with Peter Diamandis/transcripts/2026-09-22 - Ask the Mates Anything Round 2  MOONSHOTS AMA  293.md",
+          "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-09-22 - Ask the Mates Anything Round 2  MOONSHOTS AMA  293.md",
+          "processed_at": "2026-09-23T06:21:41.212234+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-09-19"
+      "latest_published": "2026-09-22"
     },
     "dwarkesh-podcast": {
       "name": "Dwarkesh Podcast",
