@@ -866,9 +866,18 @@
           "note_path": "Podcasts/The Pragmatic Engineer/2026-09-17 - AI Skills with Matt Pocock.md",
           "processed_at": "2026-09-19T06:21:15.832831+00:00",
           "status": "completed"
+        },
+        "substack:post:216793339": {
+          "title": "Design Engineering with Maggie Appleton",
+          "published": "2026-09-23",
+          "audio_url": "https://api.substack.com/feed/podcast/216793339/076ecaf7cec3f7cbd64cc49e0db4d2fc.mp3",
+          "transcript_path": "Podcasts/The Pragmatic Engineer/transcripts/2026-09-23 - Design Engineering with Maggie Appleton.md",
+          "note_path": "Podcasts/The Pragmatic Engineer/2026-09-23 - Design Engineering with Maggie Appleton.md",
+          "processed_at": "2026-09-24T06:23:11.810513+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-09-17"
+      "latest_published": "2026-09-23"
     },
     "naval": {
       "name": "Naval",
