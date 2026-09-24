@@ -1721,7 +1721,7 @@
       const words = left <= 0 ? 'nothing left'
         : Number.isInteger(left) ? `about ${left} rep${left === 1 ? '' : 's'} left`
         : `${Math.floor(left)}–${Math.ceil(left)} reps left`;
-      return `RPE ${rpe} · ${words}`;
+      return `RPE ${rpe} (${words})`;
     }
 
     const GYM_UNITS = { reps: 'reps', reps_per_side: 'reps/side', seconds: 's', cm: 'cm', metres: 'm' };
@@ -1739,10 +1739,10 @@
     // The prescribed load, shown in the box the athlete is about to type into,
     // so logging is mostly confirming a number rather than recalling one.
     //
-    // Deliberately a placeholder and not a pre-filled `value`. A filled box
-    // reads as already logged when nothing has been logged, and `onchange`
-    // does not fire on a field the user taps and leaves unchanged — so
-    // "confirming" a pre-filled target would silently record nothing.
+    // Deliberately a placeholder and not a pre-filled `value`: a filled box
+    // reads as already logged when nothing has been logged. Leaving it blank is
+    // not a gap — finishing records the prescription shown here, so the athlete
+    // types a number only when the set differed from the plan.
     function gymLoadPlaceholder(item) {
       if (item.targetLoad !== null && item.targetLoad !== undefined) {
         return String(gymIsWeight(item) ? gymTargetWeight(item.targetLoad, item.loadType) : item.targetLoad);
@@ -2029,10 +2029,9 @@
       }
     }
 
+    // No guard on an empty grid: a card left alone means it went as prescribed,
+    // and the server fills those sets in at finish.
     async function finishGymWorkout() {
-      if (gymCollectEntries().length === 0) {
-        return showToast('Log at least one set first.', 'error');
-      }
       // Pinned before the first await — profile, week and day together, because
       // all three are read off live state that the header and the day list can
       // change mid-finish. Both profiles' week files are byte-identical, so

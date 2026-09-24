@@ -644,6 +644,9 @@ function createGymStore(dataRoot, { libraryPath = DEFAULT_LIBRARY_PATH } = {}) {
   const KG_PER_LB = 0.45359237;
   const ASSUMABLE_RESULTS = new Set(['reps', 'reps_per_side', 'seconds']);
 
+  /** Load types where `targetLoad` is a number the athlete could have used as prescribed. */
+  const PRESCRIBED_LOADS = new Set(['kg', 'kg_total_pair', 'setting', 'bodyweight_plus_kg']);
+
   /** The app-wide weight unit people type and read. Storage is always kilograms. */
   function getUnits() {
     requireEnabled();
@@ -652,16 +655,22 @@ function createGymStore(dataRoot, { libraryPath = DEFAULT_LIBRARY_PATH } = {}) {
   }
 
   /**
-   * What a blank means once a set is finished, so the athlete types only what
-   * differs from the plan:
-   * - a barbell set (the library gives the exercise a `barLb`) left blank or at
-   *   0 is the empty bar. A typed load is a full total and is never touched.
+   * What a blank means once a set is finished. A blank box is the athlete
+   * saying they did what the card said, so they type only what differed:
+   * - blank load is the prescribed weight when the set has one, whatever the
+   *   card calls it: the pin on a machine, the pair total on dumbbells, the
+   *   added kilos on a weighted pull-up. A typed load is a full total and is
+   *   never touched.
+   * - with nothing prescribed ("pick a weight"), a barbell set (the library
+   *   gives the exercise a `barLb`) left blank is the empty bar. A typed 0 is
+   *   the empty bar even when a weight was prescribed — that is the athlete
+   *   saying they dropped to the bar.
    *   On a max-test ramp only a typed 0 is the bar: a blank there is a set
    *   whose weight went unrecorded, and filling it in would test a fake max.
    * - blank reps are the prescribed reps, or the prescribed hold for seconds.
    *   Never on a max-test ramp or a baseline, where the number is the
    *   measurement, and never on centimetres or metres, which are not a count.
-   * - a weighted pull-up with no added load is bodyweight.
+   * - a weighted pull-up with no added load and none prescribed is bodyweight.
    * Filled-in values carry `assumed`, so the assessment can tell them apart.
    */
   function applyFinishDefaults(items, entries) {
@@ -673,13 +682,21 @@ function createGymStore(dataRoot, { libraryPath = DEFAULT_LIBRARY_PATH } = {}) {
       const next = { ...entry };
       const assumed = [];
       const { barLb } = library[item.exerciseKey] || {};
+      const bar = typeof barLb === 'number' ? Math.round(barLb * KG_PER_LB * 1000) / 1000 : null;
       const blankLoad = next.load === null || next.load === undefined;
-      if (item.loadType === 'kg' && typeof barLb === 'number'
-          && ((blankLoad && !item.isRamp) || next.load === 0)) {
-        next.load = Math.round(barLb * KG_PER_LB * 1000) / 1000;
+      const prescribed = typeof item.targetLoad === 'number' && PRESCRIBED_LOADS.has(item.loadType);
+      if (item.loadType === 'kg' && bar !== null && next.load === 0) {
+        next.load = bar;
+        assumed.push('load');
+      } else if (blankLoad && !item.isRamp && prescribed) {
+        next.load = item.targetLoad;
+        assumed.push('load');
+      } else if (item.loadType === 'kg' && bar !== null && blankLoad && !item.isRamp) {
+        next.load = bar;
         assumed.push('load');
       }
-      if (item.loadType === 'bodyweight_plus_kg' && blankLoad) next.load = 0;
+      if (item.loadType === 'bodyweight_plus_kg'
+          && (next.load === null || next.load === undefined)) next.load = 0;
       if ((next.reps === null || next.reps === undefined) && typeof item.reps === 'number'
           && ASSUMABLE_RESULTS.has(item.resultType) && !item.isRamp && !item.isBaseline) {
         next.reps = item.reps;
@@ -688,6 +705,38 @@ function createGymStore(dataRoot, { libraryPath = DEFAULT_LIBRARY_PATH } = {}) {
       if (assumed.length) next.assumed = [...new Set([...(entry.assumed || []), ...assumed])];
       return next;
     });
+  }
+
+  /**
+   * A set the athlete never touched is a set done as prescribed. Leaving the
+   * card alone is the ordinary way to say "I did exactly what it said", so
+   * finishing materialises those rows and applyFinishDefaults fills them in,
+   * tagged `assumed` like any other blank. RPE is left null: how hard it felt
+   * is the one thing no prescription can stand in for.
+   *
+   * Only where there is something to accept. A max-test ramp, a baseline and an
+   * optional max-reps set are measurements — nothing can stand in for a number
+   * that was never measured — and centimetres and metres are not rep counts.
+   */
+  function addUntouchedSets(items, entries) {
+    const key = (itemId, set) => `${itemId}::${set}`;
+    const logged = new Set(entries.map((e) => key(e.itemId, e.set)));
+    const filled = [...entries];
+    for (const item of items) {
+      if (item.isRamp || item.isBaseline || item.setsAreOptional) continue;
+      if (!ASSUMABLE_RESULTS.has(item.resultType)) continue;
+      if (typeof item.reps !== 'number' || typeof item.sets !== 'number') continue;
+      for (let set = 1; set <= item.sets; set += 1) {
+        if (logged.has(key(item.id, set))) continue;
+        filled.push({
+          itemId: item.id, set, load: null, loadType: item.loadType, reps: null, rpe: null, note: '',
+        });
+      }
+    }
+    // Stored in card order so a finished log reads like the session did.
+    const order = new Map(items.map((item, index) => [item.id, index]));
+    const rank = (e) => (order.has(e.itemId) ? order.get(e.itemId) : items.length);
+    return filled.sort((a, b) => rank(a) - rank(b) || a.set - b.set);
   }
 
   /**
@@ -701,17 +750,26 @@ function createGymStore(dataRoot, { libraryPath = DEFAULT_LIBRARY_PATH } = {}) {
     if (log && log.status === 'complete') {
       throw fail('gym_session_complete', `W${week} D${day} is already finished.`);
     }
-    if (!log || log.entries.length === 0) {
+    // No log at all is the athlete who typed nothing because nothing differed
+    // from the plan. Only a day with no prescription to fall back on — all
+    // measurements — is still empty here.
+    const base = log || emptyLog(profileId, week, day);
+    const items = dayItems(profileId, week, day);
+    const entries = applyFinishDefaults(items, addUntouchedSets(items, base.entries));
+    if (entries.length === 0) {
       throw fail('gym_session_empty', `Nothing logged for W${week} D${day} yet.`);
     }
     const finished = {
-      ...log,
-      entries: applyFinishDefaults(dayItems(profileId, week, day), log.entries),
+      ...base,
+      entries,
       status: 'complete',
+      // A session finished without a single keystroke was never "started" by
+      // saveSession. It still happened, so it gets the finish time.
+      startedAt: base.startedAt || now.toISOString(),
       // The day it was performed, kept. Reopening to correct a transcribed
       // number — or the UI's retry, which reopens purely to re-run the model —
       // must not silently move a Monday session to whatever today is.
-      performedOn: log.performedOn
+      performedOn: base.performedOn
         || validPerformedOnHint(performedOnHint, now)
         || localDateString(now),
       completedAt: now.toISOString(),

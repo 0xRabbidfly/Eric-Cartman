@@ -144,6 +144,10 @@ function defaultsFixture() {
     item({ id: 'd-side-plank', exerciseKey: 'side-plank', label: 'Side plank', loadType: 'bodyweight', resultType: 'seconds', reps: 45, targetRpe: null }),
     item({ id: 'd-front-plank', exerciseKey: 'front-plank', label: 'Front plank', loadType: 'bodyweight', resultType: 'seconds', reps: 120, targetRpe: null, isBaseline: true }),
     item({ id: 'e-carry', exerciseKey: 'farmers-carry', label: 'Carry', loadType: 'kg_total_pair', resultType: 'metres', reps: 30 }),
+    item({ id: 'f-squat-work', exerciseKey: 'back-squat', label: 'Squat, working sets', targetLoad: 60 }),
+    item({ id: 'f-pin-row', exerciseKey: 'seated-row', label: 'Seated row', loadType: 'setting', targetLoad: 7, reps: 10 }),
+    item({ id: 'f-goblet', exerciseKey: 'goblet-squat', label: 'Goblet squat', loadType: 'kg_total_pair', targetLoad: 24 }),
+    item({ id: 'f-pull-up-loaded', exerciseKey: 'pull-up-weighted', label: 'Weighted pull-up', loadType: 'bodyweight_plus_kg', targetLoad: 5, reps: 6 }),
   ];
   fs.writeFileSync(weekFile, JSON.stringify(week), 'utf8');
   const library = path.join(root, 'exercises.json');
@@ -392,9 +396,58 @@ test('finishSession leaves maxes alone when the day has no ramp', () => {
   assert.equal(maxes['back-squat'].threeRm, 70);
 });
 
-test('finishSession refuses an empty log', () => {
+// The base fixture's only item is a max-test ramp, so its day has no
+// prescription to fall back on — the one case that is still empty at finish.
+test('finishSession refuses a day where every item is a measurement', () => {
   const store = createGymStore(fixture());
   expectCode(() => store.finishSession('athlete-b', 1, 3), 'gym_session_empty');
+});
+
+test('finishing with nothing typed logs every prescribed set as prescribed', () => {
+  const { store } = defaultsFixture();
+  const { log } = store.finishSession('athlete-b', 1, 1, new Date('2026-09-09T18:00:00'));
+  assert.equal(log.status, 'complete');
+  assert.equal(findSet(log, 'b-rdl', 3).reps, 8, 'set 3 was never touched and still counts');
+  assert.equal(findSet(log, 'b-rdl', 3).load, 20.412, 'no prescribed weight, so the bar');
+  assert.deepEqual(findSet(log, 'f-squat-work', 2).assumed, ['load', 'reps']);
+  assert.equal(findSet(log, 'f-squat-work', 2).load, 60);
+  assert.equal(findSet(log, 'f-squat-work', 2).rpe, null, 'how hard it felt is never assumed');
+  assert.equal(findSet(log, 'd-side-plank', 3).reps, 45);
+  for (const id of ['a-back-squat', 'd-front-plank', 'e-carry']) {
+    assert.equal(findSet(log, id, 1), undefined, `${id} is a measurement, not a prescription`);
+  }
+});
+
+test('an untouched set sits in card order, after the sets that were typed', () => {
+  const { store } = defaultsFixture();
+  store.saveSession('athlete-b', 1, 1, { entries: [set('b-rdl', 2, { load: 60, reps: 8, rpe: 8 })] });
+  const { log } = store.finishSession('athlete-b', 1, 1, new Date('2026-09-09T18:00:00'));
+  const rdl = log.entries.filter((e) => e.itemId === 'b-rdl').map((e) => e.set);
+  assert.deepEqual(rdl, [1, 2, 3]);
+  assert.equal(findSet(log, 'b-rdl', 2).assumed, undefined, 'a typed set is left alone');
+});
+
+test('a blank load takes the prescribed weight, whatever the card prescribes', () => {
+  const { store } = defaultsFixture();
+  store.saveSession('athlete-b', 1, 1, { entries: [
+    set('f-squat-work', 1, { rpe: 7 }),
+    set('f-pin-row', 1, { loadType: 'setting', rpe: 7 }),
+    set('f-goblet', 1, { loadType: 'kg_total_pair', rpe: 7 }),
+    set('f-pull-up-loaded', 1, { loadType: 'bodyweight_plus_kg', rpe: 8 }),
+  ] });
+  const { log } = store.finishSession('athlete-b', 1, 1, new Date('2026-09-09T18:00:00'));
+  assert.equal(findSet(log, 'f-squat-work', 1).load, 60, 'the prescription, not the empty bar');
+  assert.deepEqual(findSet(log, 'f-squat-work', 1).assumed, ['load', 'reps']);
+  assert.equal(findSet(log, 'f-pin-row', 1).load, 7, 'the prescribed pin');
+  assert.equal(findSet(log, 'f-goblet', 1).load, 24, 'the prescribed pair total');
+  assert.equal(findSet(log, 'f-pull-up-loaded', 1).load, 5, 'the prescribed added load');
+});
+
+test('a load typed as 0 is still the empty bar, even where a weight was prescribed', () => {
+  const { store } = defaultsFixture();
+  store.saveSession('athlete-b', 1, 1, { entries: [set('f-squat-work', 1, { load: 0, reps: 8, rpe: 4 })] });
+  const { log } = store.finishSession('athlete-b', 1, 1, new Date('2026-09-09T18:00:00'));
+  assert.equal(findSet(log, 'f-squat-work', 1).load, 20.412, '45 lb bar');
 });
 
 test('finishSession is idempotent-safe: a finished session cannot be finished twice', () => {
