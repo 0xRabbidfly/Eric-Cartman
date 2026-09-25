@@ -131,9 +131,18 @@
           "note_path": "Podcasts/Raoul Pal The Journey Man/2026-09-17 - Why Crypto Could Be Near A Major Turning Point w Richard Galvin.md",
           "processed_at": "2026-09-18T06:15:27.305536+00:00",
           "status": "completed"
+        },
+        "9a4e4d7a-b76d-11f1-9f33-9325df0e2fb9": {
+          "title": "Solana, Tokenized Stocks, and Backpack w/ Armani Ferrante | Raoul Pal The Journey Man",
+          "published": "2026-09-24",
+          "audio_url": "https://www.podtrac.com/pts/redirect.mp3/chrt.fm/track/1B146C/pscrb.fm/rss/p/traffic.megaphone.fm/ADV7083293264.mp3",
+          "transcript_path": "Podcasts/Raoul Pal The Journey Man/transcripts/2026-09-24 - Solana, Tokenized Stocks, and Backpack w Armani Ferrante  Raoul Pal The Journey Man.md",
+          "note_path": "Podcasts/Raoul Pal The Journey Man/2026-09-24 - Solana, Tokenized Stocks, and Backpack w Armani Ferrante  Raoul Pal The Journey Man.md",
+          "processed_at": "2026-09-25T06:14:34.251268+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-09-17"
+      "latest_published": "2026-09-24"
     },
     "lex-fridman-podcast": {
       "name": "Lex Fridman Podcast",
@@ -1017,9 +1026,18 @@
           "note_path": "Podcasts/No Priors Artificial Intelligence  Technology  Startups/2026-09-18 - Why Diffusion Will Win AI Inference with Inception Co-Founder and CEO Stefano Ermon.md",
           "processed_at": "2026-09-19T06:27:39.546343+00:00",
           "status": "completed"
+        },
+        "e2eb4b88-b7c1-11f1-a5c5-4b2557d321bc": {
+          "title": "Re-Founding Incumbents for the AI Era with Sequence Holdings Co-Founder and CEO Michael Lee",
+          "published": "2026-09-24",
+          "audio_url": "https://traffic.megaphone.fm/PDP3274846886.mp3",
+          "transcript_path": "Podcasts/No Priors Artificial Intelligence  Technology  Startups/transcripts/2026-09-24 - Re-Founding Incumbents for the AI Era with Sequence Holdings Co-Founder and CEO Michael Lee.md",
+          "note_path": "Podcasts/No Priors Artificial Intelligence  Technology  Startups/2026-09-24 - Re-Founding Incumbents for the AI Era with Sequence Holdings Co-Founder and CEO Michael Lee.md",
+          "processed_at": "2026-09-25T06:22:39.098073+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-09-18"
+      "latest_published": "2026-09-24"
     },
     "cgi-conversations": {
       "name": "CGI Conversations",
