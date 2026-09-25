@@ -1640,6 +1640,23 @@ def validate_note(note_content: str) -> list[str]:
     return issues
 
 
+WEEKDAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+
+
+def topic_scan_schedule(config: dict, now: datetime | None = None) -> tuple[bool, str]:
+    """Return (scan_today, next_scan_date) from the `topic_scan_day` setting.
+
+    `daily` (or an unrecognised value, so a typo never silently stops scans)
+    scans every run. A weekday name scans on that day only.
+    """
+    now = now or datetime.now()
+    day = str(config.get("topic_scan_day", "daily")).strip().lower()
+    if day not in WEEKDAYS:
+        return True, now.strftime("%Y-%m-%d")
+    ahead = (WEEKDAYS.index(day) - now.weekday()) % 7
+    return ahead == 0, (now + timedelta(days=ahead or 7)).strftime("%Y-%m-%d")
+
+
 def detect_drift(config: dict, lookback_days: int = 30) -> list[dict]:
     """Level 3: Scan recent dailies for multi-day metric decay.
 
@@ -1701,8 +1718,11 @@ def detect_drift(config: dict, lookback_days: int = 30) -> list[dict]:
         ("news", "News", "news_items"),
     ]
     for key, label, legacy in tracked_metrics:
+        # Days the section was skipped on purpose (weekly topic scans) are
+        # dropped, so three zero-result scan days in a row still warn.
+        history = [fm for fm in metrics_history if fm.get(key) != "skipped"]
         consecutive_zeros = 0
-        for fm in metrics_history:
+        for fm in history:
             val = fm.get(key, fm.get(legacy, -1) if legacy else -1)
             if isinstance(val, int) and val == 0:
                 consecutive_zeros += 1
@@ -1712,17 +1732,17 @@ def detect_drift(config: dict, lookback_days: int = 30) -> list[dict]:
             def _val(fm):
                 return fm.get(key, fm.get(legacy, -1) if legacy else -1)
             last_nonzero = next(
-                (fm["_date"] for fm in metrics_history[consecutive_zeros:]
+                (fm["_date"] for fm in history[consecutive_zeros:]
                  if isinstance(_val(fm), int) and _val(fm) > 0),
                 None,
             )
-            if consecutive_zeros >= len(metrics_history):
+            if consecutive_zeros >= len(history):
                 streak = f"0 for all {consecutive_zeros} days checked"
             else:
                 streak = f"0 for {consecutive_zeros} consecutive days"
             tail = (
                 f" (last non-zero: {last_nonzero})" if last_nonzero
-                else f" (no non-zero value in the last {len(metrics_history)} notes)"
+                else f" (no non-zero value in the last {len(history)} notes)"
             )
             warnings.append({
                 "metric": key,
@@ -1749,11 +1769,12 @@ def detect_drift(config: dict, lookback_days: int = 30) -> list[dict]:
         })
 
     # Check for consistently low total items
+    def _int(v):
+        return v if isinstance(v, int) else 0
     total_items = [
-        fm.get("research_feed", fm.get("x_items", 0)) + fm.get("lab_pulse", 0)
-        + fm.get("news", fm.get("news_items", 0))
+        _int(fm.get("research_feed", fm.get("x_items", 0))) + _int(fm.get("lab_pulse", 0))
+        + _int(fm.get("news", fm.get("news_items", 0)))
         for fm in metrics_history[:5]
-        if isinstance(fm.get("research_feed", fm.get("x_items", 0)), int)
     ]
     if total_items and all(t < 3 for t in total_items):
         warnings.append({
@@ -2295,8 +2316,12 @@ def render_daily_note(
     captured_articles: list = None,
     tracker: TokenTracker | None = None,
     health_warnings: list[str] = None,
+    next_topic_scan: str | None = None,
 ) -> str:
-    """Render the full daily note markdown."""
+    """Render the full daily note markdown.
+
+    `next_topic_scan` is set on days topic scans were skipped by schedule.
+    """
     # Build the research feed up front: frontmatter should describe the note as
     # rendered, not the raw scan.
     reading_list = _build_reading_list(topic_results, config)
@@ -2355,7 +2380,7 @@ def render_daily_note(
         f"lab_pulse: {len(lab_pulse_items)}",
         f"prominent_voices: {prom_count}",
         f"news: {news_count}",
-        f"research_feed: {len(reading_list)}",
+        f"research_feed: {'skipped' if next_topic_scan else len(reading_list)}",
         f"captured_articles: {len(captured_articles or [])}",
     ]
     # Name what went to the Library so the note records the vault write itself,
@@ -2480,6 +2505,8 @@ def render_daily_note(
                 f"— {item['author']} #{item['topic_slug']}"
             )
         lines.append("")
+    elif next_topic_scan:
+        lines.extend([f"*Topic scans run weekly — next on {next_topic_scan}.*", ""])
     else:
         lines.extend(["*No new research results today.*", ""])
 
@@ -2639,6 +2666,7 @@ def main():
     parser.add_argument("--force-rerun", action="store_true", help="Ignore same-day note protection and rerun intentionally")
     parser.add_argument("--note-suffix", default="", help="Append a suffix to the output note filename (e.g. '_new' → 2026-04-20_new.md). Bypasses same-day protection.")
     parser.add_argument("--test-synth", action="store_true", help="Test synthesis with mock data and exit")
+    parser.add_argument("--topics-now", action="store_true", help="Run topic scans today even if it is not topic_scan_day")
     args = parser.parse_args()
 
     log_path = _setup_run_logging()
@@ -2760,12 +2788,21 @@ def main():
     # Initialize token tracker
     tracker = TokenTracker(config.get("cost_rates"))
 
-    # Run topic scans sequentially (to stay within rate limits)
-    print(f"\n[scan] Starting {len(all_topics)} topic scans (scan mode)...")
+    # Topic scans are weekly (see topic_scan_day in pipeline.md); --topic and
+    # --topics-now force one.
+    scan_topics, next_topic_scan = topic_scan_schedule(config)
+    if args.topic or args.topics_now:
+        scan_topics = True
     topic_results = []
     total_errors = []
+    if scan_topics:
+        next_topic_scan = None
+        # Run topic scans sequentially (to stay within rate limits)
+        print(f"\n[scan] Starting {len(all_topics)} topic scans (scan mode)...")
+    else:
+        print(f"\n[scan] Topic scans skipped — weekly on {config.get('topic_scan_day')}, next {next_topic_scan}")
 
-    for topic in all_topics:
+    for topic in (all_topics if scan_topics else []):
         print(f"  [{topic.slug}] Scanning...", end=" ", flush=True)
         result = run_topic_scan(
             topic, config, l30_config, selected_models,
@@ -2931,6 +2968,7 @@ def main():
         tracker=tracker,
         health_warnings=health_warnings,
         captured_articles=captured_articles,
+        next_topic_scan=next_topic_scan,
     )
 
     if args.dry_run:
@@ -2975,6 +3013,7 @@ def main():
                         news_items=news_items,
                         tracker=tracker,
                         health_warnings=health_warnings,
+                        next_topic_scan=next_topic_scan,
                     )
                     filepath = vault.write_daily_note(config, note_date_key, note_content, overwrite=True)
                     print(f"[validate] Repaired note written -> {filepath}")

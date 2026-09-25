@@ -13,18 +13,21 @@ metadata:
 
 ## Purpose
 
-Automated daily research pipeline that scans topic tracks on X, pulls Google News
-RSS, tracks lab accounts, deduplicates against your Obsidian vault history, and
+Automated daily research pipeline that scans topic tracks on X (weekly), pulls
+Google News RSS, tracks lab accounts, deduplicates against your Obsidian vault history, and
 writes a mobile-friendly daily note.
 
-**Cost**: ~$0.30/day (~$9/month). Search runs on a pinned `grok-4.3`; analysis
+**Cost**: ~$0.20–0.30/day, ~$0.65 on the weekly topic-scan day (~$8–9/month). xAI
+bills X search per post fetched (since 2026-09-21), so topic scans — the costliest
+section for the fewest new items — run once a week (`topic_scan_day`, default
+Monday) over a 7-day window. Search runs on a pinned `grok-4.3`; analysis
 (briefing, lab summary, news scoring) runs on Claude CLI and is free on a Max
 account, with `grok-4.5` as the fallback.
 
 ## Quick Start
 
 ```
-# Full daily run (all topics)
+# Full daily run (topic scans only on topic_scan_day)
 python .github/skills/obsidian-daily-research/scripts/run.py
 
 # Single topic
@@ -32,6 +35,9 @@ python .github/skills/obsidian-daily-research/scripts/run.py --topic agents
 
 # Preview without writing to vault
 python .github/skills/obsidian-daily-research/scripts/run.py --dry-run
+
+# Run topic scans today even if it is not topic_scan_day
+python .github/skills/obsidian-daily-research/scripts/run.py --topics-now
 
 # Intentionally rerun for the same day
 python .github/skills/obsidian-daily-research/scripts/run.py --force-rerun
@@ -43,7 +49,7 @@ python .github/skills/obsidian-daily-research/scripts/run.py --force-rerun
 ### Pipeline Flow
 
 1. **Vault Dedup** — Scans all dailies + library files (including year/month subfolders), extracts every URL and title seen before (zero tokens — filesystem only)
-2. **Multi-Topic Scan** — One X search per topic in scan mode
+2. **Multi-Topic Scan** — One X search per topic in scan mode, weekly on `topic_scan_day` (7-day window). Other days the note records `research_feed: skipped`, which the drift check ignores
 3. **Spam Detection** — Filters out misleading content (claim/link mismatches like fake "official guides", engagement bait)
 4. **Reply Filtering** — Drops replies from topic scans using both `is_reply` API field and text-pattern detection
 5. **Quality Filters** — Engagement floor (100+ likes on X), long-form bonus, priority-account boost. Every handle in the must-follow roster bypasses the floor and gets the boost, whether or not it is scanned.

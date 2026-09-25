@@ -427,7 +427,7 @@ Invoke the `skill-reflection` skill with:
 
 **Automated daily AI research pipeline that writes to your Obsidian vault.**
 
-Scans topic tracks on X, pulls Google News RSS, and batches a search over frontier-lab accounts, deduplicating everything against vault history. Writes a mobile-friendly daily note: a synthesized briefing, lab pulse, prominent voices, news, and a ranked research feed. Supports a feedback loop with `#good` and `#bad` tags.
+Scans topic tracks on X weekly, pulls Google News RSS daily, and batches a search over frontier-lab accounts, deduplicating everything against vault history. Writes a mobile-friendly daily note: a synthesized briefing, lab pulse, prominent voices, news, and a ranked research feed. Supports a feedback loop with `#good` and `#bad` tags.
 
 **Use When:**
 - Daily research habit for staying current on AI developments
@@ -445,13 +445,18 @@ Scans topic tracks on X, pulls Google News RSS, and batches a search over fronti
 | Vault Dedup | Avoids resurfacing links and titles already captured in the vault |
 | Feedback Loop | Collects `#good` / `#bad` tags into `feedback.json` |
 
-**Cost:** ~$0.30/day (~$9/month). Search is pinned to `grok-4.3`; analysis runs on
-Claude CLI (free on Max) with `grok-4.5` as fallback.
+**Cost:** ~$0.20–0.30/day, ~$0.65 on the weekly topic-scan day (~$8–9/month). xAI bills
+X search per post fetched, so topic scans run once a week (`topic_scan_day`). Search
+is pinned to `grok-4.3`; analysis runs on Claude CLI (free on Max) with `grok-4.5`
+as fallback.
 
 **Invocation:**
 ```bash
-# Full daily run (all topics)
+# Full daily run (topic scans only on topic_scan_day)
 python .github/skills/obsidian-daily-research/scripts/run.py
+
+# Run topic scans today even if it is not topic_scan_day
+python .github/skills/obsidian-daily-research/scripts/run.py --topics-now
 
 # Single topic
 python .github/skills/obsidian-daily-research/scripts/run.py --topic agents

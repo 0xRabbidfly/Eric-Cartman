@@ -1,14 +1,22 @@
 # Daily Research Pipeline
 
-Automated daily research pipeline that scans topic tracks on X, pulls Google News RSS, tracks frontier-lab accounts, deduplicates against your Obsidian vault history, and writes a mobile-friendly daily note.
+Automated daily research pipeline that scans topic tracks on X (weekly), pulls Google News RSS, tracks frontier-lab accounts, deduplicates against your Obsidian vault history, and writes a mobile-friendly daily note.
 
-**Cost**: ~$0.05–0.15/day (~$3/month) using scan mode.
+**Cost**: ~$0.20–0.30/day, ~$0.65 on the weekly topic-scan day (~$8–9/month). xAI
+bills X search per post fetched (since 2026-09-21), so topic scans — the costliest
+section for the fewest new items — run once a week (`topic_scan_day`, default
+Monday) over a 7-day window. Search runs on a pinned `grok-4.3`; analysis
+(briefing, lab summary, news scoring) runs on Claude CLI and is free on a Max
+account, with `grok-4.5` as the fallback.
 
 ## Quick Start
 
 ```powershell
-# Full daily run (all 5 topics)
+# Full daily run (5 topic scans only on topic_scan_day, default Monday)
 python .github/skills/obsidian-daily-research/scripts/run.py
+
+# Run topic scans today even if it is not topic_scan_day
+python .github/skills/obsidian-daily-research/scripts/run.py --topics-now
 
 # Single topic
 python .github/skills/obsidian-daily-research/scripts/run.py --topic agents
@@ -46,7 +54,7 @@ python .github/skills/obsidian-daily-research/scripts/run.py --costs
   1. VAULT DEDUP      Scan all dailies + library files
            |           -> extract every URL and title seen before (zero tokens)
            v
-  2. TOPIC SCANS      One X search per topic, scan mode (grok-4.3)
+  2. TOPIC SCANS      One X search per topic, scan mode (grok-4.3), weekly
            v
   3. CROSS-DEDUP      Filter out URLs/titles already in vault
            v

@@ -126,6 +126,12 @@
 > CLI is unavailable — a judgment task, so it gets the stronger model even
 > though search does not.
 - xai_synthesis_model: grok-4.5
+> Topic scans run once a week, not daily. Since xAI moved to per-post billing
+> (2026-09-21) they were ~70% of the run's cost for ~1.7 new items a day — every
+> post is billed before vault dedup discards the ones already seen. Their window
+> is 7 days, so a weekly scan covers the gap. A weekday name (monday..sunday),
+> or `daily` to scan every run. `run.py --topics-now` forces a scan.
+- topic_scan_day: monday
 
 # Auto-Capture Accounts
 
