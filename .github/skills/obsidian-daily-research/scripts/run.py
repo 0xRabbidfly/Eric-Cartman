@@ -193,9 +193,11 @@ class TokenTracker:
         if ticks is not None:
             exact_cost = ticks / 10_000_000_000
 
+        # Keep the raw usage too: xAI bills server-side tool calls (x_search,
+        # web_search) on top of tokens, and only the full object shows them.
         self.calls.append({"label": label, "model": model,
                            "input": inp, "output": out, "total": total,
-                           "exact_cost": exact_cost})
+                           "exact_cost": exact_cost, "raw_usage": usage})
 
     # --- Aggregations -------------------------------------------------------
 
@@ -281,8 +283,39 @@ class TokenTracker:
 
 
 def _extract_usage(response: dict) -> dict | None:
-    """Extract usage dict from an API response (OpenAI or xAI)."""
-    return response.get("usage") if isinstance(response, dict) else None
+    """Extract usage dict from an API response (OpenAI or xAI).
+
+    Top-level tool-usage fields (e.g. xAI's server_side_tool_usage) are folded
+    in under their own keys so the per-call report can show them.
+    """
+    if not isinstance(response, dict):
+        return None
+    usage = response.get("usage")
+    if usage is None:
+        return None
+    usage = dict(usage)
+    for key, val in response.items():
+        if key != "usage" and ("tool" in key or "source" in key) and not isinstance(val, list):
+            usage.setdefault(key, val)
+    return usage
+
+
+def print_cost_report(tracker: "TokenTracker") -> None:
+    """Print run totals plus a per-call breakdown with any tool-usage fields."""
+    ts = tracker.summary_dict()
+    total_cost = ts.get("cost_usd") or ts.get("estimated_cost_usd", 0)
+    cost_tag = "" if "cost_usd" in ts else "~"
+    print(f"\n[tokens] {ts['api_calls']} API calls | {ts['total_tokens']:,} tokens | {cost_tag}${total_cost:.4f}")
+    for model, data in tracker.by_model().items():
+        tag = "" if data["has_exact"] else "~"
+        print(f"  {model}: {data['calls']}× | {data['total']:,} tokens | {tag}${data['cost']:.4f}")
+    token_keys = {"input_tokens", "output_tokens", "prompt_tokens",
+                  "completion_tokens", "total_tokens", "cost_in_usd_ticks"}
+    for c in tracker.calls:
+        raw = c.get("raw_usage") or {}
+        extras = {k: v for k, v in raw.items() if k not in token_keys and v not in (None, 0, {}, [])}
+        print(f"  [call] {c['label']}: {c['input']:,} in / {c['output']:,} out | "
+              f"${tracker._call_cost(c):.4f} | {json.dumps(extras, default=str)}")
 
 
 # ---------------------------------------------------------------------------
@@ -2893,6 +2926,7 @@ def main():
         print("DRY RUN - would write this to vault:")
         print("=" * 60)
         print(note_content)
+        print_cost_report(tracker)
         return
 
     # Write to vault via Obsidian CLI
@@ -2940,13 +2974,7 @@ def main():
         print("[validate] Note passed all quality checks")
 
     # Cost summary (always print — replaces old --costs heuristic)
-    ts = tracker.summary_dict()
-    total_cost = ts.get("cost_usd") or ts.get("estimated_cost_usd", 0)
-    cost_tag = "" if "cost_usd" in ts else "~"
-    print(f"\n[tokens] {ts['api_calls']} API calls | {ts['total_tokens']:,} tokens | {cost_tag}${total_cost:.4f}")
-    for model, data in tracker.by_model().items():
-        tag = "" if data["has_exact"] else "~"
-        print(f"  {model}: {data['calls']}× | {data['total']:,} tokens | {tag}${data['cost']:.4f}")
+    print_cost_report(tracker)
 
     # Hand the writes to Obsidian Sync before we exit — a scheduled run leaves
     # the app closed otherwise, and the note never leaves this machine.
