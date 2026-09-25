@@ -1494,25 +1494,37 @@ def run_prominent_ai_scan(
         # The model routinely returns fewer items than the prompt's own floor —
         # measured mean 5.7/day against a stated 8-15, with days as low as 1.
         # The old guard only fired on a completely empty list, so thin days were
-        # silently accepted. Retry whenever we're under the minimum; an
-        # independent sample either finds more or confirms the day was quiet.
+        # silently accepted. Retry whenever we're under the minimum — but by
+        # continuing the first response with no tools, so the model re-reads
+        # posts it already fetched. A fresh search cost ~40 billed posts
+        # ($0.23) per retry once xAI moved to per-post pricing (2026-09-21).
         if len(items) < PROMINENT_MIN_ITEMS:
             n_hits = len(xai_x._extract_citation_urls(raw))
+            retry_raw = None
             if n_hits > 0:
-                print(f"({len(items)} items, {n_hits} search hits — retrying)", end=" ", flush=True)
-                raw = xai_x.search_x_prominent_ai(
-                    l30_config["XAI_API_KEY"],
-                    model,
-                    from_date,
-                    to_date,
-                    depth=depth,
-                    min_likes=min_likes,
-                )
+                print(f"({len(items)} items, {n_hits} search hits — reformatting)", end=" ", flush=True)
+                try:
+                    retry_raw = xai_x.reformat_previous_response(
+                        l30_config["XAI_API_KEY"], model, raw, PROMINENT_MIN_ITEMS,
+                    )
+                except Exception as e:
+                    # A failed retry must not cost us the first sample.
+                    print(f"(reformat failed: {str(e)[:80]})", end=" ", flush=True)
+            if retry_raw is not None:
                 if tracker:
-                    tracker.record("ProminentAI/retry", model, _extract_usage(raw))
+                    tracker.record("ProminentAI/retry", model, _extract_usage(retry_raw))
+                # The continuation ran without tools, so it carries no citations
+                # of its own. Check its URLs against the first search's hits and
+                # keep only those — a URL outside them was not actually fetched.
+                cited = xai_x._extract_citation_urls(raw)
+                retry_items = xai_x._fix_urls_from_citations(
+                    xai_x.parse_x_response(retry_raw), cited)
+                status_id = lambda u: (re.search(r"/status/(\d+)", u or "") or [None, None])[1]
+                cited_ids = {status_id(u) for u in cited} - {None}
+                retry_items = [it for it in retry_items
+                               if isinstance(it, dict) and status_id(it.get("url")) in cited_ids]
                 # Merge rather than replace — the first sample may be thin but
                 # non-empty, and overwriting it would discard real items.
-                retry_items = xai_x.parse_x_response(raw)
                 have = {it.get("url") for it in items if isinstance(it, dict)}
                 added = [it for it in retry_items
                          if not isinstance(it, dict) or it.get("url") not in have]

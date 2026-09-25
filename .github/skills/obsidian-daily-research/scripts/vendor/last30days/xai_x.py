@@ -30,6 +30,17 @@ DEPTH_CONFIG = {
     "deep": (40, 60),
 }
 
+# xAI bills x_search per post fetched ($5/1k since 2026-09-21), counting every
+# parent and quoted post a thread fetch pulls in. Searches themselves are no
+# longer the cost — the posts they return are. Topic scans only: the same rules
+# on must-follow and prominent cut their coverage in testing.
+FETCH_BUDGET_RULES = """
+
+FETCH BUDGET — every post your searches return is billed, so keep fetches lean:
+- Use as few searches as the task needs, each as narrow as possible (date range, min_faves:).
+- Do NOT open threads, fetch replies, or expand quoted/parent posts. Use each post's own text.
+- Stop searching as soon as you have {max_items} qualifying posts."""
+
 X_SEARCH_PROMPT = """You have access to real-time X (Twitter) data. Search for posts about: {topic}
 
 Focus on posts from {from_date} to {to_date}. Find {min_items}-{max_items} high-quality, relevant posts.
@@ -39,12 +50,12 @@ IMPORTANT RULES:
 2. Return ONLY valid JSON in the exact format below, no other text.
 3. The url for each item MUST be the real X post URL from your search results. Do NOT fabricate or guess status IDs.
 4. ONLY return ORIGINAL posts — NO replies to other users, NO retweets/reposts.
-5. Prefer posts with high engagement (100+ likes) and substantive content.
+5. Prefer posts with high engagement (100+ likes) and substantive content — put min_faves:100 in your search queries.
 
 {{
   "items": [
     {{
-      "text": "Full post text — include the complete text of long posts/threads, do not truncate or summarize",
+      "text": "Full text of the post itself — do not truncate or summarize, do not stitch in thread replies",
       "url": "https://x.com/user/status/...",
       "author_handle": "username",
       "date": "YYYY-MM-DD or null if unknown",
@@ -184,7 +195,7 @@ def search_x(
         "input": [
             {
                 "role": "user",
-                "content": X_SEARCH_PROMPT.format(
+                "content": (X_SEARCH_PROMPT + FETCH_BUDGET_RULES).format(
                     topic=topic,
                     from_date=from_date,
                     to_date=to_date,
@@ -427,6 +438,48 @@ def search_x_prominent_ai(
     }
 
     return http.post(XAI_RESPONSES_URL, payload, headers=headers, timeout=300, retries=1)
+
+
+def reformat_previous_response(
+    api_key: str,
+    model: str,
+    response: Dict[str, Any],
+    min_items: int,
+) -> Optional[Dict[str, Any]]:
+    """Ask the model to re-emit posts its earlier searches already found.
+
+    Continues `response` via previous_response_id with NO tools attached, so it
+    cannot search again: the only cost is tokens, never fetched posts. Used when
+    a search returned hits but the model's JSON came back empty or thin — a
+    fresh search to fix that used to fetch ~40 more billed posts.
+
+    Returns the raw response, or None when `response` has no id to continue.
+    """
+    response_id = response.get("id") if isinstance(response, dict) else None
+    if not response_id:
+        return None
+    payload = {
+        "model": model,
+        "previous_response_id": response_id,
+        "input": [
+            {
+                "role": "user",
+                "content": (
+                    "Your searches above returned posts, but your answer included "
+                    f"too few of them (the target was at least {min_items}). Do not "
+                    "search again. Go back over the posts your searches already "
+                    "returned and include every one that meets the criteria, with "
+                    "its real URL. Set engagement to null where counts were not "
+                    "visible. Return ONLY valid JSON in the same format as before."
+                ),
+            }
+        ],
+    }
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+    return http.post(XAI_RESPONSES_URL, payload, headers=headers, timeout=180, retries=1)
 
 
 def search_x_must_follow_batch(
