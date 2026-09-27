@@ -78,6 +78,11 @@
             "name": "The Joe Rogan Experience",
             "rss_url": "https://feeds.megaphone.fm/GLT1412515089",
             "enabled": false
+        },
+        "lifespan-with-dr-david-sinclair": {
+            "name": "Lifespan with Dr. David Sinclair",
+            "rss_url": "https://feeds.megaphone.fm/NUOAC1101959196",
+            "enabled": true
         }
     },
     "spotify": {
