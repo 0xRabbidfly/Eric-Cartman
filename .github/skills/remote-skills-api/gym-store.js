@@ -396,6 +396,43 @@ function createGymStore(dataRoot, { libraryPath = DEFAULT_LIBRARY_PATH } = {}) {
     return { ...data, days, profileId, span };
   }
 
+  /**
+   * What the athlete lifted the last time each of this session's exercises came
+   * up, keyed by this session's item id. Walks back through the sequence to the
+   * nearest done session (performedOn set, so a reopened one still counts) that
+   * logged a load for the same exerciseKey — item ids change between weeks, the
+   * exercise does not. Loads stay in kg; the app converts for display.
+   */
+  function previousLoads(profileId, week, day, items) {
+    const previous = {};
+    const wanted = new Map(items.map((item) => [item.exerciseKey, item.id]));
+    for (let index = sessionIndex(week, day) - 1; index >= 0 && wanted.size; index -= 1) {
+      const pos = sessionAt(index);
+      const log = readLog(profileId, pos.week, pos.day);
+      if (!log || !log.performedOn || !Array.isArray(log.entries)) continue;
+      let pastItems;
+      try {
+        pastItems = dayItems(profileId, pos.week, pos.day);
+      } catch (err) {
+        continue;                                 // no prescription left for that week
+      }
+      for (const past of pastItems) {
+        const itemId = wanted.get(past.exerciseKey);
+        if (!itemId) continue;
+        const sets = log.entries
+          .filter((e) => e.itemId === past.id && typeof e.load === 'number')
+          .sort((a, b) => a.set - b.set)
+          .map((e) => ({ set: e.set, load: e.load, reps: e.reps ?? null, rpe: e.rpe ?? null }));
+        if (!sets.length) continue;
+        previous[itemId] = {
+          week: pos.week, day: pos.day, performedOn: log.performedOn, isRamp: !!past.isRamp, sets,
+        };
+        wanted.delete(past.exerciseKey);
+      }
+    }
+    return previous;
+  }
+
   /** A locked session stays readable, so the app can show its prescription read-only. */
   function getSession(profileId, week, day) {
     requireProfile(profileId);
@@ -413,6 +450,7 @@ function createGymStore(dataRoot, { libraryPath = DEFAULT_LIBRARY_PATH } = {}) {
       log: readLog(profileId, week, day) || emptyLog(profileId, week, day),
       maxes: readJson(at(profileId, 'maxes.json'), {}),
       podcast: readPodcasts(profileId)[`W${week}D${day}`] || null,
+      previous: previousLoads(profileId, week, day, dayData.items),
       ...sequenceFlags(sequenceState(profileId), week, day),
     };
   }

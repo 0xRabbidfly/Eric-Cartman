@@ -793,6 +793,8 @@
     }
     .gym-item .gi-presc { font-size: 12px; color: var(--text-dim); margin: 5px 0 9px; line-height: 1.5; }
     .gym-item .gi-presc .gi-num { color: var(--text); font-variant-numeric: tabular-nums; }
+    .gym-item .gi-last { font-size: 12px; color: var(--text-dim); margin: -4px 0 9px; line-height: 1.5; }
+    .gym-item .gi-last .gi-num { color: var(--text); font-variant-numeric: tabular-nums; }
     .gym-sets { display: flex; flex-direction: column; gap: 6px; }
     .gym-setrow { display: grid; grid-template-columns: 26px 1fr 1fr 1fr; gap: 6px; align-items: center; }
     .gym-setrow.head { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: .04em; }
@@ -1659,22 +1661,28 @@
     const GYM_KG_PER_LB = 0.45359237;
     const GYM_WEIGHT_TYPES = new Set(['kg', 'kg_total_pair', 'bodyweight_plus_kg']);
 
-    function gymIsLb() { return gym.units === 'lb'; }
-    function gymWeightUnit() { return gymIsLb() ? 'lb' : 'kg'; }
+    // `item` is optional: anything with an exerciseKey. An exercise whose
+    // library entry says `unit: "kg"` — kettlebells, which are sold in kg — is
+    // shown and typed in kg even when the app is in lb. Storage is kg either way.
+    function gymIsLb(item) {
+      const { unit } = (item && (gym.exercises || {})[item.exerciseKey]) || {};
+      return (unit || gym.units) === 'lb';
+    }
+    function gymWeightUnit(item) { return gymIsLb(item) ? 'lb' : 'kg'; }
     function gymIsWeight(item) { return GYM_WEIGHT_TYPES.has(item.loadType); }
 
-    function gymShowWeight(kg) {
+    function gymShowWeight(kg, item) {
       if (kg === null || kg === undefined || kg === '') return '';
-      const value = gymIsLb() ? kg / GYM_KG_PER_LB : kg;
+      const value = gymIsLb(item) ? kg / GYM_KG_PER_LB : kg;
       return String(Math.round(value * 10) / 10);
     }
 
-    function gymStoreWeight(typed) {
-      return gymIsLb() ? Math.round(typed * GYM_KG_PER_LB * 1000) / 1000 : typed;
+    function gymStoreWeight(typed, item) {
+      return gymIsLb(item) ? Math.round(typed * GYM_KG_PER_LB * 1000) / 1000 : typed;
     }
 
-    function gymTargetWeight(kg, loadType) {
-      if (!gymIsLb()) return kg;
+    function gymTargetWeight(kg, loadType, item) {
+      if (!gymIsLb(item)) return kg;
       const lb = kg / GYM_KG_PER_LB;
       const nearest5 = v => Math.round(v / 5) * 5;
       return loadType === 'kg_total_pair' ? nearest5(lb / 2) * 2 : nearest5(lb);
@@ -1687,9 +1695,9 @@
     }
 
     function gymLoadLabel(item) {
-      const unit = gymWeightUnit();
+      const unit = gymWeightUnit(item);
       const hasTarget = item.targetLoad !== null && item.targetLoad !== undefined;
-      const target = hasTarget && gymIsWeight(item) ? gymTargetWeight(item.targetLoad, item.loadType) : item.targetLoad;
+      const target = hasTarget && gymIsWeight(item) ? gymTargetWeight(item.targetLoad, item.loadType, item) : item.targetLoad;
       if (item.loadType === 'bodyweight') return 'bodyweight';
       if (item.loadType === 'setting') return hasTarget ? `setting ${target}` : 'cable setting';
       if (item.loadType === 'bodyweight_plus_kg') return target ? `bodyweight + ${target} ${unit}` : 'bodyweight';
@@ -1745,11 +1753,30 @@
     // types a number only when the set differed from the plan.
     function gymLoadPlaceholder(item) {
       if (item.targetLoad !== null && item.targetLoad !== undefined) {
-        return String(gymIsWeight(item) ? gymTargetWeight(item.targetLoad, item.loadType) : item.targetLoad);
+        return String(gymIsWeight(item) ? gymTargetWeight(item.targetLoad, item.loadType, item) : item.targetLoad);
       }
       if (item.loadType === 'bodyweight' || item.loadType === 'bodyweight_plus_kg') return 'bw';
       if (gymBarLabel(item)) return 'bar';
-      return gymIsWeight(item) ? gymWeightUnit() : 'load';
+      return gymIsWeight(item) ? gymWeightUnit(item) : 'load';
+    }
+
+    // What was lifted the last time this exercise came up in the program, so
+    // picking today's weight never depends on memory. The server finds it by
+    // exercise, across weeks; loads arrive in kg and show in the app's unit,
+    // exactly as they were typed.
+    function gymLastTime(item, prev) {
+      if (!prev || !prev.sets || !prev.sets.length) return '';
+      const unit = gymIsWeight(item) ? ` ${gymWeightUnit(item)}` : '';
+      const load = v => {
+        if (item.loadType === 'bodyweight_plus_kg') return v ? `bw + ${gymShowWeight(v, item)}` : 'bw';
+        if (item.loadType === 'setting') return `setting ${v}`;
+        return gymIsWeight(item) ? gymShowWeight(v, item) : String(v);
+      };
+      const sets = prev.sets.map(e => (e.reps === null || e.reps === undefined
+        ? load(e.load) : `${load(e.load)} × ${e.reps}`)).join(' · ');
+      const when = `W${prev.week} D${prev.day}${prev.performedOn ? `, ${gymShortDate(prev.performedOn)}` : ''}`;
+      return `<div class="gi-last">Last time${prev.isRamp ? ' (max test)' : ''} · ${escHtml(when)}: `
+        + `<span class="gi-num">${escHtml(sets)}${escHtml(unit)}</span></div>`;
     }
 
     // The middle column holds whatever the exercise is measured in: reps for a
@@ -1783,7 +1810,7 @@
             <div class="gym-setrow">
               <div class="sr-n">${n}</div>
               <input inputmode="decimal" placeholder="${escHtml(gymLoadPlaceholder(item))}"
-                     class="${filled(e.load)}" value="${gymIsWeight(item) ? gymShowWeight(e.load) : val(e.load)}" ${readOnly ? 'disabled' : ''}
+                     class="${filled(e.load)}" value="${gymIsWeight(item) ? gymShowWeight(e.load, item) : val(e.load)}" ${readOnly ? 'disabled' : ''}
                      onchange="gymSetInput('${escJsAttr(item.id)}', ${n}, 'load', this.value, this)">
               <input inputmode="numeric" placeholder="${escHtml(gymResultPlaceholder(item))}"
                      class="${filled(e.reps)}" value="${val(e.reps)}" ${readOnly ? 'disabled' : ''}
@@ -1814,6 +1841,7 @@
             <div class="gi-presc"><span class="gi-num">${escHtml(gymRepLabel(item))} · ${escHtml(gymLoadLabel(item))}${rpe}</span> · rest ${item.restSec}s${escHtml(paired)}
               ${item.loadNote ? `<br>${escHtml(item.loadNote)}` : ''}
               ${hint ? `<br>${escHtml(hint)}` : ''}</div>
+            ${gymLastTime(item, (s.previous || {})[item.id])}
             <div class="gym-sets">
               <div class="gym-setrow head"><div></div><div>Load</div><div>Reps</div><div>RPE</div></div>
               ${rows.join('')}
@@ -1846,7 +1874,8 @@
             <div>${escHtml(s.podcast.show)}${s.podcast.duration ? ` · ${escHtml(s.podcast.duration)}` : ''} · Spotify</div>
             ${s.podcast.why ? `<div class="gp-why">${escHtml(s.podcast.why)}</div>` : ''}
           </a>` : ''}
-        ${readOnly ? '' : `<div class="gym-locked-note">Weights in ${gymWeightUnit()}. Blank reps count as the reps shown when you finish, except on max tests and baselines.</div>`}
+        ${readOnly ? '' : `<div class="gym-locked-note">Weights in ${gymWeightUnit()}${
+          gymIsLb() && s.day.items.some(i => gymIsWeight(i) && !gymIsLb(i)) ? ' (kettlebells in kg)' : ''}. Blank reps count as the reps shown when you finish, except on max tests and baselines.</div>`}
         <div class="gym-warmup"><b>Warm-up</b> · ${s.day.warmup.map(escHtml).join(' · ')}</div>
         ${items}
         <textarea class="gym-notes" placeholder="${gymProgram() === 'cycling'
@@ -1909,7 +1938,7 @@
       const text = String(raw).trim();
       entry[field] = text === '' ? null : Number(text);
       if (Number.isNaN(entry[field])) entry[field] = null;
-      if (field === 'load' && entry.load !== null && gymIsWeight(item)) entry.load = gymStoreWeight(entry.load);
+      if (field === 'load' && entry.load !== null && gymIsWeight(item)) entry.load = gymStoreWeight(entry.load, item);
       // A value the athlete types is no longer one the server assumed at finish.
       if (entry.assumed) {
         entry.assumed = entry.assumed.filter(f => f !== field);
@@ -2159,16 +2188,17 @@
     // Machine pins and bodyweight work have no kilograms to compare, so they
     // are left out rather than drawn as zero.
     function gymLoadTrendRows(data) {
-      const rows = Object.values(data.loadTrend || {}).map(t => {
+      const rows = Object.entries(data.loadTrend || {}).map(([key, t]) => {
+        const ex = { exerciseKey: key };
         const first = t.points[0];
         const last = t.points[t.points.length - 1];
-        const unit = t.loadType === 'kg_total_pair' ? `${gymWeightUnit()} pair` : gymWeightUnit();
-        const delta = Number(gymShowWeight(last.load - first.load));
+        const unit = t.loadType === 'kg_total_pair' ? `${gymWeightUnit(ex)} pair` : gymWeightUnit(ex);
+        const delta = Number(gymShowWeight(last.load - first.load, ex));
         const path = t.points.length > 1
-          ? `W${first.week} ${gymShowWeight(first.load)} → W${last.week} ${gymShowWeight(last.load)} ${unit}${delta ? ` · ${delta > 0 ? '+' : ''}${delta}` : ''}`
+          ? `W${first.week} ${gymShowWeight(first.load, ex)} → W${last.week} ${gymShowWeight(last.load, ex)} ${unit}${delta ? ` · ${delta > 0 ? '+' : ''}${delta}` : ''}`
           : `W${last.week} · ${last.reps} reps`;
         return `<div class="gym-trendrow"><div class="tr-name">${escHtml(t.label)}</div>
-                <div class="tr-value">${escHtml(`${gymShowWeight(last.load)} ${unit}`)}</div>
+                <div class="tr-value">${escHtml(`${gymShowWeight(last.load, ex)} ${unit}`)}</div>
                 <div class="tr-path">${escHtml(path)}</div></div>`;
       }).join('');
       return rows || '<div class="gym-pace">Appears once sets with a weight are logged. Machine pins and bodyweight work are not counted.</div>';

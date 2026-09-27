@@ -114,6 +114,52 @@ test('getSession returns an empty in-progress log when nothing is saved', () => 
   assert.equal(session.log.dayNotes, '');
 });
 
+test('getSession shows what was lifted the last time the exercise came up', () => {
+  const store = createGymStore(fixture());
+  assert.deepEqual(store.getSession('athlete-a', 1, 2).previous, {
+    'a-back-squat': {
+      week: 1, day: 1, performedOn: '2026-09-09', isRamp: true,
+      sets: [{ set: 1, load: 40, reps: 3, rpe: 7 }],
+    },
+  });
+  // Nothing before the first session, and nothing for an athlete with no history.
+  assert.deepEqual(store.getSession('athlete-a', 1, 1).previous, {});
+  assert.deepEqual(store.getSession('athlete-b', 1, 2).previous, {});
+});
+
+test('previous skips unfinished logs and sessions without the exercise, and matches by exercise not item id', () => {
+  const root = fixture();
+  const write = (rel, obj) => fs.writeFileSync(path.join(root, rel), JSON.stringify(obj), 'utf8');
+  // W1 D2 prescribes the squat under a different item id and drops it from D3.
+  const w1 = JSON.parse(fs.readFileSync(path.join(root, 'athlete-a/weeks/W1.json'), 'utf8'));
+  w1.days[1].items[0].id = 'b-back-squat';
+  w1.days[2].items[0] = { ...w1.days[2].items[0], id: 'a-plank', exerciseKey: 'plank', label: 'Plank' };
+  write('athlete-a/weeks/W1.json', w1);
+  write('athlete-a/logs/W1D2.json', {
+    profileId: 'athlete-a', week: 1, day: 2, status: 'complete', performedOn: '2026-09-11',
+    entries: [
+      { itemId: 'b-back-squat', set: 2, load: 50, loadType: 'kg', reps: 3, rpe: 8, note: '' },
+      { itemId: 'b-back-squat', set: 1, load: 45, loadType: 'kg', reps: 3, rpe: null, note: '', assumed: ['load'] },
+    ],
+  });
+  write('athlete-a/logs/W1D3.json', {
+    profileId: 'athlete-a', week: 1, day: 3, status: 'complete', performedOn: '2026-09-13',
+    entries: [{ itemId: 'a-plank', set: 1, load: null, loadType: 'bodyweight', reps: 60, rpe: null, note: '' }],
+  });
+  // Started but never finished: not a previous session yet.
+  write('athlete-a/logs/W2D1.json', {
+    profileId: 'athlete-a', week: 2, day: 1, status: 'in_progress', performedOn: null,
+    entries: [{ itemId: 'a-back-squat', set: 1, load: 99, loadType: 'kg', reps: 3, rpe: null, note: '' }],
+  });
+  const store = createGymStore(root);
+  assert.deepEqual(store.getSession('athlete-a', 2, 2).previous, {
+    'a-back-squat': {
+      week: 1, day: 2, performedOn: '2026-09-11', isRamp: true,
+      sets: [{ set: 1, load: 45, reps: 3, rpe: null }, { set: 2, load: 50, reps: 3, rpe: 8 }],
+    },
+  });
+});
+
 test('a podcast picked for a session shows on that day only, for that profile only', () => {
   const root = fixture();
   const pick = { show: 'Show', title: 'Episode', url: 'https://open.spotify.com/episode/x', why: 'w' };

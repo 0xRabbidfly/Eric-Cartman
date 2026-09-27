@@ -183,7 +183,8 @@
     "why": "total-body bracing under load plus grip; trains a rigid trunk while the legs move.",
     "how": "heavy dumbbells or handles, stand tall, shoulders down, walk with short quick steps for the set distance. Set down with a hinge.",
     "cues": "\"walk like you're proud\", no leaning, breathe behind the brace.",
-    "video": "https://www.youtube.com/watch?v=vi4X2iSOyiA"
+    "video": "https://www.youtube.com/watch?v=vi4X2iSOyiA",
+    "unit": "kg"
   },
   "box-jump": {
     "key": "box-jump",
@@ -221,7 +222,8 @@
     "how": "hinge, hike the bell back between the legs, then snap the hips forward so the bell floats to chest height. Arms are ropes. Let it fall and hinge again.",
     "cues": "\"it's a hinge, not a squat\", stand up hard, glutes finish the swing.",
     "video": "https://www.youtube.com/watch?v=bDCeXbMJVNs",
-    "loadHint": "one kettlebell"
+    "loadHint": "one kettlebell",
+    "unit": "kg"
   },
   "hang-power-clean": {
     "key": "hang-power-clean",
