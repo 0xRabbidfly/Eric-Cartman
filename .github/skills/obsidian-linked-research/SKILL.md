@@ -6,7 +6,7 @@ user-invocable: true
 disable-model-invocation: false
 metadata:
   author: 0xrabbidfly
-  version: "1.6.0"
+  version: "1.9.0"
 ---
 
 # Obsidian Linked Research
@@ -58,22 +58,127 @@ To add more sources, append rows to the table above.
 
 ## Prerequisites
 
-- **Obsidian** must be running with CLI enabled
+- **Obsidian** should be running with CLI enabled. If it is not, the skill still
+  runs in **degraded mode** — see below. Do not abort the run.
 - **XAI_API_KEY** required for tweet URLs (via keyring `automation/api`, env var, or `~/.config/last30days/.env`)
 - Web URLs work without any API key
+
+### Run on the Windows host — not a Linux sandbox
+
+Every command in this workflow must run on the **machine where Obsidian is
+installed**. In environments that expose *both* a POSIX sandbox and the Windows
+host (Cowork, and any agent with a Linux `bash` tool alongside Desktop Commander),
+the sandbox is a **different filesystem with no Obsidian install**, and
+`Obsidian()` fails at construction:
+
+```
+FileNotFoundError: Obsidian CLI not found. Ensure Obsidian 1.12+ is installed...
+```
+
+Note that this is a **raise**, not the empty-result degradation described below —
+degraded mode covers "app closed", not "wrong machine". Do not interpret it as
+DEGRADED and do not try to work around it with filesystem fallbacks against a
+mounted vault path; switch shells and re-run. Use PowerShell on the Windows host
+(`Desktop_Commander__start_process`, or the native shell) for **all** wrapper
+calls, `fetch.py`, image downloads, and the connection detector.
+
+### Degraded mode — Obsidian not running
+
+The `obsidian` wrapper is **half disk-backed, half CLI-backed**. When the
+Obsidian app is closed, the disk-backed half keeps working and the CLI-backed
+half returns `err(1)` **with empty stdout** — it does not raise. A run that
+ignores this will silently build a note on empty taxonomy data.
+
+**Preflight probe (run this first, every time):**
+
+```powershell
+python -c "import sys; sys.path.insert(0,'.github/skills/obsidian/scripts'); from obsidian import Obsidian; ob=Obsidian(); r=ob.vault_info(); print('LIVE' if r.ok else 'DEGRADED'); print('vault:', ob._vault_path)"
+```
+
+`ob._vault_path` resolves from `obsidian.json` on disk and is populated **even
+when the app is closed** — use it anywhere the workflow calls for a vault path.
+
+| Wrapper call | App closed | Documented fallback |
+|---|---|---|
+| `read(path=...)`, `create(path=...)`, `append`, `prepend` | **works** (direct disk write) | none needed |
+| `search(...)` (Step 0 URL dedup, Step 2.5a) | fails, empty | Read-only scan: walk `<vault>/Research/Library/**/*.md` and grep frontmatter `url:` lines for the input URL |
+| `tags()` (Step 0 tag index) | fails, empty | Build the tag index by parsing `tags:` frontmatter from the same walk |
+| `files(folder=...)` (Step 0 bucket listing) | fails, empty | `Path(ob._vault_path, 'Research/Library').rglob('*.md')` |
+| `vault_info()` (Step 3b) | fails, empty | `ob._vault_path` |
+| `open(...)` (Step 6) | fails | **Skip the step — this is not a run failure.** Report the `obsidian://` URL in Step 7 instead |
+
+Rules for degraded mode:
+
+- Announce it once, up front: `Obsidian not running — degraded mode, using filesystem fallbacks`.
+- Degraded mode changes **how** Step 0 and Step 2.5a gather data, never **whether** they run. The URL-dedup gate is still mandatory.
+- Only Step 6 may be skipped outright. Record it as SKIPPED, not FAIL.
 
 ## Workflow
 
 ### Step 0 — Inspect Taxonomy First
 
-Before fetching or summarizing, inspect the live research taxonomy so you do not
-invent a second folder or tag scheme.
+**First, pin `RUN_DATE` — once, here — and use it for every date in the run.**
+
+```python
+from datetime import date
+RUN_DATE = date.today().isoformat()   # capture ONCE; never call date.today() again
+```
+
+Every `date_found`, `date_saved`, `Recently Added` inline date tag, and the Step 5
+prune cutoff must come from this single value. Runs cross midnight routinely —
+a long enrichment pass or a multi-note batch can span **days** (observed
+2026-09-17 → 09-19, and 2026-09-22 → 09-24). Recomputing the date mid-run
+produces two defects at once: notes in the same batch get inconsistent
+`date_saved` values, and the second Step 5 pass prunes `Recently Added` entries
+that the first pass had just deliberately kept inside the 7-day window.
+
+Then inspect the live research taxonomy so you do not invent a second folder or
+tag scheme.
 
 Read the master library MOC first:
 
 ```powershell
 python .github/skills/obsidian/scripts/obsidian.py read --path "Research/Library/00 MOC/🗺️ MOC - Research Library.md"
 ```
+
+> **SILENT-FAILURE TRAP — the master MOC filename contains a hidden character.**
+> `🗺️` is **two** code points: `U+1F5FA` (map) + `U+FE0F` (variation selector).
+> The "obvious" spelling with a bare `U+1F5FA` does not match the file on disk.
+> A mistyped filename must not be allowed to look like an empty MOC, or the run
+> proceeds to invent its own taxonomy.
+>
+> **`ob.read()` signals a missing path in TWO different ways depending on mode —
+> an emptiness check alone is not a valid guard.** Measured 2026-09-22:
+>
+> | Mode | `ob.read()` on a missing path returns |
+> |---|---|
+> | **LIVE** (app running) | `'Error: File "<path>" not found.'` — a **non-empty** string |
+> | **DEGRADED** (app closed) | `''` — empty, via CLI `err(1)` with empty stdout |
+>
+> So `assert moc.strip()` passes on garbage in LIVE mode. Use this helper for
+> **every** read whose content drives a decision (Step 0 MOC, Step 2.5b, Step 4
+> dedup, Step 5) and never hand-roll either check:
+>
+> ```python
+> def note_text(ob, path):
+>     """Return note content, or None if the path does not exist.
+>     Handles both the LIVE 'Error: ...' string and the DEGRADED empty string."""
+>     r = ob.read(path=path)
+>     if not r or not r.strip() or r.startswith('Error'):
+>         return None
+>     return r
+>
+> MOC_PATH = 'Research/Library/00 MOC/' + chr(0x1F5FA) + chr(0xFE0F) + ' MOC - Research Library.md'
+> moc = note_text(ob, MOC_PATH)
+> assert moc, 'Master MOC read failed — wrong filename or Obsidian down. Stop and resolve.'
+> ```
+>
+> If it comes back `None`, resolve the real filename from disk instead of guessing:
+> `next(Path(ob._vault_path, 'Research/Library/00 MOC').glob('*MOC - Research Library.md'))`.
+>
+> **Corollary for existence checks** (Step 4's slug guard): "exists" is
+> `note_text(...) is not None`. Testing truthiness or `.strip()` alone reports a
+> non-existent note as EXISTS in LIVE mode and will abort a legitimate write.
 
 Read any relevant topic MOC only after the master MOC, and only for extra domain
 context. Topic MOCs are secondary maps, not the source of truth for canonical tags.
@@ -92,6 +197,21 @@ python -c "import sys; sys.stdout.reconfigure(encoding='utf-8'); sys.path.insert
 
 > **Windows UTF-8 note**: On Windows, subprocess pipes default to the system code page (cp1252), which cannot encode emoji or non-ASCII vault paths. Always add `sys.stdout.reconfigure(encoding='utf-8')` before any `print()` call in one-liner subprocess commands, or prefer calling the Obsidian Python API directly.
 
+> **`\u` escapes are decoded before Python ever sees them.** Tool input is JSON,
+> so writing `'️'` inside a `python -c "..."` string does **not** reach
+> Python as a 6-character escape sequence — the JSON layer decodes it first and
+> sends the literal character, which then hits a cp1252 decode error on stdin.
+> Do not try to escape your way out of it. Two fixes:
+> 1. Build the character in code: `chr(0x1F5FA) + chr(0xFE0F)` — pure ASCII source, no escape survives to be mangled.
+> 2. Better: put the code in a one-shot `.py` file via the `Write` tool and run `python _tmp_x.py`.
+>
+> **Use one-shot script files, not an interactive Python REPL.** Interactive
+> REPL sessions in this workflow have died mid-run more than once (observed
+> during image download and during wrapper init), losing all in-memory state.
+> One-shot scripts are reliable and re-runnable. This is the same rule as the
+> PowerShell `$` gotcha in Step 3b, generalized: **any** payload containing
+> emoji, `$`, backticks, or nested quotes goes in a temp script file.
+
 **URL-based dedup (mandatory before fetching)**: Search for an existing note
 whose `url:` frontmatter matches the input URL. This catches duplicates even
 when the slug or folder differ. Use the Obsidian search API:
@@ -101,6 +221,22 @@ python -c "import sys; sys.stdout.reconfigure(encoding='utf-8'); sys.path.insert
 ```
 
 > **Note**: Obsidian's local search does not support `url:` field-operator syntax — `url: <value>` throws "Operator not recognized". Use a plain-text query with the URL string or a distinctive fragment of it (e.g., the tweet ID or domain path).
+
+> **Degraded-mode dedup (Obsidian not running)**: `search()` returns `err(1)`
+> with empty output — which is indistinguishable from "no duplicate found", so
+> an unchecked run will happily create a duplicate note. **An empty `search()`
+> result is only trustworthy when the preflight probe said LIVE.** When
+> degraded, do the scan on disk instead — this is a required substitute, not an
+> optional extra:
+>
+> ```python
+> from pathlib import Path
+> lib = Path(ob._vault_path) / 'Research/Library'
+> frag = '<distinctive URL fragment>'
+> hits = [p for p in lib.rglob('*.md') if frag in p.read_text(encoding='utf-8', errors='ignore')]
+> ```
+>
+> Same rule applies to the Step 2.5a related-note search.
 
 If a match is found, **stop** — tell the user the note already exists, give them
 the path and an Obsidian link, and ask whether they want to update the existing
@@ -118,6 +254,16 @@ Use this routing table unless the live vault has changed again:
 | `Research/Library/06 Cryptography/` | cryptography, post-quantum, blockchain security, zero-knowledge proofs |
 | `Research/Library/07 Macrotrends & Futures/` | space, off-world, megatrends, long-horizon futures, civilizational shifts |
 | `Research/Library/08 Org Design & AI Transformation/` | organizational design, corporate transformation via AI, hierarchy-vs-intelligence, management theory |
+| `Research/Library/09 Health & Longevity/` | sleep, exercise, nutrition, longevity science, health optimization |
+| `Research/Library/10 Crypto, Tokenomics/` | blockchain, tokenomics, crypto policy, onchain finance, bitcoin |
+| `Research/Library/11 UI & Product Design/` | UI design, product design, design systems, interaction patterns |
+| `Research/Library/12 Economics/` | macroeconomics, debt cycles, bonds, currency debasement, personal finance |
+| `Research/Library/13 AI Alignment & Safety/` | alignment, AI safety research, existential risk, red-teaming |
+
+> **This table drifts.** It listed only 01–08 while the live vault had 01–13 (caught
+> 2026-09-16, which would have mis-routed any health, crypto, UI, economics or
+> alignment note). Step 0 already lists the live buckets — **trust the Step 0 output
+> over this table** whenever the two disagree, and update the table when they do.
 
 Tagging rules before you write anything:
 
@@ -177,16 +323,50 @@ If the result contains an `"error"` key, report it to the user and stop.
 
 > **X/Twitter fallback dead-ends**: Do NOT try Playwright for x.com URLs — it returns a login wall for unauthenticated sessions. Do NOT try Firecrawl — it explicitly does not support x.com. The only supported path for tweet content is `fetch.py` via the xAI `x_search` tool.
 
-**If a non-X web page is truncated or loses useful structure**: `fetch.py` is
-still the required first pass, but long articles may come back clipped (for
-example around the first ~8000 chars) or flattened enough that headings, quotes,
-or diagram captions are hard to reconstruct. In that case, supplement the fetch
-result with a secondary enrichment pass:
+**Enrichment pass for long-form sources — expect this, don't treat it as an exception.**
 
-- Use `WebFetch` (Claude Code tool) or `fetch_webpage` (if available) on the same URL to recover richer article structure
-- If neither tool is sufficient for a long structured document (e.g., an academic paper with many sections), delegate to a general-purpose sub-agent with `WebFetch` and ask it to extract all major sections in full
-- Do **not** skip `fetch.py`; it remains the canonical fetch step and the source of `image_urls` and metadata
-- Keep the original `fetch.py` metadata (`title`, `image_urls`, `url`) as the source of truth unless the secondary fetch clearly corrects it
+`fetch.py` hard-caps web content at **8,000 chars**. For any long-form source —
+essays, podcast transcripts, academic papers, substantial blog posts — that cap
+is hit essentially **every time** (a 106k-char podcast transcript returns 7.5% of
+itself). Treat the enrichment pass as the **default second half of Step 1** for
+long-form, not as an error path.
+
+**Check the cap explicitly rather than eyeballing the output:**
+
+```python
+truncated = len(result.get('content', '')) >= 8000   # at the cap == assume clipped
+```
+
+Content at or near 8,000 chars is clipped, full stop. Content well under it is
+complete and needs no enrichment. Then:
+
+- **The calling skill already has the full text** → use it, skip the second fetch. When `obsidian-linked-research` is invoked from `gmail-daily-briefing` on a newsletter, the email body *is* the publisher's own full article and is usually more complete than a re-fetch (no paywall interstitial, no nav chrome). Keep `fetch.py`'s metadata and `image_urls`; take the prose from the email. Confirm the email body actually reaches the article's conclusion before trusting it — some senders truncate at a paywall.
+
+> **Resolving a Substack URL does not require reading the email at all.** Newsletter
+> sends are large — a single Latent Space podcast email measured **738 KB**, and
+> `get_message` PLAIN_TEXT on these routinely exceeds the tool-result cap (the
+> harness then spills it to a file). If all you need is the canonical URL, hit the
+> publication's archive API instead:
+>
+> ```
+> https://<publication>/api/v1/archive?sort=new&limit=25
+> ```
+>
+> It returns JSON with `canonical_url`, `title`, and `post_date` per post — match on
+> title and you have the URL for a few KB. Verified 2026-09-22 on `www.latent.space`
+> (resolved `/p/jev` without touching the 738 KB body).
+>
+> When you *do* need the prose and the email is oversized, parse the spilled JSON's
+> `plaintextBody` on the host, strip the `[ https://substack.com/redirect/... ]`
+> noise, and read it in ~26k-char slices. Note that paid Substack issues truncate at
+> the paywall even in the delivered email, so a free-tier body may stop mid-issue —
+> check before trusting it as complete.
+- **Article / essay / blog post** → `WebFetch` (Claude Code tool) or `fetch_webpage` on the same URL to recover the article structure.
+- **Very long or many-sectioned source** (academic paper, full podcast transcript, multi-part essay) → go **straight** to a general-purpose sub-agent with `WebFetch` and ask it to extract all major sections. Do not burn a round-trip on a plain `WebFetch` first; it will return an overview, not the sections.
+- **Prompt phrasing matters**: never ask `WebFetch` for "verbatim" or "word for word" text — it refuses on copyright grounds. Ask for *"a structured outline with headings, key facts, short attributed quotes, and any comparison tables"*. That yields the structure the note actually needs.
+- Do **not** skip `fetch.py`; it remains the canonical fetch step and the source of `image_urls` and metadata.
+- Keep the original `fetch.py` metadata (`title`, `image_urls`, `url`) as the source of truth unless the secondary fetch clearly corrects it.
+- If parts of the source were provably not retrieved (e.g. sub-pages behind nav links), flag that in the note as an explicit scope boundary rather than inventing content.
 
 **If `"needs_browser": true`**: The tweet contains an X Article that requires
 JavaScript rendering. **Do NOT use `fetch_webpage`** — it cannot render X Article
@@ -240,7 +420,7 @@ Think through the content and produce this structure internally:
 {
   "title": "Clear, descriptive title for the note",
   "slug": "kebab-case-filename-slug (3-6 words, no special chars)",
-  "library_bucket": "01 Agent Harnesses & Architecture | 02 Skills, IDEs & Agent Tooling | 03 Evals, Reliability & Control | 04 SDLC, Workflow & Strategy | 05 Knowledge, RAG & Memory",
+  "library_bucket": "one of the live buckets listed by Step 0 — do not pick from a hardcoded list here",
   "library_path": "Research/Library/<bucket>/<slug>.md",
   "author": "@handle or Author Name",
   "source": "x|reddit|blog|article|github",
@@ -299,7 +479,12 @@ as the new note:
 python -c "import sys; sys.stdout.reconfigure(encoding='utf-8'); sys.path.insert(0,'.github/skills/obsidian/scripts'); from obsidian import Obsidian; ob=Obsidian(); r=ob.search(query='<primary_tag>', path='Research/Library/<bucket>'); print(r.text if hasattr(r,'text') else r)"
 ```
 
-Also check the `related_notes` identified in Step 2 — read any that exist.
+> **Degraded mode**: if the preflight probe reported DEGRADED, `search()` returns
+> empty — use the disk-walk fallback from Step 0 (filter `Research/Library/**/*.md`
+> on `tags:` frontmatter) instead of concluding there are no related notes.
+
+Also check the `related_notes` identified in Step 2 — read any that exist
+(and remember `ob.read()` returns `""` for a path that doesn't exist).
 
 From the search results plus related notes, select the **top 3-5 most related
 existing notes** by this priority:
@@ -504,7 +689,11 @@ the user's workflow. Be specific about what to keep, change, or investigate.}
 - Use tables for structured comparisons (don't convert tables to bullet lists)
 - Use blockquotes (`>`) for direct quotes from the source
 - Include `**bold**` for key terms and emphasis as in the original
-- `## Related` should use `[[wiki-links]]` to connect to other Library notes
+- `## Related` should use `[[wiki-links]]` to connect to other Library notes.
+  **Link by slug, not by title**: library notes have no `# H1` — the filename slug
+  is the only resolvable link target, so `[[Note Title 1]]` from the template above
+  creates a broken link. Use `[[slug|Display Text]]`, which is also the form the
+  master MOC uses.
 - Keep the frontmatter compatible with existing research notes in the chosen folder
 
 And if it's a thread, add a Thread Context section before Summary:
@@ -530,6 +719,39 @@ Use `![[filename]]` (Obsidian wiki-link embed) for each image. If
 If an image doesn't clearly belong to a specific section (e.g., a generic hero
 image or author avatar), place it just below the metadata header block.
 
+> **Web sources give you URLs with no captions — do not guess placement.**
+> For tweets, `media_descriptions` pairs descriptions to images. For **web pages,
+> `image_urls` is a bare, unordered-ish list with no alt text, no captions, and no
+> position anchors**, so on an image-heavy article (Substack posts routinely return
+> 8–14 URLs, mixed with avatars, logos and embedded-tweet thumbnails) there is no
+> way to tell which figure goes where. Placing them by guesswork produces confidently
+> wrong captions, which is worse than omitting them.
+>
+> Rule: embed only images you can actually identify — normally the hero (the OG
+> image, usually the first entry and the one that repeats at two widths).
+>
+> **Filter list** — drop any URL containing `w_32`, `w_36`, `w_40`, `h_40`, `w_96`,
+> `w_144`, `h_72`, `w_150`, `profile_images`, or `default-light`. The last few
+> matter more than they look: `h_72` is the publication wordmark, and **`w_150` is
+> Substack's sidebar thumbnail for *other* episodes** — embedding one puts a
+> different article's artwork in this note. Measured 2026-09-22: a Latent Space
+> podcast post returned 14 `image_urls`, only **2** of them usable.
+>
+> **Podcast posts**: the OG image is a
+> `substack-video.s3.amazonaws.com/.../transcoded-*.png` player thumbnail, not a
+> content figure. It is fine as the header image; do not caption it as a diagram.
+>
+> **Prefer inspect-then-caption over omit-by-default.** Download the full-width
+> candidates, then open each one with the `Read` tool — you can see images
+> natively, and identification is usually exact (a comparison table, a docs page,
+> a roster screenshot). That converts "omit, cannot caption" into accurate
+> captions plus transcribable table content. Fall back to omission only for
+> images you still cannot place after looking. Captions from the fetched body text
+> (they appear inline in `content`, e.g. *"Grok 4 Fast is the least likely to
+> betray you…"*) may be used **only** when the pairing is unambiguous. State any
+> remaining omission in a `## Scope Boundary` section rather than silently
+> dropping the figures.
+
 ### Step 3b — Download Images
 
 If the fetch result contains `image_urls`, download them to the vault's
@@ -538,6 +760,16 @@ attachment folder. First, discover the vault path:
 ```powershell
 python -c "import sys; sys.path.insert(0,'.github/skills/obsidian/scripts'); from obsidian import Obsidian; print(Obsidian().vault_info().text)"
 ```
+
+> **If Obsidian is not running**, `vault_info()` returns empty. Use
+> `Obsidian()._vault_path` instead — it is resolved from `obsidian.json` on disk
+> at construction time and works with the app closed.
+
+> **`ob._vault_path` is a `pathlib.Path`, not a `str`.** The
+> `'<vault_path>/Research/Library/attachments'` concatenation shown below raises
+> `TypeError: unsupported operand type(s) for +: 'WindowsPath' and 'str'` if you
+> build it with `+`. Join with `/` and cast at the boundary:
+> `str(Path(ob._vault_path) / 'Research/Library/attachments')`.
 
 Parse the vault path from the output, then download images:
 
@@ -568,6 +800,14 @@ Use `![[{slug}-1.jpg]]` in the note to embed them.
 >
 > Same rule applies to any one-liner: prefer a temp script over `python -c` whenever the payload
 > contains `$`, backticks, or nested quotes.
+
+> **PowerShell `>` redirection writes UTF-16LE with a BOM.** Redirecting `fetch.py`
+> stdout to a file (`python fetch.py "<url>" > out.json`) produces a file that
+> `json.load` rejects with
+> `UnicodeDecodeError: 'utf-8' codec can't decode byte 0xff in position 0`.
+> **Never redirect `fetch.py` with `>`.** Run it from a Python wrapper and capture
+> bytes directly:
+> `subprocess.run([sys.executable, FETCH, url], capture_output=True).stdout.decode('utf-8')`.
 
 ### Step 4 — Write to Vault
 
@@ -626,10 +866,17 @@ import sys
 sys.path.insert(0, '.github/skills/obsidian/scripts')
 from obsidian import Obsidian
 ob = Obsidian()
-result = ob.read(path='Research/Library/{library_bucket}/{slug}.md')
-print('EXISTS' if result and not result.startswith('Error') else 'NOT_FOUND')
+r = ob.read(path='Research/Library/{library_bucket}/{slug}.md')
+exists = bool(r) and bool(r.strip()) and not r.startswith('Error')
+print('EXISTS' if exists else 'NOT_FOUND')
 "
 ```
+
+> **Do not simplify this to `if result:` or `if result.strip():`.** In LIVE mode a
+> missing path returns `'Error: File "..." not found.'`, which is truthy — that
+> check reports EXISTS for a note that does not exist and aborts a valid write.
+> This is the same hazard as the Step 0 trap box; `note_text()` from Step 0 is the
+> canonical form.
 
 If the note already exists, append `-2`, `-3`, etc. to the slug before calling `ob.create()`.
 
@@ -767,11 +1014,17 @@ pruning applied, then append the new entry.
 If a topic MOC clearly applies, update it secondarily after the master MOC is
 current. The master MOC remains authoritative for canonical tags and library-wide freshness.
 
-### Step 6 — Open in Obsidian
+### Step 6 — Open in Obsidian (optional)
 
 ```powershell
 python -c "import sys; sys.path.insert(0,'.github/skills/obsidian/scripts'); from obsidian import Obsidian; ob=Obsidian(); ob.open('Research/Library/{library_bucket}/{slug}')"
 ```
+
+> **Cosmetic step — never a run failure.** `open()` is CLI-backed and fails with
+> `err(1)` when the Obsidian app is closed. The note is already written and
+> verified by this point. If the preflight probe reported DEGRADED, **skip this
+> step entirely**, record it as SKIPPED, and rely on the `obsidian://` link in
+> Step 7. Do not retry it, and do not report the run as failed because of it.
 
 ### Step 6.5 — Detect Connections
 
@@ -782,10 +1035,38 @@ relationships between the new note and existing vault content:
 python .github/skills/obsidian-connection-detector/scripts/detect.py --note "Research/Library/{library_bucket}/{slug}.md" --no-section
 ```
 
-This is best-effort — if it fails or is unavailable, continue to Step 7. The detector
-will classify relationships (supports, contradicts, extends, bridges) and write to
-`Research/connections.json`. The thesis tracker will pick up new connections on its
-next run and flag emerging theses.
+> **Run it inline, ONE note per tool call.** Measured wall time is **~45–105
+> seconds per note** (63.1s / 62.5s / 48.5s / ~60s on 2026-09-19; 101s on
+> 2026-09-22) — not the "5+ minutes" this step claimed through 2026-09-22. The
+> old advice cost more than it saved: it told the agent to background and re-check
+> something that returns inline. A single note will not time out.
+>
+> **What does time out is chaining several notes into one command** (confirmed
+> 2026-09-22 with three notes). Invoke the detector once per note, in its own
+> tool call.
+>
+> If you do background it, redirect to a log file — never pipe a long-running
+> process through `Select-String`, and never drive it via PowerShell
+> `Start-Process -ArgumentList` (the array splits bucket paths on spaces, and
+> **every** library bucket name contains a space). Use a Python
+> `subprocess.run([...])` list instead.
+>
+> Should a call genuinely time out, it is still NOT a failure — the work
+> completes in the background. Confirm via `connections.json` rather than
+> re-running:
+>
+> ```python
+> from pathlib import Path; import time
+> p = Path(ob._vault_path) / 'Research/connections.json'
+> print(p.stat().st_size, time.ctime(p.stat().st_mtime))
+> ```
+>
+> A recent mtime means it is working — record Step 6.5 as PASS and move to Step 7.
+
+This is best-effort — if it genuinely errors or is unavailable, continue to Step 7.
+The detector will classify relationships (supports, contradicts, extends, bridges)
+and write to `Research/connections.json`. The thesis tracker will pick up new
+connections on its next run and flag emerging theses.
 
 ### Step 7 — Confirm
 
@@ -839,6 +1120,13 @@ If thesis drift was detected, additional outputs may include:
 14. **Thesis drift check is semantic, not syntactic** — use your own judgment to compare core theses; do not reduce this to keyword overlap or string matching
 15. **Supersession updates are post-write** — only modify old notes after the new note is successfully written to the vault
 16. **Synthesis notes are for genuine conflicts only** — do not create synthesis notes for mere differences in emphasis, scope, or audience; reserve them for real disagreements on factual claims or framework incompatibilities
+17. **Probe before you trust an empty result** — run the Prerequisites preflight first; when Obsidian is closed, every CLI-backed call (`search`, `tags`, `files`, `vault_info`, `open`) returns `err(1)` with empty stdout, which is indistinguishable from a legitimate "no results". Treat empty as unknown, not as absence, and switch to the documented filesystem fallback
+18. **Degraded mode is not an abort** — disk-backed `read`/`create`/`append` keep working with the app closed, so the run continues; only Step 6 (`open`) may be skipped, and it is recorded SKIPPED, never FAIL
+19. **`ob.read()` signals a missing path differently per mode — emptiness alone is not a valid guard** — LIVE returns the truthy string `'Error: File "..." not found.'`, DEGRADED returns `''`. Use Step 0's `note_text()` helper (`None` on either signal) for every read whose content drives a decision, especially the master MOC (`🗺️` = `U+1F5FA` + `U+FE0F`) and the Step 4 slug check. `assert content.strip()` passes on garbage in LIVE mode, and a bare truthiness test reports a non-existent note as EXISTS
+20. **Assume long-form sources are truncated** — `fetch.py` caps at 8,000 chars; check `len(content) >= 8000` and run the enrichment pass as a matter of course, going straight to a sub-agent for transcripts and papers
+21. **One-shot scripts over interactive REPLs and `\u` escapes** — interactive Python sessions die mid-run and lose state; JSON tool input decodes `\uXXXX` before Python sees it, so build non-ASCII with `chr(0x...)` or write a temp `.py` file
+22. **Run Step 6.5 inline, one note per tool call** — the connection detector takes ~45–105s per note, not 5+ minutes; a single note returns inline. Chaining several notes into one command is what times out. If a call does time out it is still a PASS — verify via `connections.json` mtime rather than re-running it
+23. **Pin `RUN_DATE` once at Step 0** — runs cross midnight and can span days; recomputing `date.today()` mid-run gives one batch inconsistent `date_saved` values and makes the second Step 5 pass prune `Recently Added` entries the first pass deliberately kept
 
 ## Related Skills
 
