@@ -35,6 +35,24 @@ Output: `Research/Reports/weekly-brain-YYYY-MM-DD.md`
 python .github/skills/obsidian-weekly-brain/scripts/brain.py
 ```
 
+## Scheduling
+
+Runs locally from Windows Task Scheduler as `WeeklyBrain`, Sundays at 8:00 AM:
+
+```powershell
+# Register or update the task. Elevated, it also runs while logged off (S4U);
+# without admin it registers for the current user and runs while logged on.
+.github/skills/obsidian-weekly-brain/scripts/schedule.ps1
+```
+
+The task calls `scripts/run-scheduled.ps1`, which writes each run to
+`logs/weekly-brain-<timestamp>.log`, ending with the run's cost line. The week's
+cost row also lands in `Research/Reports/weekly-costs.md`.
+
+Keep it local. A cloud or Claude Desktop routine cannot run it: `api.x.ai` is
+blocked from the cloud sandbox, and the script uses this machine's Windows paths
+for the vault and `claude.exe`.
+
 
 ## CLI Options
 
