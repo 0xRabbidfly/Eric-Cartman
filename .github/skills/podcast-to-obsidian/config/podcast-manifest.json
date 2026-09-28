@@ -766,9 +766,18 @@
           "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-09-22 - Ask the Mates Anything Round 2  MOONSHOTS AMA  293.md",
           "processed_at": "2026-09-23T06:21:41.212234+00:00",
           "status": "completed"
+        },
+        "3465cd2a-b9f3-11f1-af0b-f3e876079719": {
+          "title": "Why Jensen and Zuck think the doomers are wrong (plus AI get’s a rebrand)  | #294 MOONSHOTS Live",
+          "published": "2026-09-27",
+          "audio_url": "https://traffic.megaphone.fm/DVVTS6618122011.mp3",
+          "transcript_path": "Podcasts/Moonshots with Peter Diamandis/transcripts/2026-09-27 - Why Jensen and Zuck think the doomers are wrong (plus AI get’s a rebrand)   294 MOONSHOTS Live.md",
+          "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-09-27 - Why Jensen and Zuck think the doomers are wrong (plus AI get’s a rebrand)   294 MOONSHOTS Live.md",
+          "processed_at": "2026-09-28T06:22:16.276309+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-09-22"
+      "latest_published": "2026-09-27"
     },
     "dwarkesh-podcast": {
       "name": "Dwarkesh Podcast",
