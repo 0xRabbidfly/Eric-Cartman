@@ -775,9 +775,27 @@
           "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-09-27 - Why Jensen and Zuck think the doomers are wrong (plus AI get’s a rebrand)   294 MOONSHOTS Live.md",
           "processed_at": "2026-09-28T06:22:16.276309+00:00",
           "status": "completed"
+        },
+        "42ad03ca-b9f4-11f1-8b86-ff5be5ba67c3": {
+          "title": "Palmer Luckey: Autonomous Weapons Are Ancient and Why Anduril Won't Build Humanoids  | Moonshots Live | EP #295",
+          "published": "2026-09-28",
+          "audio_url": "https://traffic.megaphone.fm/DVVTS3664750917.mp3",
+          "transcript_path": "Podcasts/Moonshots with Peter Diamandis/transcripts/2026-09-28 - Palmer Luckey Autonomous Weapons Are Ancient and Why Anduril Won't Build Humanoids   Moonshots Live  EP 295.md",
+          "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-09-28 - Palmer Luckey Autonomous Weapons Are Ancient and Why Anduril Won't Build Humanoids   Moonshots Live  EP 295.md",
+          "processed_at": "2026-09-29T06:19:41.943780+00:00",
+          "status": "completed"
+        },
+        "6cc0d8fa-bb69-11f1-9d9a-83fecdcd288d": {
+          "title": "We Gave Away $2,000,000 To 5 AI Builders | MOONSHOTS Live",
+          "published": "2026-09-28",
+          "audio_url": "https://traffic.megaphone.fm/DVVTS6198299069.mp3",
+          "transcript_path": "Podcasts/Moonshots with Peter Diamandis/transcripts/2026-09-28 - We Gave Away $2,000,000 To 5 AI Builders  MOONSHOTS Live.md",
+          "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-09-28 - We Gave Away $2,000,000 To 5 AI Builders  MOONSHOTS Live.md",
+          "processed_at": "2026-09-29T06:19:41.972737+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-09-27"
+      "latest_published": "2026-09-28"
     },
     "dwarkesh-podcast": {
       "name": "Dwarkesh Podcast",
