@@ -793,9 +793,18 @@
           "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-09-28 - We Gave Away $2,000,000 To 5 AI Builders  MOONSHOTS Live.md",
           "processed_at": "2026-09-29T06:19:41.972737+00:00",
           "status": "completed"
+        },
+        "91b9988e-b9f4-11f1-b811-9708293222c9": {
+          "title": "Cathie Wood on Tesla-SpaceX Merger, $1M Bitcoin, More AIs Than Humans | EP #296 | Moonshots Live",
+          "published": "2026-09-29",
+          "audio_url": "https://traffic.megaphone.fm/DVVTS6825572957.mp3",
+          "transcript_path": "Podcasts/Moonshots with Peter Diamandis/transcripts/2026-09-29 - Cathie Wood on Tesla-SpaceX Merger, $1M Bitcoin, More AIs Than Humans  EP 296  Moonshots Live.md",
+          "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-09-29 - Cathie Wood on Tesla-SpaceX Merger, $1M Bitcoin, More AIs Than Humans  EP 296  Moonshots Live.md",
+          "processed_at": "2026-09-30T06:19:53.462520+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-09-28"
+      "latest_published": "2026-09-29"
     },
     "dwarkesh-podcast": {
       "name": "Dwarkesh Podcast",
