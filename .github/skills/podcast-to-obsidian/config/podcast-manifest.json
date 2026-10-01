@@ -802,9 +802,18 @@
           "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-09-29 - Cathie Wood on Tesla-SpaceX Merger, $1M Bitcoin, More AIs Than Humans  EP 296  Moonshots Live.md",
           "processed_at": "2026-09-30T06:19:53.462520+00:00",
           "status": "completed"
+        },
+        "8c8ae0de-b9f4-11f1-bfbf-53c964c2293b": {
+          "title": "Why We're Living in a Biological Singularity With Ben Lamm | MOONSHOTS Live #297",
+          "published": "2026-09-30",
+          "audio_url": "https://traffic.megaphone.fm/DVVTS4029448105.mp3",
+          "transcript_path": "Podcasts/Moonshots with Peter Diamandis/transcripts/2026-09-30 - Why We're Living in a Biological Singularity With Ben Lamm  MOONSHOTS Live 297.md",
+          "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-09-30 - Why We're Living in a Biological Singularity With Ben Lamm  MOONSHOTS Live 297.md",
+          "processed_at": "2026-10-01T06:16:45.318975+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-09-29"
+      "latest_published": "2026-09-30"
     },
     "dwarkesh-podcast": {
       "name": "Dwarkesh Podcast",
@@ -920,9 +929,18 @@
           "note_path": "Podcasts/The Pragmatic Engineer/2026-09-23 - Design Engineering with Maggie Appleton.md",
           "processed_at": "2026-09-24T06:23:11.810513+00:00",
           "status": "completed"
+        },
+        "substack:post:217889431": {
+          "title": "Distributed databases with Peter Mattis",
+          "published": "2026-09-30",
+          "audio_url": "https://api.substack.com/feed/podcast/217889431/e6c0522fd2ba52d0d7c1d42880a1a952.mp3",
+          "transcript_path": "Podcasts/The Pragmatic Engineer/transcripts/2026-09-30 - Distributed databases with Peter Mattis.md",
+          "note_path": "Podcasts/The Pragmatic Engineer/2026-09-30 - Distributed databases with Peter Mattis.md",
+          "processed_at": "2026-10-01T06:32:49.208856+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-09-23"
+      "latest_published": "2026-09-30"
     },
     "naval": {
       "name": "Naval",
