@@ -442,6 +442,7 @@ Scans topic tracks on X weekly, pulls Google News RSS daily, and batches a searc
 | Lab Account Scan | Batched X search over frontier-lab accounts (Anthropic, OpenAI, Google, SpaceXAI, Mistral, Meta, Moonshot), chunked at 10, no engagement floor |
 | Prominent Voices | One broad search for high-engagement posts across the AI space, no hardcoded handles |
 | News | Google News RSS per topic, deduplicated against vault history by URL and title, then LLM-ranked |
+| Feed Capture | Every post from the always-capture feeds (claude.dev) becomes a Research Library note; pending items retry until the note exists |
 | Vault Dedup | Avoids resurfacing links and titles already captured in the vault |
 | Feedback Loop | Collects `#good` / `#bad` tags into `feedback.json` |
 
@@ -466,6 +467,9 @@ python .github/skills/obsidian-daily-research/scripts/run.py --dry-run
 
 # Intentionally regenerate today's note
 python .github/skills/obsidian-daily-research/scripts/run.py --force-rerun
+
+# Only capture new always-capture feed articles (claude.dev) into Research/Library
+python .github/skills/obsidian-daily-research/scripts/run.py --feeds-only
 ```
 
 ```

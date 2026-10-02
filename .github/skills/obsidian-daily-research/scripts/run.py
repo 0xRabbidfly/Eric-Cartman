@@ -436,6 +436,7 @@ def _parse_pipeline_md(path: Path) -> dict:
         "must_follow_accounts": [],
         "discovery_accounts": [],
         "auto_capture_accounts": [],
+        "capture_feeds": [],
     }
 
     if not path.exists():
@@ -463,6 +464,8 @@ def _parse_pipeline_md(path: Path) -> dict:
                     section = "discovery"
                 elif "setting" in header:
                     section = "settings"
+                elif "capture" in header and "feed" in header:
+                    section = "capture-feeds"
                 elif "auto" in header and "capture" in header:
                     section = "auto-capture"
                 else:
@@ -546,6 +549,9 @@ def _parse_pipeline_md(path: Path) -> dict:
                         "handle": rest.strip(),
                         "label": rest.strip(),
                     })
+
+            elif section == "capture-feeds" and line.startswith("- http"):
+                config["capture_feeds"].append(line[2:].split()[0])
 
             elif section == "auto-capture" and line.startswith("- @"):
                 handle = line[3:].strip()
@@ -1206,6 +1212,128 @@ def _extract_article_candidates(
     return out[:limit]
 
 
+REPO_ROOT = SKILL_DIR.parent.parent.parent
+
+
+def _norm_url(url: str) -> str:
+    return (url or "").strip().split("#", 1)[0].rstrip("/").lower()
+
+
+def _library_note_urls(config: dict) -> set:
+    """Normalized `url:` frontmatter values of every Research/Library note.
+
+    Read-only filesystem scan, recursive — the library is split into numbered
+    subfolders. This is the ground truth for "is it captured": a URL that only
+    appears in a daily note's reading list is NOT captured.
+    """
+    lib = Path(os.path.expanduser(str(config.get("vault_path", "")))) / config.get(
+        "library_folder", "Research/Library")
+    urls = set()
+    for p in lib.rglob("*.md"):
+        try:
+            head = p.read_text(encoding="utf-8", errors="ignore")[:3000]
+        except OSError:
+            continue
+        # `url:` frontmatter, plus the `**Cross-posted**:` line a note captured
+        # from an X post carries for the blog it links (e.g. a claude.dev post
+        # first seen as a tweet) — that article is already in the Library.
+        for m in re.finditer(r'^(?:url:|\*\*Cross-posted\*\*:)\s*["\']?(https?://[^\s"\'>)]+)',
+                             head, re.MULTILINE):
+            urls.add(_norm_url(m.group(1)))
+    return urls
+
+
+def _capture_url(url: str, config: dict, timeout: int = 600) -> bool:
+    """Run the linked-research skill on one URL in a headless Claude CLI.
+
+    Success is judged by the note appearing in Research/Library, never by the
+    exit code: a headless run whose tool calls are denied prints a refusal and
+    exits 0. That is exactly how every capture failed silently from 2026-09-25
+    to 2026-10-02 — the scheduled task starts in `.github\\`, where the repo's
+    `.claude/settings.local.json` allowlist does not apply, so every python call
+    was refused. Always run from the repo root.
+    """
+    try:
+        proc = subprocess.run(
+            [CLAUDE_CLI, "--print", "-p",
+             "Follow .github/skills/obsidian-linked-research/SKILL.md to capture "
+             f"this URL as a Research Library note: {url}\n"
+             "This run is unattended; nobody can answer questions. If a note on "
+             "the same article already exists under a different URL (e.g. the X "
+             "post that announced it), do not stop: write this note and mark the "
+             "older one superseded per Step 2.5d."],
+            capture_output=True, text=True, encoding="utf-8",
+            timeout=timeout, cwd=str(REPO_ROOT),
+        )
+    except Exception as e:
+        print(f"  [capture] error: {e}")
+        return False
+    if _norm_url(url) in _library_note_urls(config):
+        return True
+    tail = _oneline((proc.stdout or "") + " " + (proc.stderr or ""), 300)
+    print(f"  [capture] FAILED (exit {proc.returncode}, no note written): {tail}")
+    return False
+
+
+def _parse_rss_links(xml_text: str) -> list:
+    """Return [{url, title}] from an RSS 2.0 or Atom feed, newest first."""
+    root = ET.fromstring(xml_text)
+    out = []
+    for item in root.iter("item"):
+        link = (item.findtext("link") or "").strip()
+        if link:
+            out.append({"url": link, "title": (item.findtext("title") or "").strip()})
+    atom = "{http://www.w3.org/2005/Atom}"
+    for entry in root.iter(f"{atom}entry"):
+        el = entry.find(f"{atom}link")
+        link = (el.get("href") if el is not None else "") or ""
+        if link:
+            out.append({"url": link.strip(),
+                        "title": (entry.findtext(f"{atom}title") or "").strip()})
+    return out
+
+
+def run_feed_captures(config: dict) -> list:
+    """Capture every not-yet-captured article from the always-capture feeds.
+
+    Unlike synthesis picks, these are never judged — every post from a listed
+    feed is wanted. The vault is the manifest: a feed item is pending until a
+    Library note carries its URL, so a failed capture simply retries tomorrow.
+    """
+    feeds = config.get("capture_feeds") or []
+    if not feeds:
+        return []
+    try:
+        max_items = int(config.get("feed_capture_max", 5) or 0)
+    except (TypeError, ValueError):
+        max_items = 5
+    have = _library_note_urls(config)
+    pending = []
+    for feed in feeds:
+        try:
+            req = urllib.request.Request(feed, headers={"User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                items = _parse_rss_links(resp.read().decode("utf-8", errors="replace"))
+        except Exception as e:
+            print(f"[feeds] {feed}: fetch failed ({e}) — retrying next run")
+            continue
+        new = [i for i in items if _norm_url(i["url"]) not in have]
+        print(f"[feeds] {feed}: {len(items)} item(s), {len(new)} not yet in Library")
+        pending.extend(new)
+
+    captured = []
+    for item in pending[:max_items]:
+        print(f"  [feeds] capturing: {item['title'][:70]} -> {item['url']}")
+        if _capture_url(item["url"], config):
+            captured.append({"url": item["url"], "title": item["title"],
+                             "why": "always-capture feed"})
+    if len(pending) > max_items > 0:
+        print(f"[feeds] {len(pending) - max_items} more pending — next run")
+    if captured:
+        print(f"[feeds] {len(captured)} article(s) added to Research/Library")
+    return captured
+
+
 def run_article_captures(picks: list, candidates: list, config: dict) -> list:
     """Run the linked-research skill over the articles synthesis chose to keep.
 
@@ -1239,19 +1367,7 @@ def run_article_captures(picks: list, candidates: list, config: dict) -> list:
         title = _oneline(pick.get("title", "") or url, 120)
         why = _oneline(pick.get("why", ""), 160)
         print(f"  [capture] {title[:60]} -> {url[:60]}")
-        try:
-            proc = subprocess.run(
-                [CLAUDE_CLI, "--print", "-p",
-                 f"Run the obsidian-linked-research skill for this URL: {url}"],
-                capture_output=True, text=True, encoding="utf-8", timeout=300,
-            )
-            ok = proc.returncode == 0
-            if not ok:
-                print(f"  [capture] failed: {(proc.stderr or '')[:120]}")
-        except Exception as e:
-            ok = False
-            print(f"  [capture] error: {e}")
-        if ok:
+        if _capture_url(url, config):
             captured.append({"url": url, "title": title, "why": why})
 
     if captured:
@@ -1291,21 +1407,11 @@ def auto_capture_articles(must_follow_results: list, config: dict):
                 url_lower = url.lower()
                 if any(domain in url_lower for domain in _ARTICLE_DOMAINS):
                     print(f"  [auto-capture] @{handle}: {url[:80]}")
-                    try:
-                        # Run linked-research via subprocess (best-effort)
-                        result_proc = subprocess.run(
-                            [CLAUDE_CLI, "--print", "-p",
-                             f"Run the obsidian-linked-research skill for this URL: {url}"],
-                            capture_output=True, text=True, encoding="utf-8",
-                            timeout=180,
-                        )
-                        if result_proc.returncode == 0:
-                            captured += 1
-                            print(f"  [auto-capture] Captured: {url[:60]}")
-                        else:
-                            print(f"  [auto-capture] Failed: {result_proc.stderr[:100]}")
-                    except Exception as e:
-                        print(f"  [auto-capture] Error: {e}")
+                    if _norm_url(url) in _library_note_urls(config):
+                        continue
+                    if _capture_url(url, config):
+                        captured += 1
+                        print(f"  [auto-capture] Captured: {url[:60]}")
 
     if captured:
         print(f"[auto-capture] Captured {captured} article(s) from auto-capture accounts")
@@ -2666,6 +2772,7 @@ def main():
     parser.add_argument("--force-rerun", action="store_true", help="Ignore same-day note protection and rerun intentionally")
     parser.add_argument("--note-suffix", default="", help="Append a suffix to the output note filename (e.g. '_new' → 2026-04-20_new.md). Bypasses same-day protection.")
     parser.add_argument("--test-synth", action="store_true", help="Test synthesis with mock data and exit")
+    parser.add_argument("--feeds-only", action="store_true", help="Only capture new always-capture feed articles into Research/Library, then exit")
     parser.add_argument("--topics-now", action="store_true", help="Run topic scans today even if it is not topic_scan_day")
     args = parser.parse_args()
 
@@ -2713,6 +2820,10 @@ def main():
     # Enable debug
     if args.debug:
         os.environ["LAST30DAYS_DEBUG"] = "1"
+
+    if args.feeds_only:
+        run_feed_captures(config)
+        return
 
     if not args.dry_run and not args.force_rerun and not args.note_suffix and vault.daily_exists(config, today):
         print(f"[skip] Daily research note already exists for {today}. Use --force-rerun to run again intentionally.")
@@ -2958,6 +3069,10 @@ def main():
         captured_articles = run_article_captures(
             synthesis.get("capture") or [], article_candidates, config,
         )
+        try:
+            captured_articles += run_feed_captures(config)
+        except Exception as e:
+            print(f"[feeds] Error ({e}) — continuing")
 
     # Render daily note
     note_content = render_daily_note(

@@ -133,6 +133,18 @@
 > or `daily` to scan every run. `run.py --topics-now` forces a scan.
 - topic_scan_day: monday
 
+# Capture Feeds
+
+> RSS/Atom feeds where EVERY post is captured as a Research Library note via the
+> obsidian-linked-research skill — no synthesis judgment, no quality bar. The
+> vault is the manifest: an item stays pending until a Library note's `url:`
+> matches it, so a failed capture retries on the next run. `feed_capture_max`
+> (Settings, default 5) caps captures per run. `run.py --feeds-only` runs just
+> this stage.
+> Format: `- <feed URL>`
+
+- https://claude.dev/rss.xml
+
 # Auto-Capture Accounts
 
 > Tweets from these accounts that contain article/blog URLs are automatically

@@ -60,6 +60,8 @@ python .github/skills/obsidian-daily-research/scripts/run.py --force-rerun
 10. **Google News RSS** — Per-topic RSS fetch, deduplicated against vault history by URL and title, then LLM-scored and ranked
 11. **Batched Synthesis** — One Claude CLI call producing the POW briefing and lab pulse summary, reading topic scans, news, prominent voices and lab posts together
 12. **Article Capture** — Article URLs linked from the day's posts are offered to the synthesis call, which picks any worth a permanent note. Those run through the `obsidian-linked-research` skill into `Research/Library`. Capped by `auto_capture_max`, validated against the candidate list, and skipped on `--dry-run`.
+    - **Feed Capture** — Every post from the feeds under `# Capture Feeds` in `pipeline.md` (currently `https://claude.dev/rss.xml`) is captured, with no synthesis judgment. The vault is the manifest: an item is pending until a Library note's `url:` (or `**Cross-posted**:` line) matches it, so a failed capture retries next run. Capped by `feed_capture_max` (default 5). `run.py --feeds-only` runs only this stage.
+    - **Captures are verified, not trusted.** Each capture is a headless `claude -p` run started from the repo root, and success means the note exists in `Research/Library` afterwards. The exit code is not the test: a run whose tool calls are denied prints a refusal and exits 0. That is how every capture failed silently between 2026-09-25 and 2026-10-02, while the log said "added". The scheduled task starts in `.github\`, where the repo's `.claude/settings.local.json` allowlist does not apply.
 13. **Write Daily Note** — Outputs structured markdown to `Research/Dailies/YYYY/MM/YYYY-MM-DD.md`
 14. **Sync Hand-off** — Leaves Obsidian running so Sync can push the note off this machine. Writes land on the vault filesystem and Sync only pushes while the desktop app runs, so a scheduled run with the app closed keeps its note local, where any other device asked to open it reports the file missing. Prints one `[sync]` line, never raises; `OBSIDIAN_AUTOLAUNCH=0` opts out and accepts the lag.
 
@@ -107,8 +109,8 @@ The daily note carries no action tags. The `#keep` promote path and the
 `#good`/`#bad` feedback loop were both removed — the feedback tags accumulated in
 `feedback.json` with nothing reading them, so tagging changed nothing.
 
-`Research/Library` is still written automatically by the auto-capture accounts and
-by the article-capture step, and is still read for deduplication.
+`Research/Library` is still written automatically by the auto-capture accounts,
+the capture feeds, and the article-capture step, and is still read for deduplication.
 
 ### Daily Note Structure
 

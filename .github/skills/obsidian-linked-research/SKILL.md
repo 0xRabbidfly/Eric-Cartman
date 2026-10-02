@@ -6,7 +6,7 @@ user-invocable: true
 disable-model-invocation: false
 metadata:
   author: 0xrabbidfly
-  version: "1.9.0"
+  version: "1.9.1"
 ---
 
 # Obsidian Linked Research
@@ -38,6 +38,7 @@ original analysis worth preserving.
 | Source | Email / Handle | Why |
 |--------|---------------|-----|
 | AINews / Latent Space | `swyx@substack.com`, `latentspace`, `@swyx` | Daily AI industry analysis with original commentary, curated signal |
+| claude.dev Blog | `https://claude.dev/rss.xml`, `@claudedevs` | Anthropic's developer blog: every post is captured. The daily pipeline's `# Capture Feeds` stage polls the RSS feed |
 
 When a calling skill (e.g., gmail-daily-briefing) encounters content from an
 always-capture source, it should invoke this skill regardless of whether the
@@ -484,7 +485,15 @@ python -c "import sys; sys.stdout.reconfigure(encoding='utf-8'); sys.path.insert
 > on `tags:` frontmatter) instead of concluding there are no related notes.
 
 Also check the `related_notes` identified in Step 2 — read any that exist
-(and remember `ob.read()` returns `""` for a path that doesn't exist).
+via Step 0's `note_text()` (a missing path is `'Error: ...'` in LIVE mode and
+`''` in DEGRADED mode, so neither truthiness nor emptiness alone is a valid check).
+
+**Same article, different URL.** The URL-dedup gate misses a source captured
+earlier from another channel. The usual case is a claude.dev blog post whose
+X thread is already in the vault. That is not a duplicate stop. Classify it as
+**Supersedes** when the new URL is the canonical, more complete version, and
+check the older note's facts against it (on 2026-10-02 the thread note had
+"20 of 50" where the blog says 35).
 
 From the search results plus related notes, select the **top 3-5 most related
 existing notes** by this priority:
@@ -540,11 +549,14 @@ matching. Apply these definitions:
    content = ob.read(path='<old_note_path>')
    # Add superseded status to frontmatter
    content = content.replace('status: unread', 'status: superseded', 1)
-   # If no status field, add one after the last frontmatter field before ---
-   # Also add superseded_by field
+   # Insert superseded_by before the CLOSING frontmatter delimiter.
+   # Do not use re.sub(r'^---', ..., count=1): that matches the OPENING
+   # delimiter and puts the field above the frontmatter (caught 2026-10-02).
    import re
    if 'superseded_by:' not in content:
-       content = re.sub(r'^(---\s*$)', r'superseded_by: \"[[<new-note-slug>]]\"\n\1', content, count=1, flags=re.MULTILINE)
+       m = re.match(r'^---\n.*?\n---\n', content, flags=re.S)
+       end = m.end() - len('---\n')
+       content = content[:end] + 'superseded_by: \"[[<new-note-slug>]]\"\n' + content[end:]
    ob.create(path='<old_note_path>', content=content, overwrite=True)
    print('Updated old note with superseded status')
    "
