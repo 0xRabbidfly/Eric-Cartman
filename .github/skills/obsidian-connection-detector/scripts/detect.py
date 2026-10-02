@@ -96,16 +96,23 @@ def extract_frontmatter(text: str) -> dict:
     return meta
 
 
-def extract_title(text: str) -> str:
-    """Extract the first H1 heading or fall back to first line."""
+def extract_title(text: str, fallback: str | None = None) -> str:
+    """Extract the first H1 heading outside code fences, else `fallback`
+    (the filename slug — library notes have no H1), else the first line."""
     body = strip_frontmatter(text)
+    in_fence = False
     for line in body.splitlines():
         line = line.strip()
-        if line.startswith("# "):
+        if line.startswith(("```", "~~~")):
+            in_fence = not in_fence
+            continue
+        if not in_fence and line.startswith("# "):
             return line[2:].strip()
+    if fallback:
+        return fallback
     # Fallback: first non-empty line
     for line in body.splitlines():
-        if line.strip():
+        if line.strip() and not line.strip().startswith(("```", "~~~")):
             return line.strip()[:120]
     return "(untitled)"
 
@@ -630,7 +637,7 @@ def detect_connections(
 ) -> list[dict]:
     """Detect connections for a single note."""
     source_text = source_path.read_text(encoding="utf-8")
-    source_title = extract_title(source_text)
+    source_title = extract_title(source_text, fallback=source_path.stem)
     source_summary = get_summary(source_text)
     source_slug = note_slug(source_path)
 
@@ -655,7 +662,7 @@ def detect_connections(
         except (OSError, UnicodeDecodeError):
             continue
 
-        candidate_title = extract_title(candidate_text)
+        candidate_title = extract_title(candidate_text, fallback=candidate_path.stem)
         candidate_summary = get_summary(candidate_text)
 
         print(f"  Classifying: {source_title} <-> {candidate_title} ... ", end="")
