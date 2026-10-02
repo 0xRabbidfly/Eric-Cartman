@@ -140,9 +140,18 @@
           "note_path": "Podcasts/Raoul Pal The Journey Man/2026-09-24 - Solana, Tokenized Stocks, and Backpack w Armani Ferrante  Raoul Pal The Journey Man.md",
           "processed_at": "2026-09-25T06:14:34.251268+00:00",
           "status": "completed"
+        },
+        "713ab56a-bc3e-11f1-9de1-dfc1fe09b0c5": {
+          "title": "AI Needs Crypto",
+          "published": "2026-10-01",
+          "audio_url": "https://www.podtrac.com/pts/redirect.mp3/chrt.fm/track/1B146C/pscrb.fm/rss/p/traffic.megaphone.fm/ADV4981961207.mp3",
+          "transcript_path": "Podcasts/Raoul Pal The Journey Man/transcripts/2026-10-01 - AI Needs Crypto.md",
+          "note_path": "Podcasts/Raoul Pal The Journey Man/2026-10-01 - AI Needs Crypto.md",
+          "processed_at": "2026-10-02T06:22:30.376018+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-09-24"
+      "latest_published": "2026-10-01"
     },
     "lex-fridman-podcast": {
       "name": "Lex Fridman Podcast",
