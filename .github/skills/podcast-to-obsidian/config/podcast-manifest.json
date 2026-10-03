@@ -820,9 +820,18 @@
           "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-09-30 - Why We're Living in a Biological Singularity With Ben Lamm  MOONSHOTS Live 297.md",
           "processed_at": "2026-10-01T06:16:45.318975+00:00",
           "status": "completed"
+        },
+        "0b129ec4-be7d-11f1-8639-0743acf3ce3e": {
+          "title": "Can We Still Build AI Safely? The White House Thinks So | MOONSHOTS #298",
+          "published": "2026-10-02",
+          "audio_url": "https://traffic.megaphone.fm/DVVTS4856683130.mp3",
+          "transcript_path": "Podcasts/Moonshots with Peter Diamandis/transcripts/2026-10-02 - Can We Still Build AI Safely The White House Thinks So  MOONSHOTS 298.md",
+          "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-10-02 - Can We Still Build AI Safely The White House Thinks So  MOONSHOTS 298.md",
+          "processed_at": "2026-10-03T06:35:56.081231+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-09-30"
+      "latest_published": "2026-10-02"
     },
     "dwarkesh-podcast": {
       "name": "Dwarkesh Podcast",
@@ -1098,9 +1107,18 @@
           "note_path": "Podcasts/No Priors Artificial Intelligence  Technology  Startups/2026-09-24 - Re-Founding Incumbents for the AI Era with Sequence Holdings Co-Founder and CEO Michael Lee.md",
           "processed_at": "2026-09-25T06:22:39.098073+00:00",
           "status": "completed"
+        },
+        "44fa0b1c-be0b-11f1-b00d-cb6a27141e9e": {
+          "title": "Frontier Chips for Frontier AI Labs, with Walter Goodwin, Founder/CEO of Fractile",
+          "published": "2026-10-02",
+          "audio_url": "https://traffic.megaphone.fm/PDP7579412568.mp3",
+          "transcript_path": "Podcasts/No Priors Artificial Intelligence  Technology  Startups/transcripts/2026-10-02 - Frontier Chips for Frontier AI Labs, with Walter Goodwin, FounderCEO of Fractile.md",
+          "note_path": "Podcasts/No Priors Artificial Intelligence  Technology  Startups/2026-10-02 - Frontier Chips for Frontier AI Labs, with Walter Goodwin, FounderCEO of Fractile.md",
+          "processed_at": "2026-10-03T06:42:48.621784+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-09-24"
+      "latest_published": "2026-10-02"
     },
     "cgi-conversations": {
       "name": "CGI Conversations",
