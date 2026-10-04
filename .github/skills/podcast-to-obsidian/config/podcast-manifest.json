@@ -829,9 +829,18 @@
           "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-10-02 - Can We Still Build AI Safely The White House Thinks So  MOONSHOTS 298.md",
           "processed_at": "2026-10-03T06:35:56.081231+00:00",
           "status": "completed"
+        },
+        "1bbe0fbe-bf41-11f1-884b-0f2a11bcd0ce": {
+          "title": "Recursive's $670M Bet on Self-Improving AI, Sonnet 5.5 Hits 70%, Elon Co-Leads Pentagon Push | EP #299",
+          "published": "2026-10-03",
+          "audio_url": "https://traffic.megaphone.fm/DVVTS8960714801.mp3",
+          "transcript_path": "Podcasts/Moonshots with Peter Diamandis/transcripts/2026-10-03 - Recursive's $670M Bet on Self-Improving AI, Sonnet 5.5 Hits 70%, Elon Co-Leads Pentagon Push  EP 299.md",
+          "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-10-03 - Recursive's $670M Bet on Self-Improving AI, Sonnet 5.5 Hits 70%, Elon Co-Leads Pentagon Push  EP 299.md",
+          "processed_at": "2026-10-04T06:35:22.716488+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-10-02"
+      "latest_published": "2026-10-03"
     },
     "dwarkesh-podcast": {
       "name": "Dwarkesh Podcast",
