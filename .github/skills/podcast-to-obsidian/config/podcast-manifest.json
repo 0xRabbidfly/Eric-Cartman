@@ -1347,9 +1347,18 @@
           "note_path": "Podcasts/Lifespan with Dr. David Sinclair/2026-09-19 - This Sugar Substitute May Extend Your Life  Lifespan with Dr. David Sinclair - S2, Ep. 9.md",
           "processed_at": "2026-09-20T06:33:25.480164+00:00",
           "status": "completed"
+        },
+        "a23535fa-bf86-11f1-9a3d-8fc8807aa763": {
+          "title": "Are GLP-1s the First Longevity Drugs? | Lifespan with Dr. David Sinclair - S2, Ep. 11",
+          "published": "2026-10-04",
+          "audio_url": "https://traffic.megaphone.fm/NUOAC6987972913.mp3",
+          "transcript_path": "Podcasts/Lifespan with Dr. David Sinclair/transcripts/2026-10-04 - Are GLP-1s the First Longevity Drugs  Lifespan with Dr. David Sinclair - S2, Ep. 11.md",
+          "note_path": "Podcasts/Lifespan with Dr. David Sinclair/2026-10-04 - Are GLP-1s the First Longevity Drugs  Lifespan with Dr. David Sinclair - S2, Ep. 11.md",
+          "processed_at": "2026-10-05T06:23:44.428893+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-09-19"
+      "latest_published": "2026-10-04"
     }
   }
 }
