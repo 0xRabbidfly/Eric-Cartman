@@ -805,6 +805,8 @@
       border-radius: 8px; color: var(--text); font-size: 15px; outline: none;
       -webkit-appearance: none;
     }
+    .gym-setrow .sr-load { display: flex; flex-direction: column; gap: 2px; }
+    .gym-setrow .sr-total { font-size: 11px; color: var(--text-dim); text-align: center; font-variant-numeric: tabular-nums; min-height: 1em; }
     .gym-setrow input:focus { border-color: var(--accent); }
     .gym-setrow input.filled { border-color: var(--success); }
     .gym-setctl { display: flex; gap: 8px; margin-top: 8px; }
@@ -1688,10 +1690,48 @@
       return loadType === 'kg_total_pair' ? nearest5(lb / 2) * 2 : nearest5(lb);
     }
 
+    // ── Barbells: the plates are typed, the total is stored ──
+    // On a barbell the athlete types only the plates, both ends added together,
+    // because that is what they just loaded. The library's `barKg` is added
+    // before saving, so storage, targets, maxes and the assessment all stay in
+    // totals. Bars are named in kg whatever the app's unit, as they're stamped.
+    function gymBarKg(item) {
+      const { barKg } = (gym.exercises || {})[item.exerciseKey] || {};
+      return item.loadType === 'kg' && typeof barKg === 'number' ? barKg : null;
+    }
+
     function gymBarLabel(item) {
-      const { barLb } = (gym.exercises || {})[item.exerciseKey] || {};
-      if (typeof barLb !== 'number') return null;
-      return gymIsLb() ? `${barLb} lb` : `${Math.round(barLb * GYM_KG_PER_LB * 10) / 10} kg`;
+      const kg = gymBarKg(item);
+      return kg === null ? null : `${kg} kg`;
+    }
+
+    // A stored load as the athlete types it: for a barbell, the plates. A
+    // stored total lighter than the bar can only be from before plates were
+    // typed, when the number went in exactly as typed, so it shows that way.
+    function gymShowLoad(kg, item) {
+      const bar = gymBarKg(item);
+      if (bar === null || typeof kg !== 'number' || kg < bar) return gymShowWeight(kg, item);
+      return gymShowWeight(kg - bar, item);
+    }
+
+    function gymStoreLoad(typed, item) {
+      const bar = gymBarKg(item);
+      const kg = gymStoreWeight(typed, item);
+      return bar === null ? kg : Math.round((kg + bar) * 1000) / 1000;
+    }
+
+    // A barbell total with the bar in, for reading beside the plates.
+    function gymBarTotal(kg, item) {
+      return `${Math.round(gymIsLb(item) ? kg / GYM_KG_PER_LB : kg)} ${gymWeightUnit(item)}`;
+    }
+
+    // The plates to load for a barbell's prescribed total, in the steps plates
+    // come in: 5 lb, a 2.5 on each end. Never below the empty bar. In kg it is
+    // left unrounded, like every other kg target. gymlib.target_plates_lb in the
+    // gym-cyclist skill does the same sum, so notes and app agree.
+    function gymTargetPlates(item) {
+      const kg = Math.max(0, item.targetLoad - gymBarKg(item));
+      return gymIsLb(item) ? Math.round(kg / GYM_KG_PER_LB / 5) * 5 : Math.round(kg * 10) / 10;
     }
 
     function gymLoadLabel(item) {
@@ -1705,6 +1745,11 @@
         return item.targetPct ? `${item.targetPct}% of 1RM — not set yet` : 'pick a weight';
       }
       if (item.loadType === 'kg_total_pair') return `${target} ${unit} both together (${target / 2} each hand)`;
+      if (gymBarKg(item) !== null) {
+        const plates = gymTargetPlates(item);
+        const total = gymBarTotal(gymStoreLoad(plates, item), item);
+        return plates ? `${plates} ${unit} of plates (${total} with the bar)` : `empty bar (${total})`;
+      }
       return `${target} ${unit}`;
     }
 
@@ -1713,7 +1758,8 @@
       const { loadHint } = (gym.exercises || {})[item.exerciseKey] || {};
       const bar = gymBarLabel(item);
       if (item.loadType === 'kg_total_pair') return 'Weight: both dumbbells added together.';
-      if (bar) return `Weight: the total, ${bar} bar included. Blank or 0 is the empty bar.`;
+      // A landmine loads one end only, so its library hint says where the plates go.
+      if (bar) return `Weight: ${loadHint || 'just the plates, both ends added together'}. The ${bar} bar is added for you, and 0 is the empty bar.`;
       if (loadHint) return `Weight: ${loadHint}.`;
       if (item.loadType === 'bodyweight') return 'Leave the weight blank. It counts as bodyweight.';
       if (item.loadType === 'bodyweight_plus_kg') return 'Weight: only what you add. Blank is bodyweight.';
@@ -1753,6 +1799,7 @@
     // types a number only when the set differed from the plan.
     function gymLoadPlaceholder(item) {
       if (item.targetLoad !== null && item.targetLoad !== undefined) {
+        if (gymBarKg(item) !== null) return String(gymTargetPlates(item));
         return String(gymIsWeight(item) ? gymTargetWeight(item.targetLoad, item.loadType, item) : item.targetLoad);
       }
       if (item.loadType === 'bodyweight' || item.loadType === 'bodyweight_plus_kg') return 'bw';
@@ -1766,11 +1813,11 @@
     // exactly as they were typed.
     function gymLastTime(item, prev) {
       if (!prev || !prev.sets || !prev.sets.length) return '';
-      const unit = gymIsWeight(item) ? ` ${gymWeightUnit(item)}` : '';
+      const unit = gymIsWeight(item) ? ` ${gymWeightUnit(item)}${gymBarKg(item) !== null ? ' of plates' : ''}` : '';
       const load = v => {
         if (item.loadType === 'bodyweight_plus_kg') return v ? `bw + ${gymShowWeight(v, item)}` : 'bw';
         if (item.loadType === 'setting') return `setting ${v}`;
-        return gymIsWeight(item) ? gymShowWeight(v, item) : String(v);
+        return gymIsWeight(item) ? gymShowLoad(v, item) : String(v);
       };
       const sets = prev.sets.map(e => (e.reps === null || e.reps === undefined
         ? load(e.load) : `${load(e.load)} × ${e.reps}`)).join(' · ');
@@ -1806,12 +1853,16 @@
           const e = gymSession.entries.get(gymEntryKey(item.id, n)) || {};
           const val = v => (v === null || v === undefined ? '' : v);
           const filled = v => (v === null || v === undefined || v === '' ? '' : 'filled');
+          const loadBox = `<input inputmode="decimal" placeholder="${escHtml(gymLoadPlaceholder(item))}"
+                     class="${filled(e.load)}" value="${gymIsWeight(item) ? gymShowLoad(e.load, item) : val(e.load)}" ${readOnly ? 'disabled' : ''}
+                     onchange="gymSetInput('${escJsAttr(item.id)}', ${n}, 'load', this.value, this)">`;
+          // Under the plates, the total they make with the bar, so a slip in
+          // the sum shows before it's saved.
           rows.push(`
             <div class="gym-setrow">
               <div class="sr-n">${n}</div>
-              <input inputmode="decimal" placeholder="${escHtml(gymLoadPlaceholder(item))}"
-                     class="${filled(e.load)}" value="${gymIsWeight(item) ? gymShowWeight(e.load, item) : val(e.load)}" ${readOnly ? 'disabled' : ''}
-                     onchange="gymSetInput('${escJsAttr(item.id)}', ${n}, 'load', this.value, this)">
+              ${gymBarKg(item) === null ? loadBox : `<div class="sr-load">${loadBox}
+                <div class="sr-total">${typeof e.load === 'number' ? escHtml(gymBarTotal(e.load, item)) : ''}</div></div>`}
               <input inputmode="numeric" placeholder="${escHtml(gymResultPlaceholder(item))}"
                      class="${filled(e.reps)}" value="${val(e.reps)}" ${readOnly ? 'disabled' : ''}
                      onchange="gymSetInput('${escJsAttr(item.id)}', ${n}, 'reps', this.value, this)">
@@ -1843,7 +1894,7 @@
               ${hint ? `<br>${escHtml(hint)}` : ''}</div>
             ${gymLastTime(item, (s.previous || {})[item.id])}
             <div class="gym-sets">
-              <div class="gym-setrow head"><div></div><div>Load</div><div>Reps</div><div>RPE</div></div>
+              <div class="gym-setrow head"><div></div><div>${gymBarKg(item) === null ? 'Load' : 'Plates'}</div><div>Reps</div><div>RPE</div></div>
               ${rows.join('')}
             </div>
             ${ctl}
@@ -1938,7 +1989,9 @@
       const text = String(raw).trim();
       entry[field] = text === '' ? null : Number(text);
       if (Number.isNaN(entry[field])) entry[field] = null;
-      if (field === 'load' && entry.load !== null && gymIsWeight(item)) entry.load = gymStoreWeight(entry.load, item);
+      if (field === 'load' && entry.load !== null && gymIsWeight(item)) entry.load = gymStoreLoad(entry.load, item);
+      const total = field === 'load' && el && el.parentElement.querySelector('.sr-total');
+      if (total) total.textContent = entry.load === null ? '' : gymBarTotal(entry.load, item);
       // A value the athlete types is no longer one the server assumed at finish.
       if (entry.assumed) {
         entry.assumed = entry.assumed.filter(f => f !== field);

@@ -7,7 +7,7 @@
     "how": "bar on upper traps, feet shoulder width, toes slightly out. Big breath, brace, sit down between the hips keeping the chest up and knees tracking over the toes. Depth: thighs at least parallel. Drive the floor away, exhale at the top.",
     "cues": "\"spread the floor\", \"chest up, elbows under\", knees out over the little toe.",
     "video": "https://www.youtube.com/watch?v=8PMjqgR8Wa8",
-    "barLb": 45
+    "barKg": 20
   },
   "trap-bar-deadlift": {
     "key": "trap-bar-deadlift",
@@ -17,7 +17,7 @@
     "how": "stand in the middle of the bar, feet hip width. Hinge and grab the high handles, shins near vertical, back flat, chest proud. Push the floor away and stand tall; hips and shoulders rise together. Lower under control, reset every rep.",
     "cues": "\"push, don't pull\", \"long spine\", squeeze the glutes at the top, don't lean back.",
     "video": "https://www.youtube.com/watch?v=EsqwERaSTMI",
-    "barLb": 45
+    "barKg": 20
   },
   "romanian-deadlift-rdl": {
     "key": "romanian-deadlift-rdl",
@@ -27,7 +27,7 @@
     "how": "bar at the hips, soft knees. Push the hips back and let the bar slide down the thighs, back flat, until you feel a strong hamstring stretch (bar around mid-shin). Drive the hips forward to stand. Knees stay slightly bent the whole time.",
     "cues": "\"hips to the wall behind you\", bar close to the legs, shoulders down and back.",
     "video": "https://www.youtube.com/watch?v=5bJEigM5iVg",
-    "barLb": 45
+    "barKg": 20
   },
   "barbell-hip-thrust": {
     "key": "barbell-hip-thrust",
@@ -37,7 +37,7 @@
     "how": "upper back on a bench, bar padded over the hips, feet flat so the shins are vertical at the top. Drive through the heels to full hip extension, chin tucked, ribs down. Pause one second at the top, lower without touching down.",
     "cues": "\"ribs down, chin down\", squeeze glutes not lower back, shins vertical at the top.",
     "video": "https://www.youtube.com/watch?v=S_uZP4UH6J0",
-    "barLb": 10
+    "barKg": 20
   },
   "bulgarian-split-squat": {
     "key": "bulgarian-split-squat",
@@ -120,7 +120,8 @@
     "how": "bar in a landmine or a corner. Half-kneeling or standing, hold the end at the shoulder, brace, press up and forward until the arm is straight. Lower with control.",
     "cues": "ribs down, glutes tight, don't lean back.",
     "video": "https://www.youtube.com/watch?v=9OW4SONxuGI",
-    "loadHint": "plates loaded on the bar end"
+    "loadHint": "plates loaded on the bar end",
+    "barKg": 20
   },
   "pallof-press": {
     "key": "pallof-press",
@@ -212,7 +213,7 @@
     "how": "trap bar with light load (20–30% of your deadlift). Set up as for a deadlift, then jump as high as possible, land soft with the bar under control, reset fully before the next.",
     "cues": "\"jump, don't lift\", hips through, quiet landing.",
     "video": "https://www.youtube.com/watch?v=rZGkx5PaZSM",
-    "barLb": 45
+    "barKg": 20
   },
   "kettlebell-swing": {
     "key": "kettlebell-swing",
@@ -233,7 +234,7 @@
     "how": "bar at the hips, hinge to just above the knees. Explode the hips forward, shrug, pull the elbows high and fast, and catch the bar on the shoulders in a quarter squat. Stand up. Lower to the hips and repeat.",
     "cues": "\"jump and catch\", elbows fast, bar stays close.",
     "video": "https://www.youtube.com/watch?v=CQgRkrtJaro",
-    "barLb": 45
+    "barKg": 20
   },
   "goblet-squat": {
     "key": "goblet-squat",

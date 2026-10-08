@@ -198,9 +198,9 @@ function defaultsFixture() {
   fs.writeFileSync(weekFile, JSON.stringify(week), 'utf8');
   const library = path.join(root, 'exercises.json');
   fs.writeFileSync(library, JSON.stringify({
-    'back-squat': { key: 'back-squat', name: 'Back squat', barLb: 45 },
-    'barbell-hip-thrust': { key: 'barbell-hip-thrust', name: 'Barbell hip thrust', barLb: 10 },
-    'romanian-deadlift-rdl': { key: 'romanian-deadlift-rdl', name: 'Romanian deadlift', barLb: 45 },
+    'back-squat': { key: 'back-squat', name: 'Back squat', barKg: 20 },
+    'barbell-hip-thrust': { key: 'barbell-hip-thrust', name: 'Barbell hip thrust', barKg: 10 },
+    'romanian-deadlift-rdl': { key: 'romanian-deadlift-rdl', name: 'Romanian deadlift', barKg: 20 },
   }), 'utf8');
   fs.rmSync(path.join(root, 'athlete-b', 'logs'), { recursive: true, force: true });
   return { root, store: createGymStore(root, { libraryPath: library }) };
@@ -249,9 +249,9 @@ test('finishing puts the bar on a barbell set left blank or at 0, using that exe
     set('c-row', 1, { reps: 10, rpe: 7 }),
   ] });
   const { log } = store.finishSession('athlete-b', 1, 1, new Date('2026-09-09T18:00:00'));
-  assert.equal(findSet(log, 'a-back-squat', 1).load, 20.412, '45 lb bar');
+  assert.equal(findSet(log, 'a-back-squat', 1).load, 20, '20 kg bar');
   assert.deepEqual(findSet(log, 'a-back-squat', 1).assumed, ['load']);
-  assert.equal(findSet(log, 'b-hip-thrust', 1).load, 4.536, '10 lb hip-thrust bar');
+  assert.equal(findSet(log, 'b-hip-thrust', 1).load, 10, '10 kg hip-thrust bar');
   assert.equal(findSet(log, 'b-rdl', 1).load, 61.235, 'a typed total already includes the bar');
   assert.equal(findSet(log, 'c-row', 1).load, null, 'a dumbbell has no bar to assume');
 });
@@ -454,7 +454,7 @@ test('finishing with nothing typed logs every prescribed set as prescribed', () 
   const { log } = store.finishSession('athlete-b', 1, 1, new Date('2026-09-09T18:00:00'));
   assert.equal(log.status, 'complete');
   assert.equal(findSet(log, 'b-rdl', 3).reps, 8, 'set 3 was never touched and still counts');
-  assert.equal(findSet(log, 'b-rdl', 3).load, 20.412, 'no prescribed weight, so the bar');
+  assert.equal(findSet(log, 'b-rdl', 3).load, 20, 'no prescribed weight, so the bar');
   assert.deepEqual(findSet(log, 'f-squat-work', 2).assumed, ['load', 'reps']);
   assert.equal(findSet(log, 'f-squat-work', 2).load, 60);
   assert.equal(findSet(log, 'f-squat-work', 2).rpe, null, 'how hard it felt is never assumed');
@@ -493,7 +493,7 @@ test('a load typed as 0 is still the empty bar, even where a weight was prescrib
   const { store } = defaultsFixture();
   store.saveSession('athlete-b', 1, 1, { entries: [set('f-squat-work', 1, { load: 0, reps: 8, rpe: 4 })] });
   const { log } = store.finishSession('athlete-b', 1, 1, new Date('2026-09-09T18:00:00'));
-  assert.equal(findSet(log, 'f-squat-work', 1).load, 20.412, '45 lb bar');
+  assert.equal(findSet(log, 'f-squat-work', 1).load, 20, '20 kg bar');
 });
 
 test('finishSession is idempotent-safe: a finished session cannot be finished twice', () => {

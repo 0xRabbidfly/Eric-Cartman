@@ -116,7 +116,7 @@ Phone (Safari/Chrome)
 | PUT | `/api/gym/session/:week/:day` | Save a partial log (`?profile=`) |
 | POST | `/api/gym/session/:week/:day/finish` | Complete the session, fill blank reps, barbell loads and weighted pull-up loads (each marked `assumed`), and start the assessment; body `{performedOn: "YYYY-MM-DD"}` is the phone's local date, used when the log has none and within a day of the server's; returns `{jobId}` (`?profile=`) |
 | POST | `/api/gym/session/:week/:day/reopen` | Make a finished session editable again (`?profile=`) |
-| GET | `/api/gym/exercises` | Exercise library with how-tos and videos, from the tracked `gym-library/exercises.json`. Barbell lifts carry `barLb`, the empty bar in pounds; single-weight lifts may carry a `loadHint` saying what to type (`?profile=`) |
+| GET | `/api/gym/exercises` | Exercise library with how-tos and videos, from the tracked `gym-library/exercises.json`. Barbell lifts carry `barKg`, the empty bar in kilograms; single-weight lifts may carry a `loadHint` saying what to type (`?profile=`) |
 | GET | `/api/gym/stats` | The athlete's `program`, week-by-week tonnage, RPE and adherence, 1RM trend, working-load trend and baseline re-checks (`?profile=`) |
 | GET | `/api/gym/assessments` | Past session assessments, newest first (`?profile=`) |
 
@@ -171,8 +171,13 @@ plan, and lists each in the entry's `assumed` array:
 
 - Blank reps become the prescribed reps, or the prescribed hold for seconds.
   Never on a max-test ramp, a baseline, centimetres or metres.
-- A barbell set (`barLb` in the library) left blank or at 0 becomes the empty
-  bar. On a max-test ramp only a typed 0 does.
+- A barbell set (`barKg` in the library) with nothing prescribed and left
+  blank, or at 0, becomes the empty bar. On a max-test ramp only a typed 0 does.
+
+On a barbell the app takes only the plates, both ends added together, and adds
+the library's `barKg` before saving. Stored loads stay totals with the bar in.
+The card shows the target as plates to load, in 5 lb steps, with the total
+beside it.
 - A weighted pull-up with no added load becomes 0, bodyweight.
 
 Typing into a field the server filled removes that field from `assumed`.

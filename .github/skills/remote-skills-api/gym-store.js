@@ -679,7 +679,6 @@ function createGymStore(dataRoot, { libraryPath = DEFAULT_LIBRARY_PATH } = {}) {
     return reopened;
   }
 
-  const KG_PER_LB = 0.45359237;
   const ASSUMABLE_RESULTS = new Set(['reps', 'reps_per_side', 'seconds']);
 
   /** Load types where `targetLoad` is a number the athlete could have used as prescribed. */
@@ -700,7 +699,7 @@ function createGymStore(dataRoot, { libraryPath = DEFAULT_LIBRARY_PATH } = {}) {
    *   added kilos on a weighted pull-up. A typed load is a full total and is
    *   never touched.
    * - with nothing prescribed ("pick a weight"), a barbell set (the library
-   *   gives the exercise a `barLb`) left blank is the empty bar. A typed 0 is
+   *   gives the exercise a `barKg`) left blank is the empty bar. A typed 0 is
    *   the empty bar even when a weight was prescribed — that is the athlete
    *   saying they dropped to the bar.
    *   On a max-test ramp only a typed 0 is the bar: a blank there is a set
@@ -719,8 +718,8 @@ function createGymStore(dataRoot, { libraryPath = DEFAULT_LIBRARY_PATH } = {}) {
       if (!item) return entry;
       const next = { ...entry };
       const assumed = [];
-      const { barLb } = library[item.exerciseKey] || {};
-      const bar = typeof barLb === 'number' ? Math.round(barLb * KG_PER_LB * 1000) / 1000 : null;
+      const { barKg } = library[item.exerciseKey] || {};
+      const bar = typeof barKg === 'number' ? barKg : null;
       const blankLoad = next.load === null || next.load === undefined;
       const prescribed = typeof item.targetLoad === 'number' && PRESCRIBED_LOADS.has(item.loadType);
       if (item.loadType === 'kg' && bar !== null && next.load === 0) {
