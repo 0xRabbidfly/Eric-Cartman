@@ -434,9 +434,18 @@
           "note_path": "Podcasts/Limitless/2026-09-09 - OpenAI's GPT-6 Astra (Part II) Is This Thing AGI.md",
           "processed_at": "2026-09-12T06:18:44.459858+00:00",
           "status": "completed"
+        },
+        "e2fca133-31a2-4095-8453-fa9fc063892c": {
+          "title": "HUGE UPDATE: What's Happening With Our Show & What's Next",
+          "published": "2026-10-07",
+          "audio_url": "https://media.transistor.fm/65f41137/4215e3a8.mp3",
+          "transcript_path": "Podcasts/Limitless/transcripts/2026-10-07 - HUGE UPDATE What's Happening With Our Show & What's Next.md",
+          "note_path": "Podcasts/Limitless/2026-10-07 - HUGE UPDATE What's Happening With Our Show & What's Next.md",
+          "processed_at": "2026-10-08T06:17:08.651775+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-09-11"
+      "latest_published": "2026-10-07"
     },
     "the-pomp-podcast": {
       "name": "The Pomp Podcast",
@@ -847,9 +856,18 @@
           "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-10-05 - Google X's Astro Teller The $1B Bet No CEO Will Back, Moonshots 3x Cheaper in 16 Yrs, and Clean Water at 1¢L EP 300.md",
           "processed_at": "2026-10-06T06:16:57.562113+00:00",
           "status": "completed"
+        },
+        "eb332b08-c266-11f1-8450-67f68606e725": {
+          "title": "Why Altman Says \"Accept Some Bad Things Happening\" and What It Means for AI Safety | MOONSHOTS #301",
+          "published": "2026-10-07",
+          "audio_url": "https://traffic.megaphone.fm/DVVTS8926888397.mp3",
+          "transcript_path": "Podcasts/Moonshots with Peter Diamandis/transcripts/2026-10-07 - Why Altman Says Accept Some Bad Things Happening and What It Means for AI Safety  MOONSHOTS 301.md",
+          "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-10-07 - Why Altman Says Accept Some Bad Things Happening and What It Means for AI Safety  MOONSHOTS 301.md",
+          "processed_at": "2026-10-08T06:47:34.720193+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-10-05"
+      "latest_published": "2026-10-07"
     },
     "dwarkesh-podcast": {
       "name": "Dwarkesh Podcast",
