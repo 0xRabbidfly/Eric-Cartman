@@ -149,9 +149,18 @@
           "note_path": "Podcasts/Raoul Pal The Journey Man/2026-10-01 - AI Needs Crypto.md",
           "processed_at": "2026-10-02T06:22:30.376018+00:00",
           "status": "completed"
+        },
+        "cb272300-c275-11f1-bf29-8f9563523707": {
+          "title": "The AI Job Shock Is Coming",
+          "published": "2026-10-08",
+          "audio_url": "https://www.podtrac.com/pts/redirect.mp3/chrt.fm/track/1B146C/pscrb.fm/rss/p/traffic.megaphone.fm/ADV3175967686.mp3",
+          "transcript_path": "Podcasts/Raoul Pal The Journey Man/transcripts/2026-10-08 - The AI Job Shock Is Coming.md",
+          "note_path": "Podcasts/Raoul Pal The Journey Man/2026-10-08 - The AI Job Shock Is Coming.md",
+          "processed_at": "2026-10-09T06:23:17.715397+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-10-01"
+      "latest_published": "2026-10-08"
     },
     "lex-fridman-podcast": {
       "name": "Lex Fridman Podcast",
@@ -443,9 +452,18 @@
           "note_path": "Podcasts/Limitless/2026-10-07 - HUGE UPDATE What's Happening With Our Show & What's Next.md",
           "processed_at": "2026-10-08T06:17:08.651775+00:00",
           "status": "completed"
+        },
+        "33f81bb9-5ad6-4b50-aa46-66a58aebf2e5": {
+          "title": "Meta Muse, Grok Bot, OpenAI Dots: Which AI Agent Should You Use?",
+          "published": "2026-10-08",
+          "audio_url": "https://media.transistor.fm/19eb83c3/ea862cd1.mp3",
+          "transcript_path": "Podcasts/Limitless/transcripts/2026-10-08 - Meta Muse, Grok Bot, OpenAI Dots Which AI Agent Should You Use.md",
+          "note_path": "Podcasts/Limitless/2026-10-08 - Meta Muse, Grok Bot, OpenAI Dots Which AI Agent Should You Use.md",
+          "processed_at": "2026-10-09T06:29:54.932808+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-10-07"
+      "latest_published": "2026-10-08"
     },
     "the-pomp-podcast": {
       "name": "The Pomp Podcast",
