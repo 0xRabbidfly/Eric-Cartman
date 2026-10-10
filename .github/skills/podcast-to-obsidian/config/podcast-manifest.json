@@ -461,9 +461,18 @@
           "note_path": "Podcasts/Limitless/2026-10-08 - Meta Muse, Grok Bot, OpenAI Dots Which AI Agent Should You Use.md",
           "processed_at": "2026-10-09T06:29:54.932808+00:00",
           "status": "completed"
+        },
+        "e0b96d5d-8569-42db-b6aa-6042fee1da58": {
+          "title": "Inside Google's AI Slump: Can Gemini 4 Argon Fix It?",
+          "published": "2026-10-09",
+          "audio_url": "https://media.transistor.fm/c3634fd8/3307ec00.mp3",
+          "transcript_path": "Podcasts/Limitless/transcripts/2026-10-09 - Inside Google's AI Slump Can Gemini 4 Argon Fix It.md",
+          "note_path": "Podcasts/Limitless/2026-10-09 - Inside Google's AI Slump Can Gemini 4 Argon Fix It.md",
+          "processed_at": "2026-10-10T06:15:12.770224+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-10-08"
+      "latest_published": "2026-10-09"
     },
     "the-pomp-podcast": {
       "name": "The Pomp Podcast",
@@ -1010,9 +1019,18 @@
           "note_path": "Podcasts/The Pragmatic Engineer/2026-09-30 - Distributed databases with Peter Mattis.md",
           "processed_at": "2026-10-01T06:32:49.208856+00:00",
           "status": "completed"
+        },
+        "substack:post:218980052": {
+          "title": "Building resilient systems with Sam Newman",
+          "published": "2026-10-07",
+          "audio_url": "https://api.substack.com/feed/podcast/218980052/828d036d1ad46c29f3ad04d639f26aa7.mp3",
+          "transcript_path": "Podcasts/The Pragmatic Engineer/transcripts/2026-10-07 - Building resilient systems with Sam Newman.md",
+          "note_path": "Podcasts/The Pragmatic Engineer/2026-10-07 - Building resilient systems with Sam Newman.md",
+          "processed_at": "2026-10-10T06:37:33.747005+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-09-30"
+      "latest_published": "2026-10-07"
     },
     "naval": {
       "name": "Naval",
