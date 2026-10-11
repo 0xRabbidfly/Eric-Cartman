@@ -1188,9 +1188,18 @@
           "note_path": "Podcasts/No Priors Artificial Intelligence  Technology  Startups/2026-10-02 - Frontier Chips for Frontier AI Labs, with Walter Goodwin, FounderCEO of Fractile.md",
           "processed_at": "2026-10-03T06:42:48.621784+00:00",
           "status": "completed"
+        },
+        "994123ec-c395-11f1-b01e-fff03490a570": {
+          "title": "Beam: The Great American Open Model with ReflectionAI Co-Founder and CEO Misha Laskin",
+          "published": "2026-10-09",
+          "audio_url": "https://traffic.megaphone.fm/PDP1028435739.mp3",
+          "transcript_path": "Podcasts/No Priors Artificial Intelligence  Technology  Startups/transcripts/2026-10-09 - Beam The Great American Open Model with ReflectionAI Co-Founder and CEO Misha Laskin.md",
+          "note_path": "Podcasts/No Priors Artificial Intelligence  Technology  Startups/2026-10-09 - Beam The Great American Open Model with ReflectionAI Co-Founder and CEO Misha Laskin.md",
+          "processed_at": "2026-10-11T06:24:54.043854+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-10-02"
+      "latest_published": "2026-10-09"
     },
     "cgi-conversations": {
       "name": "CGI Conversations",
