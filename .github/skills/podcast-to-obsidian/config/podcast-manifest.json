@@ -488,9 +488,18 @@
           "note_path": "Podcasts/Limitless/2026-10-13 - We’re Losing Control Of AI Anthropic Bans Cruelty, OpenAI Fires Safety Researchers.md",
           "processed_at": "2026-10-14T06:13:59.456139+00:00",
           "status": "completed"
+        },
+        "e65e37db-7a9c-4eaf-9dfe-4f6e1ff7265e": {
+          "title": "I Used to Hate Meta: Muse Wonder Changed My Mind",
+          "published": "2026-10-14",
+          "audio_url": "https://media.transistor.fm/15f879d5/cd837ed2.mp3",
+          "transcript_path": "Podcasts/Limitless/transcripts/2026-10-14 - I Used to Hate Meta Muse Wonder Changed My Mind.md",
+          "note_path": "Podcasts/Limitless/2026-10-14 - I Used to Hate Meta Muse Wonder Changed My Mind.md",
+          "processed_at": "2026-10-15T06:14:22.811315+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-10-13"
+      "latest_published": "2026-10-14"
     },
     "the-pomp-podcast": {
       "name": "The Pomp Podcast",
@@ -1046,9 +1055,18 @@
           "note_path": "Podcasts/The Pragmatic Engineer/2026-10-07 - Building resilient systems with Sam Newman.md",
           "processed_at": "2026-10-10T06:37:33.747005+00:00",
           "status": "completed"
+        },
+        "substack:post:220071064": {
+          "title": "Uber’s AI infra, from the inside",
+          "published": "2026-10-14",
+          "audio_url": "https://api.substack.com/feed/podcast/220071064/fe9ce244b78f558c93e83a8d90a2b03e.mp3",
+          "transcript_path": "Podcasts/The Pragmatic Engineer/transcripts/2026-10-14 - Uber’s AI infra, from the inside.md",
+          "note_path": "Podcasts/The Pragmatic Engineer/2026-10-14 - Uber’s AI infra, from the inside.md",
+          "processed_at": "2026-10-15T06:29:30.790210+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-10-07"
+      "latest_published": "2026-10-14"
     },
     "naval": {
       "name": "Naval",
