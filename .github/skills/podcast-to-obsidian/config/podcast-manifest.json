@@ -919,9 +919,18 @@
           "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-10-07 - Why Altman Says Accept Some Bad Things Happening and What It Means for AI Safety  MOONSHOTS 301.md",
           "processed_at": "2026-10-08T06:47:34.720193+00:00",
           "status": "completed"
+        },
+        "51a52882-c8c5-11f1-bb73-0ba4c145591a": {
+          "title": "OpenAI Bulk-Solves 722 Math Problems, Anthropic’s Cruelty Policy, and Elon’s Quadrillion-Dollar SpaceX | EP #302",
+          "published": "2026-10-15",
+          "audio_url": "https://traffic.megaphone.fm/DVVTS1915543471.mp3",
+          "transcript_path": "Podcasts/Moonshots with Peter Diamandis/transcripts/2026-10-15 - OpenAI Bulk-Solves 722 Math Problems, Anthropic’s Cruelty Policy, and Elon’s Quadrillion-Dollar SpaceX  EP 302.md",
+          "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-10-15 - OpenAI Bulk-Solves 722 Math Problems, Anthropic’s Cruelty Policy, and Elon’s Quadrillion-Dollar SpaceX  EP 302.md",
+          "processed_at": "2026-10-16T07:20:05.296171+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-10-07"
+      "latest_published": "2026-10-15"
     },
     "dwarkesh-podcast": {
       "name": "Dwarkesh Podcast",
@@ -1233,9 +1242,18 @@
           "note_path": "Podcasts/No Priors Artificial Intelligence  Technology  Startups/2026-10-09 - Beam The Great American Open Model with ReflectionAI Co-Founder and CEO Misha Laskin.md",
           "processed_at": "2026-10-11T06:24:54.043854+00:00",
           "status": "completed"
+        },
+        "6fed676e-c84d-11f1-a40c-678dc1ca0b76": {
+          "title": "The Changing Physics of Cybersecurity and Drug Development with OpenAI President Greg Brockman",
+          "published": "2026-10-15",
+          "audio_url": "https://traffic.megaphone.fm/PDP1628614600.mp3",
+          "transcript_path": "Podcasts/No Priors Artificial Intelligence  Technology  Startups/transcripts/2026-10-15 - The Changing Physics of Cybersecurity and Drug Development with OpenAI President Greg Brockman.md",
+          "note_path": "Podcasts/No Priors Artificial Intelligence  Technology  Startups/2026-10-15 - The Changing Physics of Cybersecurity and Drug Development with OpenAI President Greg Brockman.md",
+          "processed_at": "2026-10-16T07:27:04.300425+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-10-09"
+      "latest_published": "2026-10-15"
     },
     "cgi-conversations": {
       "name": "CGI Conversations",
