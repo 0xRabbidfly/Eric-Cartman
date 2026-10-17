@@ -497,9 +497,18 @@
           "note_path": "Podcasts/Limitless/2026-10-14 - I Used to Hate Meta Muse Wonder Changed My Mind.md",
           "processed_at": "2026-10-15T06:14:22.811315+00:00",
           "status": "completed"
+        },
+        "f649e06c-cc3a-4bd8-8ad2-af9daeedf3ee": {
+          "title": "ChatGPT Just Caught a Spy Stealing From OpenAI",
+          "published": "2026-10-16",
+          "audio_url": "https://media.transistor.fm/a2201b24/df5d309f.mp3",
+          "transcript_path": "Podcasts/Limitless/transcripts/2026-10-16 - ChatGPT Just Caught a Spy Stealing From OpenAI.md",
+          "note_path": "Podcasts/Limitless/2026-10-16 - ChatGPT Just Caught a Spy Stealing From OpenAI.md",
+          "processed_at": "2026-10-17T06:13:48.288678+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-10-14"
+      "latest_published": "2026-10-16"
     },
     "the-pomp-podcast": {
       "name": "The Pomp Podcast",
