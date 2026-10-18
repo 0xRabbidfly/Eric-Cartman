@@ -563,6 +563,8 @@ def _extract_images(html: str, base_url: str) -> List[str]:
     seen: set = set()
 
     def _add(src: str):
+        # Attribute values arrive HTML-escaped (`&amp;` in Next.js image URLs)
+        src = html_mod.unescape(src)
         if not src or src in seen:
             return
         # Skip data URIs, SVG inline, tracking pixels, tiny icons
@@ -606,11 +608,12 @@ def _extract_images(html: str, base_url: str) -> List[str]:
     return images
 
 
-def fetch_web(url: str, timeout: int = 15) -> Dict[str, Any]:
+def fetch_web(url: str, timeout: int = 15, max_chars: int = 8000) -> Dict[str, Any]:
     """Fetch a web page and extract plain text content + image URLs.
 
-    Returns dict with url, title (from <title>), content (plain text, max 8000 chars),
-    and image_urls (list of meaningful image URLs found in the page).
+    Returns dict with url, title (from <title>), content (plain text, capped at
+    max_chars; 0 = no cap), and image_urls (list of meaningful image URLs found
+    in the page).
     """
     try:
         req = urllib.request.Request(
@@ -648,7 +651,7 @@ def fetch_web(url: str, timeout: int = 15) -> Dict[str, Any]:
         "type": "web",
         "url": url,
         "title": title,
-        "content": text[:8000],
+        "content": text[:max_chars] if max_chars else text,
         "image_urls": image_urls,
     }
 
@@ -720,6 +723,8 @@ def main():
                         help="Download images to DIR and include local paths in output")
     parser.add_argument("--slug", default="img",
                         help="Filename prefix for downloaded images (default: img)")
+    parser.add_argument("--max-chars", type=int, default=8000,
+                        help="Cap on web page text (default: 8000; 0 = full page)")
     args = parser.parse_args()
 
     url = args.url.strip()
@@ -749,7 +754,7 @@ def main():
             result = {"type": "tweet", "url": url, **tweet_data}
     else:
         _log(f"Web URL detected → HTTP fetch")
-        result = fetch_web(url)
+        result = fetch_web(url, max_chars=args.max_chars)
 
     # Download images if requested
     if args.download_images:
