@@ -937,9 +937,18 @@
           "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-10-15 - OpenAI Bulk-Solves 722 Math Problems, Anthropic’s Cruelty Policy, and Elon’s Quadrillion-Dollar SpaceX  EP 302.md",
           "processed_at": "2026-10-16T07:20:05.296171+00:00",
           "status": "completed"
+        },
+        "3b862154-ca42-11f1-917a-133350e8cd3e": {
+          "title": "Flying Tesla Car, Robot Brains Halving in Cost Every 3 Weeks, and Why Incentives Decide AI Alignment | #303",
+          "published": "2026-10-17",
+          "audio_url": "https://traffic.megaphone.fm/DVVTS7801921557.mp3",
+          "transcript_path": "Podcasts/Moonshots with Peter Diamandis/transcripts/2026-10-17 - Flying Tesla Car, Robot Brains Halving in Cost Every 3 Weeks, and Why Incentives Decide AI Alignment  303.md",
+          "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-10-17 - Flying Tesla Car, Robot Brains Halving in Cost Every 3 Weeks, and Why Incentives Decide AI Alignment  303.md",
+          "processed_at": "2026-10-18T06:33:48.936328+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-10-15"
+      "latest_published": "2026-10-17"
     },
     "dwarkesh-podcast": {
       "name": "Dwarkesh Podcast",
