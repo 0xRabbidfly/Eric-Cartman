@@ -1500,9 +1500,18 @@
           "note_path": "Podcasts/Lifespan with Dr. David Sinclair/2026-10-04 - Are GLP-1s the First Longevity Drugs  Lifespan with Dr. David Sinclair - S2, Ep. 11.md",
           "processed_at": "2026-10-05T06:23:44.428893+00:00",
           "status": "completed"
+        },
+        "0ffda37e-caa9-11f1-9f74-c7e26fd3fd9c": {
+          "title": "Younger Skin with Peptides? | Lifespan with Dr. David Sinclair - S2, Ep. 11",
+          "published": "2026-10-18",
+          "audio_url": "https://traffic.megaphone.fm/NUOAC3316189556.mp3",
+          "transcript_path": "Podcasts/Lifespan with Dr. David Sinclair/transcripts/2026-10-18 - Younger Skin with Peptides  Lifespan with Dr. David Sinclair - S2, Ep. 11.md",
+          "note_path": "Podcasts/Lifespan with Dr. David Sinclair/2026-10-18 - Younger Skin with Peptides  Lifespan with Dr. David Sinclair - S2, Ep. 11.md",
+          "processed_at": "2026-10-19T06:25:59.541472+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-10-04"
+      "latest_published": "2026-10-18"
     }
   }
 }
