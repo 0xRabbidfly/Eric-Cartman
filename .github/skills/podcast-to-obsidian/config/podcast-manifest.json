@@ -506,9 +506,18 @@
           "note_path": "Podcasts/Limitless/2026-10-16 - ChatGPT Just Caught a Spy Stealing From OpenAI.md",
           "processed_at": "2026-10-17T06:13:48.288678+00:00",
           "status": "completed"
+        },
+        "1ae29413-82c7-4bd4-a145-4c7493b31085": {
+          "title": "Tesla's Flying Roadster Is Really About SpaceX",
+          "published": "2026-10-19",
+          "audio_url": "https://media.transistor.fm/68d500b8/fef7e943.mp3",
+          "transcript_path": "Podcasts/Limitless/transcripts/2026-10-19 - Tesla's Flying Roadster Is Really About SpaceX.md",
+          "note_path": "Podcasts/Limitless/2026-10-19 - Tesla's Flying Roadster Is Really About SpaceX.md",
+          "processed_at": "2026-10-20T06:11:29.471718+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-10-16"
+      "latest_published": "2026-10-19"
     },
     "the-pomp-podcast": {
       "name": "The Pomp Podcast",
