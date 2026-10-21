@@ -515,9 +515,18 @@
           "note_path": "Podcasts/Limitless/2026-10-19 - Tesla's Flying Roadster Is Really About SpaceX.md",
           "processed_at": "2026-10-20T06:11:29.471718+00:00",
           "status": "completed"
+        },
+        "33bd1dff-6014-4aee-9f34-39c61322d615": {
+          "title": "Why Anthropic Is Giving Away 20% of Its Equity (And Why Everyone's Mad)",
+          "published": "2026-10-20",
+          "audio_url": "https://media.transistor.fm/776a01bb/cb04072f.mp3",
+          "transcript_path": "Podcasts/Limitless/transcripts/2026-10-20 - Why Anthropic Is Giving Away 20% of Its Equity (And Why Everyone's Mad).md",
+          "note_path": "Podcasts/Limitless/2026-10-20 - Why Anthropic Is Giving Away 20% of Its Equity (And Why Everyone's Mad).md",
+          "processed_at": "2026-10-21T06:15:01.116964+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-10-19"
+      "latest_published": "2026-10-20"
     },
     "the-pomp-podcast": {
       "name": "The Pomp Podcast",
