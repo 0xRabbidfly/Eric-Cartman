@@ -524,9 +524,18 @@
           "note_path": "Podcasts/Limitless/2026-10-20 - Why Anthropic Is Giving Away 20% of Its Equity (And Why Everyone's Mad).md",
           "processed_at": "2026-10-21T06:15:01.116964+00:00",
           "status": "completed"
+        },
+        "f68bf6d3-60fb-43a8-af28-596b9bd402d9": {
+          "title": "CoreWeave's Crash Looks Like 2008. Here's Why It Isn't.",
+          "published": "2026-10-21",
+          "audio_url": "https://media.transistor.fm/397347f0/806249c5.mp3",
+          "transcript_path": "Podcasts/Limitless/transcripts/2026-10-21 - CoreWeave's Crash Looks Like 2008. Here's Why It Isn't.md",
+          "note_path": "Podcasts/Limitless/2026-10-21 - CoreWeave's Crash Looks Like 2008. Here's Why It Isn't.md",
+          "processed_at": "2026-10-22T06:21:33.196160+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-10-20"
+      "latest_published": "2026-10-21"
     },
     "the-pomp-podcast": {
       "name": "The Pomp Podcast",
@@ -964,9 +973,18 @@
           "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-10-17 - Flying Tesla Car, Robot Brains Halving in Cost Every 3 Weeks, and Why Incentives Decide AI Alignment  303.md",
           "processed_at": "2026-10-18T06:33:48.936328+00:00",
           "status": "completed"
+        },
+        "75ffa2e0-cd5f-11f1-8611-833714f6a862": {
+          "title": "Chamath: AGI Is Here, Anthropic’s $100B Giveaway, Elon’s SpaceX Shares for 72M Kids | EP #304",
+          "published": "2026-10-21",
+          "audio_url": "https://traffic.megaphone.fm/DVVTS7398139491.mp3",
+          "transcript_path": "Podcasts/Moonshots with Peter Diamandis/transcripts/2026-10-21 - Chamath AGI Is Here, Anthropic’s $100B Giveaway, Elon’s SpaceX Shares for 72M Kids  EP 304.md",
+          "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-10-21 - Chamath AGI Is Here, Anthropic’s $100B Giveaway, Elon’s SpaceX Shares for 72M Kids  EP 304.md",
+          "processed_at": "2026-10-22T06:37:55.207591+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-10-17"
+      "latest_published": "2026-10-21"
     },
     "dwarkesh-podcast": {
       "name": "Dwarkesh Podcast",
