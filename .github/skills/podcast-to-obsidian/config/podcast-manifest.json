@@ -533,9 +533,18 @@
           "note_path": "Podcasts/Limitless/2026-10-21 - CoreWeave's Crash Looks Like 2008. Here's Why It Isn't.md",
           "processed_at": "2026-10-22T06:21:33.196160+00:00",
           "status": "completed"
+        },
+        "8f4c4260-a83f-44d2-b0ee-8f075f434642": {
+          "title": "AI Just Saved SpaceX: Record $14.6B Quarter, First Profit and a Tesla Merger",
+          "published": "2026-10-22",
+          "audio_url": "https://media.transistor.fm/47d471c0/94c7c88b.mp3",
+          "transcript_path": "Podcasts/Limitless/transcripts/2026-10-22 - AI Just Saved SpaceX Record $14.6B Quarter, First Profit and a Tesla Merger.md",
+          "note_path": "Podcasts/Limitless/2026-10-22 - AI Just Saved SpaceX Record $14.6B Quarter, First Profit and a Tesla Merger.md",
+          "processed_at": "2026-10-23T06:15:40.972503+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-10-21"
+      "latest_published": "2026-10-22"
     },
     "the-pomp-podcast": {
       "name": "The Pomp Podcast",
@@ -1127,9 +1136,18 @@
           "note_path": "Podcasts/The Pragmatic Engineer/2026-10-14 - Uber’s AI infra, from the inside.md",
           "processed_at": "2026-10-15T06:29:30.790210+00:00",
           "status": "completed"
+        },
+        "substack:post:221358515": {
+          "title": "The revised rules of engineering management with Will Larson",
+          "published": "2026-10-21",
+          "audio_url": "https://api.substack.com/feed/podcast/221358515/c10623babe06c48e26c6c9ce22593269.mp3",
+          "transcript_path": "Podcasts/The Pragmatic Engineer/transcripts/2026-10-21 - The revised rules of engineering management with Will Larson.md",
+          "note_path": "Podcasts/The Pragmatic Engineer/2026-10-21 - The revised rules of engineering management with Will Larson.md",
+          "processed_at": "2026-10-23T06:32:48.732259+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-10-14"
+      "latest_published": "2026-10-21"
     },
     "naval": {
       "name": "Naval",
