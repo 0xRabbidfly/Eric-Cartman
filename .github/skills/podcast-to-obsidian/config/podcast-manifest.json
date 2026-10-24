@@ -542,9 +542,18 @@
           "note_path": "Podcasts/Limitless/2026-10-22 - AI Just Saved SpaceX Record $14.6B Quarter, First Profit and a Tesla Merger.md",
           "processed_at": "2026-10-23T06:15:40.972503+00:00",
           "status": "completed"
+        },
+        "d91e5dcf-4c14-4e23-852a-d589e1ef5a1d": {
+          "title": "Black October: AI Agents in Our Bank Accounts and the PHP Hack",
+          "published": "2026-10-23",
+          "audio_url": "https://media.transistor.fm/4d539b99/9a39fe09.mp3",
+          "transcript_path": "Podcasts/Limitless/transcripts/2026-10-23 - Black October AI Agents in Our Bank Accounts and the PHP Hack.md",
+          "note_path": "Podcasts/Limitless/2026-10-23 - Black October AI Agents in Our Bank Accounts and the PHP Hack.md",
+          "processed_at": "2026-10-24T06:12:10.310249+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-10-22"
+      "latest_published": "2026-10-23"
     },
     "the-pomp-podcast": {
       "name": "The Pomp Podcast",
@@ -991,9 +1000,18 @@
           "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-10-21 - Chamath AGI Is Here, Anthropic’s $100B Giveaway, Elon’s SpaceX Shares for 72M Kids  EP 304.md",
           "processed_at": "2026-10-22T06:37:55.207591+00:00",
           "status": "completed"
+        },
+        "b8aa637c-ceff-11f1-9176-c355c0c123db": {
+          "title": "SpaceX’s AI Business Up 830%, OpenAI Agents Lie, and Startup Turns Mercury Into Gold | EP #305",
+          "published": "2026-10-23",
+          "audio_url": "https://traffic.megaphone.fm/DVVTS2164439111.mp3",
+          "transcript_path": "Podcasts/Moonshots with Peter Diamandis/transcripts/2026-10-23 - SpaceX’s AI Business Up 830%, OpenAI Agents Lie, and Startup Turns Mercury Into Gold  EP 305.md",
+          "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-10-23 - SpaceX’s AI Business Up 830%, OpenAI Agents Lie, and Startup Turns Mercury Into Gold  EP 305.md",
+          "processed_at": "2026-10-24T06:35:41.235075+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-10-21"
+      "latest_published": "2026-10-23"
     },
     "dwarkesh-podcast": {
       "name": "Dwarkesh Podcast",
