@@ -1341,9 +1341,27 @@
           "note_path": "Podcasts/No Priors Artificial Intelligence  Technology  Startups/2026-10-15 - The Changing Physics of Cybersecurity and Drug Development with OpenAI President Greg Brockman.md",
           "processed_at": "2026-10-16T07:27:04.300425+00:00",
           "status": "completed"
+        },
+        "1b967280-ce7b-11f1-8a29-072c10b8d7bc": {
+          "title": "Democratizing Security for the Agentic Web with Cloudflare CTO Dane Knecht",
+          "published": "2026-10-23",
+          "audio_url": "https://traffic.megaphone.fm/PDP2314551616.mp3",
+          "transcript_path": "Podcasts/No Priors Artificial Intelligence  Technology  Startups/transcripts/2026-10-23 - Democratizing Security for the Agentic Web with Cloudflare CTO Dane Knecht.md",
+          "note_path": "Podcasts/No Priors Artificial Intelligence  Technology  Startups/2026-10-23 - Democratizing Security for the Agentic Web with Cloudflare CTO Dane Knecht.md",
+          "processed_at": "2026-10-25T06:23:00.782957+00:00",
+          "status": "completed"
+        },
+        "c69c028a-cdc7-11f1-a97a-77799e86d8ea": {
+          "title": "The New Apex Predator: CrowdStrike CEO George Kurtz on Adversaries Armed With AI Agents",
+          "published": "2026-10-22",
+          "audio_url": "https://traffic.megaphone.fm/PDP8573582914.mp3",
+          "transcript_path": "Podcasts/No Priors Artificial Intelligence  Technology  Startups/transcripts/2026-10-22 - The New Apex Predator CrowdStrike CEO George Kurtz on Adversaries Armed With AI Agents.md",
+          "note_path": "Podcasts/No Priors Artificial Intelligence  Technology  Startups/2026-10-22 - The New Apex Predator CrowdStrike CEO George Kurtz on Adversaries Armed With AI Agents.md",
+          "processed_at": "2026-10-25T06:23:00.827172+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-10-15"
+      "latest_published": "2026-10-23"
     },
     "cgi-conversations": {
       "name": "CGI Conversations",
