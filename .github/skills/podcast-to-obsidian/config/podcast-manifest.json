@@ -551,9 +551,18 @@
           "note_path": "Podcasts/Limitless/2026-10-23 - Black October AI Agents in Our Bank Accounts and the PHP Hack.md",
           "processed_at": "2026-10-24T06:12:10.310249+00:00",
           "status": "completed"
+        },
+        "06d38da6-646c-4e94-a730-3c5ccce85bf6": {
+          "title": "Claude Duet is Here: Anthropic's 24/7 AI Agent (48 Hour Test)",
+          "published": "2026-10-26",
+          "audio_url": "https://media.transistor.fm/98b67f8b/f70058f6.mp3",
+          "transcript_path": "Podcasts/Limitless/transcripts/2026-10-26 - Claude Duet is Here Anthropic's 247 AI Agent (48 Hour Test).md",
+          "note_path": "Podcasts/Limitless/2026-10-26 - Claude Duet is Here Anthropic's 247 AI Agent (48 Hour Test).md",
+          "processed_at": "2026-10-27T06:14:01.658856+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-10-23"
+      "latest_published": "2026-10-26"
     },
     "the-pomp-podcast": {
       "name": "The Pomp Podcast",
