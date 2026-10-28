@@ -560,9 +560,18 @@
           "note_path": "Podcasts/Limitless/2026-10-26 - Claude Duet is Here Anthropic's 247 AI Agent (48 Hour Test).md",
           "processed_at": "2026-10-27T06:14:01.658856+00:00",
           "status": "completed"
+        },
+        "2f8b39b9-7af7-4ce3-b6f6-e95067d52482": {
+          "title": "Anthropic's IPO Is Not What It Looks Like: Inside the S-1 and the $80 Billion \"Loss\"",
+          "published": "2026-10-27",
+          "audio_url": "https://media.transistor.fm/15eb137e/1ba8fbf0.mp3",
+          "transcript_path": "Podcasts/Limitless/transcripts/2026-10-27 - Anthropic's IPO Is Not What It Looks Like Inside the S-1 and the $80 Billion Loss.md",
+          "note_path": "Podcasts/Limitless/2026-10-27 - Anthropic's IPO Is Not What It Looks Like Inside the S-1 and the $80 Billion Loss.md",
+          "processed_at": "2026-10-28T06:13:19.408339+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-10-26"
+      "latest_published": "2026-10-27"
     },
     "the-pomp-podcast": {
       "name": "The Pomp Podcast",
