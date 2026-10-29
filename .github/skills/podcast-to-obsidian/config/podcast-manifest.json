@@ -569,9 +569,18 @@
           "note_path": "Podcasts/Limitless/2026-10-27 - Anthropic's IPO Is Not What It Looks Like Inside the S-1 and the $80 Billion Loss.md",
           "processed_at": "2026-10-28T06:13:19.408339+00:00",
           "status": "completed"
+        },
+        "24d380ff-78ee-44ea-9115-37930bf4ae08": {
+          "title": "Three Billionaires Just Called the AI Top: Elon, Ken Griffin, Chamath and What Each Stands to Gain",
+          "published": "2026-10-28",
+          "audio_url": "https://media.transistor.fm/b845911c/6a3d70eb.mp3",
+          "transcript_path": "Podcasts/Limitless/transcripts/2026-10-28 - Three Billionaires Just Called the AI Top Elon, Ken Griffin, Chamath and What Each Stands to Gain.md",
+          "note_path": "Podcasts/Limitless/2026-10-28 - Three Billionaires Just Called the AI Top Elon, Ken Griffin, Chamath and What Each Stands to Gain.md",
+          "processed_at": "2026-10-29T06:12:01.676322+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-10-27"
+      "latest_published": "2026-10-28"
     },
     "the-pomp-podcast": {
       "name": "The Pomp Podcast",
@@ -1027,9 +1036,18 @@
           "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-10-23 - SpaceX’s AI Business Up 830%, OpenAI Agents Lie, and Startup Turns Mercury Into Gold  EP 305.md",
           "processed_at": "2026-10-24T06:35:41.235075+00:00",
           "status": "completed"
+        },
+        "944322fe-d2e6-11f1-b55f-d75ab929bc0a": {
+          "title": "Anthropic’s $2T IPO, Elon Predicts Neocloud Death, and China’s Kimi Catches Up | #306",
+          "published": "2026-10-28",
+          "audio_url": "https://traffic.megaphone.fm/DVVTS3099884582.mp3",
+          "transcript_path": "Podcasts/Moonshots with Peter Diamandis/transcripts/2026-10-28 - Anthropic’s $2T IPO, Elon Predicts Neocloud Death, and China’s Kimi Catches Up  306.md",
+          "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-10-28 - Anthropic’s $2T IPO, Elon Predicts Neocloud Death, and China’s Kimi Catches Up  306.md",
+          "processed_at": "2026-10-29T06:32:52.177425+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-10-23"
+      "latest_published": "2026-10-28"
     },
     "dwarkesh-podcast": {
       "name": "Dwarkesh Podcast",
