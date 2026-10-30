@@ -158,9 +158,27 @@
           "note_path": "Podcasts/Raoul Pal The Journey Man/2026-10-08 - The AI Job Shock Is Coming.md",
           "processed_at": "2026-10-09T06:23:17.715397+00:00",
           "status": "completed"
+        },
+        "50c93c4c-d3e1-11f1-9b2b-cf2ae7d4b880": {
+          "title": "Why This Isn’t the Dot-Com Bubble | Raoul Pal The Journey Man With Andreas Steno & David Mattin",
+          "published": "2026-10-29",
+          "audio_url": "https://www.podtrac.com/pts/redirect.mp3/chrt.fm/track/1B146C/pscrb.fm/rss/p/traffic.megaphone.fm/ADV1105598164.mp3",
+          "transcript_path": "Podcasts/Raoul Pal The Journey Man/transcripts/2026-10-29 - Why This Isn’t the Dot-Com Bubble  Raoul Pal The Journey Man With Andreas Steno & David Mattin.md",
+          "note_path": "Podcasts/Raoul Pal The Journey Man/2026-10-29 - Why This Isn’t the Dot-Com Bubble  Raoul Pal The Journey Man With Andreas Steno & David Mattin.md",
+          "processed_at": "2026-10-30T06:27:21.290767+00:00",
+          "status": "completed"
+        },
+        "1119b65e-d3e0-11f1-a0ac-6f9b075b739f": {
+          "title": "Raoul Pal: Four Frameworks, One Code",
+          "published": "2026-10-25",
+          "audio_url": "https://www.podtrac.com/pts/redirect.mp3/chrt.fm/track/1B146C/pscrb.fm/rss/p/traffic.megaphone.fm/ADV2280278545.mp3",
+          "transcript_path": "Podcasts/Raoul Pal The Journey Man/transcripts/2026-10-25 - Raoul Pal Four Frameworks, One Code.md",
+          "note_path": "Podcasts/Raoul Pal The Journey Man/2026-10-25 - Raoul Pal Four Frameworks, One Code.md",
+          "processed_at": "2026-10-30T06:27:21.338025+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-10-08"
+      "latest_published": "2026-10-29"
     },
     "lex-fridman-podcast": {
       "name": "Lex Fridman Podcast",
