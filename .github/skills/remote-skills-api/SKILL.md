@@ -170,7 +170,12 @@ Finishing a session fills blanks the athlete skipped because they matched the
 plan, and lists each in the entry's `assumed` array:
 
 - Blank reps become the prescribed reps, or the prescribed hold for seconds.
-  Never on a max-test ramp, a baseline, centimetres or metres.
+  On a max-test ramp only for a set with a load (the card says 3). Never on a
+  baseline, centimetres or metres.
+- A blank load with a prescription becomes the weight the card showed. In
+  pounds that is the target rounded the card's way (5 lb, per hand on a pair,
+  the plates on a barbell), not the unrounded kg target. So 50 kg on a 20 kg
+  bar stores as 65 lb of plates, and later reads back as 65, not 66.1.
 - A barbell set (`barKg` in the library) with nothing prescribed and left
   blank, or at 0, becomes the empty bar. On a max-test ramp only a typed 0 does.
 

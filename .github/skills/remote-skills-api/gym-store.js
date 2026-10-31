@@ -684,6 +684,30 @@ function createGymStore(dataRoot, { libraryPath = DEFAULT_LIBRARY_PATH } = {}) {
   /** Load types where `targetLoad` is a number the athlete could have used as prescribed. */
   const PRESCRIBED_LOADS = new Set(['kg', 'kg_total_pair', 'setting', 'bodyweight_plus_kg']);
 
+  const KG_PER_LB = 0.45359237;
+  const WEIGHT_TYPES = new Set(['kg', 'kg_total_pair', 'bodyweight_plus_kg']);
+
+  /**
+   * The prescribed load as the card showed it, back in kilograms. In pounds the
+   * card rounds a target to 5 lb (per hand on a pair, the plates on a barbell),
+   * and a blank box means "I did what the card said", so the blank is that
+   * rounded weight, not the unrounded kg target behind it. Mirrors ui.html's
+   * gymTargetWeight, gymTargetPlates and gymStoreLoad term for term. In kg the
+   * card shows the target as is.
+   */
+  function shownTargetKg(item, entry, units) {
+    const target = item.targetLoad;
+    if ((entry.unit || units) !== 'lb' || !WEIGHT_TYPES.has(item.loadType)) return target;
+    const toKg = (lb) => Math.round(lb * KG_PER_LB * 1000) / 1000;
+    const nearest5 = (v) => Math.round(v / 5) * 5;
+    if (item.loadType === 'kg' && typeof entry.barKg === 'number') {
+      const plates = nearest5(Math.max(0, target - entry.barKg) / KG_PER_LB);
+      return Math.round((toKg(plates) + entry.barKg) * 1000) / 1000;
+    }
+    const lb = target / KG_PER_LB;
+    return toKg(item.loadType === 'kg_total_pair' ? nearest5(lb / 2) * 2 : nearest5(lb));
+  }
+
   /** The app-wide weight unit people type and read. Storage is always kilograms. */
   function getUnits() {
     requireEnabled();
@@ -694,7 +718,8 @@ function createGymStore(dataRoot, { libraryPath = DEFAULT_LIBRARY_PATH } = {}) {
   /**
    * What a blank means once a set is finished. A blank box is the athlete
    * saying they did what the card said, so they type only what differed:
-   * - blank load is the prescribed weight when the set has one, whatever the
+   * - blank load is the prescribed weight when the set has one, as the card
+   *   showed it (rounded to 5 lb in pounds, see shownTargetKg), whatever the
    *   card calls it: the pin on a machine, the pair total on dumbbells, the
    *   added kilos on a weighted pull-up. A typed load is a full total and is
    *   never touched.
@@ -705,20 +730,23 @@ function createGymStore(dataRoot, { libraryPath = DEFAULT_LIBRARY_PATH } = {}) {
    *   On a max-test ramp only a typed 0 is the bar: a blank there is a set
    *   whose weight went unrecorded, and filling it in would test a fake max.
    * - blank reps are the prescribed reps, or the prescribed hold for seconds.
-   *   Never on a max-test ramp or a baseline, where the number is the
-   *   measurement, and never on centimetres or metres, which are not a count.
+   *   On a max-test ramp too, for any set with a load: the card says 3, and a
+   *   blank means 3. Never on a baseline, where the number is the measurement,
+   *   and never on centimetres or metres, which are not a count.
    * - a weighted pull-up with no added load and none prescribed is bodyweight.
    * Filled-in values carry `assumed`, so the assessment can tell them apart.
    */
   function applyFinishDefaults(items, entries) {
     const byId = new Map(items.map((i) => [i.id, i]));
     const library = readJson(libraryPath, {});
+    const units = getUnits();
     return entries.map((entry) => {
       const item = byId.get(entry.itemId);
       if (!item) return entry;
       const next = { ...entry };
       const assumed = [];
-      const { barKg } = library[item.exerciseKey] || {};
+      const libEntry = library[item.exerciseKey] || {};
+      const { barKg } = libEntry;
       const bar = typeof barKg === 'number' ? barKg : null;
       const blankLoad = next.load === null || next.load === undefined;
       const prescribed = typeof item.targetLoad === 'number' && PRESCRIBED_LOADS.has(item.loadType);
@@ -726,7 +754,7 @@ function createGymStore(dataRoot, { libraryPath = DEFAULT_LIBRARY_PATH } = {}) {
         next.load = bar;
         assumed.push('load');
       } else if (blankLoad && !item.isRamp && prescribed) {
-        next.load = item.targetLoad;
+        next.load = shownTargetKg(item, libEntry, units);
         assumed.push('load');
       } else if (item.loadType === 'kg' && bar !== null && blankLoad && !item.isRamp) {
         next.load = bar;
@@ -734,8 +762,12 @@ function createGymStore(dataRoot, { libraryPath = DEFAULT_LIBRARY_PATH } = {}) {
       }
       if (item.loadType === 'bodyweight_plus_kg'
           && (next.load === null || next.load === undefined)) next.load = 0;
+      // On a max-test ramp the card still says 3, so a set with a weight on it
+      // and blank reps is a triple. Only a set with no load at all went
+      // unrecorded, and filling its reps would invent a set.
+      const performed = !item.isRamp || typeof next.load === 'number';
       if ((next.reps === null || next.reps === undefined) && typeof item.reps === 'number'
-          && ASSUMABLE_RESULTS.has(item.resultType) && !item.isRamp && !item.isBaseline) {
+          && ASSUMABLE_RESULTS.has(item.resultType) && performed && !item.isBaseline) {
         next.reps = item.reps;
         assumed.push('reps');
       }

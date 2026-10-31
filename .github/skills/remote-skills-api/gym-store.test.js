@@ -226,15 +226,14 @@ test('finishing fills blank reps with the prescription and marks them assumed', 
   assert.equal(findSet(log, 'd-side-plank', 1).reps, 45, 'a prescribed hold counts like prescribed reps');
 });
 
-test('finishing never assumes reps on a max test, a baseline or a distance', () => {
+test('finishing never assumes reps on a baseline or a distance', () => {
   const { store } = defaultsFixture();
   store.saveSession('athlete-b', 1, 1, { entries: [
-    set('a-back-squat', 1, { load: 60, rpe: 9 }),
     set('d-front-plank', 1, { loadType: 'bodyweight', rpe: 9 }),
     set('e-carry', 1, { loadType: 'kg_total_pair', load: 40, rpe: 7 }),
   ] });
   const { log } = store.finishSession('athlete-b', 1, 1, new Date('2026-09-09T18:00:00'));
-  for (const id of ['a-back-squat', 'd-front-plank', 'e-carry']) {
+  for (const id of ['d-front-plank', 'e-carry']) {
     assert.equal(findSet(log, id, 1).reps, null, id);
     assert.equal(findSet(log, id, 1).assumed, undefined, id);
   }
@@ -487,6 +486,44 @@ test('a blank load takes the prescribed weight, whatever the card prescribes', (
   assert.equal(findSet(log, 'f-pin-row', 1).load, 7, 'the prescribed pin');
   assert.equal(findSet(log, 'f-goblet', 1).load, 24, 'the prescribed pair total');
   assert.equal(findSet(log, 'f-pull-up-loaded', 1).load, 5, 'the prescribed added load');
+});
+
+test('in pounds, a blank load is the weight the card showed, not the unrounded kg target', () => {
+  const { root, store } = defaultsFixture();
+  const file = path.join(root, 'profiles.json');
+  fs.writeFileSync(file, JSON.stringify({ ...JSON.parse(fs.readFileSync(file, 'utf8')), units: 'lb' }), 'utf8');
+  const weekFile = path.join(root, 'athlete-b', 'weeks', 'W1.json');
+  const week = JSON.parse(fs.readFileSync(weekFile, 'utf8'));
+  week.days[0].items.find((i) => i.id === 'f-squat-work').targetLoad = 50;
+  fs.writeFileSync(weekFile, JSON.stringify(week), 'utf8');
+  store.saveSession('athlete-b', 1, 1, { entries: [
+    set('f-squat-work', 1, { rpe: 7 }),
+    set('f-pin-row', 1, { loadType: 'setting', rpe: 7 }),
+    set('f-goblet', 1, { loadType: 'kg_total_pair', rpe: 7 }),
+    set('f-pull-up-loaded', 1, { loadType: 'bodyweight_plus_kg', rpe: 8 }),
+  ] });
+  const { log } = store.finishSession('athlete-b', 1, 1, new Date('2026-09-09T18:00:00'));
+  // 50 kg on a 20 kg bar is 66.1 lb of plates; the card said 65.
+  assert.equal(findSet(log, 'f-squat-work', 1).load, 49.484, '65 lb of plates plus the bar');
+  assert.equal(findSet(log, 'f-pin-row', 1).load, 7, 'a pin is not a weight');
+  // 24 kg a pair is 26.5 lb a hand; the card said 25 a hand, 50 the pair.
+  assert.equal(findSet(log, 'f-goblet', 1).load, 22.68, 'the pair the card showed');
+  assert.equal(findSet(log, 'f-pull-up-loaded', 1).load, 4.536, '11 lb shown as 10');
+});
+
+test('a ramp set with a load and blank reps is the prescribed triple, and sets the max', () => {
+  const { root, store } = defaultsFixture();
+  store.saveSession('athlete-b', 1, 1, { entries: [
+    set('a-back-squat', 1, { load: 50, rpe: 6 }),
+    set('a-back-squat', 2, { load: 58.555, rpe: 9 }),
+    set('a-back-squat', 3, { rpe: 9.5 }),
+  ] });
+  const { log } = store.finishSession('athlete-b', 1, 1, new Date('2026-09-09T18:00:00'));
+  assert.equal(findSet(log, 'a-back-squat', 2).reps, 3, 'the card said 3');
+  assert.deepEqual(findSet(log, 'a-back-squat', 2).assumed, ['reps']);
+  assert.equal(findSet(log, 'a-back-squat', 3).reps, null, 'no load means the set went unrecorded');
+  const maxes = JSON.parse(fs.readFileSync(path.join(root, 'athlete-b', 'maxes.json'), 'utf8'));
+  assert.equal(maxes['back-squat'].threeRm, 58.555);
 });
 
 test('a load typed as 0 is still the empty bar, even where a weight was prescribed', () => {
