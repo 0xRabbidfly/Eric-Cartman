@@ -217,6 +217,7 @@ regenerating a week never drops it.
 
 - **Token auth (default)**: Header-only `Authorization: Bearer <API_SECRET>`
 - **Tailscale**: Network-level encryption + identity. Not exposed to public internet.
+- **Remembered sign-in**: any request with the right key also sets `skills_auth`, an HttpOnly, `SameSite=Strict` cookie that lasts 400 days and is refreshed on use. It holds an HMAC of the secret, not the secret, so rotating `API_SECRET` signs every device out. The page tries the cookie before asking for the key, so a device whose localStorage was wiped (common on iOS) doesn't have to type it again. `POST /api/auth/logout` clears it.
 - **URL token bootstrap**: `?token=` in the UI is only for saving token to localStorage on that device; API query-token auth is disabled by default.
 - **Optional compatibility mode**: Set `ALLOW_QUERY_TOKEN=true` only if you intentionally need API query-token auth.
 
@@ -224,7 +225,7 @@ regenerating a week never drops it.
 
 1. Install Tailscale on your phone
 2. Open `http://<pc-tailscale-ip>:3838?token=YOUR_API_SECRET` once on a new device (optional)
-3. Token is saved to localStorage — bookmark the page
+3. Token is saved to localStorage and the device gets a sign-in cookie, so it isn't asked again. Bookmark the page
 4. Use **Settings → API token** anytime to update the token on that device
 5. Add to Home Screen for app-like experience (iOS: Share → Add to Home Screen)
 

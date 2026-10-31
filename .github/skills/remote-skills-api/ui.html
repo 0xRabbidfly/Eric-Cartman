@@ -1220,7 +1220,7 @@
       const res = await fetch(path, {
         ...opts,
         headers: {
-          'Authorization': `Bearer ${API_TOKEN}`,
+          ...(API_TOKEN ? { 'Authorization': `Bearer ${API_TOKEN}` } : {}),
           'Content-Type': 'application/json',
           ...(sessionId ? { 'X-Session-ID': sessionId } : {}),
           ...(opts.headers || {}),
@@ -2676,7 +2676,7 @@
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${API_TOKEN}`,
+          ...(API_TOKEN ? { 'Authorization': `Bearer ${API_TOKEN}` } : {}),
           'Content-Type': 'application/json',
           'Accept': 'text/event-stream',
           ...(sessionId ? { 'X-Session-ID': sessionId } : {}),
@@ -3139,7 +3139,7 @@
     // ── Settings ──
     async function refreshSettings() {
       document.getElementById('tokenStatus').textContent =
-        API_TOKEN ? 'Saved on this device — tap to replace' : 'Not set — tap to enter';
+        API_TOKEN ? 'Saved on this device — tap to replace' : 'Signed in on this device — tap to replace';
       const info = document.getElementById('settingsInfo');
       try {
         const s = await api('/api/status');
@@ -3157,8 +3157,12 @@
     // ── Init ──
     wireModal();
     if (promptForTokenOnLoad) {
-      // No token yet — show prompt first, then load skills after
+      // No key on the page. The browser may still hold the sign-in cookie the
+      // server set the last time a key was typed (the page's own storage can
+      // be wiped by iOS while the cookie survives), so try that before asking.
       setTimeout(async () => {
+        const signedIn = await fetch('/api/status').then(r => r.ok).catch(() => false);
+        if (signedIn) { promptForTokenOnLoad = false; loadSkills(); loadGymProfiles(); return; }
         await promptSetToken();
         if (API_TOKEN) { loadSkills(); loadGymProfiles(); }
       }, 150);

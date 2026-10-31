@@ -409,13 +409,42 @@ app.use(cors());
 app.use(express.json());
 
 // Auth middleware
+// A device that has typed the key once stays signed in. iOS can wipe a page's
+// localStorage (Safari's 7-day script-storage cap, a cleared site, a home-screen
+// app that keeps its own storage), and each wipe used to mean typing the key
+// again. A server-set HttpOnly cookie is not subject to that cap. It holds an
+// HMAC of the secret, not the secret, so rotating API_SECRET signs every
+// device out. SameSite=Strict keeps other sites from riding on it.
+const AUTH_COOKIE = 'skills_auth';
+const AUTH_COOKIE_MS = 400 * 24 * 60 * 60 * 1000;   // the longest browsers keep one
+const authCookieValue = () => require('crypto').createHmac('sha256', API_SECRET).update(AUTH_COOKIE).digest('hex');
+
+function readCookie(req, name) {
+  for (const part of (req.headers.cookie || '').split(';')) {
+    const at = part.indexOf('=');
+    if (at > 0 && part.slice(0, at).trim() === name) return decodeURIComponent(part.slice(at + 1).trim());
+  }
+  return '';
+}
+
+function authCookieOptions(req, maxAge) {
+  const https = req.secure || req.headers['x-forwarded-proto'] === 'https';
+  return { httpOnly: true, sameSite: 'strict', secure: https, path: '/', maxAge };
+}
+
 function auth(req, res, next) {
   const headerToken = (req.headers.authorization || '').replace('Bearer ', '');
   const queryToken = ALLOW_QUERY_TOKEN
     ? req.query.token?.replace('Bearer ', '')
     : '';
   const token = headerToken || queryToken;
-  if (token !== API_SECRET) return res.status(401).json({ error: 'Unauthorized' });
+  if (token) {
+    if (token !== API_SECRET) return res.status(401).json({ error: 'Unauthorized' });
+    // Refreshed on every keyed request, so a device in use never ages out.
+    res.cookie(AUTH_COOKIE, authCookieValue(), authCookieOptions(req, AUTH_COOKIE_MS));
+    return next();
+  }
+  if (readCookie(req, AUTH_COOKIE) !== authCookieValue()) return res.status(401).json({ error: 'Unauthorized' });
   next();
 }
 
@@ -1018,6 +1047,12 @@ function resolveChatRequest(message, selectedSkill, history = []) {
 // ---------------------------------------------------------------------------
 
 // Health / status
+// Signing out has to reach the cookie: the page cannot clear an HttpOnly one.
+app.post('/api/auth/logout', (req, res) => {
+  res.cookie(AUTH_COOKIE, '', authCookieOptions(req, 0));
+  res.json({ ok: true });
+});
+
 app.get('/api/status', auth, (req, res) => {
   res.json({
     active: isProcessing,

@@ -327,3 +327,22 @@ test('finish stores the calendar date the phone sends', async () => {
   const reread = await (await get('/api/gym/session/5/1?profile=athlete-b')).json();
   assert.equal(reread.log.performedOn, performedOn);
 });
+
+test('a device that signed in once stays signed in through a long-lived cookie', async () => {
+  const signIn = await get('/api/status');
+  const setCookie = signIn.headers.get('set-cookie') || '';
+  assert.match(setCookie, /skills_auth=/);
+  assert.match(setCookie, /HttpOnly/i);
+  assert.match(setCookie, /SameSite=Strict/i);
+  assert.match(setCookie, /Max-Age=\d{7,}/, 'months, not a browser session');
+  const cookie = setCookie.split(';')[0];
+
+  const later = await fetch(`${BASE}/api/status`, { headers: { Cookie: cookie } });
+  assert.equal(later.status, 200, 'no key needed with the cookie');
+
+  const forged = await fetch(`${BASE}/api/status`, { headers: { Cookie: 'skills_auth=wrong' } });
+  assert.equal(forged.status, 401);
+
+  const out = await fetch(`${BASE}/api/auth/logout`, { method: 'POST', headers: { Cookie: cookie } });
+  assert.match(out.headers.get('set-cookie') || '', /skills_auth=;.*Max-Age=0/i, 'logout clears it');
+});
