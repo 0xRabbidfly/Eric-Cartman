@@ -596,9 +596,27 @@
           "note_path": "Podcasts/Limitless/2026-10-28 - Three Billionaires Just Called the AI Top Elon, Ken Griffin, Chamath and What Each Stands to Gain.md",
           "processed_at": "2026-10-29T06:12:01.676322+00:00",
           "status": "completed"
+        },
+        "c52adf4b-6573-4e8b-8702-f4c99842e124": {
+          "title": "Google Has the #1 AI Model but the Stock Just Fell 12%",
+          "published": "2026-10-30",
+          "audio_url": "https://media.transistor.fm/01b7bba0/37067ad6.mp3",
+          "transcript_path": "Podcasts/Limitless/transcripts/2026-10-30 - Google Has the 1 AI Model but the Stock Just Fell 12%.md",
+          "note_path": "Podcasts/Limitless/2026-10-30 - Google Has the 1 AI Model but the Stock Just Fell 12%.md",
+          "processed_at": "2026-10-31T06:14:53.587110+00:00",
+          "status": "completed"
+        },
+        "702d1264-973b-4abf-91d5-d8243d45ba0a": {
+          "title": "Anthropic Got Hacked Again: How Ex-DOGE Researchers Got Into Its Slack With AI Agents",
+          "published": "2026-10-29",
+          "audio_url": "https://media.transistor.fm/8e8c1b7a/3fe02114.mp3",
+          "transcript_path": "Podcasts/Limitless/transcripts/2026-10-29 - Anthropic Got Hacked Again How Ex-DOGE Researchers Got Into Its Slack With AI Agents.md",
+          "note_path": "Podcasts/Limitless/2026-10-29 - Anthropic Got Hacked Again How Ex-DOGE Researchers Got Into Its Slack With AI Agents.md",
+          "processed_at": "2026-10-31T06:14:53.626975+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-10-28"
+      "latest_published": "2026-10-30"
     },
     "the-pomp-podcast": {
       "name": "The Pomp Podcast",
