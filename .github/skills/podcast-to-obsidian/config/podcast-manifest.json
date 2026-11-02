@@ -1449,9 +1449,18 @@
           "note_path": "Podcasts/No Priors Artificial Intelligence  Technology  Startups/2026-10-22 - The New Apex Predator CrowdStrike CEO George Kurtz on Adversaries Armed With AI Agents.md",
           "processed_at": "2026-10-25T06:23:00.827172+00:00",
           "status": "completed"
+        },
+        "060e3c46-d339-11f1-a994-87ae12352fb9": {
+          "title": "Taking on ServiceNow: Coding Agents the Rest of Us with Serval Co-Founder and CEO Jake Stauch",
+          "published": "2026-10-29",
+          "audio_url": "https://traffic.megaphone.fm/PDP1665700091.mp3",
+          "transcript_path": "Podcasts/No Priors Artificial Intelligence  Technology  Startups/transcripts/2026-10-29 - Taking on ServiceNow Coding Agents the Rest of Us with Serval Co-Founder and CEO Jake Stauch.md",
+          "note_path": "Podcasts/No Priors Artificial Intelligence  Technology  Startups/2026-10-29 - Taking on ServiceNow Coding Agents the Rest of Us with Serval Co-Founder and CEO Jake Stauch.md",
+          "processed_at": "2026-11-02T07:31:34.054471+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-10-23"
+      "latest_published": "2026-10-29"
     },
     "cgi-conversations": {
       "name": "CGI Conversations",
@@ -1689,9 +1698,18 @@
           "note_path": "Podcasts/Lifespan with Dr. David Sinclair/2026-10-18 - Younger Skin with Peptides  Lifespan with Dr. David Sinclair - S2, Ep. 11.md",
           "processed_at": "2026-10-19T06:25:59.541472+00:00",
           "status": "completed"
+        },
+        "8620dfb8-d615-11f1-86b0-1b7ac2fa4ea7": {
+          "title": "Prevent Alzheimer's with Peptides? | Lifespan with Dr. David Sinclair - S2, Ep. 12",
+          "published": "2026-11-01",
+          "audio_url": "https://traffic.megaphone.fm/NUOAC2624928115.mp3",
+          "transcript_path": "Podcasts/Lifespan with Dr. David Sinclair/transcripts/2026-11-01 - Prevent Alzheimer's with Peptides  Lifespan with Dr. David Sinclair - S2, Ep. 12.md",
+          "note_path": "Podcasts/Lifespan with Dr. David Sinclair/2026-11-01 - Prevent Alzheimer's with Peptides  Lifespan with Dr. David Sinclair - S2, Ep. 12.md",
+          "processed_at": "2026-11-02T07:39:50.165640+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-10-18"
+      "latest_published": "2026-11-01"
     }
   }
 }
