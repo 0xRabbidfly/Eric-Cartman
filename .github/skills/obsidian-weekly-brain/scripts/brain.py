@@ -254,6 +254,30 @@ def note_date(fm: dict) -> datetime | None:
     return None
 
 
+_PUBLISHED_RE = re.compile(r"^\*\*Published\*\*:\s*(\d{4}-\d{2}-\d{2})", re.MULTILINE)
+
+
+def published_date(fm: dict, body: str) -> datetime | None:
+    """When the source itself was published, as opposed to when it was saved.
+    Library notes keep this in a `**Published**: YYYY-MM-DD` body line."""
+    for key in ("published", "date_published"):
+        dt = parse_date(fm.get(key, ""))
+        if dt:
+            return dt
+    m = _PUBLISHED_RE.search(body[:2000])
+    return parse_date(m.group(1)) if m else None
+
+
+def note_when(note: dict) -> str:
+    """Date label for prompts. `date` is the capture date, which keeps
+    recency windows about what you read; a model shown only that reported
+    anthropic-oss-scanner (published 10-08) as 10-20 news."""
+    saved, pub = note["date"], note.get("published")
+    if pub and saved and pub.date() != saved.date():
+        return f"published {pub:%Y-%m-%d}, saved {saved:%Y-%m-%d}"
+    return f"{(pub or saved):%Y-%m-%d}" if (pub or saved) else "undated"
+
+
 def week_key(dt: datetime) -> str:
     """Return ISO year-week string like '2026-W30'."""
     iso = dt.isocalendar()
@@ -300,6 +324,7 @@ def read_md_files(directory: Path, recurse: bool = True, skip_dirs: set | None =
             "body": body,
             "tags": fm.get("tags", []),
             "date": note_date(fm),
+            "published": published_date(fm, body),
             "source": fm.get("source", fm.get("author", "")),
         })
     return notes
@@ -559,7 +584,16 @@ def pass_thesis(vault: dict, api_key: str) -> str:
     lines = []
     rendered: list[tuple[int, list[str], str]] = []  # (evidence, detail_lines, one_liner)
 
+    # A merged thesis's notes now live in another thesis's cluster, so its
+    # evidence is counted there. Listing it separately read as a dead thesis
+    # with fresh evidence (thesis-003 "ORPHANED", last evidence 3d ago).
+    merged: dict[str, list[str]] = {}
     for thesis in theses:
+        if thesis.get("status") == "merged" and thesis.get("merged_into"):
+            merged.setdefault(thesis["merged_into"], []).append(thesis.get("id", "?"))
+    live = [t for t in theses if not (t.get("status") == "merged" and t.get("merged_into"))]
+
+    for thesis in live:
         thesis_id = thesis.get("id", thesis.get("name", "unknown"))
         thesis_name = thesis.get("name", thesis.get("title", thesis_id))
         thesis_tags = thesis.get("tags", [])
@@ -648,6 +682,8 @@ def pass_thesis(vault: dict, api_key: str) -> str:
                       f"({supporting} supporting, {contradicting} contradicting)")
         if statement:
             detail.append(f"  > {statement}")
+        if merged.get(thesis_id):
+            detail.append(f"  Absorbed: {', '.join(sorted(merged[thesis_id]))}")
         # Swap `lines` for this thesis's own buffer; collected at the end.
         _outer_lines, lines = lines, detail
 
@@ -722,7 +758,7 @@ def pass_thesis(vault: dict, api_key: str) -> str:
 
     full = rendered[:THESIS_FULL_DETAIL_MAX]
     rest = rendered[THESIS_FULL_DETAIL_MAX:]
-    lines.append(f"**{len(theses)} theses tracked** · showing {len(full)} in detail"
+    lines.append(f"**{len(live)} theses tracked** · showing {len(full)} in detail"
                  + (f", {len(rest)} more below" if rest else "") + "\n")
     for _, detail_lines, _ in full:
         lines.extend(detail_lines)
@@ -730,6 +766,9 @@ def pass_thesis(vault: dict, api_key: str) -> str:
         lines.append("\n**Also tracked** (support/contradict counts):")
         for _, _, one_liner in rest:
             lines.append(one_liner)
+    if merged:
+        pairs = " · ".join(f"{', '.join(sorted(ids))} → {host}" for host, ids in sorted(merged.items()))
+        lines.append(f"\n**Merged** (cluster absorbed by another thesis): {pairs}")
 
     stale = [t for t in theses if t.get("last_updated") and
              (parse_date(t["last_updated"]) or datetime.now()) < datetime.now() - timedelta(weeks=4)]
@@ -1183,7 +1222,7 @@ def pass_action(vault: dict, api_key: str) -> str:
             tag_entries[tag].append({
                 "voice": voice,
                 "note": note["name"],
-                "date": f"{note['date']:%Y-%m-%d}",
+                "date": note_when(note),
                 "excerpt": excerpt,
             })
 
@@ -1329,7 +1368,7 @@ def _reading_lines(vault: dict, since: datetime, max_notes: int) -> list[str]:
             body = re.sub(r"^\s*#\s.*\n", "", n["body"], count=1)
             body = re.sub(r"https?://\S+", "", body)
             excerpt = " ".join(body.split())[:600]
-            out.append(f"[[{n['name']}]] ({n['date']:%Y-%m-%d}, {note_voice(n)}): {excerpt}")
+            out.append(f"[[{n['name']}]] ({note_when(n)}, {note_voice(n)}): {excerpt}")
     return out
 
 

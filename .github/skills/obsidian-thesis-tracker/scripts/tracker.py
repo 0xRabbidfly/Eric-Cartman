@@ -33,6 +33,8 @@ MAX_CLUSTER_SIZE = 70   # larger than this gets recursively split. Louvain at
                         # current graph; splitting below ~60 produced near-duplicate
                         # theses ("harness > model" eight different ways).
 MIN_EVIDENCE_FOR_THESIS = 3  # supporting/extending edges needed to even be "emerging"
+MERGE_CONTAINMENT = 0.8  # share of an unmatched thesis's notes inside a matched
+                         # thesis's cluster for it to count as merged, not orphaned
 
 CLAUDE_CLI = r"C:\Users\nuno_\.local\bin\claude.exe"
 
@@ -515,9 +517,10 @@ def analyze_theses(api_key: str, dry_run: bool = False) -> dict:
             existing["contradiction_count"] = contradiction_count
             existing["last_updated"] = today
 
-            # Check for status upgrade (also re-adopts orphaned / legacy
-            # "draft-generated" theses whose cluster re-formed)
-            if existing["status"] in ("emerging", "orphaned", "draft-generated"):
+            # Check for status upgrade (also re-adopts orphaned / merged /
+            # legacy "draft-generated" theses whose cluster re-formed)
+            existing.pop("merged_into", None)
+            if existing["status"] in ("emerging", "orphaned", "merged", "draft-generated"):
                 if evidence_count >= EVIDENCE_THRESHOLD:
                     if existing["status"] != "mature":
                         print(f"  UPGRADED: Thesis '{existing['id']}' is now mature")
@@ -553,11 +556,29 @@ def analyze_theses(api_key: str, dry_run: bool = False) -> dict:
             matched_ids.add(thesis_id)
             print(f"  NEW thesis {thesis_id}: {statement[:60]}...")
 
-    # Theses whose cluster dissolved: mark, don't delete (the weekly brain
-    # surfaces these as DECAYING rather than silently dropping them).
+    # Unmatched theses: mark, don't delete. Most "lost" clusters were absorbed
+    # into a bigger one that another thesis already claimed (all of 004 and
+    # 010-014 sat inside thesis-001's cluster), so record which thesis now
+    # carries the notes. Only a thesis whose notes went nowhere is orphaned.
+    matched = [t for t in existing_theses if t.get("id") in matched_ids]
     for t in existing_theses:
-        if t.get("id") not in matched_ids and t.get("status") not in ("orphaned", "archived"):
+        if t.get("id") in matched_ids or t.get("status") == "archived":
+            continue
+        notes = set(t.get("notes", []))
+        host, host_share = None, 0.0
+        for m in matched:
+            share = len(notes & set(m.get("notes", []))) / max(len(notes), 1)
+            if share > host_share:
+                host, host_share = m, share
+        if host and host_share >= MERGE_CONTAINMENT:
+            if t.get("status") != "merged" or t.get("merged_into") != host["id"]:
+                t["status"] = "merged"
+                t["merged_into"] = host["id"]
+                t["last_updated"] = today
+                print(f"  MERGED: {t['id']} -> {host['id']} ({host_share:.0%} of its notes)")
+        elif t.get("status") != "orphaned":
             t["status"] = "orphaned"
+            t.pop("merged_into", None)
             t["last_updated"] = today
             print(f"  ORPHANED: {t['id']} no longer maps to a cluster")
 
@@ -592,6 +613,8 @@ def print_status() -> None:
             "emerging": "[~]",
             "mature": "[*]",
             "draft-generated": "[v]",
+            "merged": "[>]",
+            "orphaned": "[x]",
         }.get(t["status"], "[?]")
 
         print(f"  {status_icon} {t['id']} — {t['status'].upper()}")
