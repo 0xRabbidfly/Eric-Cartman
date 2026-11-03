@@ -534,7 +534,7 @@ def pass_trend(vault: dict, api_key: str) -> str:
 
 TRACKER_SCRIPT = Path(r"Z:\Projects\Eric-Cartman\.github\skills\obsidian-thesis-tracker\scripts\tracker.py")
 THESIS_REFRESH_DAYS = 6       # re-cluster if theses.json is older than this
-THESIS_FULL_DETAIL_MAX = 8    # theses shown with statement + links; rest as one-liners
+THESIS_FULL_DETAIL_MAX = 8    # theses shown with change, dates and best read; rest as one-liners
 
 
 def refresh_theses_if_stale(vault: dict) -> None:
@@ -568,8 +568,61 @@ def refresh_theses_if_stale(vault: dict) -> None:
         print(f"  WARNING: thesis tracker failed ({e}); using existing theses.json", file=sys.stderr)
 
 
+SUMMARY_CACHE = Path(__file__).resolve().parent.parent / ".cache" / "thesis-summaries.json"
+_CONTRA = ("contradict", "against", "challenge")
+
+
+def _is_contra(rel: str) -> bool:
+    return any(k in rel.lower() for k in _CONTRA)
+
+
+def thesis_summaries(theses: list[dict], api_key: str) -> dict[str, str]:
+    """One plain-English line per thesis. Statements run ~60 words, too long to
+    scan, so ask once per statement and cache by its hash (gitignored .cache/).
+    Falls back to the statement's opening words if the model call fails."""
+    import hashlib
+    cache = load_json_safe(SUMMARY_CACHE)
+    cache = cache if isinstance(cache, dict) else {}
+    out, todo = {}, []
+    for t in theses:
+        stmt = (t.get("statement") or "").strip()
+        h = hashlib.sha1(stmt.encode("utf-8")).hexdigest()[:12]
+        hit = cache.get(t["id"])
+        if hit and hit.get("hash") == h:
+            out[t["id"]] = hit["summary"]
+        elif stmt:
+            todo.append((t["id"], h, stmt))
+    if todo:
+        prompt = (
+            "Summarize each research thesis below in one plain sentence of at most 18 words: "
+            "the claim itself, no hedging, no 'this thesis argues'. Return only a JSON object "
+            "mapping each id to its summary.\n\n"
+            + "\n\n".join(f"{tid}: {stmt}" for tid, _, stmt in todo)
+        )
+        system = "You compress research theses into one-line claims."
+        raw = claude_chat(system, prompt) or xai_chat(api_key, system, prompt, effort="low")
+        try:
+            got = json.loads(raw[raw.find("{"): raw.rfind("}") + 1])
+        except (ValueError, AttributeError):
+            got = {}
+        for tid, h, stmt in todo:
+            s = (got.get(tid) or "").strip()
+            if s:
+                cache[tid] = {"hash": h, "summary": s}
+                out[tid] = s
+            else:
+                out[tid] = " ".join(stmt.split()[:18]) + "…"
+        try:
+            SUMMARY_CACHE.parent.mkdir(parents=True, exist_ok=True)
+            SUMMARY_CACHE.write_text(json.dumps(cache, indent=2, ensure_ascii=False), encoding="utf-8")
+        except OSError:
+            pass
+    return out
+
+
 def pass_thesis(vault: dict, api_key: str) -> str:
-    """Assess health of tracked theses."""
+    """Per thesis: what it claims, how its evidence is moving, key dates, and
+    the one note to read."""
     print("\n[Pass 2/9] Thesis Health Check...")
     refresh_theses_if_stale(vault)
     theses = vault["theses"]
@@ -578,198 +631,117 @@ def pass_thesis(vault: dict, api_key: str) -> str:
     if not theses:
         return "_No theses tracked yet (Research/theses.json not found or empty)._\n"
 
-    three_weeks_ago = datetime.now() - timedelta(weeks=3)
-    lines = []
-    rendered: list[tuple[int, list[str], str]] = []  # (evidence, detail_lines, one_liner)
+    now = datetime.now()
+    week_ago, w4, w8 = now - timedelta(days=7), now - timedelta(weeks=4), now - timedelta(weeks=8)
 
     # A merged thesis's notes now live in another thesis's cluster, so its
-    # evidence is counted there. Listing it separately read as a dead thesis
-    # with fresh evidence (thesis-003 "ORPHANED", last evidence 3d ago).
+    # evidence is counted there; list it once, under its host.
     merged: dict[str, list[str]] = {}
     for thesis in theses:
         if thesis.get("status") == "merged" and thesis.get("merged_into"):
             merged.setdefault(thesis["merged_into"], []).append(thesis.get("id", "?"))
     live = [t for t in theses if not (t.get("status") == "merged" and t.get("merged_into"))]
+    summaries = thesis_summaries(live, api_key)
+    expl = {(c.get("source"), c.get("target")): c.get("explanation", "") for c in connections}
 
+    rows = []
     for thesis in live:
-        thesis_id = thesis.get("id", thesis.get("name", "unknown"))
-        thesis_name = thesis.get("name", thesis.get("title", thesis_id))
-        thesis_tags = thesis.get("tags", [])
+        tid = thesis.get("id", "?")
+        notes = set(thesis.get("notes", []))
+        conns = thesis.get("connections", [])
+        supporting = sum(1 for c in conns if not _is_contra(c.get("relationship", "")))
+        contradicting = len(conns) - supporting
 
-        # Gather this thesis's note paths and embedded connections
-        thesis_notes = set(thesis.get("notes", []))
-        thesis_conns = thesis.get("connections", [])
-
-        # Count supporting vs contradicting connections
-        supporting = 0
-        contradicting = 0
-        latest_support_date = None
-
-        # Use the thesis's own curated connection list for counts
-        if thesis_conns:
-            for conn in thesis_conns:
-                rel = conn.get("relationship", conn.get("type", "")).lower()
-                if "contradict" in rel or "against" in rel or "challenge" in rel:
-                    contradicting += 1
-                else:
-                    supporting += 1
-
-        # Match vault connections by thesis notes for dates (and counts
-        # as fallback when the thesis has no embedded connections)
-        for conn in connections:
-            conn_source = conn.get("source", "")
-            conn_target = conn.get("target", "")
-            if conn_source not in thesis_notes and conn_target not in thesis_notes:
+        # Evidence movement from the vault graph's detection dates.
+        this_week = last4 = prev4 = 0
+        latest = None
+        new_challenges = []
+        for c in connections:
+            if c.get("source") not in notes and c.get("target") not in notes:
                 continue
-            rel = conn.get("relationship", conn.get("type", "")).lower()
-            conn_date_str = conn.get("detected_at", conn.get("date", conn.get("created", "")))
-            conn_date = parse_date(conn_date_str[:10]) if conn_date_str else None
+            dt = parse_date((c.get("detected_at") or c.get("date") or "")[:10])
+            if not dt:
+                continue
+            if _is_contra(c.get("relationship", "")):
+                if dt >= w4:
+                    new_challenges.append(c)
+                continue
+            latest = dt if latest is None or dt > latest else latest
+            if dt >= week_ago:
+                this_week += 1
+            if dt >= w4:
+                last4 += 1
+            elif dt >= w8:
+                prev4 += 1
 
-            if not thesis_conns:
-                # Fallback: count from vault connections
-                if "contradict" in rel or "against" in rel or "challenge" in rel:
-                    contradicting += 1
-                else:
-                    supporting += 1
-
-            # Track latest supporting evidence date
-            if not ("contradict" in rel or "against" in rel or "challenge" in rel):
-                if conn_date and (latest_support_date is None or conn_date > latest_support_date):
-                    latest_support_date = conn_date
-
-        # Determine health status
-        flags = []
-        if thesis.get("status") == "orphaned":
-            flags.append("ORPHANED")
-        # Proportional: 5 contradictions against 296 supports is a healthy
-        # thesis with interesting tensions, not a contradicted one.
-        total = supporting + contradicting
-        if contradicting >= 2 and total and contradicting / total >= 0.2:
-            flags.append("CONTRADICTED")
-        if latest_support_date and latest_support_date < three_weeks_ago:
-            flags.append("DECAYING")
-        elif latest_support_date is None and supporting == 0:
-            flags.append("UNSUPPORTED")
-
-        # Check if the field is moving away: recent notes in same tags but not referencing thesis
-        if thesis_tags:
-            related_recent = [
-                n for n in vault["recent"]
-                if any(t in n["tags"] for t in thesis_tags)
-            ]
-            mentions_thesis = sum(
-                1 for n in related_recent
-                if thesis_name.lower() in n["body"].lower()
-            )
-            if len(related_recent) >= 3 and mentions_thesis == 0:
-                flags.append("FIELD-DRIFT")
-
-        if not flags:
-            status = "HEALTHY"
+        if last4 == 0:
+            trend = "Quiet"
+        elif prev4 == 0 or last4 >= 1.5 * prev4:
+            trend = "Gaining"
+        elif last4 <= 0.5 * prev4:
+            trend = "Slowing"
         else:
-            status = " | ".join(flags)
+            trend = "Steady"
+        contested = contradicting >= 2 and contradicting / max(len(conns), 1) >= 0.2
+        icon = "❌" if contested else {"Gaining": "📈", "Steady": "✅", "Slowing": "📉", "Quiet": "💤"}[trend]
+        if thesis.get("status") == "orphaned":
+            icon, trend = "🪦", "Orphaned"
 
-        emoji = {"HEALTHY": "✅", "DECAYING": "⚠️", "CONTRADICTED": "❌", "UNSUPPORTED": "❓",
-                 "FIELD-DRIFT": "🔀", "ORPHANED": "🪦"}
-        status_emoji = emoji.get(flags[0], "⚠️") if flags else "✅"
-
-        # --- What the thesis actually says, and where to go read about it ---
-        statement = (thesis.get("statement") or "").strip()
-        detail: list[str] = []
-        detail.append(f"- {status_emoji} **{thesis_id}** — {status} "
-                      f"({supporting} supporting, {contradicting} contradicting)")
-        if statement:
-            detail.append(f"  > {statement}")
-        if merged.get(thesis_id):
-            detail.append(f"  Absorbed: {', '.join(sorted(merged[thesis_id]))}")
-        # Swap `lines` for this thesis's own buffer; collected at the end.
-        _outer_lines, lines = lines, detail
-
-        # Report link: report_path is stored as an absolute-ish Windows path;
-        # reduce it to a vault-relative wikilink.
-        report_path = thesis.get("report_path") or ""
-        report_link = ""
+        # Best read: the thesis's own report if it has one, else the
+        # best-connected non-daily note in its cluster.
+        report_path = (thesis.get("report_path") or "").replace("\\", "/")
         if report_path:
-            rp = Path(report_path.replace("\\", "/"))
-            try:
-                rel = rp.relative_to(Path(str(VAULT_PATH).replace("\\", "/")))
-            except ValueError:
-                # Path stored without drive letter — match on the vault folder name
-                parts = rp.parts
-                if "Obsidian Vault" in parts:
-                    rel = Path(*parts[parts.index("Obsidian Vault") + 1:])
-                else:
-                    rel = Path(rp.name)
-            report_link = f"[[{rel.with_suffix('').as_posix()}]]"
-        meta = []
-        if report_link:
-            meta.append(f"Report: {report_link}")
-        if thesis.get("first_detected"):
-            meta.append(f"detected {thesis['first_detected']}")
-        if thesis.get("last_updated"):
-            meta.append(f"last updated {thesis['last_updated']}")
-        if meta:
-            lines.append("  " + " · ".join(meta))
+            rel = report_path.split("Obsidian Vault/", 1)[-1]
+            best = f"Report: [[{Path(rel).with_suffix('').as_posix()}]]"
+        else:
+            degree: Counter = Counter()
+            for c in conns:
+                for p in (c.get("source", ""), c.get("target", "")):
+                    if p and "/Dailies/" not in p:
+                        degree[p] += 1
+            best = f"Best read: [[{Path(degree.most_common(1)[0][0]).name}]]" if degree else ""
 
-        # Anchor notes: the most-connected notes in the thesis cluster, as links.
-        degree: Counter = Counter()
-        for conn in thesis_conns:
-            degree[conn.get("source", "")] += 1
-            degree[conn.get("target", "")] += 1
-        anchors = [p for p, _ in degree.most_common(3) if p]
-        if anchors:
-            anchor_links = ", ".join(f"[[{Path(p).name}]]" for p in anchors)
-            lines.append(f"  Anchor notes: {anchor_links} ({len(thesis_notes)} notes in cluster)")
+        summary = summaries.get(tid) or (thesis.get("statement") or "")[:140]
+        change = f"{trend}: +{this_week} links this week, +{last4} in 4 weeks ({prev4} the 4 before)"
+        if new_challenges:
+            c = max(new_challenges, key=lambda c: c.get("detected_at", ""))
+            why = (expl.get((c.get("source"), c.get("target"))) or "").strip()
+            why = (why[:117].rstrip() + "…") if len(why) > 120 else why
+            change += (f"; {len(new_challenges)} new challenge{'s' if len(new_challenges) > 1 else ''}: "
+                       f"[[{Path(c['source']).name}]] ⟂ [[{Path(c['target']).name}]]"
+                       + (f" — {why}" if why else ""))
+        dates = [f"Tracked since {thesis.get('first_detected', '?')}"]
+        if latest:
+            dates.append(f"last evidence {latest:%Y-%m-%d} ({(now - latest).days}d ago)")
+        if thesis.get("statement_changed"):
+            dates.append(f"claim rewritten {thesis['statement_changed']}")
+        dates.append(f"{supporting} supporting / {contradicting} challenging")
 
-        # Evidence recency — makes DECAYING legible.
-        if latest_support_date:
-            age = (datetime.now() - latest_support_date).days
-            lines.append(f"  Last new evidence: {latest_support_date:%Y-%m-%d} ({age}d ago)")
+        detail = [f"- {icon} **{tid}** — {summary}", f"  {change}", "  " + " · ".join(dates)]
+        if best:
+            detail.append(f"  {best}")
+        if merged.get(tid):
+            detail.append(f"  Absorbed: {', '.join(sorted(merged[tid]))}")
+        quiet_since = f" since {latest:%m-%d}" if latest else ""
+        one_liner = f"- {icon} **{tid}** — {summary} · {trend.lower()}{quiet_since if trend == 'Quiet' else ''}"
+        rows.append((last4, this_week, detail, one_liner))
 
-        # Tensions: the contradicting edges are the most interesting part of a
-        # thesis, so show them rather than just counting them.
-        tensions = [c for c in thesis_conns
-                    if any(k in c.get("relationship", "").lower() for k in ("contradict", "against", "challenge"))]
-        if tensions:
-            # Pull explanations from the vault connections where available
-            expl = {(c.get("source"), c.get("target")): c.get("explanation", "") for c in connections}
-            lines.append(f"  Tensions ({len(tensions)}):")
-            for c in tensions[:3]:
-                s, t = c.get("source", ""), c.get("target", "")
-                why = expl.get((s, t), "").strip()
-                why = (" — " + (why if len(why) <= 160 else why[:157].rstrip() + "…")) if why else ""
-                lines.append(f"    - [[{Path(s).name}]] ⟂ [[{Path(t).name}]]{why}")
-
-        # Restore the section buffer and file this thesis for ranking.
-        lines = _outer_lines
-        short = statement if len(statement) <= 140 else statement[:137].rstrip() + "…"
-        one_liner = (f"- {status_emoji} **{thesis_id}** ({supporting}/{contradicting}) "
-                     f"{short}" + (f" — {report_link}" if report_link else ""))
-        rendered.append((supporting, detail, one_liner))
-
-    # Problem theses first (anything flagged), then by evidence.
-    def _rank(item):
-        _, detail_lines, _ = item
-        flagged = "HEALTHY" not in detail_lines[0]
-        return (0 if flagged else 1, -item[0])
-    rendered.sort(key=_rank)
-
-    full = rendered[:THESIS_FULL_DETAIL_MAX]
-    rest = rendered[THESIS_FULL_DETAIL_MAX:]
-    lines.append(f"**{len(live)} theses tracked** · showing {len(full)} in detail"
-                 + (f", {len(rest)} more below" if rest else "") + "\n")
-    for _, detail_lines, _ in full:
-        lines.extend(detail_lines)
+    # Where the evidence is moving now comes first.
+    rows.sort(key=lambda r: (r[0], r[1]), reverse=True)
+    full, rest = rows[:THESIS_FULL_DETAIL_MAX], rows[THESIS_FULL_DETAIL_MAX:]
+    lines = [f"**{len(live)} theses** · most active first · "
+             "📈 gaining · ✅ steady · 📉 slowing · 💤 quiet · ❌ contested\n"]
+    for *_, detail, _ in full:
+        lines.extend(detail)
     if rest:
-        lines.append("\n**Also tracked** (support/contradict counts):")
-        for _, _, one_liner in rest:
-            lines.append(one_liner)
+        lines.append("\n**Also tracked:**")
+        lines.extend(r[3] for r in rest)
     if merged:
         pairs = " · ".join(f"{', '.join(sorted(ids))} → {host}" for host, ids in sorted(merged.items()))
         lines.append(f"\n**Merged** (cluster absorbed by another thesis): {pairs}")
 
     stale = [t for t in theses if t.get("last_updated") and
-             (parse_date(t["last_updated"]) or datetime.now()) < datetime.now() - timedelta(weeks=4)]
+             (parse_date(t["last_updated"]) or now) < now - timedelta(weeks=4)]
     if stale and len(stale) == len(theses):
         lines.append(
             f"\n_⚠️ theses.json last updated {max(t['last_updated'] for t in stale)} — "
@@ -777,6 +749,7 @@ def pass_thesis(vault: dict, api_key: str) -> str:
         )
 
     return "\n".join(lines) + "\n"
+
 
 
 # ---------------------------------------------------------------------------

@@ -506,6 +506,7 @@ def analyze_theses(api_key: str, dry_run: bool = False) -> dict:
                 if new_stmt and not new_stmt.startswith("Cluster of "):
                     existing["previous_statement"] = existing.get("statement", "")
                     existing["statement"] = new_stmt
+                    existing["statement_changed"] = today
             # Update existing thesis
             existing["notes"] = sorted(cluster)
             existing["connections"] = [
