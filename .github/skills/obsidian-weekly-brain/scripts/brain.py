@@ -201,6 +201,40 @@ def claude_chat(system_prompt: str, user_prompt: str, web: bool = False) -> str 
     return None
 
 
+_ZEITGEIST_MAX_WORDS = 450
+
+
+def fit_words(text: str, cap: int, label: str, truncate: bool = True) -> str:
+    """Hold a section to its word cap. Prompts alone ran over (One Thing 90/80,
+    Zeitgeist 502/450 on 11-03), so: one rewrite at the cap, then, for short
+    sections, cut at the last sentence that fits. Essays are never cut
+    mid-argument; an essay still over after the rewrite is kept and logged."""
+    n = len(text.split())
+    if n <= cap:
+        return text
+    rewrite = claude_chat(
+        "You are an editor. You cut words, never claims.",
+        f"Rewrite the text below in at most {cap} words. Keep its bold opening line if it has one, its "
+        "claims, its [[wikilinks]] exactly as written, and any closing question. Imperative voice for "
+        "instructions; no notes to the editor. Return only the rewritten text.\n\n" + text,
+    )
+    if rewrite and len(rewrite.split()) <= cap:
+        print(f"  {label}: {n} -> {len(rewrite.split())} words (cap {cap})")
+        return rewrite.strip()
+    best = rewrite.strip() if rewrite and len(rewrite.split()) < n else text
+    if truncate:
+        kept = []
+        for sent in re.split(r"(?<=[.!?])\s+", best):
+            if len(" ".join(kept + [sent]).split()) > cap:
+                break
+            kept.append(sent)
+        if kept:
+            print(f"  {label}: cut to {len(' '.join(kept).split())} words at a sentence boundary (cap {cap})")
+            return " ".join(kept)
+    print(f"  WARNING: {label} is {len(best.split())} words (cap {cap}) after one rewrite")
+    return best
+
+
 def parse_frontmatter(text: str) -> dict:
     """Extract YAML-ish frontmatter from a markdown note. Returns dict with common keys."""
     fm = {}
@@ -742,7 +776,7 @@ def pass_thesis(vault: dict, api_key: str) -> str:
     rows.sort(key=lambda r: (r[0], r[1]), reverse=True)
     full, rest = rows[:THESIS_FULL_DETAIL_MAX], rows[THESIS_FULL_DETAIL_MAX:]
     lines = [f"**{len(live)} theses** · most active first · "
-             "📈 gaining · ✅ steady · 📉 slowing · 💤 quiet · ❌ contested\n"]
+             "📈 gaining · ✅ steady · 📉 slowing · 💤 quiet · ❌ contested · 🪦 orphaned\n"]
     for *_, detail, _ in full:
         lines.extend(detail)
     if rest:
@@ -990,7 +1024,6 @@ def pass_blindspot(vault: dict, api_key: str) -> str:
 # "agents x <rare tag>" because `agents` is on ~345 notes; it's gone.
 
 _BRIDGE_MAX = 3
-_BRIDGE_FALLBACK_WEEKS = 4
 
 
 def _last_report_date(today: datetime) -> datetime | None:
@@ -1050,14 +1083,9 @@ def pass_bridge(vault: dict, api_key: str) -> str:
     window_label = f"since last report ({since:%Y-%m-%d})" if since else "last 2 weeks"
     if not since:
         since = now - timedelta(weeks=2)
+    # Only new bridges. Backfilling from the last 4 weeks when fewer than 2
+    # were new re-showed last week's bridges under a "new" header.
     new = [b for b in bridges if (d := _detected(b)) and d >= since]
-
-    widened = False
-    if len(new) < 2:
-        fb = now - timedelta(weeks=_BRIDGE_FALLBACK_WEEKS)
-        new = [b for b in bridges if (d := _detected(b)) and d >= fb]
-        widened = True
-        window_label = f"last {_BRIDGE_FALLBACK_WEEKS} weeks (fewer than 2 new since last report)"
 
     if not new:
         return f"_No new bridges detected {window_label}._\n"
@@ -1252,6 +1280,8 @@ def pass_zeitgeist(vault: dict, api_key: str) -> str:
         result = xai_chat(api_key, system, prompt, effort="high")
     else:
         print("  [claude] Used for zeitgeist synthesis")
+    if result:
+        result = fit_words(result, _ZEITGEIST_MAX_WORDS, "essay", truncate=False)
     vault["_zeitgeist_text"] = result or ""  # pass_predict scores the essay's own forecasts
     return (result or "_Zeitgeist synthesis failed._").strip() + "\n"
 
@@ -1764,10 +1794,7 @@ def synthesize_one_thing(api_key: str, sections: dict) -> tuple[str, list[dict]]
 
     m = _NOTE_LINE_RE.search(result)
     note = m.group(1).strip().strip("`*\"'") if m else None
-    text = _NOTE_LINE_RE.sub("", result).strip()
-    words = len(text.split())
-    if words > _ONE_THING_MAX_WORDS * 1.4:
-        print(f"  WARNING: One Thing is {words} words (cap {_ONE_THING_MAX_WORDS})")
+    text = fit_words(_NOTE_LINE_RE.sub("", result).strip(), _ONE_THING_MAX_WORDS, "One Thing")
 
     if note and prior and _slugify(note) == _slugify(prior["note"]):
         prior["weeks"] = prior.get("weeks", 1) + 1
