@@ -439,6 +439,10 @@ def last_report_section(today: datetime, heading: str) -> str:
 # Pass 1: Trend Momentum
 # ---------------------------------------------------------------------------
 
+_TREND_UBIQUITOUS = 0.12  # tags on more of the corpus than this are background, not trends
+_TREND_MIN_NOTES = 3      # notes a tag needs in a half to count as rising or cooling
+
+
 def pass_trend(vault: dict, api_key: str) -> str:
     """Identify rising tags and convergent discoveries."""
     print("\n[Pass 1/9] Trend Momentum...")
@@ -456,41 +460,48 @@ def pass_trend(vault: dict, api_key: str) -> str:
     def _is_topic_tag(tag: str) -> bool:
         return tag.lower() not in _skip
 
-    week_tags: dict[str, Counter] = defaultdict(Counter)
-    for note in trend_notes:
-        if not note["date"] or note["date"] < vault["cutoff_8w"]:
-            continue
-        wk = week_key(note["date"])
-        for tag in note["tags"]:
-            if _is_topic_tag(tag):
-                week_tags[wk][tag] += 1
+    # Tags already on a large share of the corpus (agents, workflow-design…)
+    # rise and converge every week and tell you nothing new.
+    corpus_tag_freq = Counter(t for n in trend_notes for t in n["tags"])
+    ubiquitous = {t for t, c in corpus_tag_freq.items() if c / max(len(trend_notes), 1) > _TREND_UBIQUITOUS}
 
-    # Sort weeks chronologically
-    sorted_weeks = sorted(week_tags.keys())
-    if len(sorted_weeks) < 2:
-        return "_Not enough weekly data to detect trends._\n"
+    # Two 4-week halves by save date. Ranking on raw count growth put the
+    # biggest tag first every week (agents 37 -> 50 above tokenomics 1 -> 11)
+    # and rose with total volume, so compare each tag's SHARE of the notes
+    # saved in each half instead.
+    late_start = now - timedelta(weeks=4)
+    early = [n for n in trend_notes if n["date"] and vault["cutoff_8w"] <= n["date"] < late_start]
+    late = [n for n in trend_notes if n["date"] and n["date"] >= late_start]
+    if not early or not late:
+        return "_Not enough data in the last 8 weeks to detect trends._\n"
 
-    # Collect all tags seen
-    all_tags = set()
-    for wk_counter in week_tags.values():
-        all_tags.update(wk_counter.keys())
+    def _counts(notes: list[dict]) -> Counter:
+        return Counter(t for n in notes for t in set(n["tags"])
+                       if _is_topic_tag(t) and t not in ubiquitous)
 
-    # Score tags by rising trajectory
-    # Compare first half vs second half of the 8-week window
-    mid = len(sorted_weeks) // 2
-    early_weeks = sorted_weeks[:mid]
-    late_weeks = sorted_weeks[mid:]
+    early_c, late_c = _counts(early), _counts(late)
+    n_e, n_l = len(early), len(late)
 
-    tag_scores = []
-    for tag in all_tags:
-        early_count = sum(week_tags[w][tag] for w in early_weeks)
-        late_count = sum(week_tags[w][tag] for w in late_weeks)
-        if late_count > early_count and late_count >= 2:
-            momentum = late_count - early_count
-            tag_scores.append((tag, early_count, late_count, momentum))
+    def _lift(tag: str) -> float:
+        # +1 smoothing so a 0 -> 3 tag ranks below a 0 -> 11 one
+        return ((late_c[tag] + 1) / (n_l + 1)) / ((early_c[tag] + 1) / (n_e + 1))
 
-    tag_scores.sort(key=lambda x: x[3], reverse=True)
-    top_trends = tag_scores[:5]
+    rising = sorted(
+        (t for t in late_c if late_c[t] >= _TREND_MIN_NOTES and _lift(t) >= 1.5),
+        key=lambda t: (_lift(t), late_c[t]), reverse=True,
+    )[:5]
+    cooling = sorted(
+        (t for t in early_c if early_c[t] >= _TREND_MIN_NOTES and _lift(t) <= 0.5),
+        key=lambda t: (_lift(t), -early_c[t]),
+    )[:3]
+
+    def _change(tag: str) -> str:
+        e, l = early_c[tag], late_c[tag]
+        if e == 0:
+            return "new"
+        if l == 0:
+            return "gone"
+        return f"×{(l / n_l) / (e / n_e):.1f}"
 
     # Convergent discovery: topics appearing in 3+ independent sources within 2 weeks
     # Exclude dailies — they all tag the same 5 topics so every daily adds noise
@@ -504,24 +515,27 @@ def pass_trend(vault: dict, api_key: str) -> str:
         for tag in note["tags"]:
             if _is_topic_tag(tag):
                 tag_sources[tag].add(who)
-    # A "discovery" is a topic that *newly* has several voices. Tags already on a
-    # large share of the corpus (agents, workflow-design…) converge every week and
-    # tell you nothing new, so cap by overall prevalence.
-    corpus_tag_freq = Counter(t for n in trend_notes for t in n["tags"])
-    ubiquitous = {t for t, c in corpus_tag_freq.items() if c / max(len(trend_notes), 1) > 0.12}
     for tag, sources in tag_sources.items():
         if len(sources) >= 3 and tag not in ubiquitous:
             convergent.append((tag, len(sources), sorted(sources)[:5]))
     convergent.sort(key=lambda x: x[1], reverse=True)
 
     # Format output
-    lines = []
-    if top_trends:
-        for tag, early, late, momentum in top_trends:
-            arrow = "+" * min(momentum, 5)
-            lines.append(f"- **{tag}** — {early} mentions (early) -> {late} mentions (recent) [{arrow}]")
+    lines = [
+        f"_Share of saved Library and podcast notes carrying each tag: weeks 5–8 ago "
+        f"({n_e} notes) vs the last 4 weeks ({n_l}). Tags on more than "
+        f"{_TREND_UBIQUITOUS:.0%} of all notes are left out._\n"
+    ]
+    if rising:
+        for tag in rising:
+            newest = sorted((n for n in late if tag in n["tags"]), key=lambda n: n["date"], reverse=True)[:3]
+            links = ", ".join(f"[[{n['name']}]]" for n in newest)
+            lines.append(f"- **{tag}** — {_change(tag)} · {early_c[tag]} → {late_c[tag]} notes · {links}")
     else:
-        lines.append("- _No rising trends detected in the last 8 weeks._")
+        lines.append("- _No rising topics in the last 4 weeks._")
+    if cooling:
+        lines.append("\n**Cooling:** " + " · ".join(
+            f"{tag} ({_change(tag)}, {early_c[tag]} → {late_c[tag]})" for tag in cooling))
 
     if convergent:
         lines.append("\n**Convergent Discoveries** (3+ independent sources):")
