@@ -24,7 +24,7 @@ run marks it done if a Research note by that name has appeared, and an undone
 pick carries over under the same name ("Carried over, week N") instead of
 returning reworded.
 
-1. **Trend Momentum** — Rising tags, convergent discoveries across independent sources
+1. **Trend Momentum** — Topics rising and cooling as a share of the notes you save
 2. **Thesis Health Check** — Supporting/contradicting evidence, thesis decay detection
 3. **Blindspot Detection** — Missing subtopics, high consumption-to-synthesis ratios
 4. **Cross-Domain Bridges** — Unusual tag co-occurrences that reveal insight

@@ -444,7 +444,7 @@ _TREND_MIN_NOTES = 3      # notes a tag needs in a half to count as rising or co
 
 
 def pass_trend(vault: dict, api_key: str) -> str:
-    """Identify rising tags and convergent discoveries."""
+    """Topics rising and cooling as a share of what you save."""
     print("\n[Pass 1/9] Trend Momentum...")
     now = datetime.now()
 
@@ -503,22 +503,10 @@ def pass_trend(vault: dict, api_key: str) -> str:
             return "gone"
         return f"×{(l / n_l) / (e / n_e):.1f}"
 
-    # Convergent discovery: topics appearing in 3+ independent sources within 2 weeks
-    # Exclude dailies — they all tag the same 5 topics so every daily adds noise
-    convergent = []
-    two_weeks_ago = now - timedelta(weeks=2)
-    tag_sources: dict[str, set] = defaultdict(set)
-    for note in trend_notes:
-        if not note["date"] or note["date"] < two_weeks_ago:
-            continue
-        who = note_voice(note)
-        for tag in note["tags"]:
-            if _is_topic_tag(tag):
-                tag_sources[tag].add(who)
-    for tag, sources in tag_sources.items():
-        if len(sources) >= 3 and tag not in ubiquitous:
-            convergent.append((tag, len(sources), sorted(sources)[:5]))
-    convergent.sort(key=lambda x: x[1], reverse=True)
+    # "Convergent Discoveries" (tags with 3+ voices in 2 weeks) used to print
+    # here as tag + names with no claim and no links, overlapping the rising
+    # list. pass_action does the same check with excerpts and turns it into
+    # Do This Week, which is where it earns its keep.
 
     # Format output
     lines = [
@@ -536,11 +524,6 @@ def pass_trend(vault: dict, api_key: str) -> str:
     if cooling:
         lines.append("\n**Cooling:** " + " · ".join(
             f"{tag} ({_change(tag)}, {early_c[tag]} → {late_c[tag]})" for tag in cooling))
-
-    if convergent:
-        lines.append("\n**Convergent Discoveries** (3+ independent sources):")
-        for tag, count, sources in convergent[:5]:
-            lines.append(f"- **{tag}** — {count} independent sources: {', '.join(sources)}")
 
     return "\n".join(lines) + "\n"
 
