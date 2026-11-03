@@ -17,22 +17,24 @@ A weekly intelligence digest that mines the entire Obsidian vault corpus and pro
 
 ## What It Does
 
-The script performs 9 passes over your vault, then picks "The One Thing": one
-item from Do This Week or a Blindspot "Note to write", sized to under two hours
+The script performs 8 passes over your vault, then picks "The One Thing": one
+Blindspot "Note to write" or Bridge "Do", sized to under two hours
 and capped at 80 words. Each pick is logged in `Research/one-thing.json`; the next
 run marks it done if a Research note by that name has appeared, and an undone
 pick carries over under the same name ("Carried over, week N") instead of
 returning reworded.
 
 1. **Trend Momentum** — Topics rising and cooling as a share of the notes you save
-2. **Thesis Health Check** — Supporting/contradicting evidence, thesis decay detection
-3. **Blindspot Detection** — Missing subtopics, high consumption-to-synthesis ratios
-4. **Cross-Domain Bridges** — Unusual tag co-occurrences that reveal insight
-5. **Zeitgeist Snapshot** — Dominant tensions, what's hot, what disappeared
-6. **Actionable Insights** — LEARN/BUILD/WATCH/RECONSIDER recommendations
-7. **Prediction Extraction** — Forecasts from sources, resolution tracking
-8. **Account Discovery** — X handles worth following, from curated-note provenance
-9. **Cost Tracking** — This run's cost plus the week's research spend
+2. **Thesis Health Check** — Each thesis's claim, how its evidence is moving, key dates, best read
+3. **Blindspot Detection** — What you keep reading with no Library note; open gaps carry over by name
+4. **Cross-Domain Bridges** — New bridge edges between notes from different clusters
+5. **Zeitgeist Snapshot** — A 350-450 word essay on the fortnight's biggest idea, rotating subject, with links
+6. **Prediction Extraction** — Forecasts from sources, resolution tracking
+7. **Account Discovery** — X handles worth following, from curated-note provenance
+8. **Cost Tracking** — This run's cost plus the week's research spend
+
+(Do This Week / Actionable Insights was dropped 2026-11-03: it restated the
+Blindspots and Bridges and its items were never done.)
 
 Output: `Research/Reports/weekly-brain-YYYY-MM-DD.md`
 

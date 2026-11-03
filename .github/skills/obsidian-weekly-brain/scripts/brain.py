@@ -44,6 +44,10 @@ THESES_FILE = VAULT_PATH / "Research" / "theses.json"
 PREDICTIONS_FILE = VAULT_PATH / "Research" / "predictions.json"
 DISCOVER_FILE = VAULT_PATH / "Research" / "discover.json"
 ONE_THING_FILE = VAULT_PATH / "Research" / "one-thing.json"
+
+# Set from --dry-run in main(). Passes that keep their own state files check
+# it; main() already skips the report, predictions and One Thing writes.
+_DRY_RUN = False
 REPORTS_DIR = VAULT_PATH / "Research" / "Reports"
 
 CONFIG_DIR = Path.home() / ".config" / "last30days"
@@ -54,7 +58,7 @@ XAI_MODEL = "grok-4.5"
 
 CLAUDE_CLI = r"C:\Users\nuno_\.local\bin\claude.exe"
 
-PASS_NAMES = ["trend", "thesis", "blindspot", "bridge", "zeitgeist", "action", "predict", "discover", "cost"]
+PASS_NAMES = ["trend", "thesis", "blindspot", "bridge", "zeitgeist", "predict", "discover", "cost"]
 
 # Path to the daily research pipeline config (for must-follow list)
 PIPELINE_MD = Path(r"Z:\Projects\Eric-Cartman\.github\skills\obsidian-daily-research\pipeline.md")
@@ -445,7 +449,7 @@ _TREND_MIN_NOTES = 3      # notes a tag needs in a half to count as rising or co
 
 def pass_trend(vault: dict, api_key: str) -> str:
     """Topics rising and cooling as a share of what you save."""
-    print("\n[Pass 1/9] Trend Momentum...")
+    print("\n[Pass 1/8] Trend Momentum...")
     now = datetime.now()
 
     # Build tag frequency per week for the last 8 weeks
@@ -505,8 +509,7 @@ def pass_trend(vault: dict, api_key: str) -> str:
 
     # "Convergent Discoveries" (tags with 3+ voices in 2 weeks) used to print
     # here as tag + names with no claim and no links, overlapping the rising
-    # list. pass_action does the same check with excerpts and turns it into
-    # Do This Week, which is where it earns its keep.
+    # list, and its downstream use (Do This Week) was dropped too.
 
     # Format output
     lines = [
@@ -552,6 +555,9 @@ def refresh_theses_if_stale(vault: dict) -> None:
     except OSError:
         age_days = 10**6
     if age_days < THESIS_REFRESH_DAYS:
+        return
+    if _DRY_RUN:
+        print(f"  theses.json is {age_days}d old — dry run, not refreshing it")
         return
     print(f"  theses.json is {age_days}d old — running thesis tracker...")
     try:
@@ -623,7 +629,7 @@ def thesis_summaries(theses: list[dict], api_key: str) -> dict[str, str]:
 def pass_thesis(vault: dict, api_key: str) -> str:
     """Per thesis: what it claims, how its evidence is moving, key dates, and
     the one note to read."""
-    print("\n[Pass 2/9] Thesis Health Check...")
+    print("\n[Pass 2/8] Thesis Health Check...")
     refresh_theses_if_stale(vault)
     theses = vault["theses"]
     connections = vault["connections"]
@@ -861,7 +867,7 @@ def _past_blindspots(today: datetime) -> list[dict]:
 
 def pass_blindspot(vault: dict, api_key: str) -> str:
     """What you keep reading that the Library has no considered view on."""
-    print("\n[Pass 3/9] Blindspot Detection...")
+    print("\n[Pass 3/8] Blindspot Detection...")
     past = _past_blindspots(datetime.now())
     past_lines = [
         f"- {p['date']}: {p['topic']} -> note `{p['note'] or '?'}` — "
@@ -1023,7 +1029,7 @@ def _note_excerpt(note: dict | None, slug: str, chars: int = 800) -> str:
 
 def pass_bridge(vault: dict, api_key: str) -> str:
     """New cross-domain bridges since the last report, from connections.json."""
-    print("\n[Pass 4/9] Cross-Domain Bridges...")
+    print("\n[Pass 4/8] Cross-Domain Bridges...")
     now = datetime.now()
     conns = vault["connections"]
     bridges = [c for c in conns if c.get("relationship") == "bridges"]
@@ -1108,7 +1114,7 @@ def pass_bridge(vault: dict, api_key: str) -> str:
 
 def pass_zeitgeist(vault: dict, api_key: str) -> str:
     """Synthesize the current mood and direction of the vault's sources."""
-    print("\n[Pass 5/9] Zeitgeist Snapshot...")
+    print("\n[Pass 5/8] Zeitgeist Snapshot...")
     now = datetime.now()
     four_weeks_ago = now - timedelta(weeks=4)
     # Newest first, so the cap keeps the most recent material rather than
@@ -1242,114 +1248,7 @@ def pass_zeitgeist(vault: dict, api_key: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Pass 6: Actionable Insights
-# ---------------------------------------------------------------------------
-
-def pass_action(vault: dict, api_key: str) -> str:
-    """Find convergence points and classify actions."""
-    print("\n[Pass 6/9] Actionable Insights...")
-    now = datetime.now()
-    # Library + Podcast notes only: dailies all carry the same 5 tags and would
-    # make every one of them a "convergence point". (The old check compared
-    # against "Research/Dailies" with a forward slash, which never matched on
-    # Windows, so dailies were in fact the main input until now.)
-    recent_quality = sorted(
-        [n for n in vault["recent"] if not is_daily(n)],
-        key=lambda n: n["date"], reverse=True,
-    )
-    if not recent_quality:
-        return "_No recent Library/Podcast notes to derive actionable insights._\n"
-
-    skip = structural_tags(vault)
-
-    # Convergence points: topic tags where 3+ distinct *voices* (author / show,
-    # not the source-type field) have something to say in the window.
-    tag_entries: dict[str, list] = defaultdict(list)
-    for note in recent_quality:
-        body = re.sub(r"^\s*#\s.*\n", "", note["body"], count=1)  # drop H1
-        body = re.sub(r"\[\[([^\]|]+)(?:\|[^\]]+)?\]\]", r"\1", body)
-        body = re.sub(r"https?://\S+", "", body)
-        excerpt = " ".join(body.split())[:400]
-        voice = note_voice(note)
-        for tag in note["tags"]:
-            if tag.lower() in skip:
-                continue
-            tag_entries[tag].append({
-                "voice": voice,
-                "note": note["name"],
-                "date": note_when(note),
-                "excerpt": excerpt,
-            })
-
-    convergent = []
-    for tag, entries in tag_entries.items():
-        voices = {e["voice"] for e in entries}
-        if len(voices) >= 3:
-            # one entry per voice, newest first, so the model sees breadth not repetition
-            seen, picked = set(), []
-            for e in entries:
-                if e["voice"] not in seen:
-                    seen.add(e["voice"])
-                    picked.append(e)
-                if len(picked) == 5:
-                    break
-            convergent.append({"tag": tag, "voices": len(voices), "entries": picked})
-    convergent.sort(key=lambda x: x["voices"], reverse=True)
-
-    if not convergent:
-        return "_No convergence points found (need 3+ independent voices on a topic)._\n"
-
-    # Context: theses (so actions can be tied to them) and last week's actions
-    # (so this week's aren't a repeat, and open items get a status).
-    theses = vault.get("theses", [])
-    thesis_lines = [f"- {t.get('id')}: {t.get('statement', '')[:240]}" for t in theses if t.get("statement")]
-    previous = last_report_section(now, "Do This Week")
-
-    convergence_data = json.dumps(convergent[:8], indent=2, ensure_ascii=False)
-    prompt = (
-        "Below are convergence points from a personal research vault — topics where 3+ independent "
-        f"voices said something in the last {vault['weeks']} weeks — plus the vault's tracked theses "
-        "and last week's recommendations.\n\n"
-        "Classify each recommended action as one of:\n"
-        "- LEARN — invest time understanding this deeper\n"
-        "- BUILD — try this tool/technique hands-on\n"
-        "- WATCH — monitor this company/trend passively\n"
-        "- RECONSIDER — a previous assumption may be wrong\n\n"
-        "Return EXACTLY 3 recommendations (hard cap). For each, as a numbered markdown item:\n"
-        "1. Action type in bold, then what to do in 1-2 concrete sentences (a note title, a tool to try, "
-        "a question to answer — not 'explore').\n"
-        "2. *Why now:* one sentence on what converged.\n"
-        "3. *Thesis:* which tracked thesis this feeds, tests, or challenges (by id), or 'none'.\n"
-        "4. *Sources:* the supporting notes as [[wikilinks]] using the exact note names given.\n\n"
-        "Rules: ground every claim in the excerpts; do not repeat last week's items unless the evidence "
-        "changed materially (then say what changed); prefer actions that close a gap in a thesis over "
-        "ones that merely restate its strongest cluster.\n\n"
-        + ("After the three items, add one short paragraph headed **Carried over:** giving each of last "
-           "week's items a status — done/superseded/still open — in one line each, based on what the "
-           "recent notes show. If you can't tell, say 'no signal'.\n\n" if previous else "")
-        + "=== TRACKED THESES ===\n" + ("\n".join(thesis_lines) if thesis_lines else "(none)") + "\n\n"
-        + ("=== LAST WEEK'S DO THIS WEEK ===\n" + previous + "\n\n" if previous else "")
-        + f"=== CONVERGENCE POINTS ===\n{convergence_data}"
-    )
-
-    result = claude_chat(
-        "You are a research advisor turning data convergence into actionable weekly recommendations.",
-        prompt,
-    )
-    if result is None:
-        result = xai_chat(
-            api_key,
-            "You are a research advisor turning data convergence into actionable weekly recommendations.",
-            prompt,
-            effort="medium",
-        )
-    else:
-        print("  [claude] Used for action synthesis")
-    return result + "\n"
-
-
-# ---------------------------------------------------------------------------
-# Pass 7: Prediction Extraction + Resolution
+# Pass 6: Prediction Extraction + Resolution
 # ---------------------------------------------------------------------------
 #
 # predictions.json entries:
@@ -1526,7 +1425,7 @@ def _resolve_predictions(api_key: str, candidates: list[dict], reading: list[str
 
 def pass_predict(vault: dict, api_key: str):
     """Extract new predictions, resolve due ones, report the track record."""
-    print("\n[Pass 7/9] Prediction Extraction...")
+    print("\n[Pass 6/8] Prediction Extraction...")
     now = datetime.now()
     today = now.strftime("%Y-%m-%d")
     preds: list[dict] = vault["predictions"]
@@ -1718,9 +1617,9 @@ def synthesize_one_thing(api_key: str, sections: dict) -> tuple[str, list[dict]]
             e["last_date"] = e.pop("prev_last_date", e.get("first_date"))
     prior = ledger[-1] if ledger and ledger[-1].get("status") == "open" else None
 
-    # The One Thing picks from [action] and [blindspot]; the other passes are
+    # The One Thing picks from [blindspot] and [bridge]; the other passes are
     # there to judge which pick matters most this week.
-    _BUDGET = {"action": 3000, "blindspot": 2500, "zeitgeist": 1500, "bridge": 1200, "thesis": 800}
+    _BUDGET = {"blindspot": 3000, "bridge": 2500, "zeitgeist": 1500, "thesis": 800}
     combined = ""
     for name, content in sections.items():
         limit = _BUDGET.get(name, 500)
@@ -1749,8 +1648,8 @@ def synthesize_one_thing(api_key: str, sections: dict) -> tuple[str, list[dict]]
         f"Past One Things and whether the reader did them:\n{history}\n\n"
         f"{carry}"
         "Rules:\n"
-        "- Pick ONE item that already appears in [action] (Do This Week) or as a \"Note to "
-        "write\" in [blindspot], and name it as it appears there. Do not invent a new task.\n"
+        "- Pick ONE item that already appears as a \"Note to write\" in [blindspot] or as a "
+        "\"Do:\" in [bridge], and name it as it appears there. Do not invent a new task.\n"
         "- Do not re-ask an undone past item under a new name. Carry it over by its old name "
         "or leave it.\n"
         "- It must fit in under two hours. If the full note is bigger, ask only for its first "
@@ -1796,7 +1695,7 @@ def synthesize_one_thing(api_key: str, sections: dict) -> tuple[str, list[dict]]
 
 
 # ---------------------------------------------------------------------------
-# Pass 8: Cost Tracking
+# Pass 8: Cost Tracking (ledger constants)
 # ---------------------------------------------------------------------------
 
 COST_LEDGER_PATH = VAULT_PATH / "Research" / "Reports" / "weekly-costs.md"
@@ -1804,7 +1703,7 @@ USD_TO_CAD = 1.37  # approximate; updated manually if needed
 
 
 # ---------------------------------------------------------------------------
-# Pass 8: Account Discovery
+# Pass 7: Account Discovery
 # ---------------------------------------------------------------------------
 #
 # Handles are ranked by WHERE they appear, not how often. A handle in the
@@ -1839,6 +1738,8 @@ def _load_discover_log() -> dict:
 
 
 def _save_discover_log(log: dict) -> None:
+    if _DRY_RUN:
+        return  # dry runs bumped "times" and auto-rejected handles after 3
     DISCOVER_FILE.parent.mkdir(parents=True, exist_ok=True)
     DISCOVER_FILE.write_text(json.dumps({"handles": log}, indent=2, ensure_ascii=False), encoding="utf-8")
 
@@ -1877,7 +1778,7 @@ def _extract_handles_from_text(text: str) -> list:
 
 def pass_discover(vault: dict, api_key: str) -> str:
     """Discover X accounts worth following, weighted by where they're cited."""
-    print("\n[Pass 8/9] Account Discovery...")
+    print("\n[Pass 7/8] Account Discovery...")
     now = datetime.now()
     followed = _load_must_follow_handles()
     log = _load_discover_log()
@@ -2271,10 +2172,6 @@ def build_report_part2(sections: dict, vault: dict) -> str:
 
 {sections.get('zeitgeist', '_Skipped._')}
 
-## Do This Week ✅
-
-{sections.get('action', '_Skipped._')}
-
 ## Predictions 🔮
 
 {sections.get('predict', '_Skipped._')}
@@ -2304,7 +2201,6 @@ PASS_FUNCS = {
     "blindspot": pass_blindspot,
     "bridge": pass_bridge,
     "zeitgeist": pass_zeitgeist,
-    "action": pass_action,
     "predict": pass_predict,
     "discover": pass_discover,
 }
@@ -2319,6 +2215,8 @@ def main():
     parser.add_argument("--weeks", type=int, default=4,
                         help="Lookback window in weeks (default: 4)")
     args = parser.parse_args()
+    global _DRY_RUN
+    _DRY_RUN = args.dry_run
 
     today = datetime.now().strftime("%Y-%m-%d")
     print(f"=== Obsidian Weekly Brain Digest — {today} ===\n")
@@ -2369,10 +2267,10 @@ def main():
     elif len(sections) == 1:
         one_thing = list(sections.values())[0][:300]
 
-    # Pass 9: Cost Tracking
+    # Pass 8: Cost Tracking
     run_all = not args.single_pass
     if "cost" in passes_to_run or run_all:
-        print("\n[Pass 9/9] Cost Tracking...")
+        print("\n[Pass 8/8] Cost Tracking...")
         try:
             cost_summary = track_weekly_costs(vault, today)
             sections["cost"] = cost_summary
