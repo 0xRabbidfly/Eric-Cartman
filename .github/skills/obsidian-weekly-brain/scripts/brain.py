@@ -2273,6 +2273,130 @@ def build_report_part2(sections: dict, vault: dict) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Self-review: skill-reflection on this run, against SKILL.md's Section goals
+# ---------------------------------------------------------------------------
+
+SKILL_MD = Path(__file__).resolve().parent.parent / "SKILL.md"
+REFLECTION_SKILL_MD = Path(__file__).resolve().parents[2] / "skill-reflection" / "SKILL.md"
+REFLECTIONS_DIR = REPORTS_DIR / "Skill Reflections"
+_FRICTION_RE = re.compile(r"^\s*(ERROR|WARNING|Traceback|\[claude-cli\])|falling back to xAI")
+
+
+class _FrictionTee:
+    """Pass output through unchanged, keeping the lines that signal trouble so
+    the self-review sees what went wrong in this run."""
+
+    def __init__(self, stream, sink: list[str]):
+        self._stream, self._sink, self._buf = stream, sink, ""
+
+    def write(self, s):
+        self._buf += s
+        while "\n" in self._buf:
+            line, self._buf = self._buf.split("\n", 1)
+            if _FRICTION_RE.search(line):
+                self._sink.append(line.strip())
+        return self._stream.write(s)
+
+    def flush(self):
+        self._stream.flush()
+
+    def __getattr__(self, name):
+        return getattr(self._stream, name)
+
+
+def _words(text: str) -> int:
+    text = re.sub(r"```.*?```", " ", text or "", flags=re.DOTALL)
+    return len(text.split())
+
+
+def _section_metrics(report: str, sections: dict, one_thing: str, vault: dict) -> list[str]:
+    """Numbers the goals can be checked against, measured rather than judged."""
+    m = [f"- The One Thing: {_words(one_thing)} words; carried over: {'yes' if 'Carried over' in one_thing else 'no'}"]
+    ledger = load_json_safe(ONE_THING_FILE)
+    if isinstance(ledger, list) and ledger:
+        done = sum(1 for e in ledger if e.get("status") == "done")
+        longest = max((e.get("weeks", 1) for e in ledger if e.get("status") == "open"), default=0)
+        m.append(f"  One Thing history: {len(ledger)} asks, {done} done, longest open {longest} week(s)")
+    t = sections.get("thesis", "")
+    m.append(f"- Thesis Health: {len(re.findall(r'^- \S+ \*\*thesis-', t, re.MULTILINE))} theses listed; "
+             f"merged line: {'yes' if '**Merged**' in t else 'no'}; "
+             f"fallback summaries (ending in …): {len(re.findall(r'thesis-\d+\*\* — [^\n]*…', t))}")
+    b = sections.get("blindspot", "")
+    m.append(f"- Blindspots: {_words(b)} words; {len(re.findall(r'^### ', b, re.MULTILINE))} gaps; "
+             f"{b.count('Open since')} marked Open since")
+    z = sections.get("zeitgeist", "")
+    names = {n["name"] for n in vault["all_notes"]}
+    zl = re.findall(r"\[\[([^\]|#]+)", z)
+    m.append(f"- Zeitgeist: {_words(z)} words; {len(zl)} links, {sum(1 for l in zl if l not in names)} broken")
+    preds = vault.get("predictions", [])
+    sc = Counter(p.get("status") for p in preds)
+    web = sum(1 for p in preds if p.get("resolved_via") == "web")
+    m.append(f"- Predictions: {dict(sc)}; web-resolved so far: {web}; undated open: "
+             f"{sum(1 for p in preds if p.get('status') == 'open' and not p.get('due'))}")
+    d = sections.get("discover", "")
+    m.append(f"- Discover: {_words(d)} words; {len(re.findall(r'^- \*\*@', d, re.MULTILINE))} accounts")
+    all_links = re.findall(r"\[\[([^\]|#]+)", report)
+    broken = sorted({l for l in all_links if Path(l).name not in names and not (VAULT_PATH / f"{l}.md").exists()
+                     and not l.startswith("weekly-brain-")})
+    m.append(f"- Whole report: {_words(report)} words; {len(all_links)} links, {len(broken)} broken"
+             + (f" (e.g. {', '.join(broken[:3])})" if broken else ""))
+    return m
+
+
+def run_self_review(today: str, report: str, sections: dict, one_thing: str,
+                    vault: dict, friction: list[str], api_key: str) -> tuple[str, str]:
+    """Run skill-reflection on this run. Returns (full reflection, short report section)."""
+    print("\n[Self-review] skill-reflection against Section goals...")
+    try:
+        reflection_skill = REFLECTION_SKILL_MD.read_text(encoding="utf-8")
+        own_skill = SKILL_MD.read_text(encoding="utf-8")
+    except OSError as e:
+        print(f"  WARNING: self-review skipped, can't read skill files ({e})")
+        return "", ""
+    steps = [f"{i}. {name} - " + ("FAIL" if str(sections.get(name, "")).startswith("_Error")
+                                   else "PASS" if name in sections else "SKIPPED")
+             for i, name in enumerate(PASS_NAMES, 1)]
+    history = []
+    if REFLECTIONS_DIR.exists():
+        for fp in sorted(REFLECTIONS_DIR.glob("obsidian-weekly-brain-*.md"))[-2:]:
+            if today not in fp.name:
+                history.append(f"--- {fp.stem} ---\n" + fp.read_text(encoding="utf-8", errors="replace")[:3000])
+    prompt = (
+        "You are running the skill-reflection skill (instructions below) for `obsidian-weekly-brain`, "
+        "at the end of an unattended run. All inputs are provided; do not ask questions.\n\n"
+        "Judge the run against the calling skill's Purpose and its `## Section goals` table: for each "
+        "section, compare the MEASURED METRICS and the report text with that section's 'Working when' "
+        "column. Treat a goal missed in this run and in a previous reflection as repeat friction.\n\n"
+        "Use the skill's output format, with these limits: at most 5 prioritized recommendations, each "
+        "naming the section and the goal it serves, and each a concrete change to brain.py or SKILL.md; "
+        "whole reflection under 400 words. Advisory only.\n\n"
+        "After the reflection, end with a line `SUMMARY:` followed by 1-3 lines starting `- `, each at "
+        "most 20 words: the most important recommendations, for the bottom of the report.\n\n"
+        "=== skill-reflection SKILL.md (your instructions) ===\n" + reflection_skill + "\n\n"
+        "=== obsidian-weekly-brain SKILL.md (calling skill) ===\n" + own_skill + "\n\n"
+        "=== STEPS ===\n" + "\n".join(steps) + "\n\n"
+        "=== MEASURED METRICS ===\n" + "\n".join(_section_metrics(report, sections, one_thing, vault)) + "\n\n"
+        "=== FRICTION (ERROR/WARNING lines from this run) ===\n"
+        + ("\n".join(dict.fromkeys(friction)) or "(none)") + "\n\n"
+        "=== PREVIOUS REFLECTIONS ===\n" + ("\n\n".join(history) or "(none yet)") + "\n\n"
+        "=== THIS RUN'S REPORT ===\n" + report[:16000]
+    )
+    system = "You are a skill reviewer. You measure a run against its stated goals and recommend specific fixes."
+    raw = claude_chat(system, prompt)
+    if raw is None:
+        raw = xai_chat(api_key, system, prompt, effort="medium")
+    else:
+        print("  [claude] Used for self-review")
+    if not raw:
+        return "", ""
+    full, _, summary = raw.partition("SUMMARY:")
+    bullets = [l.strip() for l in summary.splitlines() if l.strip().startswith("- ")][:3]
+    link = f"[[Research/Reports/Skill Reflections/obsidian-weekly-brain-{today}|full reflection]]"
+    short = ("\n".join(bullets) or "- No recommendations this week.") + f"\n\n_Advisory; see {link}._\n"
+    return full.strip(), short
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -2298,6 +2422,9 @@ def main():
     args = parser.parse_args()
     global _DRY_RUN
     _DRY_RUN = args.dry_run
+    friction: list[str] = []
+    sys.stdout = _FrictionTee(sys.stdout, friction)
+    sys.stderr = _FrictionTee(sys.stderr, friction)
 
     today = datetime.now().strftime("%Y-%m-%d")
     print(f"=== Obsidian Weekly Brain Digest — {today} ===\n")
@@ -2362,16 +2489,35 @@ def main():
     report = build_report(today, sections, one_thing, vault)
     report += build_report_part2(sections, vault)
 
+    # Self-review last, so it sees the finished report (full runs only).
+    reflection = ""
+    if run_all:
+        try:
+            reflection, review = run_self_review(today, report, sections, one_thing, vault, friction, api_key)
+            if review:
+                report = report.replace("\n---\n\n> Generated from", f"\n## Self-Review 🔧\n\n{review}\n---\n\n> Generated from", 1)
+        except Exception as e:
+            print(f"  ERROR in self-review: {e}", file=sys.stderr)
+
     if args.dry_run:
         print("\n--- DRY RUN — Report preview ---\n")
         print(report)
         print("--- End of dry run ---")
+        if reflection:
+            print("\n--- Self-review (not written) ---\n" + reflection)
     else:
         # Write report to vault
         REPORTS_DIR.mkdir(parents=True, exist_ok=True)
         report_path = REPORTS_DIR / f"weekly-brain-{today}.md"
         report_path.write_text(report, encoding="utf-8")
         print(f"\n  Report written to: {report_path}")
+        if reflection:
+            REFLECTIONS_DIR.mkdir(parents=True, exist_ok=True)
+            rp = REFLECTIONS_DIR / f"obsidian-weekly-brain-{today}.md"
+            rp.write_text("---\ntype: skill-reflection\nskill: obsidian-weekly-brain\n"
+                          f"date: {today}\ntags: [skill-reflection]\n---\n\n"
+                          f"# SKILL REFLECTION — obsidian-weekly-brain — {today}\n\n{reflection}\n", encoding="utf-8")
+            print(f"  Self-review written to: {rp}")
 
         # Update predictions.json if anything changed (new, resolved, corroborated)
         if new_predictions or vault.get("_predictions_dirty"):

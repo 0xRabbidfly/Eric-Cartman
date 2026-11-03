@@ -1,8 +1,8 @@
 ---
 name: obsidian-weekly-brain
-description: Weekly intelligence digest analyzing the vault corpus for trends, thesis health, blindspots, cross-domain bridges, zeitgeist, actionable insights, and predictions. Triggers: "weekly brain", "brain digest", "what did my vault learn this week".
+description: Weekly intelligence digest analyzing the vault corpus for trends, thesis health, blindspots, cross-domain bridges, zeitgeist, predictions and accounts to follow, ending with a self-review against its own section goals. Triggers: "weekly brain", "brain digest", "what did my vault learn this week".
 user-invocable: true
-argument-hint: "--pass trend|zeitgeist|thesis|blindspot|bridge|action|predict"
+argument-hint: "--pass trend|thesis|blindspot|bridge|zeitgeist|predict|discover|cost"
 disable-model-invocation: true
 metadata:
   author: 0xrabbidfly
@@ -97,13 +97,34 @@ python brain.py --weeks 2          # Lookback window (default 4)
   the Claude CLI fails. The script exits at startup without it.
 - No pip dependencies (stdlib only)
 
-## Step N: Reflection (composable)
+## Section goals
 
-Invoke the `skill-reflection` skill with the following context:
+What each part of the digest is for, and how to tell it's working. The
+self-review at the end of every run judges the run against this table, so
+change it here when a goal changes.
 
-- **Calling skill**: `obsidian-weekly-brain`
-- **SKILL.md path**: `.github/skills/obsidian-weekly-brain/SKILL.md`
-- **Steps completed**: list each pass with pass/fail/skipped + cost data
-- **Friction notes**: any workarounds, retries, unexpected errors, or manual interventions
+| Section | Goal | Working when |
+|---|---|---|
+| The One Thing | One small, finishable action for the week | <=80 words; picked from Blindspots or Bridges; an undone ask carries over by name; asks actually get done |
+| Trend Momentum | Which topics you're reading more or less of | Ranked by share, not raw count; background tags (>12% of notes) excluded; each rising tag links its notes |
+| Thesis Health | Per thesis: the claim, how it's moving, key dates, one best read | Every live thesis has a one-line summary; merged theses fold into one line; most active first |
+| Blindspots | Gaps between what you read and what the Library holds | <=3 gaps, ~300 words total; a recurring gap keeps its name with "Open since"; long-open gaps shrink to a first step |
+| Cross-Domain Bridges | New links across clusters worth testing | Only bridges detected since the last report; each ends in a concrete "Do" |
+| Zeitgeist | One argued idea from the fortnight | 350-450 words; subject differs from recent essays unless it dominates; avoids the Blindspot/One Thing topics; 3-5 valid links; any forecast stated with a date |
+| Predictions | A scored record of who calls the future right | New calls have a named source, checkable outcome and due date; few "unverifiable"; web verdicts cite a URL; scorecard grows |
+| Discover | Accounts worth following | One line per account; nothing suggested more than twice |
+| Run | A reliable, cheap, unattended run | One run per Sunday; no ERROR lines or xAI fallbacks; dry runs write nothing |
 
-The reflection skill will analyze the run and produce improvement recommendations.
+## Self-review (automatic, last step)
+
+After the report is built, `brain.py` runs the `skill-reflection` skill on the
+run itself: one Claude call given `skill-reflection/SKILL.md` as its
+instructions, this SKILL.md (purpose and Section goals), measured metrics per
+section (word counts, link validity, repeat counts, prediction verdict mix),
+the run's ERROR/WARNING lines, the report, and the last two reflections for
+repeat detection. It is advisory and never edits this file.
+
+- Full reflection: `Research/Reports/Skill Reflections/obsidian-weekly-brain-YYYY-MM-DD.md`
+- The report ends with a short **Self-Review** section: the top recommendations
+  and a link to the full reflection.
+- Dry runs print the reflection and write nothing.
