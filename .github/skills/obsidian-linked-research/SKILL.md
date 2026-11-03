@@ -6,7 +6,7 @@ user-invocable: true
 disable-model-invocation: false
 metadata:
   author: 0xrabbidfly
-  version: "1.10.1"
+  version: "1.10.2"
 ---
 
 # Obsidian Linked Research
@@ -253,7 +253,15 @@ python -c "import sys; sys.stdout.reconfigure(encoding='utf-8'); sys.path.insert
 >
 > Same rule applies to the Step 2.5a related-note search.
 
-If a match is found, **stop** — tell the user the note already exists, give them
+> **A search hit is not a match until you check where the URL sits.** `search()`
+> and the disk grep both hit body text. On 2026-10-20 the input
+> `red.anthropic.com/oss-scanner` matched `anthropic-cyber-mission`, but only as
+> an enrollment link inside a broader announcement whose `url:` was a different
+> article. A duplicate means the URL is in the hit's **`url:` frontmatter line**.
+> Body-only hits are related notes, so carry them into Step 2.5a instead of
+> stopping.
+
+If a `url:` match is found, **stop** — tell the user the note already exists, give them
 the path and an Obsidian link, and ask whether they want to update the existing
 note instead. Do NOT proceed to fetch or create a new note.
 
@@ -334,6 +342,15 @@ download them into the vault.
 
 If the result contains an `"error"` key, report it to the user and stop.
 
+> **Exception: `HTTP Error 403` on bot-walled publishers is a fallback, not a
+> stop.** openai.com returns 403 to `fetch.py` and WebFetch on every capture
+> (2026-10-07 and 2026-10-27). Fetch the page with Playwright instead:
+> `browser_navigate(url)`. The returned snapshot already holds the full article
+> text, headings and link targets, so no extra wait is needed. Then run
+> `browser_evaluate` to read `meta[property="og:image"]` (the hero for Step 3b),
+> and finish with `browser_close()`. `fetch.py` still counts as the canonical
+> attempt for Rule 1. Record the 403 in the note's `## Scope Boundary`.
+
 > **Transient retry**: If the error is `"No JSON in response"` for a tweet URL, retry once — the xAI Responses API occasionally returns a top-level array `[{...}]` instead of a plain `{...}` object; a second call usually returns the plain object. If it fails twice, report to the user.
 
 > **X/Twitter fallback dead-ends**: Do NOT try Playwright for x.com URLs — it returns a login wall for unauthenticated sessions. Do NOT try Firecrawl — it explicitly does not support x.com. The only supported path for tweet content is `fetch.py` via the xAI `x_search` tool.
@@ -377,6 +394,7 @@ complete and needs no enrichment. Then:
 > the paywall even in the delivered email, so a free-tier body may stop mid-issue —
 > check before trusting it as complete.
 - **Static HTML page (no paywall, no JS rendering)** → re-run `fetch.py "<url>" --max-chars 0` first. It is the same stdlib strip without the cap, so you get the publisher's actual text rather than a summary. Measured 2026-10-09: anthropic.com/news returned 17.5k chars, the whole article.
+- **GitHub repository URL** → the under-cap check gives a false "complete". `fetch.py` returns the README landing text plus GitHub nav chrome, and for a skill, tool or library repo the substance sits in the files (`SKILL.md`, `references/`, docs). Captured 2026-10-31: `heydamir/unslop` returned 5.7k chars of README, while the skill itself was 31 KB plus 29 KB of references. List the tree with `https://api.github.com/repos/<owner>/<repo>/git/trees/<branch>?recursive=1` (unauthenticated, via `urllib` — `gh` is not on the Git Bash PATH), read the key files from `https://raw.githubusercontent.com/<owner>/<repo>/<branch>/<path>` into a fresh `_tmp_<slug>_src/` directory, and take metadata (created date, stars, license, commits) from `/repos/<owner>/<repo>` and `/commits`. `fetch.py`'s `image_urls` for GitHub are mostly site chrome (`githubassets.com`, avatars). Only a repo-hosted `raw/` image is content.
 - **Article / essay / blog post** → `WebFetch` (Claude Code tool) or `fetch_webpage` on the same URL to recover the article structure.
 - **WebFetch output is a small model's paraphrase, so it can't be the source for figures or quotes.** On 2026-10-09 its outline turned the article's *"in some rare cases, this might take decades"* into "years". Use WebFetch for headings and structure only. Check every number, date, name and quoted phrase against the `--max-chars 0` text (or the email body) before it goes in the note.
 - **Very long or many-sectioned source** (academic paper, full podcast transcript, multi-part essay) → go **straight** to a general-purpose sub-agent with `WebFetch` and ask it to extract all major sections. Do not burn a round-trip on a plain `WebFetch` first; it will return an overview, not the sections.
@@ -971,6 +989,14 @@ print('MOC updated')
 "
 ```
 
+> **Never anchor an edit on the bare string `Recently Added`.** Its first
+> occurrence is inside the `## Freshness Rules` bullet ("add it to the
+> `Recently Added` section..."), not the heading. A run before 2026-10-20 used an
+> unanchored `replace` and spliced two entries into the middle of that sentence.
+> Slice between `'## Recently Added'` and the next `'\n## '` heading, edit that
+> slice, and assert afterwards that the Freshness Rules bullet still reads
+> `` add it to the `Recently Added` section at the bottom ``.
+
 > **Windows UTF-8**: `ob.read()` and `ob.create()` handle encoding correctly. Do not go
 > through subprocess pipes for MOC reads/writes — encoding errors will occur with emoji paths.
 
@@ -1109,6 +1135,17 @@ For any candidate it rated `supports`, `contradicts`, `extends` or `bridges`
 that is not already linked, read it. If it bears on the thesis, amend the note
 and rewrite it through `ob.create(..., overwrite=True)`. This counts even when
 the candidate fell below the detector's save threshold.
+
+> **Re-read the note before anchoring an amend edit — do not retype the anchor
+> from the draft you wrote.** The amend is a `str.replace` against vault text,
+> and the two most common mismatches are invisible: an apostrophe or dash that
+> was ASCII in the draft (`Didn't`, `--`) versus the typographic form you
+> reflexively type into the patch script (`Didn’t`, `—`), and vice versa. Caught
+> 2026-10-21: the amend aborted on `AssertionError: related anchor not found`
+> because the patch used `’` where the note had `'`. Pull the live text with
+> `ob.read()`, `print(repr(...))` the span, and copy the anchor from that output.
+> Keep the `assert anchor in t` guard — it is what turns a silent no-op replace
+> into a visible failure.
 
 This is best-effort — if it genuinely errors or is unavailable, continue to Step 7.
 The detector will classify relationships (supports, contradicts, extends, bridges)
