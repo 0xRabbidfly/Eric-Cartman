@@ -962,6 +962,8 @@ def pass_blindspot(vault: dict, api_key: str) -> str:
         result = xai_chat(api_key, system, prompt, effort="high")
     else:
         print("  [claude] Used for blindspot synthesis")
+    # Zeitgeist reads these so it doesn't make the same subject its essay.
+    vault["_blindspot_topics"] = re.findall(r"^###\s+(.+)$", result or "", re.MULTILINE)
     return (result or "_Blindspot synthesis failed._").strip() + "\n"
 
 
@@ -1126,13 +1128,31 @@ def pass_zeitgeist(vault: dict, api_key: str) -> str:
             items = _daily_reading_items(note, max_items=8)
             if not items:
                 continue
-            note_summaries.append(f"- DAILY {note['date']:%Y-%m-%d}:\n" + "\n".join(f"    {it}" for it in items))
+            note_summaries.append(f"- DAILY [[{note['name']}]]:\n" + "\n".join(f"    {it}" for it in items))
         else:
             body = re.sub(r"^\s*#\s.*\n", "", note["body"], count=1)
             body = re.sub(r"https?://\S+", "", body)
             snippet = " ".join(body.split())[:500]
             source = note["frontmatter"].get("show") or note["source"] or note["name"]
-            note_summaries.append(f"- [{tags_str}] ({source}, {note['date']:%m-%d}): {snippet}")
+            note_summaries.append(f"- [[{note['name']}]] [{tags_str}] ({source}, {note_when(note)}): {snippet}")
+
+    # Six essays in a row (09-27 to 11-01) were on agents at the door:
+    # identity, gates, attestation, surface. Show the recent central claims and
+    # what the other sections already cover, so the essay picks its subject
+    # instead of inheriting it.
+    past_claims = []
+    for fp in sorted(REPORTS_DIR.glob("weekly-brain-*.md"))[-4:]:
+        m = re.search(r"(\d{4}-\d{2}-\d{2})", fp.name)
+        if not m or m.group(1) >= f"{now:%Y-%m-%d}":
+            continue
+        text = fp.read_text(encoding="utf-8", errors="replace")
+        sec = re.search(r"^## Zeitgeist[^\n]*\n+\s*\*\*(.+?)\*\*", text, re.MULTILINE | re.DOTALL)
+        if sec:
+            past_claims.append(f"- {m.group(1)}: {' '.join(sec.group(1).split())}")
+    elsewhere = list(vault.get("_blindspot_topics", []))
+    ledger = load_json_safe(ONE_THING_FILE)
+    if isinstance(ledger, list) and ledger and ledger[-1].get("status") == "open":
+        elsewhere.append(f"{ledger[-1]['note']} (The One Thing)")
 
     # Topics that were hot 4-6 weeks ago and have gone quiet. Structural/show
     # tags excluded; "now <= 1" rather than "now == 0" because 6 -> 1 is the
@@ -1153,9 +1173,15 @@ def pass_zeitgeist(vault: dict, api_key: str) -> str:
     # Last week's read, for continuity
     previous = last_report_section(now, "Zeitgeist")
     prev_block = (
-        "=== YOUR ESSAY FROM LAST WEEK (your prior position; build on it or revise it, don't recap it) ===\n"
+        "=== YOUR ESSAY FROM LAST WEEK (for reference only; you are not continuing it) ===\n"
         + previous + "\n\n"
         if previous else ""
+    )
+    rotation_block = (
+        ("=== YOUR RECENT CENTRAL CLAIMS (oldest first) ===\n" + "\n".join(past_claims) + "\n\n"
+         if past_claims else "")
+        + ("=== ALREADY COVERED THIS WEEK BY OTHER SECTIONS ===\n"
+           + "\n".join(f"- {t}" for t in elsewhere) + "\n\n" if elsewhere else "")
     )
     faded_block = (
         f"Topics that were active 4-6 weeks ago and have gone quiet (tag, then → now): {', '.join(faded[:6])}. "
@@ -1168,9 +1194,17 @@ def pass_zeitgeist(vault: dict, api_key: str) -> str:
         "already seen the raw material below — they do not need it summarised back to them. What they "
         "want is thinking: what does this fortnight actually mean, and what should they believe "
         "differently because of it?\n\n"
-        "Write an ESSAY of roughly 500-700 words:\n"
+        "Choosing the subject:\n"
+        "- Look at YOUR RECENT CENTRAL CLAIMS. If they share a subject, pick a different one this "
+        "week, unless that subject clearly dominates the raw material more than anything else; if "
+        "you stay, say in the opening paragraph why it still beats the alternatives.\n"
+        "- Do not make anything under ALREADY COVERED THIS WEEK your central idea. The reader gets "
+        "those elsewhere in the same digest.\n"
+        "- The vault spans AI, agents, crypto, macro, markets and compute economics. The best subject "
+        "is the one the fortnight's material most changes the reader's mind about.\n\n"
+        "Write an ESSAY of 350-450 words:\n"
         "- Open with one bold sentence stating the fortnight's central idea — a claim, not a topic.\n"
-        "- Then 3-4 paragraphs of continuous argument developing ONE or at most TWO ideas. Choose the "
+        "- Then 2-3 paragraphs of continuous argument developing ONE idea. Choose the "
         "questions the week genuinely forces, and reason about them: what follows if this is true, what "
         "would have to be true for it to be wrong, where the second-order effects land, what it changes "
         "about how the reader should act or think. Depth over coverage.\n"
@@ -1181,13 +1215,17 @@ def pass_zeitgeist(vault: dict, api_key: str) -> str:
         "as an argument.\n"
         "- Attribute sparingly. Name a person only when their specific claim carries the argument; "
         "aim for no more than 5 attributions in the whole essay, and never inline dates.\n"
+        "- Link the 3-5 notes the argument actually rests on, as the [[wikilinks]] given in the raw "
+        "material, inline where the claim is made. Every factual claim you build on should be "
+        "traceable to one of them. Do not invent links.\n"
         "- No bullet points, no per-paragraph headers or bold lead-ins after the opening sentence, no "
         "'what everyone is talking about' / 'the mood is' scaffolding.\n"
         "- Leave out whatever doesn't serve the central idea, however interesting. Anything you drop is "
         "still in the vault.\n"
-        + ("- Last week's essay is your own prior position. Where this week changes it, say so inside "
-           "the argument — one or two sentences — not as a separate section.\n" if previous else "")
+        + ("- If you stay on last week's subject, say in one sentence where this week changes your "
+           "position. If you move on, don't mention last week at all.\n" if previous else "")
         + "\n" + faded_block
+        + rotation_block
         + prev_block
         + f"=== RAW MATERIAL: recent notes ({len(note_summaries)}) ===\n"
         + "\n".join(note_summaries)
