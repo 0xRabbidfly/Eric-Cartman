@@ -29,7 +29,8 @@ returning reworded.
 3. **Blindspot Detection** — What you keep reading with no Library note; open gaps carry over by name
 4. **Cross-Domain Bridges** — New bridge edges between notes from different clusters
 5. **Zeitgeist Snapshot** — A 350-450 word essay on the fortnight's biggest idea, rotating subject, with links
-6. **Prediction Extraction** — Forecasts from sources, resolution tracking
+6. **Prediction Extraction** — Checkable, dated forecasts from sources and from the digest's own
+   essay; due ones are judged against the vault, then the web (cited); a "who's been right" scorecard
 7. **Account Discovery** — X handles worth following, from curated-note provenance
 8. **Cost Tracking** — This run's cost plus the week's research spend
 

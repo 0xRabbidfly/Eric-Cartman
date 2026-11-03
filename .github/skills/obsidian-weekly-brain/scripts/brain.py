@@ -172,17 +172,23 @@ def xai_chat(api_key: str, system_prompt: str, user_prompt: str, effort: str = "
     return data["choices"][0]["message"]["content"]
 
 
-def claude_chat(system_prompt: str, user_prompt: str) -> str | None:
-    """Call Claude via CLI (Max subscription, free). Returns None on failure."""
+def claude_chat(system_prompt: str, user_prompt: str, web: bool = False) -> str | None:
+    """Call Claude via CLI (Max subscription, free). Returns None on failure.
+
+    web=True lets this one call use WebSearch/WebFetch, for checking facts the
+    vault doesn't hold (prediction outcomes)."""
     import subprocess
     combined = f"{system_prompt}\n\n{user_prompt}" if system_prompt else user_prompt
+    cmd = [CLAUDE_CLI, "--print"]
+    if web:
+        cmd += ["--tools", "WebSearch", "WebFetch", "--allowedTools", "WebSearch", "WebFetch"]
     try:
         # Prompt goes over stdin: Windows caps a command line at ~32K chars,
         # and the blindspot/zeitgeist prompts are bigger than that.
         result = subprocess.run(
-            [CLAUDE_CLI, "--print"],
+            cmd,
             input=combined,
-            capture_output=True, text=True, encoding="utf-8", timeout=300,
+            capture_output=True, text=True, encoding="utf-8", timeout=900 if web else 300,
         )
         content = result.stdout.strip()
         if content and "Failed to authenticate" not in content:
@@ -1228,6 +1234,8 @@ def pass_zeitgeist(vault: dict, api_key: str) -> str:
         "'what everyone is talking about' / 'the mood is' scaffolding.\n"
         "- Leave out whatever doesn't serve the central idea, however interesting. Anything you drop is "
         "still in the vault.\n"
+        "- If the argument implies a forecast, state it once, plainly, with a checkable outcome and a "
+        "date (\"by mid-2027, ...\"). The digest scores its own calls like anyone else's.\n"
         + ("- If you stay on last week's subject, say in one sentence where this week changes your "
            "position. If you move on, don't mention last week at all.\n" if previous else "")
         + "\n" + faded_block
@@ -1244,6 +1252,7 @@ def pass_zeitgeist(vault: dict, api_key: str) -> str:
         result = xai_chat(api_key, system, prompt, effort="high")
     else:
         print("  [claude] Used for zeitgeist synthesis")
+    vault["_zeitgeist_text"] = result or ""  # pass_predict scores the essay's own forecasts
     return (result or "_Zeitgeist synthesis failed._").strip() + "\n"
 
 
@@ -1364,10 +1373,16 @@ def _extract_predictions(api_key: str, reading: list[str], open_preds: list[dict
         "Rules:\n"
         "- Skip anything that duplicates an ALREADY-OPEN prediction below (same claim, any wording). If a "
         "different person makes the same claim, list it under corroborations instead of new.\n"
-        "- Skip vague aspiration ('AI will change everything'); keep claims that could be checked.\n"
-        "- 'due' should be the date by which the claim can be judged (a release 'in 3-4 weeks' from a "
-        "post dated 08-13 is due ~09-10). Be concrete; null only for genuinely open-ended claims.\n"
-        "- Attribute to the person, not the note.\n\n"
+        "- Keep a claim ONLY if all three hold: (1) a named source: a person or organisation, not "
+        "'developers', 'a host citing rumors' or 'the note'; (2) a checkable outcome someone could later "
+        "call true or false: a release, a number, an event, a decision; (3) a due date.\n"
+        "- Skip vague aspiration ('X will enable a new generation of ...'), directional claims with no "
+        "threshold ('the harness will shrink'), and anything already true when said.\n"
+        "- 'due' is the date by which the claim can be judged. Infer it from the timeframe: a release "
+        "'in 3-4 weeks' from a post dated 08-13 is due ~09-10; 'next year' is that year's 12-31; 'soon' "
+        "is +90 days; 'by the end of the decade' is 2029-12-31. If no date can be inferred, skip it.\n"
+        "- Attribute to the person, not the note. Forecasts in the Weekly Brain's own essay (the "
+        "[[weekly-brain-...]] entry) are attributed to \"Weekly Brain\".\n\n"
         "=== ALREADY-OPEN PREDICTIONS ===\n" + (open_list or "(none)") + "\n\n"
         "=== NOTES ===\n" + "\n".join(reading)
     )
@@ -1389,10 +1404,35 @@ def _extract_predictions(api_key: str, reading: list[str], open_preds: list[dict
         if not isinstance(p, dict) or not p.get("prediction"):
             continue
         due = p.get("due")
-        p["due"] = due if (isinstance(due, str) and parse_date(due)) else None
+        # 13 of the first 54 had no due date and so could never be judged.
+        if not (isinstance(due, str) and parse_date(due)):
+            continue
         p["source_note"] = str(p.get("source_note", "")).strip("[] ")
         cleaned.append(p)
     return cleaned, corr
+
+
+def _date_undated(api_key: str, undated: list[dict], today: str) -> dict[str, str | None]:
+    """One call for open predictions with no due date: infer one, or None when
+    the claim can't be judged at all (they then become 'untestable')."""
+    if not undated:
+        return {}
+    items = "\n".join(f"- {p['id']} (said {p.get('extracted_date', '?')}, timeframe "
+                      f"\"{p.get('timeframe') or 'none'}\", by {p.get('who', '?')}): {p['prediction']}"
+                      for p in undated)
+    prompt = (
+        f"Today is {today}. Each prediction below has no due date. For each, give the date by which it "
+        "could be judged true or false, inferred from its timeframe ('next year' = that year's 12-31, "
+        "'soon' = +90 days from when it was said). Return null if it has no checkable outcome at all "
+        "(vague aspiration, a directional claim with no threshold, or already true when said).\n\n"
+        'Return ONLY a JSON object: {"<id>": "YYYY-MM-DD" or null}\n\n' + items
+    )
+    system = "You date forecasts so they can be scored. Return only valid JSON."
+    raw = claude_chat(system, prompt) or xai_chat(api_key, system, prompt, effort="low")
+    data = _parse_json_block(raw)
+    if not isinstance(data, dict):
+        return {}
+    return {k: (v if isinstance(v, str) and parse_date(v) else None) for k, v in data.items()}
 
 
 def _resolve_predictions(api_key: str, candidates: list[dict], reading: list[str], today: str) -> list[dict]:
@@ -1404,21 +1444,28 @@ def _resolve_predictions(api_key: str, candidates: list[dict], reading: list[str
         for p in candidates
     )
     prompt = (
-        f"Today is {today}. Judge each prediction below against the recent notes.\n\n"
+        f"Today is {today}. Judge each prediction below.\n\n"
         "Return ONLY a JSON array: [{\"id\": \"...\", \"verdict\": \"resolved-true|resolved-false|still-open|unverifiable\", "
-        "\"evidence\": \"<one sentence citing the note(s), or why no signal>\"}]\n\n"
-        "Rules: 'resolved-true/false' only when the notes contain evidence, not from your own knowledge. "
-        "'still-open' if the due date hasn't clearly passed or the outcome is pending. 'unverifiable' if the "
-        "claim can't be checked from this vault (e.g. private internal metrics).\n\n"
+        "\"evidence\": \"<one sentence citing the [[note]] or the URL>\", \"via\": \"vault|web\"}]\n\n"
+        "Rules:\n"
+        "- First check the notes below. If they settle it, cite the [[note]] and set via 'vault'.\n"
+        "- If the notes don't settle it and the due date has passed, use web search to find the outcome. "
+        "Cite the URL in evidence and set via 'web'. Prefer primary sources (the company, the filing, "
+        "the official account) over commentary.\n"
+        "- 'resolved-true/false' only with a cited note or URL, never from memory alone.\n"
+        "- 'still-open' if the due date hasn't passed or the outcome is genuinely pending.\n"
+        "- 'unverifiable' only if neither the notes nor the web can settle it (e.g. private metrics).\n\n"
         "=== PREDICTIONS TO JUDGE ===\n" + cand + "\n\n"
         "=== RECENT NOTES ===\n" + "\n".join(reading)
     )
     system = "You are a careful forecast resolver. Return only valid JSON."
-    raw = claude_chat(system, prompt)
+    # Vault-only resolution left 4 of the first 9 verdicts 'unverifiable'
+    # because no note happened to mention the outcome; this call may search.
+    raw = claude_chat(system, prompt, web=True)
     if raw is None:
         raw = xai_chat(api_key, system, prompt, effort="medium")
     else:
-        print("  [claude] Used for prediction resolution")
+        print("  [claude] Used for prediction resolution (web allowed)")
     data = _parse_json_block(raw)
     return [d for d in (data or []) if isinstance(d, dict) and d.get("id")]
 
@@ -1437,7 +1484,28 @@ def pass_predict(vault: dict, api_key: str):
                          default=None)
     since = max(filter(None, [last_extracted, now - timedelta(weeks=2)]))
     reading = _reading_lines(vault, since, _PREDICT_MAX_NOTES)
+    # The digest's own forecasts get scored like anyone else's.
+    if vault.get("_zeitgeist_text"):
+        essay = " ".join(re.sub(r"\[\[([^\]|]+)(?:\|[^\]]+)?\]\]", r"\1", vault["_zeitgeist_text"]).split())
+        reading.append(f"[[weekly-brain-{today}]] ({today}, Weekly Brain's own essay): {essay}")
     open_preds = [p for p in preds if p.get("status") == "open"]
+
+    # Open predictions with no due date can never be judged: date them or
+    # retire them as untestable.
+    undated = [p for p in open_preds if not p.get("due")]
+    if undated:
+        for pid, due in _date_undated(api_key, undated, today).items():
+            p = next((x for x in undated if x["id"] == pid), None)
+            if not p:
+                continue
+            if due:
+                p["due"] = due
+            else:
+                p["status"] = "untestable"
+                p["resolved_date"] = today
+                p["resolution_note"] = "No checkable outcome or date."
+            vault["_predictions_dirty"] = True
+        open_preds = [p for p in preds if p.get("status") == "open"]
 
     # ---- 1. extract (only if there is unscanned material) -------------------
     new_preds: list[dict] = []
@@ -1477,6 +1545,7 @@ def pass_predict(vault: dict, api_key: str):
             p["status"] = verdict
             p["resolved_date"] = today
             p["resolution_note"] = r.get("evidence", "")
+            p["resolved_via"] = r.get("via", "vault")
             resolved_now.append((p, verdict, p["resolution_note"]))
             vault["_predictions_dirty"] = True
     # expire long-overdue open predictions with no signal
@@ -1510,13 +1579,37 @@ def pass_predict(vault: dict, api_key: str):
     lines = [
         f"**Track record:** {counts['resolved-true']} ✅ · {counts['resolved-false']} ❌"
         + (f" ({counts['resolved-true'] / judged:.0%} right)" if judged else "")
-        + f" · {counts['unverifiable']} unverifiable · {counts['expired']} expired · "
-        f"**{len(still_open)} open** ({len(overdue)} overdue)"
+        + f" · {counts['unverifiable']} unverifiable · {counts['expired']} expired"
+        + (f" · {counts['untestable']} untestable" if counts["untestable"] else "")
+        + f" · **{len(still_open)} open** ({len(overdue)} overdue)"
     ]
+
+    # Who's been right: the point of tracking calls at all. Names are
+    # normalised ("Cathie Wood (ARK Invest)" -> "Cathie Wood") so a source's
+    # calls pool; shown once a source has 2+ judged calls.
+    def _who(p: dict) -> str:
+        return re.sub(r"\s*\(.*?\)", "", p.get("who") or "?").strip()
+    score: dict[str, list[int]] = defaultdict(lambda: [0, 0])
+    for p in all_preds:
+        if p.get("status") in ("resolved-true", "resolved-false"):
+            s = score[_who(p)]
+            s[0] += p["status"] == "resolved-true"
+            s[1] += 1
+    board = sorted(((w, r, n) for w, (r, n) in score.items() if n >= 2),
+                   key=lambda x: (x[1] / x[2], x[2]), reverse=True)
+    if board:
+        lines.append("\n**Who's been right** (2+ judged calls): "
+                     + " · ".join(f"{w} {r}/{n}" for w, r, n in board))
+    wb = score.get("Weekly Brain")
+    wb_open = sum(1 for p in still_open if _who(p) == "Weekly Brain")
+    if wb or wb_open:
+        lines.append(f"_Weekly Brain's own calls: {wb[0] if wb else 0}/{wb[1] if wb else 0} right, {wb_open} open._")
+
     if resolved_now or expired_now:
         lines.append("\n**Resolved this week:**")
         for p, verdict, ev in resolved_now:
-            lines.append(f"- {icon.get(verdict, '•')} {p['prediction']} — _{p.get('who', '?')}_\n  ↳ {ev}")
+            via = " (web)" if p.get("resolved_via") == "web" else ""
+            lines.append(f"- {icon.get(verdict, '•')} {p['prediction']} — _{p.get('who', '?')}_\n  ↳ {ev}{via}")
         for p in expired_now:
             lines.append(f"- ⌛ {p['prediction']} — _{p.get('who', '?')}_ (expired, no signal)")
     if new_preds:
