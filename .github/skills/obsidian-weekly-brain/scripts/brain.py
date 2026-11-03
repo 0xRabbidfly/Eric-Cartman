@@ -43,6 +43,7 @@ CONNECTIONS_FILE = VAULT_PATH / "Research" / "connections.json"
 THESES_FILE = VAULT_PATH / "Research" / "theses.json"
 PREDICTIONS_FILE = VAULT_PATH / "Research" / "predictions.json"
 DISCOVER_FILE = VAULT_PATH / "Research" / "discover.json"
+ONE_THING_FILE = VAULT_PATH / "Research" / "one-thing.json"
 REPORTS_DIR = VAULT_PATH / "Research" / "Reports"
 
 CONFIG_DIR = Path.home() / ".config" / "last30days"
@@ -1587,47 +1588,157 @@ def pass_predict(vault: dict, api_key: str):
 # One Thing synthesis + Report assembly
 # ---------------------------------------------------------------------------
 
-def synthesize_one_thing(api_key: str, sections: dict) -> str:
-    """Use xAI to pick the single most important insight from all passes."""
+# The One Thing had no memory: from 09-20 to 11-01 it asked for roughly the
+# same agent-security note six times under six names, and none got written.
+# one-thing.json records each ask, and the next run checks whether a note by
+# that name now exists, so an unfinished ask carries over instead of mutating.
+
+_ONE_THING_MAX_WORDS = 80
+_NOTE_LINE_RE = re.compile(r"^\s*NOTE:\s*(.+?)\s*$", re.MULTILINE | re.IGNORECASE)
+
+
+def _slugify(text: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
+
+
+def _note_exists_since(note: str, since: str) -> str | None:
+    """Path of a Research note created on/after `since` whose filename or H1
+    matches the asked-for note, or None. Containment either way, so
+    `agent-control-plane-map` still counts for `agent-control-plane-market-map-2026`
+    only if one name holds the other whole."""
+    want = _slugify(note)
+    if len(want) < 8:
+        return None
+    cutoff = (parse_date(since) or datetime.now()).timestamp()
+    for fp in (VAULT_PATH / "Research").rglob("*.md"):
+        if fp.name.startswith(("weekly-brain", "weekly-costs")):
+            continue
+        try:
+            if fp.stat().st_ctime < cutoff:
+                continue
+            names = {_slugify(fp.stem)}
+            m = re.search(r"^#\s+(.+)$", fp.read_text(encoding="utf-8", errors="replace")[:3000], re.MULTILINE)
+            if m:
+                names.add(_slugify(m.group(1)))
+        except OSError:
+            continue
+        for have in names:
+            if len(have) >= 8 and (have == want or want in have or have in want):
+                return str(fp.relative_to(VAULT_PATH))
+    return None
+
+
+def load_one_thing_ledger() -> list[dict]:
+    """Past asks, newest last, with open asks re-checked for completion."""
+    ledger = load_json_safe(ONE_THING_FILE)
+    ledger = ledger if isinstance(ledger, list) else []
+    for entry in ledger:
+        if entry.get("status") == "open" and entry.get("note"):
+            hit = _note_exists_since(entry["note"], entry.get("first_date", ""))
+            if hit:
+                entry["status"] = "done"
+                entry["done_note"] = hit
+                print(f"  One Thing done: {entry['note']} -> {hit}")
+    return ledger
+
+
+def synthesize_one_thing(api_key: str, sections: dict) -> tuple[str, list[dict]]:
+    """Pick this week's one action from the action/blindspot passes.
+
+    Returns the report text and the updated ledger; main() saves the ledger
+    unless this is a dry run. Claude CLI first, xAI as fallback.
+    """
     print("\n  Synthesizing The One Thing...")
-    # Build a condensed version of all section outputs. The synthesized passes
-    # (action, zeitgeist, bridge) carry the most judgement, so give them more room;
-    # the stat-driven passes (blindspot, trend, thesis) are context, not the headline.
-    _BUDGET = {"action": 2500, "zeitgeist": 2000, "bridge": 1500, "blindspot": 1500, "thesis": 1200}
+    today = datetime.now().strftime("%Y-%m-%d")
+    ledger = load_one_thing_ledger()
+    # A same-day re-run (manual, or the second Sunday launch) redoes today's
+    # pick rather than counting as another week.
+    if ledger and ledger[-1].get("first_date") == today:
+        ledger.pop()
+    for e in ledger:
+        if e.get("replaced_on") == today:
+            e["status"] = "open"
+            e.pop("replaced_on", None)
+        if e.get("last_date") == today and e.get("weeks", 1) > 1:
+            e["weeks"] -= 1
+            e["last_date"] = e.pop("prev_last_date", e.get("first_date"))
+    prior = ledger[-1] if ledger and ledger[-1].get("status") == "open" else None
+
+    # The One Thing picks from [action] and [blindspot]; the other passes are
+    # there to judge which pick matters most this week.
+    _BUDGET = {"action": 3000, "blindspot": 2500, "zeitgeist": 1500, "bridge": 1200, "thesis": 800}
     combined = ""
     for name, content in sections.items():
-        limit = _BUDGET.get(name, 600)
+        limit = _BUDGET.get(name, 500)
         snippet = content[:limit].replace("\n", " ").strip()
         combined += f"\n[{name}]: {snippet}\n"
 
+    history = "\n".join(
+        f"- {e.get('first_date')}: {e.get('note')} — {e.get('status')}"
+        + (f" ({e.get('weeks', 1)} weeks)" if e.get("weeks", 1) > 1 else "")
+        for e in ledger[-8:]
+    ) or "- (none yet)"
+    if prior:
+        carry = (
+            f"Last week's One Thing is still undone after {prior.get('weeks', 1)} week(s): "
+            f"\"{prior['note']}\". If it is still the most important thing, carry it over "
+            "under the SAME NOTE name and shrink it to its next small step. Otherwise pick "
+            "something else and say in a few words why the old ask no longer matters.\n\n"
+        )
+    else:
+        carry = ""
+
     prompt = (
-        "Below are outputs from 7 analysis passes over a personal research vault. "
-        "Pick the single most important, actionable insight across all passes and "
-        "write 2-3 sentences a busy researcher should read first thing Sunday morning.\n\n"
+        f"Below are outputs from the analysis passes of a weekly digest over a personal "
+        f"research vault. Write \"The One Thing\": the single action the reader should "
+        f"take this week.\n\n"
+        f"Past One Things and whether the reader did them:\n{history}\n\n"
+        f"{carry}"
         "Rules:\n"
-        "- Lead with a concrete action the reader can take this week, and say why now.\n"
-        "- Prefer insights from the [action], [zeitgeist], [bridge], and [blindspot] passes; the "
-        "[trend] and [thesis] passes are supporting evidence, not the headline.\n"
-        "- Do NOT restate raw counts (e.g. 'X mentioned 103 times'). Name topics, not stats.\n"
-        "- Do NOT comment on the pipeline's own data quality or tokenizer artifacts.\n"
-        "- Be specific: name the topic, the sources, and the deliverable.\n\n"
+        "- Pick ONE item that already appears in [action] (Do This Week) or as a \"Note to "
+        "write\" in [blindspot], and name it as it appears there. Do not invent a new task.\n"
+        "- Do not re-ask an undone past item under a new name. Carry it over by its old name "
+        "or leave it.\n"
+        "- It must fit in under two hours. If the full note is bigger, ask only for its first "
+        "step (for example the comparison table, or one section) and say so.\n"
+        f"- At most 3 sentences and {_ONE_THING_MAX_WORDS} words: the action, then why now. "
+        "No lists of sources; the linked section has them.\n"
+        "- Do NOT restate raw counts, and do NOT comment on the pipeline's data quality.\n"
+        "- End with one line on its own: NOTE: <the note's name, exactly as the reader "
+        "should title it>\n\n"
         f"{combined}"
     )
 
-    result = claude_chat(
-        "You are a research advisor distilling complex analysis into one key takeaway.",
-        prompt,
-    )
+    system = "You are a research advisor choosing one small, finishable action for the week."
+    result = claude_chat(system, prompt)
     if result is None:
-        result = xai_chat(
-            api_key,
-            "You are a research advisor distilling complex analysis into one key takeaway.",
-            prompt,
-            effort="high",
-        )
+        result = xai_chat(api_key, system, prompt, effort="high")
     else:
         print("  [claude] Used for One Thing synthesis")
-    return result
+
+    m = _NOTE_LINE_RE.search(result)
+    note = m.group(1).strip().strip("`*\"'") if m else None
+    text = _NOTE_LINE_RE.sub("", result).strip()
+    words = len(text.split())
+    if words > _ONE_THING_MAX_WORDS * 1.4:
+        print(f"  WARNING: One Thing is {words} words (cap {_ONE_THING_MAX_WORDS})")
+
+    if note and prior and _slugify(note) == _slugify(prior["note"]):
+        prior["weeks"] = prior.get("weeks", 1) + 1
+        prior["prev_last_date"] = prior.get("last_date")
+        prior["last_date"] = today
+        prior["text"] = text
+        text = f"_Carried over, week {prior['weeks']}._ {text}"
+    else:
+        if prior:
+            prior["status"] = "replaced"
+            prior["replaced_on"] = today
+        if note:
+            ledger.append({"note": note, "first_date": today, "last_date": today,
+                           "weeks": 1, "status": "open", "text": text})
+        else:
+            print("  WARNING: One Thing had no NOTE line; not tracked")
+    return text, ledger
 
 
 # ---------------------------------------------------------------------------
@@ -2194,9 +2305,10 @@ def main():
 
     # Synthesize "The One Thing" (only if multiple passes ran)
     one_thing = ""
+    one_thing_ledger = None
     if len(sections) >= 3:
         try:
-            one_thing = synthesize_one_thing(api_key, sections)
+            one_thing, one_thing_ledger = synthesize_one_thing(api_key, sections)
         except Exception as e:
             print(f"  ERROR synthesizing One Thing: {e}", file=sys.stderr)
             one_thing = "_Could not synthesize — see individual sections below._"
@@ -2235,6 +2347,11 @@ def main():
             with open(PREDICTIONS_FILE, "w", encoding="utf-8") as f:
                 json.dump(all_predictions, f, indent=2, ensure_ascii=False)
             print(f"  predictions.json: +{len(new_predictions)} new, {len(all_predictions)} total")
+
+        if one_thing_ledger is not None:
+            with open(ONE_THING_FILE, "w", encoding="utf-8") as f:
+                json.dump(one_thing_ledger, f, indent=2, ensure_ascii=False)
+            print(f"  one-thing.json: {len(one_thing_ledger)} asks tracked")
 
         # Append cost row to weekly-costs.md ledger
         if "cost" in sections:

@@ -17,7 +17,12 @@ A weekly intelligence digest that mines the entire Obsidian vault corpus and pro
 
 ## What It Does
 
-The script performs 9 passes over your vault, then synthesizes "The One Thing" from them:
+The script performs 9 passes over your vault, then picks "The One Thing": one
+item from Do This Week or a Blindspot "Note to write", sized to under two hours
+and capped at 80 words. Each pick is logged in `Research/one-thing.json`; the next
+run marks it done if a Research note by that name has appeared, and an undone
+pick carries over under the same name ("Carried over, week N") instead of
+returning reworded.
 
 1. **Trend Momentum** — Rising tags, convergent discoveries across independent sources
 2. **Thesis Health Check** — Supporting/contradicting evidence, thesis decay detection
@@ -78,6 +83,7 @@ python brain.py --weeks 2          # Lookback window (default 4)
 - `Research/connections.json` — Connection graph
 - `Research/theses.json` — Thesis tracker data
 - `Research/predictions.json` — Prediction tracker (created if needed)
+- `Research/one-thing.json` — One Thing history: each ask, weeks open, done/replaced
 
 ## Requirements
 
