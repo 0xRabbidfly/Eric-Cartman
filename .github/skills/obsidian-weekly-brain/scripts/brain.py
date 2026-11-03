@@ -828,9 +828,46 @@ def _daily_reading_items(note: dict, max_items: int = 14) -> list[str]:
     return items[:max_items]
 
 
+_BLINDSPOT_HISTORY_REPORTS = 6
+_NOTE_TO_WRITE_RE = re.compile(
+    r"\*\*Note to write:\*\*\s*(?:`([^`]+)`|\*\"([^\"]+)\"\*|\*([^*]+)\*|\"([^\"]+)\")")
+
+
+def _past_blindspots(today: datetime) -> list[dict]:
+    """Blindspots from recent reports, oldest first, with whether the suggested
+    note has since been written. Without this the pass re-found the same gap
+    every week under a new name: agent identity/containment ran 09-27 to 11-01
+    as six differently-named notes, none written."""
+    reports = []
+    for fp in REPORTS_DIR.glob("weekly-brain-*.md"):
+        m = re.search(r"(\d{4}-\d{2}-\d{2})", fp.name)
+        dt = parse_date(m.group(1)) if m else None
+        if dt and dt.date() < today.date():
+            reports.append((dt, fp))
+    past = []
+    for dt, fp in sorted(reports)[-_BLINDSPOT_HISTORY_REPORTS:]:
+        text = fp.read_text(encoding="utf-8", errors="replace")
+        sec = re.search(r"^## Blindspots[^\n]*\n(.*?)(?=^## |\Z)", text, re.MULTILINE | re.DOTALL)
+        if not sec:
+            continue
+        for block in re.split(r"^### ", sec.group(1), flags=re.MULTILINE)[1:]:
+            topic = block.splitlines()[0].strip()
+            m = _NOTE_TO_WRITE_RE.search(block)
+            note = next((g for g in m.groups() if g), "").strip() if m else ""
+            written = _note_exists_since(note, f"{dt:%Y-%m-%d}") if note else None
+            past.append({"date": f"{dt:%Y-%m-%d}", "topic": topic, "note": note, "written": written})
+    return past
+
+
 def pass_blindspot(vault: dict, api_key: str) -> str:
     """What you keep reading that the Library has no considered view on."""
     print("\n[Pass 3/9] Blindspot Detection...")
+    past = _past_blindspots(datetime.now())
+    past_lines = [
+        f"- {p['date']}: {p['topic']} -> note `{p['note'] or '?'}` — "
+        + (f"WRITTEN ({p['written']})" if p["written"] else "not written")
+        for p in past
+    ]
     library = vault["library"]
     dailies = vault["dailies"]
     podcasts = vault["podcasts"]
@@ -893,16 +930,25 @@ def pass_blindspot(vault: dict, api_key: str) -> str:
         "- a subject already covered by Library notes or tags below (check titles AND tags before claiming a gap);\n"
         "- a one-off news item; it must recur across several days or sources;\n"
         "- a pipeline artefact, a person's handle, or a generic phrase.\n\n"
-        "Return at most 3 blindspots, ordered by how much reading attention they get. For each use exactly this shape:\n\n"
+        "Return at most 3 blindspots, ordered by how much reading attention they get.\n\n"
+        "PAST BLINDSPOTS are listed below with whether their note was written. If a gap you find "
+        "is the same subject as a past unwritten one, it is NOT new: reuse the MOST RECENT past "
+        "note name for that subject exactly (other sections track it by that name), put "
+        "`Open since <the subject's first date>` after the heading, and replace the Signal line "
+        "with one line on what's new since then. Never rename an open gap or split it into a "
+        "variant. If it has been open 4+ weeks, make the Note line its smallest first step "
+        "(one table, one section). Do not re-raise a gap whose note was WRITTEN unless the new "
+        "reading goes beyond it.\n\n"
+        "For each blindspot use exactly this shape, one line each, at most 70 words per blindspot:\n\n"
         "### <short topic name>\n"
-        "- **Reading signal:** what keeps coming up — cite 2-3 specific items/dates from the reading list.\n"
-        "- **Closest Library coverage:** the nearest existing notes/tags and why they don't actually cover it "
-        "(or 'none').\n"
-        "- **Note to write:** a concrete note title and a one-line scope.\n\n"
-        "Then a final line: **Not blindspots:** 2-4 things that look hot in the reading but are already well "
-        "covered (name the covering notes/tags), so the owner isn't tempted to duplicate.\n\n"
+        "- **Signal:** what keeps coming up, citing 2-3 dated items from the reading list.\n"
+        "- **Gap:** the closest Library notes/tags and what they miss (or 'none').\n"
+        "- **Note to write:** `note-name` — one-line scope.\n\n"
+        "Then one final line: **Not blindspots:** 2-4 hot topics already covered, each with its "
+        "covering note in [[wikilink]] form, comma-separated, no explanations.\n\n"
         "Prefer gaps that sit next to the tracked theses (a thesis with a hole in its evidence is more valuable "
         "than an unrelated curiosity). Be concrete and terse; no preamble.\n\n"
+        "=== PAST BLINDSPOTS (oldest first) ===\n" + ("\n".join(past_lines) or "(none)") + "\n\n"
         "=== READING (recent) ===\n" + "\n".join(reading_lines) + "\n\n"
         "=== RECURRING PHRASES IN READING (counts; treat as hints, not truth) ===\n" + phrase_hint + "\n\n"
         "=== LIBRARY COVERAGE: folders and note titles ===\n" + "\n".join(coverage_lines) + "\n\n"
