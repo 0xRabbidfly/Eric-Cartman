@@ -1809,6 +1809,7 @@ USD_TO_CAD = 1.37  # approximate; updated manually if needed
 # proposed twice, and a rejected one is never proposed again.
 
 _DISCOVER_MAX = 3
+_DISCOVER_MAX_REPEATS = 2  # @teortaxesTex was suggested 6 times
 _DISCOVER_MIN_SCORE = 4
 
 # Groups that exist in pipeline.md. Lab groups get a dedicated X scan; the
@@ -1896,6 +1897,9 @@ def pass_discover(vault: dict, api_key: str) -> str:
                 continue
             if log.get(h, {}).get("status") in ("added", "rejected"):
                 continue
+            # suggested twice and still not added = passed on; stop repeating
+            if log.get(h, {}).get("times", 0) >= _DISCOVER_MAX_REPEATS:
+                continue
             if daily:
                 sec = _daily_section_of(body, m.start())
                 if "Prominent Voices" in sec or "Lab Pulse" in sec:
@@ -1945,83 +1949,67 @@ def pass_discover(vault: dict, api_key: str) -> str:
         "- `library` / `podcast` / `note-author` = cited inside curated notes. Strong signal: someone chose to reference them.\n"
         "- `prominent-voices` = they appeared in the daily scraper's high-engagement table. Weak signal: "
         "the reader already sees these posts daily, so following adds little.\n\n"
-        f"Return at most {_DISCOVER_MAX} recommendations — fewer, or none, if nothing is genuinely worth it. "
-        "Returning zero is a valid and useful answer. For each, use exactly:\n\n"
-        "### @handle — Display Name\n"
-        "- **Who:** one line. Say plainly if you cannot identify them with confidence.\n"
-        "- **Why:** what they add that the current follow list doesn't, citing the quotes below.\n"
-        "- **Group:** one of Thought Leaders / Researcher / Tool Builder, or a lab name "
-        "(Anthropic, OpenAI, Google, SpaceXAI, Mistral, Meta, Moonshot) if they post as that org.\n"
-        "- **org:** yes/no — is this an official company/product account rather than a person?\n\n"
-        "Then a line `**Skip:** @a (reason), @b (reason)` for candidates you rejected — keep reasons to a few words.\n\n"
+        f"Pick at most {_DISCOVER_MAX} — fewer, or none, if nothing is genuinely worth it. Zero is a valid answer.\n\n"
         "Reject: bots, brand accounts with no original content, news aggregators, engagement-bait, and anyone "
         "whose only provenance is `prominent-voices`. Do not invent identities — 'unidentified' is fine.\n\n"
+        "Return ONLY a JSON object:\n"
+        '{"picks": [{"handle": "...", "name": "<display name>", "who": "<what they are, max 8 words>", '
+        '"why": "<what they add that the follow list lacks, max 15 words>", '
+        '"note": "<the one note name (from the quotes) that best shows why>", '
+        '"group": "Thought Leaders|Researcher|Tool Builder|<lab name if they post as that org>", '
+        '"org": true|false}],\n'
+        ' "skip": ["<handle>", ...]}\n\n'
         "=== CANDIDATES ===\n" + "\n\n".join(blocks)
     )
 
     system = "You are a research assistant recommending high-signal X accounts. You never invent identities."
-    result = claude_chat(system, prompt)
-    if result is None:
-        result = xai_chat(api_key, system, prompt, effort="medium")
+    raw = claude_chat(system, prompt)
+    if raw is None:
+        raw = xai_chat(api_key, system, prompt, effort="medium")
     else:
         print("  [claude] Used for account discovery")
-    result = (result or "_Could not evaluate candidates._").strip()
+    data = _parse_json_block(raw)
+    if not isinstance(data, dict):
+        return "_Could not evaluate candidates._\n"
 
-    # Paste-ready lines built from the MODEL'S picks (the old version pasted the
-    # raw heuristic top-5, which is how a rejected handle ended up in the block).
     picked = []
-    heads = list(re.finditer(r"^###\s*@(\w+)\s*(?:—|-)\s*(.+)$", result, re.MULTILINE))
-    for i, m in enumerate(heads):
-        h, name = m.group(1), m.group(2).strip()
-        # read to the next heading, not a fixed window: a long "Why" would
-        # otherwise push the Group line out of range and silently default it
-        end = heads[i + 1].start() if i + 1 < len(heads) else len(result)
-        tail = result[m.end(): end]
-        gm = re.search(r"\*\*Group:\*\*\s*([^\n]+)", tail)
-        om = re.search(r"\*\*org:\*\*\s*(yes|no)", tail, re.IGNORECASE)
-        group = (gm.group(1).strip().rstrip(".") if gm else "Thought Leaders")
-        picked.append((h, name, group, bool(om and om.group(1).lower() == "yes")))
+    for p in data.get("picks", [])[:_DISCOVER_MAX]:
+        h = str(p.get("handle", "")).lstrip("@").strip()
+        if h.lower() in candidates:
+            picked.append({**p, "handle": h})
 
-    out = result + "\n"
+    # One line per pick; the old per-pick Who/Why/Group/org block plus prose
+    # ran ~450 words for three handles.
     if picked:
-        out += "\n**To add to `pipeline.md`** (format per its own spec — no `(solo)` flag):\n\n"
+        lines = [
+            f"- **@{p['handle']}** — {p.get('name') or 'unidentified'} · {p.get('who', '')} · "
+            f"{p.get('why', '')}" + (f" · [[{p['note']}]]" if p.get("note") else "")
+            for p in picked
+        ]
         by_group: dict[str, list] = defaultdict(list)
-        for h, name, group, is_org in picked:
-            by_group[group].append(f"- @{h} — {name}{' (org)' if is_org else ''}")
-        for group, lines_ in by_group.items():
-            note = ""
-            if group in _PIPELINE_OTHER_GROUPS:
-                note = "  <!-- not scanned: earns a +20 relevance boost and reaches notes via Prominent Voices -->"
-            elif group in _PIPELINE_LAB_GROUPS:
-                note = "  <!-- lab group: gets a dedicated X scan with no engagement floor -->"
-            out += f"```markdown\n## {group}{note}\n" + "\n".join(lines_) + "\n```\n"
+        for p in picked:
+            by_group[p.get("group") or "Thought Leaders"].append(
+                f"- @{p['handle']} — {p.get('name') or p['handle']}{' (org)' if p.get('org') else ''}")
+        lines.append("\n```markdown\n" + "\n\n".join(
+            f"## {g}\n" + "\n".join(ls) for g, ls in by_group.items()) + "\n```")
+        out = "\n".join(lines) + "\n"
+    else:
+        out = "_No new accounts worth following this week._\n"
 
     # remember, so next week doesn't repeat these
     today = now.strftime("%Y-%m-%d")
-    for h, _, _, _ in picked:
-        entry = log.setdefault(h, {"status": "suggested", "first_suggested": today, "times": 0})
+    for p in picked:
+        entry = log.setdefault(p["handle"].lower(), {"status": "suggested", "first_suggested": today, "times": 0})
         entry["times"] = entry.get("times", 0) + 1
         entry["last_suggested"] = today
-    skip_line = re.search(r"\*\*Skip:\*\*(.+)", result)
-    if skip_line:
-        picked_handles = {h.lower() for h, _, _, _ in picked}
-        # Only the handle that *opens* each comma-separated item is the skipped
-        # one; handles inside a reason ("overlaps @nrehiew_ on architecture")
-        # are references, not rejections.
-        for chunk in re.split(r",\s*(?=@)", skip_line.group(1)):
-            m = re.match(r"\s*@(\w{2,30})", chunk)
-            if not m:
-                continue
-            h = m.group(1).lower()
-            if h in picked_handles:
-                continue
+    picked_handles = {p["handle"].lower() for p in picked}
+    for h in data.get("skip", []):
+        h = str(h).lstrip("@").strip().lower()
+        if h and h not in picked_handles:
             entry = log.setdefault(h, {"first_suggested": today, "times": 0})
             entry["status"] = "rejected"
             entry["last_suggested"] = today
     _save_discover_log(log)
-
-    out += ("\n_Edit `Research/discover.json` to mark a handle `added` or `rejected`; "
-            "either way it won't be suggested again._\n")
     return out
 
 
