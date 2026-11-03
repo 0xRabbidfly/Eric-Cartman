@@ -13,11 +13,11 @@ metadata:
 
 ## Purpose
 
-A weekly intelligence digest that mines the entire Obsidian vault corpus and produces a single analytical document combining 7 analysis capabilities. Designed to run every Sunday morning via scheduled task.
+A weekly intelligence digest that mines the entire Obsidian vault corpus and produces a single analytical document. Designed to run every Sunday morning via scheduled task.
 
 ## What It Does
 
-The script performs 7 analysis passes over your vault:
+The script performs 9 passes over your vault, then synthesizes "The One Thing" from them:
 
 1. **Trend Momentum** — Rising tags, convergent discoveries across independent sources
 2. **Thesis Health Check** — Supporting/contradicting evidence, thesis decay detection
@@ -26,6 +26,8 @@ The script performs 7 analysis passes over your vault:
 5. **Zeitgeist Snapshot** — Dominant tensions, what's hot, what disappeared
 6. **Actionable Insights** — LEARN/BUILD/WATCH/RECONSIDER recommendations
 7. **Prediction Extraction** — Forecasts from sources, resolution tracking
+8. **Account Discovery** — X handles worth following, from curated-note provenance
+9. **Cost Tracking** — This run's cost plus the week's research spend
 
 Output: `Research/Reports/weekly-brain-YYYY-MM-DD.md`
 
@@ -37,7 +39,8 @@ python .github/skills/obsidian-weekly-brain/scripts/brain.py
 
 ## Scheduling
 
-Runs locally from Windows Task Scheduler as `WeeklyBrain`, Sundays at 8:00 AM:
+Runs locally from Windows Task Scheduler as `WeeklyBrain`, Sundays at 7:00 AM Eastern
+(the trigger is pinned to UTC-5, so it fires at 8:00 AM while daylight saving is on):
 
 ```powershell
 # Register or update the task. Elevated, it also runs while logged off (S4U);
@@ -46,8 +49,11 @@ Runs locally from Windows Task Scheduler as `WeeklyBrain`, Sundays at 8:00 AM:
 ```
 
 The task calls `scripts/run-scheduled.ps1`, which writes each run to
-`logs/weekly-brain-<timestamp>.log`, ending with the run's cost line. The week's
-cost row also lands in `Research/Reports/weekly-costs.md`.
+`logs/weekly-brain-<timestamp>.log` (UTF-8), ending with the run's cost line. The
+log's `Launcher:` line names the process that started the run. The wrapper holds a
+named mutex, so a second copy started mid-run logs that and exits without
+touching the report. The week's cost row also lands in
+`Research/Reports/weekly-costs.md`.
 
 Keep it local. A cloud or Claude Desktop routine cannot run it: `api.x.ai` is
 blocked from the cloud sandbox, and the script uses this machine's Windows paths
@@ -66,7 +72,7 @@ python brain.py --weeks 2          # Lookback window (default 4)
 
 ## Data Sources
 
-- `Research/Library/` — All ~190 research notes
+- `Research/Library/` — All research notes (~420 as of 2026-11)
 - `Research/Dailies/` — Daily research notes (last 4 weeks)
 - `Podcasts/` — Podcast notes (skip transcripts/)
 - `Research/connections.json` — Connection graph
@@ -76,7 +82,10 @@ python brain.py --weeks 2          # Lookback window (default 4)
 ## Requirements
 
 - Python 3.10+
-- xAI API key in `~/.config/last30days/.env` (as `XAI_API_KEY`)
+- Claude Code CLI, logged in to the Max subscription: every LLM call goes through
+  `claude --print` first, at no per-call charge
+- xAI API key in `~/.config/last30days/.env` (as `XAI_API_KEY`): the fallback when
+  the Claude CLI fails. The script exits at startup without it.
 - No pip dependencies (stdlib only)
 
 ## Step N: Reflection (composable)

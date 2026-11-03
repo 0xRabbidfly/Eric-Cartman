@@ -56,31 +56,78 @@ function Convert-ToAsciiSafe {
     return ($normalized -replace '[^\u0009\u000A\u000D\u0020-\u007E]', '?')
 }
 
+# Who started us. Some Sundays get a second run ~3 minutes into the first,
+# with nothing in Task Scheduler to explain it; this names the launcher.
+function Get-Launcher {
+    try {
+        $self = Get-CimInstance Win32_Process -Filter "ProcessId=$PID"
+        $parent = Get-CimInstance Win32_Process -Filter "ProcessId=$($self.ParentProcessId)"
+        if ($parent) { return "$($parent.Name) (pid $($parent.ProcessId)): $($parent.CommandLine)" }
+        return "pid $($self.ParentProcessId) (exited)"
+    }
+    catch {
+        return "unknown ($($_.Exception.Message))"
+    }
+}
+
+# Out-File/Add-Content with -Encoding utf8 on every write. Tee-Object -Append
+# on Windows PowerShell 5.1 writes UTF-16, which is what spaced out old logs.
+function Write-Log {
+    param([string]$Text)
+    Add-Content -Path $logFile -Value $Text -Encoding utf8
+}
+
 @(
     "[$(Get-Date -Format 'o')] Starting WeeklyBrain",
+    "Launcher: $(Get-Launcher)",
     "Python: $resolvedPython",
     "Script: $resolvedRunScript",
     "Repo:   $repoRoot",
     "Args:   $($RunArgs -join ' ')"
 ) | Out-File -FilePath $logFile -Encoding utf8
 
+# One run at a time: a second copy started while one is going would rewrite
+# the same report and ledger row.
+$mutex = New-Object System.Threading.Mutex($false, 'Global\EricCartman-WeeklyBrain')
+$haveLock = $false
+try {
+    $haveLock = $mutex.WaitOne(0)
+}
+catch [System.Threading.AbandonedMutexException] {
+    $haveLock = $true
+}
+if (-not $haveLock) {
+    Write-Log "[$(Get-Date -Format 'o')] Another WeeklyBrain run holds the lock; exiting without running."
+    $mutex.Dispose()
+    exit 0
+}
+
+# Python writes UTF-8 and PowerShell reads it as UTF-8, so em dashes and
+# arrows reach Convert-ToAsciiSafe intact instead of arriving as '?'.
+$env:PYTHONIOENCODING = 'utf-8'
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+
 Push-Location $repoRoot
 try {
+    # Stderr lines arrive as error records; under 'Stop' the first one would
+    # abort the wrapper while Python keeps running.
+    $ErrorActionPreference = 'Continue'
     & $resolvedPython $resolvedRunScript @RunArgs 2>&1 |
         ForEach-Object {
-            $line = $_.ToString()
-            $asciiLine = Convert-ToAsciiSafe -Text $line
+            $asciiLine = Convert-ToAsciiSafe -Text $_.ToString()
+            Write-Log $asciiLine
             $asciiLine
-        } |
-        Tee-Object -FilePath $logFile -Append
+        }
     $exitCode = if ($null -ne $LASTEXITCODE) { $LASTEXITCODE } else { 0 }
-    "[$(Get-Date -Format 'o')] ExitCode: $exitCode" | Out-File -FilePath $logFile -Encoding utf8 -Append
+    Write-Log "[$(Get-Date -Format 'o')] ExitCode: $exitCode"
     exit $exitCode
 }
 catch {
-    "[$(Get-Date -Format 'o')] PowerShell wrapper failure: $($_ | Out-String)" | Out-File -FilePath $logFile -Encoding utf8 -Append
+    Write-Log "[$(Get-Date -Format 'o')] PowerShell wrapper failure: $($_ | Out-String)"
     throw
 }
 finally {
     Pop-Location
+    $mutex.ReleaseMutex()
+    $mutex.Dispose()
 }

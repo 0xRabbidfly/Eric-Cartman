@@ -415,7 +415,7 @@ def last_report_section(today: datetime, heading: str) -> str:
 
 def pass_trend(vault: dict, api_key: str) -> str:
     """Identify rising tags and convergent discoveries."""
-    print("\n[Pass 1/7] Trend Momentum...")
+    print("\n[Pass 1/9] Trend Momentum...")
     now = datetime.now()
 
     # Build tag frequency per week for the last 8 weeks
@@ -547,7 +547,7 @@ def refresh_theses_if_stale(vault: dict) -> None:
 
 def pass_thesis(vault: dict, api_key: str) -> str:
     """Assess health of tracked theses."""
-    print("\n[Pass 2/7] Thesis Health Check...")
+    print("\n[Pass 2/9] Thesis Health Check...")
     refresh_theses_if_stale(vault)
     theses = vault["theses"]
     connections = vault["connections"]
@@ -820,7 +820,7 @@ def _daily_reading_items(note: dict, max_items: int = 14) -> list[str]:
 
 def pass_blindspot(vault: dict, api_key: str) -> str:
     """What you keep reading that the Library has no considered view on."""
-    print("\n[Pass 3/7] Blindspot Detection...")
+    print("\n[Pass 3/9] Blindspot Detection...")
     library = vault["library"]
     dailies = vault["dailies"]
     podcasts = vault["podcasts"]
@@ -965,7 +965,7 @@ def _note_excerpt(note: dict | None, slug: str, chars: int = 800) -> str:
 
 def pass_bridge(vault: dict, api_key: str) -> str:
     """New cross-domain bridges since the last report, from connections.json."""
-    print("\n[Pass 4/7] Cross-Domain Bridges...")
+    print("\n[Pass 4/9] Cross-Domain Bridges...")
     now = datetime.now()
     conns = vault["connections"]
     bridges = [c for c in conns if c.get("relationship") == "bridges"]
@@ -1050,7 +1050,7 @@ def pass_bridge(vault: dict, api_key: str) -> str:
 
 def pass_zeitgeist(vault: dict, api_key: str) -> str:
     """Synthesize the current mood and direction of the vault's sources."""
-    print("\n[Pass 5/7] Zeitgeist Snapshot...")
+    print("\n[Pass 5/9] Zeitgeist Snapshot...")
     now = datetime.now()
     four_weeks_ago = now - timedelta(weeks=4)
     # Newest first, so the cap keeps the most recent material rather than
@@ -1153,7 +1153,7 @@ def pass_zeitgeist(vault: dict, api_key: str) -> str:
 
 def pass_action(vault: dict, api_key: str) -> str:
     """Find convergence points and classify actions."""
-    print("\n[Pass 6/7] Actionable Insights...")
+    print("\n[Pass 6/9] Actionable Insights...")
     now = datetime.now()
     # Library + Podcast notes only: dailies all carry the same 5 tags and would
     # make every one of them a "convergence point". (The old check compared
@@ -1432,7 +1432,7 @@ def _resolve_predictions(api_key: str, candidates: list[dict], reading: list[str
 
 def pass_predict(vault: dict, api_key: str):
     """Extract new predictions, resolve due ones, report the track record."""
-    print("\n[Pass 7/7] Prediction Extraction...")
+    print("\n[Pass 7/9] Prediction Extraction...")
     now = datetime.now()
     today = now.strftime("%Y-%m-%d")
     preds: list[dict] = vault["predictions"]
@@ -2164,10 +2164,10 @@ def main():
     elif len(sections) == 1:
         one_thing = list(sections.values())[0][:300]
 
-    # Pass 8: Cost Tracking
+    # Pass 9: Cost Tracking
     run_all = not args.single_pass
     if "cost" in passes_to_run or run_all:
-        print("\n[Pass 8/8] Cost Tracking...")
+        print("\n[Pass 9/9] Cost Tracking...")
         try:
             cost_summary = track_weekly_costs(vault, today)
             sections["cost"] = cost_summary
