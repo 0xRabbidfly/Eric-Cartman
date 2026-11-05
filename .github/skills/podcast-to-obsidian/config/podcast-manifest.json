@@ -632,9 +632,18 @@
           "note_path": "Podcasts/Limitless/2026-11-03 - Anthropic's Q3 The Profit Disappeared, the $895 Billion Compute Bill, and Why It's Still Bullish.md",
           "processed_at": "2026-11-04T07:12:13.398790+00:00",
           "status": "completed"
+        },
+        "7eddb773-d61d-41cc-b1df-a4800927fe95": {
+          "title": "Why Elon Is Rationing Grok Bot: Anthropic's Compute and the $60B Cursor Bet",
+          "published": "2026-11-04",
+          "audio_url": "https://media.transistor.fm/1b8839d4/86eee57e.mp3",
+          "transcript_path": "Podcasts/Limitless/transcripts/2026-11-04 - Why Elon Is Rationing Grok Bot Anthropic's Compute and the $60B Cursor Bet.md",
+          "note_path": "Podcasts/Limitless/2026-11-04 - Why Elon Is Rationing Grok Bot Anthropic's Compute and the $60B Cursor Bet.md",
+          "processed_at": "2026-11-05T07:11:58.666420+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-11-03"
+      "latest_published": "2026-11-04"
     },
     "the-pomp-podcast": {
       "name": "The Pomp Podcast",
@@ -1108,9 +1117,18 @@
           "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-10-31 - Making Sense of This Week’s AI Market Crashes  x307.md",
           "processed_at": "2026-11-01T07:31:39.263828+00:00",
           "status": "completed"
+        },
+        "c31f084a-d868-11f1-aff5-13a8a2387190": {
+          "title": "Big Tech’s $3T AI Bet, Claude Writes 90% of Anthropic’s Code, AIs Editing AI Brains | EP #308",
+          "published": "2026-11-04",
+          "audio_url": "https://traffic.megaphone.fm/DVVTS1005854863.mp3",
+          "transcript_path": "Podcasts/Moonshots with Peter Diamandis/transcripts/2026-11-04 - Big Tech’s $3T AI Bet, Claude Writes 90% of Anthropic’s Code, AIs Editing AI Brains  EP 308.md",
+          "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-11-04 - Big Tech’s $3T AI Bet, Claude Writes 90% of Anthropic’s Code, AIs Editing AI Brains  EP 308.md",
+          "processed_at": "2026-11-05T07:29:18.721214+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-10-31"
+      "latest_published": "2026-11-04"
     },
     "dwarkesh-podcast": {
       "name": "Dwarkesh Podcast",
