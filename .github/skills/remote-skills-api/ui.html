@@ -793,7 +793,10 @@
     }
     .gym-item .gi-presc { font-size: 12px; color: var(--text-dim); margin: 5px 0 9px; line-height: 1.5; }
     .gym-item .gi-presc .gi-num { color: var(--text); font-variant-numeric: tabular-nums; }
-    .gym-item .gi-last { font-size: 12px; color: var(--text-dim); margin: -4px 0 9px; line-height: 1.5; }
+    .gym-item .gi-presc { margin-bottom: 4px; }
+    .gym-item .gi-seg { white-space: nowrap; }
+    .gym-item .gi-note { font-size: 12px; color: var(--text-dim); margin: 0 0 9px; line-height: 1.5; text-wrap: pretty; }
+    .gym-item .gi-last { font-size: 12px; color: var(--text-dim); margin: -4px 0 9px; line-height: 1.5; text-wrap: pretty; }
     .gym-item .gi-last .gi-num { color: var(--text); font-variant-numeric: tabular-nums; }
     .gym-sets { display: flex; flex-direction: column; gap: 6px; }
     .gym-setrow { display: grid; grid-template-columns: 26px 1fr 1fr 1fr; gap: 6px; align-items: center; }
@@ -1875,7 +1878,16 @@
         const paired = item.pairedWith
           ? ` · then ${item.pairedWith.reps} ${item.pairedWith.exerciseKey.replace(/-/g, ' ')} within ${item.pairedWith.withinSec} s`
           : '';
-        const rpe = item.targetRpe ? ` · ${gymRpeLabel(item)}` : '';
+        // Each piece stays whole; a line may only break between pieces, at a
+        // " · ", never inside "90 s rest" or "65 lb plates (109 lb total)".
+        const seg = (text, num) => `<span class="gi-seg${num ? ' gi-num' : ''}">${escHtml(text)}</span>`;
+        const presc = [
+          seg(gymRepLabel(item), true),
+          gymLoadLabel(item) ? seg(gymLoadLabel(item), true) : '',
+          item.targetRpe ? seg(gymRpeLabel(item), true) : '',
+          seg(`${gymRestLabel(item.restSec)} rest`),
+          paired ? seg(paired.replace(/^ · /, '')) : '',
+        ].filter(Boolean).join('&nbsp;· ');   // the dot ends a line, never starts one
         const hint = readOnly ? '' : gymLoadHint(item);
         const ctl = (item.setsAreOptional && !readOnly) ? `
           <div class="gym-setctl">
@@ -1889,9 +1901,8 @@
               <span class="gi-block">${escHtml(item.block)}</span>
               <span class="gi-name" onclick="gymShowExercise('${escJsAttr(item.exerciseKey)}')">${escHtml(item.label)}</span>
             </div>
-            <div class="gi-presc"><span class="gi-num">${escHtml([gymRepLabel(item), gymLoadLabel(item)].filter(Boolean).join(' · '))}${rpe}</span> · ${escHtml(gymRestLabel(item.restSec))} rest${escHtml(paired)}
-              ${item.loadNote ? `<br>${escHtml(item.loadNote)}` : ''}
-              ${hint ? `<br>${escHtml(hint)}` : ''}</div>
+            <div class="gi-presc">${presc}</div>
+            ${item.loadNote || hint ? `<div class="gi-note">${escHtml([item.loadNote, hint].filter(Boolean).join(' '))}</div>` : ''}
             ${gymLastTime(item, (s.previous || {})[item.id])}
             <div class="gym-sets">
               <div class="gym-setrow head"><div></div><div>${gymBarKg(item) === null ? 'Load' : 'Plates'}</div><div>Reps</div><div>RPE</div></div>
