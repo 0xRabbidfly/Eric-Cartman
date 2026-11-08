@@ -801,6 +801,14 @@
       font-size: 9px; font-weight: 700; color: var(--text-dim);
       text-transform: uppercase; letter-spacing: .04em;
     }
+    /* One colour per kind of instruction, light enough to read on --surface2. */
+    .gym-item .gi-k-sets { color: #a5b4fc; }
+    .gym-item .gi-k-load { color: #fcd34d; }
+    .gym-item .gi-k-rpe  { color: #fca5a5; }
+    .gym-item .gi-k-rest { color: #7dd3fc; }
+    .gym-item .gi-k-then { color: #f0abfc; }
+    .gym-item .gi-k-note { color: #86efac; }
+    .gym-item .gi-k-last, .gym-item .gi-k-test { color: #cbd5e1; }
     .gym-item .gi-line {
       display: grid; grid-template-columns: 34px 1fr; gap: 6px; align-items: baseline;
       font-size: 12px; color: var(--text-dim); line-height: 1.45; margin: 0 0 6px;
@@ -1848,7 +1856,7 @@
     // A labelled line under the chips: the label sits in its own column, so
     // the text wraps inside its column and never under the label.
     function gymInfoLine(label, html) {
-      return `<div class="gi-line"><span class="gi-k">${label}</span><span class="gi-v">${html}</span></div>`;
+      return `<div class="gi-line"><span class="gi-k gi-k-${label.toLowerCase()}">${label}</span><span class="gi-v">${html}</span></div>`;
     }
 
     // The middle column holds whatever the exercise is measured in: reps for a
@@ -1904,7 +1912,7 @@
         // " · ", never inside "90 s rest" or "65 lb plates (109 lb total)".
         // One chip per kind of instruction. A chip never breaks; the row wraps
         // only between chips.
-        const chip = (k, v) => `<span class="gi-chip"><span class="gi-k">${k}</span>${escHtml(v)}</span>`;
+        const chip = (k, v) => `<span class="gi-chip"><span class="gi-k gi-k-${k.toLowerCase()}">${k}</span>${escHtml(v)}</span>`;
         const presc = [
           chip('Sets', gymRepLabel(item)),
           gymLoadLabel(item) ? chip('Load', gymLoadLabel(item)) : '',
