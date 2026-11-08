@@ -1144,9 +1144,18 @@
           "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-11-04 - Big Tech’s $3T AI Bet, Claude Writes 90% of Anthropic’s Code, AIs Editing AI Brains  EP 308.md",
           "processed_at": "2026-11-05T07:29:18.721214+00:00",
           "status": "completed"
+        },
+        "956960ca-da9e-11f1-8413-0f800da01260": {
+          "title": "The Great Collision Between Politics and AI | #309",
+          "published": "2026-11-07",
+          "audio_url": "https://traffic.megaphone.fm/DVVTS4303160358.mp3",
+          "transcript_path": "Podcasts/Moonshots with Peter Diamandis/transcripts/2026-11-07 - The Great Collision Between Politics and AI  309.md",
+          "note_path": "Podcasts/Moonshots with Peter Diamandis/2026-11-07 - The Great Collision Between Politics and AI  309.md",
+          "processed_at": "2026-11-08T07:26:20.042274+00:00",
+          "status": "completed"
         }
       },
-      "latest_published": "2026-11-04"
+      "latest_published": "2026-11-07"
     },
     "dwarkesh-podcast": {
       "name": "Dwarkesh Podcast",
