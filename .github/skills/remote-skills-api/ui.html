@@ -1757,7 +1757,10 @@
     function gymLoadHint(item) {
       const { loadHint } = (gym.exercises || {})[item.exerciseKey] || {};
       const bar = gymBarLabel(item);
-      if (item.loadType === 'kg_total_pair') return 'Weight: both dumbbells added together.';
+      // With a target the card already reads "70 lb both together (35 each hand)".
+      if (item.loadType === 'kg_total_pair') {
+        return item.targetLoad === null || item.targetLoad === undefined ? 'Weight: both dumbbells added together.' : '';
+      }
       // A landmine loads one end only, so its library hint says where the plates go.
       if (bar) return `Weight: ${loadHint || 'just the plates, both ends added together'}. The ${bar} bar is added for you, and 0 is the empty bar.`;
       if (loadHint) return `Weight: ${loadHint}.`;
