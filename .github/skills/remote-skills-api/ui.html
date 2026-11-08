@@ -791,13 +791,24 @@
       font-weight: 600; font-size: 14px; color: var(--text);
       text-decoration: underline dotted var(--text-dim); cursor: pointer;
     }
-    .gym-item .gi-presc { font-size: 12px; color: var(--text-dim); margin: 5px 0 9px; line-height: 1.5; }
-    .gym-item .gi-presc .gi-num { color: var(--text); font-variant-numeric: tabular-nums; }
-    .gym-item .gi-presc { margin-bottom: 4px; }
-    .gym-item .gi-seg { white-space: nowrap; }
-    .gym-item .gi-note { font-size: 12px; color: var(--text-dim); margin: 0 0 9px; line-height: 1.5; text-wrap: balance; }
-    .gym-item .gi-last { font-size: 12px; color: var(--text-dim); margin: -4px 0 9px; line-height: 1.5; text-wrap: balance; }
-    .gym-item .gi-last .gi-num { color: var(--text); font-variant-numeric: tabular-nums; }
+    .gym-item .gi-chips { display: flex; flex-wrap: wrap; gap: 4px; margin: 8px 0 8px; }
+    .gym-item .gi-chip {
+      display: inline-flex; align-items: baseline; gap: 4px; white-space: nowrap;
+      font-size: 12px; color: var(--text); font-variant-numeric: tabular-nums;
+      background: var(--surface2); border-radius: 6px; padding: 2px 6px;
+    }
+    .gym-item .gi-k {
+      font-size: 9px; font-weight: 700; color: var(--text-dim);
+      text-transform: uppercase; letter-spacing: .04em;
+    }
+    .gym-item .gi-line {
+      display: grid; grid-template-columns: 34px 1fr; gap: 6px; align-items: baseline;
+      font-size: 12px; color: var(--text-dim); line-height: 1.45; margin: 0 0 6px;
+    }
+    .gym-item .gi-line .gi-k { line-height: 1.3; }
+    .gym-item .gi-v { text-wrap: balance; min-width: 0; }
+    .gym-item .gi-v .gi-num { color: var(--text); font-variant-numeric: tabular-nums; }
+    .gym-item .gym-sets { margin-top: 10px; }
     .gym-sets { display: flex; flex-direction: column; gap: 6px; }
     .gym-setrow { display: grid; grid-template-columns: 26px 1fr 1fr 1fr; gap: 6px; align-items: center; }
     .gym-setrow.head { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: .04em; }
@@ -1831,8 +1842,13 @@
         ? `${load(first.load)}${unit}${first.reps === null || first.reps === undefined ? '' : ` × ${first.reps}`}, ${each.length} sets`
         : `${each.join(' · ')}${unit}`;
       const when = prev.performedOn ? gymShortDate(prev.performedOn) : `W${prev.week} D${prev.day}`;
-      return `<div class="gi-last">Last${prev.isRamp ? ' (test)' : ''}, ${escHtml(when)}: `
-        + `<span class="gi-num">${escHtml(sets)}</span></div>`;
+      return gymInfoLine(prev.isRamp ? 'Test' : 'Last', `${escHtml(when)} · <span class="gi-num">${gymKeepUnits(escHtml(sets))}</span>`);
+    }
+
+    // A labelled line under the chips: the label sits in its own column, so
+    // the text wraps inside its column and never under the label.
+    function gymInfoLine(label, html) {
+      return `<div class="gi-line"><span class="gi-k">${label}</span><span class="gi-v">${html}</span></div>`;
     }
 
     // The middle column holds whatever the exercise is measured in: reps for a
@@ -1886,14 +1902,16 @@
           : '';
         // Each piece stays whole; a line may only break between pieces, at a
         // " · ", never inside "90 s rest" or "65 lb plates (109 lb total)".
-        const seg = (text, num) => `<span class="gi-seg${num ? ' gi-num' : ''}">${escHtml(text)}</span>`;
+        // One chip per kind of instruction. A chip never breaks; the row wraps
+        // only between chips.
+        const chip = (k, v) => `<span class="gi-chip"><span class="gi-k">${k}</span>${escHtml(v)}</span>`;
         const presc = [
-          seg(gymRepLabel(item), true),
-          gymLoadLabel(item) ? seg(gymLoadLabel(item), true) : '',
-          item.targetRpe ? seg(gymRpeLabel(item), true) : '',
-          seg(`${gymRestLabel(item.restSec)} rest`),
-          paired ? seg(paired.replace(/^ · /, '')) : '',
-        ].filter(Boolean).join('&nbsp;· ');   // the dot ends a line, never starts one
+          chip('Sets', gymRepLabel(item)),
+          gymLoadLabel(item) ? chip('Load', gymLoadLabel(item)) : '',
+          item.targetRpe ? chip('RPE', item.isRamp ? `up to ${item.targetRpe}` : String(item.targetRpe)) : '',
+          chip('Rest', gymRestLabel(item.restSec)),
+          paired ? chip('Then', paired.replace(/^ · then /, '')) : '',
+        ].filter(Boolean).join('');
         const hint = readOnly ? '' : gymLoadHint(item);
         const ctl = (item.setsAreOptional && !readOnly) ? `
           <div class="gym-setctl">
@@ -1907,8 +1925,8 @@
               <span class="gi-block">${escHtml(item.block)}</span>
               <span class="gi-name" onclick="gymShowExercise('${escJsAttr(item.exerciseKey)}')">${escHtml(item.label)}</span>
             </div>
-            <div class="gi-presc">${presc}</div>
-            ${item.loadNote || hint ? `<div class="gi-note">${gymKeepUnits(escHtml([item.loadNote, hint].filter(Boolean).join(' ')))}</div>` : ''}
+            <div class="gi-chips">${presc}</div>
+            ${item.loadNote || hint ? gymInfoLine('Note', gymKeepUnits(escHtml([item.loadNote, hint].filter(Boolean).join(' ')))) : ''}
             ${gymLastTime(item, (s.previous || {})[item.id])}
             <div class="gym-sets">
               <div class="gym-setrow head"><div></div><div>${gymBarKg(item) === null ? 'Load' : 'Plates'}</div><div>Reps</div><div>RPE</div></div>
