@@ -930,6 +930,125 @@
       font-size: 12px; border-collapse: collapse; margin: 8px 0;
     }
     .gym-note .gn-body th, .gym-note .gn-body td { padding: 4px 8px; border-bottom: 1px solid var(--border); }
+    /* ── Session focus: progress, the next set, finished exercises folded ── */
+    .gym-progress {
+      position: sticky; top: 0; z-index: 5; margin: 0 -12px 10px; padding: 8px 14px;
+      background: var(--bg); border-bottom: 1px solid var(--border);
+      display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center;
+    }
+    .gym-progress .gp-bar { height: 6px; border-radius: 3px; background: var(--surface2); overflow: hidden; }
+    .gym-progress .gp-bar > span { display: block; width: 0; height: 100%; background: var(--success); border-radius: 3px; transition: width .25s ease; }
+    .gym-progress .gp-count { font-size: 12px; color: var(--text); font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .gym-item .gi-fold {
+      margin-left: auto; align-self: center; background: none; border: none; color: var(--text-dim);
+      font-size: 13px; padding: 2px 2px 2px 12px; cursor: pointer; -webkit-tap-highlight-color: transparent;
+    }
+    .gym-item .gi-sum { display: none; margin-top: 6px; font-size: 12.5px; color: var(--text); line-height: 1.45;
+                        font-variant-numeric: tabular-nums; cursor: pointer; text-wrap: balance; }
+    .gym-item.folded { padding-top: 10px; padding-bottom: 10px; }
+    .gym-item.folded > :not(.gi-head):not(.gi-sum) { display: none; }
+    .gym-item.folded .gi-sum { display: block; }
+    .gym-item.finished { border-color: #22c55e66; }
+    .gym-item.finished .gi-block { background: #22c55e24; color: var(--success); }
+    .gym-setrow.next .sr-n { background: var(--accent); color: #fff; border-radius: 6px; padding: 4px 0; font-weight: 700; }
+    .gym-setrow .gap, .gym-pairrow .gap { border-color: var(--danger) !important; box-shadow: 0 0 0 2px #ef444433; }
+
+    /* ── RPE: a tap target that opens the values people log ── */
+    .gym-setrow .sr-rpe {
+      width: 100%; padding: 8px 6px; text-align: center; font-size: 15px; font-family: inherit;
+      background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+      color: var(--text-dim); cursor: pointer; font-variant-numeric: tabular-nums;
+      -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+    }
+    .gym-setrow .sr-rpe:disabled { cursor: default; }
+    .gym-setrow .sr-rpe.has { color: var(--text); border-color: var(--success); }
+    .gym-setrow .sr-rpe.rpe-on { color: #86efac; border-color: var(--success); background: #22c55e1f; }
+    .gym-setrow .sr-rpe.rpe-over { color: #fcd34d; border-color: var(--warn); background: #f59e0b1f; }
+    .gym-setrow .sr-rpe.rpe-under { color: #7dd3fc; border-color: #38bdf8; background: #38bdf81f; }
+    .gym-rpepick { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; padding: 2px 0 4px 32px; }
+    .gym-rpepick button {
+      padding: 9px 0; font-size: 15px; font-weight: 600; font-family: inherit; font-variant-numeric: tabular-nums;
+      background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--text);
+      cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+    }
+    .gym-rpepick button.target { border-color: var(--success); }
+    .gym-rpepick button.current { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .gym-rpepick button.clear { font-size: 12px; font-weight: 600; color: var(--text-dim); }
+
+    /* ── Contrast: the jumps after a heavy set are their own step ── */
+    .gym-pairrow { display: grid; grid-template-columns: 26px 1fr auto 64px; gap: 6px; align-items: center; }
+    .gym-pairrow .pr-arrow { text-align: center; color: #f0abfc; font-size: 13px; }
+    .gym-pairrow .pr-text { font-size: 12px; color: var(--text-dim); line-height: 1.35; text-wrap: balance; }
+    .gym-pairrow .pr-text b { color: #f0abfc; font-size: 9px; letter-spacing: .04em; text-transform: uppercase; margin-right: 3px; }
+    .gym-pairrow .pr-go {
+      padding: 6px 9px; border-radius: 7px; border: 1px solid #f0abfc66; background: #f0abfc14;
+      color: #f5d0fe; font-size: 12px; font-weight: 700; font-family: inherit; white-space: nowrap; cursor: pointer;
+    }
+    .gym-pairrow input {
+      width: 100%; padding: 6px 4px; text-align: center; font-size: 13px;
+      background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+      color: var(--text); outline: none; -webkit-appearance: none;
+    }
+    .gym-pairrow input:focus { border-color: var(--accent); }
+    .gym-pairrow input.filled { border-color: var(--success); }
+
+    /* ── Copy a changed load or rep count down to the sets still blank ── */
+    .gym-copy {
+      display: flex; align-items: center; gap: 8px; margin-top: 8px; padding: 6px 6px 6px 10px;
+      background: var(--accent-soft); border: 1px solid #6366f155; border-radius: 8px;
+      font-size: 12.5px; color: var(--text);
+    }
+    .gym-copy span { flex: 1; min-width: 0; }
+    .gym-copy button { padding: 6px 12px; border-radius: 7px; border: none; font-size: 12.5px; font-weight: 700; font-family: inherit; cursor: pointer; }
+    .gym-copy .apply { background: var(--accent); color: #fff; }
+    .gym-copy .dismiss { background: none; color: var(--text-dim); padding: 6px; }
+
+    /* ── Rest timer: sits above the tab bar while the gym tab is open ── */
+    .gym-timer {
+      position: relative; flex-shrink: 0; display: flex; align-items: center; gap: 10px;
+      padding: 9px 14px 11px; background: var(--surface); border-top: 1px solid var(--border); overflow: hidden;
+    }
+    .gym-timer .gt-fillbar { position: absolute; left: 0; bottom: 0; height: 3px; background: #7dd3fc; transition: width .25s linear; }
+    .gym-timer.jump .gt-fillbar { background: #f0abfc; }
+    .gym-timer .gt-k { font-size: 9.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #7dd3fc; }
+    .gym-timer.jump .gt-k { color: #f0abfc; }
+    .gym-timer .gt-time { font-size: 22px; font-weight: 700; line-height: 1.1; color: var(--text); font-variant-numeric: tabular-nums; min-width: 62px; }
+    .gym-timer .gt-what { flex: 1; min-width: 0; font-size: 12px; color: var(--text-dim); line-height: 1.35; text-wrap: balance; }
+    .gym-timer button {
+      padding: 7px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface2);
+      color: var(--text); font-size: 12.5px; font-weight: 600; font-family: inherit; cursor: pointer; white-space: nowrap;
+    }
+    .gym-timer.ding { animation: gymDing .6s ease 3; }
+    .gym-timer.ding .gt-time { color: var(--success); }
+    @keyframes gymDing { 50% { background: #22c55e33; } }
+
+    /* ── New bests: what this session set, above its assessment ── */
+    .gym-bests-title { font-size: 10px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #86efac; margin: 4px 0 6px; }
+    .gym-bests { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+    .gym-best {
+      display: inline-flex; align-items: baseline; gap: 6px; white-space: nowrap; padding: 6px 10px;
+      border-radius: 9px; background: #22c55e14; border: 1px solid #22c55e55;
+      font-size: 13px; color: var(--text); font-variant-numeric: tabular-nums;
+    }
+    .gym-best .gb-k { font-size: 9.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: #86efac; }
+    .gym-best .gb-up { font-size: 12px; font-weight: 700; color: #86efac; }
+
+    /* ── Pre-finish check ── */
+    .gym-review { text-align: left; font-size: 13px; line-height: 1.45; display: flex; flex-direction: column; gap: 8px; }
+    .gym-review .rv { display: grid; grid-template-columns: 16px 1fr; gap: 6px; }
+    .gym-review .rv-ok { color: var(--text); }
+    .gym-review .rv-ok .rv-i { color: var(--success); }
+    .gym-review .rv-gap { color: #fcd34d; }
+    .gym-review .rv-gap .rv-i { color: var(--warn); font-weight: 800; }
+
+    /* ── Sparklines: a value across the twelve weeks, test weeks ticked ── */
+    .gym-spark { display: block; width: 100%; height: auto; margin-top: 4px; }
+    .gym-spark .sk-tick { stroke: var(--border); stroke-width: 1; stroke-dasharray: 2 3; }
+    .gym-spark .sk-lab { fill: var(--text-dim); font-size: 8px; text-anchor: middle; }
+    .gym-spark .sk-line { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+    .gym-spark .sk-dot { fill: var(--accent); }
+    .gym-spark .sk-dot.last { fill: #a5b4fc; }
+    .gym-statrow .sr-spark, .gym-trendrow .tr-spark { grid-column: 1 / -1; }
   </style>
 </head>
 <body>
@@ -1074,6 +1193,7 @@
       <div id="gymScroll" class="view-scroll">
         <div class="gym-empty">Loading…</div>
       </div>
+      <div id="gymTimer" class="gym-timer hidden" role="timer"></div>
     </div>
 
   </div>
@@ -1635,7 +1755,10 @@
     // ── Gym session logging ──
     const gymSession = { week: null, day: null, data: null, entries: new Map(), dayNotes: '',
                          saveTimer: null, pending: null, saving: Promise.resolve(),
-                         job: null, assessment: null, assessmentFailed: false };
+                         job: null, assessment: null, assessmentFailed: false,
+                         // Cards the athlete folded or unfolded by hand, which beats
+                         // the automatic fold. Cleared when a session is opened.
+                         foldOverride: new Map(), revealNext: false };
 
     function gymEntryKey(itemId, setNo) { return `${itemId}#${setNo}`; }
 
@@ -1646,6 +1769,8 @@
       gymSession.assessment = null;
       gymSession.assessmentFailed = false;
       gymSession.job = null;
+      gymSession.foldOverride = new Map();
+      gymSession.revealNext = true;
       document.getElementById('gymScroll').innerHTML = '<div class="gym-empty">Loading…</div>';
       try {
         const [data, exercises] = await Promise.all([
@@ -1802,7 +1927,7 @@
     // "20 s", "70 lb", "5 min" stay on one line: a number never ends a line
     // without its unit.
     function gymKeepUnits(html) {
-      return html.replace(/(\d) (s|lb|kg|min|m|cm|reps?)\b/g, '$1&nbsp;$2');
+      return html.replace(/(\d) (s|lb|kg|min|m|cm|reps?)\b/g, '$1&nbsp;$2').replace(/ × /g, '&nbsp;×&nbsp;');
     }
 
     function gymRestLabel(sec) {
@@ -1836,21 +1961,38 @@
     // exactly as they were typed.
     function gymLastTime(item, prev) {
       if (!prev || !prev.sets || !prev.sets.length) return '';
-      const unit = gymIsWeight(item) ? ` ${gymWeightUnit(item)}${gymBarKg(item) !== null ? ' plates' : ''}` : '';
-      const load = v => {
-        if (item.loadType === 'bodyweight_plus_kg') return v ? `bw + ${gymShowWeight(v, item)}` : 'bw';
-        if (item.loadType === 'setting') return `setting ${v}`;
-        return gymIsWeight(item) ? gymShowLoad(v, item) : String(v);
-      };
-      const each = prev.sets.map(e => (e.reps === null || e.reps === undefined
-        ? load(e.load) : `${load(e.load)} × ${e.reps}`));
-      // Identical sets collapse to one, with the unit on the weight: "70 lb × 8, 2 sets".
-      const first = prev.sets[0];
-      const sets = each.every(x => x === each[0]) && each.length > 1
-        ? `${load(first.load)}${unit}${first.reps === null || first.reps === undefined ? '' : ` × ${first.reps}`}, ${each.length} sets`
-        : `${each.join(' · ')}${unit}`;
       const when = prev.performedOn ? gymShortDate(prev.performedOn) : `W${prev.week} D${prev.day}`;
-      return gymInfoLine(prev.isRamp ? 'Test' : 'Last', `${escHtml(when)} · <span class="gi-num">${gymKeepUnits(escHtml(sets))}</span>`);
+      return gymInfoLine(prev.isRamp ? 'Test' : 'Last',
+        `${escHtml(when)} · <span class="gi-num">${gymKeepUnits(escHtml(gymSetsText(item, prev.sets)))}</span>`);
+    }
+
+    // A list of sets as one short line. Identical sets collapse, with the unit
+    // on the weight: "70 lb × 8, 2 sets"; different ones read
+    // "109 × 3 · 114 × 3 lb plates". Loads arrive in kg and show in the app's
+    // unit, exactly as they were typed.
+    function gymSetsText(item, sets) {
+      const has = v => v !== null && v !== undefined;
+      const weight = gymIsWeight(item) && item.loadType !== 'bodyweight_plus_kg';
+      const unit = weight ? ` ${gymWeightUnit(item)}${gymBarKg(item) !== null ? ' plates' : ''}` : '';
+      const load = v => {
+        if (!has(v) || item.loadType === 'bodyweight') return '';
+        if (item.loadType === 'bodyweight_plus_kg') return v ? `bw + ${gymShowWeight(v, item)} ${gymWeightUnit(item)}` : 'bw';
+        if (item.loadType === 'setting') return `setting ${v}`;
+        return weight ? gymShowLoad(v, item) : String(v);
+      };
+      const result = (r, withLoad) => {
+        if (!has(r)) return '';
+        if (item.resultType === 'reps') return withLoad ? `× ${r}` : `${r} reps`;
+        if (item.resultType === 'reps_per_side') return withLoad ? `× ${r}/side` : `${r}/side`;
+        return `${withLoad ? '× ' : ''}${r} ${GYM_UNITS[item.resultType]}`;
+      };
+      const one = (e, withUnit) => {
+        const l = load(e.load);
+        return [l && withUnit && weight ? `${l}${unit}` : l, result(e.reps, !!l)].filter(Boolean).join(' ');
+      };
+      const each = sets.map(e => one(e, false));
+      if (each.length > 1 && each.every(x => x === each[0])) return `${one(sets[0], true)}, ${each.length} sets`;
+      return `${each.join(' · ')}${weight && sets.some(e => has(e.load)) ? unit : ''}`;
     }
 
     // A labelled line under the chips: the label sits in its own column, so
@@ -1860,11 +2002,15 @@
     }
 
     // The middle column holds whatever the exercise is measured in: reps for a
-    // squat, centimetres for a broad jump, seconds for a plank.
+    // squat, centimetres for a broad jump, seconds for a plank. A count the
+    // card prescribes (reps, a hold, a carry's metres) shows as its number,
+    // because a blank box finishes as that number. A jump's centimetres are a
+    // measurement with nothing to default to, so that box shows the unit.
     function gymResultPlaceholder(item) {
-      return item.resultType === 'reps' || item.resultType === 'reps_per_side'
-        ? gymRepTarget(item)
-        : GYM_UNITS[item.resultType];
+      if (item.resultType === 'reps' || item.resultType === 'reps_per_side') return gymRepTarget(item);
+      if ((item.resultType === 'seconds' || item.resultType === 'metres') && !item.isBaseline
+          && typeof item.reps === 'number') return String(item.reps);
+      return GYM_UNITS[item.resultType];
     }
 
     function renderGymSession() {
@@ -1882,43 +2028,43 @@
 
       const items = s.day.items.map(item => {
         const rows = [];
+        const id = escJsAttr(item.id);
         for (let n = 1; n <= gymRowCount(item); n += 1) {
           const e = gymSession.entries.get(gymEntryKey(item.id, n)) || {};
+          const key = escHtml(gymEntryKey(item.id, n));
           const val = v => (v === null || v === undefined ? '' : v);
           const filled = v => (v === null || v === undefined || v === '' ? '' : 'filled');
           const loadBox = `<input inputmode="decimal" placeholder="${escHtml(gymLoadPlaceholder(item))}"
+                     data-key="${key}" data-field="load"
                      class="${filled(e.load)}" value="${gymIsWeight(item) ? gymShowLoad(e.load, item) : val(e.load)}" ${readOnly ? 'disabled' : ''}
-                     onchange="gymSetInput('${escJsAttr(item.id)}', ${n}, 'load', this.value, this)">`;
+                     onchange="gymTyped('${id}', ${n}, 'load', this.value, this)">`;
+          const rpe = e.rpe === null || e.rpe === undefined ? null : e.rpe;
           // Under the plates, the total they make with the bar, so a slip in
           // the sum shows before it's saved.
           rows.push(`
-            <div class="gym-setrow">
+            <div class="gym-setrow" data-set="${n}">
               <div class="sr-n">${n}</div>
               ${gymBarKg(item) === null ? loadBox : `<div class="sr-load">${loadBox}
                 <div class="sr-total">${typeof e.load === 'number' ? escHtml(gymBarTotal(e.load, item)) : ''}</div></div>`}
               <input inputmode="numeric" placeholder="${escHtml(gymResultPlaceholder(item))}"
+                     data-key="${key}" data-field="reps"
                      class="${filled(e.reps)}" value="${val(e.reps)}" ${readOnly ? 'disabled' : ''}
-                     onchange="gymSetInput('${escJsAttr(item.id)}', ${n}, 'reps', this.value, this)">
-              <input inputmode="decimal" placeholder="RPE"
-                     class="${filled(e.rpe)}" value="${val(e.rpe)}" ${readOnly ? 'disabled' : ''}
-                     onchange="gymSetInput('${escJsAttr(item.id)}', ${n}, 'rpe', this.value, this)">
+                     onchange="gymTyped('${id}', ${n}, 'reps', this.value, this)">
+              <button type="button" class="sr-rpe ${gymRpeClass(item, rpe)}" data-key="${key}" ${readOnly ? 'disabled' : ''}
+                      aria-label="RPE for set ${n}" onclick="gymToggleRpe('${id}', ${n})">${rpe === null ? 'RPE' : escHtml(String(rpe))}</button>
             </div>`);
+          if (item.pairedWith) rows.push(gymPairRow(item, n, e, readOnly));
         }
 
-        const paired = item.pairedWith
-          ? ` · then ${item.pairedWith.reps} ${item.pairedWith.exerciseKey.replace(/-/g, ' ')} within ${item.pairedWith.withinSec} s`
-          : '';
-        // Each piece stays whole; a line may only break between pieces, at a
-        // " · ", never inside "90 s rest" or "65 lb plates (109 lb total)".
         // One chip per kind of instruction. A chip never breaks; the row wraps
-        // only between chips.
+        // only between chips. A contrast set's jumps are drawn as their own
+        // step under each set, so they have no chip.
         const chip = (k, v) => `<span class="gi-chip"><span class="gi-k gi-k-${k.toLowerCase()}">${k}</span>${escHtml(v)}</span>`;
         const presc = [
           chip('Sets', gymRepLabel(item)),
           gymLoadLabel(item) ? chip('Load', gymLoadLabel(item)) : '',
           item.targetRpe ? chip('RPE', item.isRamp ? `up to ${item.targetRpe}` : String(item.targetRpe)) : '',
           chip('Rest', gymRestLabel(item.restSec)),
-          paired ? chip('Then', paired.replace(/^ · then /, '')) : '',
         ].filter(Boolean).join('');
         const hint = readOnly ? '' : gymLoadHint(item);
         const ctl = (item.setsAreOptional && !readOnly) ? `
@@ -1928,11 +2074,13 @@
           </div>` : '';
 
         return `
-          <div class="gym-item">
+          <div class="gym-item" data-item="${escHtml(item.id)}">
             <div class="gi-head">
               <span class="gi-block">${escHtml(item.block)}</span>
               <span class="gi-name" onclick="gymShowExercise('${escJsAttr(item.exerciseKey)}')">${escHtml(item.label)}</span>
+              ${readOnly ? '' : `<button type="button" class="gi-fold" aria-label="Fold or unfold ${escHtml(item.label)}" onclick="gymToggleFold('${id}')">▾</button>`}
             </div>
+            <div class="gi-sum" onclick="gymToggleFold('${id}')"></div>
             <div class="gi-chips">${presc}</div>
             ${item.loadNote || hint ? gymInfoLine('Note', gymKeepUnits(escHtml([item.loadNote, hint].filter(Boolean).join(' ')))) : ''}
             ${gymLastTime(item, (s.previous || {})[item.id])}
@@ -1961,6 +2109,7 @@
             <div class="gw-sub">${s.day.estMinutes} min · ${escHtml(s.week.blockLabel)}${done ? ` · done ${gymShortDate(s.log.performedOn)}` : ''}</div>
           </div>
         </div>
+        ${readOnly ? '' : '<div class="gym-progress"><div class="gp-bar"><span></span></div><div class="gp-count"></div></div>'}
         ${lockedNote}
         ${s.podcast && /^https:\/\//.test(s.podcast.url) ? `
           <a class="gym-podcast" href="${escHtml(s.podcast.url)}" target="_blank" rel="noopener">
@@ -1969,7 +2118,7 @@
             ${s.podcast.why ? `<div class="gp-why">${escHtml(s.podcast.why)}</div>` : ''}
           </a>` : ''}
         ${readOnly ? '' : `<div class="gym-locked-note">Weights in ${gymWeightUnit()}${
-          gymIsLb() && s.day.items.some(i => gymIsWeight(i) && !gymIsLb(i)) ? ' (kettlebells in kg)' : ''}. Blank reps count as the reps shown when you finish, except on max tests and baselines.</div>`}
+          gymIsLb() && s.day.items.some(i => gymIsWeight(i) && !gymIsLb(i)) ? ' (kettlebells in kg)' : ''}. A blank box finishes as the card's number. On a test, a set with a weight counts as 3.</div>`}
         <div class="gym-warmup"><b>Warm-up</b> · ${s.day.warmup.map(escHtml).join(' · ')}</div>
         ${items}
         <textarea class="gym-notes" placeholder="${gymProgram() === 'cycling'
@@ -1981,12 +2130,15 @@
           : done
             ? `<button class="gym-back" onclick="reopenGymSession()">Reopen to correct a number</button>`
             : `<button class="gym-finish" onclick="finishGymWorkout()">Finish workout</button>`}
+        ${done ? gymBests(s) : ''}
         ${locked ? '' : assessment}`;
+      if (!readOnly) gymUpdateFocus({ instant: true });
     }
 
     function gymCollectEntries() {
       return [...gymSession.entries.values()].filter(e =>
-        e.load !== null || e.reps !== null || e.rpe !== null);
+        e.load !== null || e.reps !== null || e.rpe !== null
+        || (e.pairedResult !== null && e.pairedResult !== undefined));
     }
 
     // Snapshot BOTH the target and the body at queue time. Reading them when the
@@ -2049,6 +2201,504 @@
     function gymSetNotes(value) {
       gymSession.dayNotes = value;
       gymQueueSave();
+    }
+
+    function gymItem(itemId) { return gymSession.data.day.items.find(i => i.id === itemId); }
+    function gymCard(itemId) { return document.querySelector(`.gym-item[data-item="${CSS.escape(itemId)}"]`); }
+    function gymSetRow(itemId, n) {
+      const card = gymCard(itemId);
+      return card ? card.querySelector(`.gym-setrow[data-set="${n}"]`) : null;
+    }
+    function gymSessionReadOnly() {
+      const s = gymSession.data;
+      return !s || s.log.status === 'complete' || !!s.locked;
+    }
+
+    // A typed box: store it, offer to carry a changed load or rep count down
+    // to the sets still blank, and move the focus marker on.
+    function gymTyped(itemId, n, field, raw, el) {
+      gymSetInput(itemId, n, field, raw, el);
+      if (el) el.classList.remove('gap');
+      if (field === 'load' || field === 'reps') gymOfferCopy(itemId, n, field, String(raw).trim(), el);
+      gymUpdateFocus();
+    }
+
+    // ── Copy down ──
+    // Blank means "as the card said", so a set that went differently is the
+    // one number typed. When the rest of the exercise went the same way, one
+    // tap carries it down instead of typing it into every set.
+    function gymOfferCopy(itemId, n, field, text, el) {
+      document.querySelector('.gym-copy')?.remove();
+      const item = gymItem(itemId);
+      if (!text || !el || item.isRamp || item.setsAreOptional) return;
+      if (text === el.placeholder) return;   // the card's own number: the blanks already mean it
+      const targets = [];
+      for (let m = n + 1; m <= gymRowCount(item); m += 1) {
+        const e = gymSession.entries.get(gymEntryKey(itemId, m));
+        if (!e || e[field] === null || e[field] === undefined) targets.push(m);
+      }
+      if (!targets.length) return;
+      const what = field === 'load'
+        ? `${text}${gymIsWeight(item) ? ` ${gymWeightUnit(item)}${gymBarKg(item) !== null ? ' plates' : ''}` : ''}`
+        : `${text} ${GYM_UNITS[item.resultType] || 'reps'}`;
+      const where = targets.length === 1 ? `set ${targets[0]}` : `sets ${gymRanges(targets)}`;
+      const bar = document.createElement('div');
+      bar.className = 'gym-copy';
+      bar.innerHTML = `<span>Use ${escHtml(what)} for ${escHtml(where)}?</span>
+        <button type="button" class="apply" onclick="gymApplyCopy('${escJsAttr(itemId)}', '${field}', '${escJsAttr(text)}', [${targets.join(',')}])">Apply</button>
+        <button type="button" class="dismiss" aria-label="No thanks" onclick="this.parentElement.remove(); gymUpdateFocus()">✕</button>`;
+      el.closest('.gym-sets').after(bar);
+    }
+
+    function gymApplyCopy(itemId, field, text, sets) {
+      document.querySelector('.gym-copy')?.remove();
+      for (const m of sets) {
+        const input = document.querySelector(
+          `.gym-setrow input[data-key="${CSS.escape(gymEntryKey(itemId, m))}"][data-field="${field}"]`);
+        if (input) { input.value = text; input.classList.remove('gap'); }
+        gymSetInput(itemId, m, field, text, input);
+      }
+      gymUpdateFocus();
+    }
+
+    // "1, 2, 3, 5" reads "1–3, 5".
+    function gymRanges(nums) {
+      const out = [];
+      for (let i = 0; i < nums.length; i += 1) {
+        let j = i;
+        while (j + 1 < nums.length && nums[j + 1] === nums[j] + 1) j += 1;
+        out.push(j > i ? `${nums[i]}–${nums[j]}` : String(nums[i]));
+        i = j;
+      }
+      return out.join(', ');
+    }
+
+    // ── RPE picker ──
+    // Tapping a set's RPE opens the values people actually log, under that
+    // set: the common ones on top, the ramp warm-ups below. The chosen value
+    // is coloured against the card's target.
+    const GYM_RPE_CHOICES = [6, 7, 8, 9, 10, 3, 4, 5, 9.5, null];
+
+    function gymRpeClass(item, rpe) {
+      if (rpe === null || rpe === undefined) return '';
+      const target = item.targetRpe;
+      if (typeof target !== 'number') return 'has';
+      if (item.isRamp) return rpe > target ? 'rpe-over' : 'rpe-on';   // a ceiling, not a target
+      return rpe === target ? 'rpe-on' : rpe > target ? 'rpe-over' : 'rpe-under';
+    }
+
+    function gymToggleRpe(itemId, n) {
+      const key = gymEntryKey(itemId, n);
+      const open = document.querySelector('.gym-rpepick');
+      const same = open && open.dataset.key === key;
+      if (open) open.remove();
+      if (same) { gymUpdateFocus(); return; }
+      gymAudioUnlock();   // a tap is the gesture iOS needs before the timer may sound
+      const item = gymItem(itemId);
+      const current = (gymSession.entries.get(key) || {}).rpe;
+      const pick = document.createElement('div');
+      pick.className = 'gym-rpepick';
+      pick.dataset.key = key;
+      pick.innerHTML = GYM_RPE_CHOICES.map(v => v === null
+        ? `<button type="button" class="clear" onclick="gymPickRpe('${escJsAttr(itemId)}', ${n}, null)">Clear</button>`
+        : `<button type="button" class="${v === item.targetRpe ? 'target' : ''}${v === current ? ' current' : ''}"
+                   onclick="gymPickRpe('${escJsAttr(itemId)}', ${n}, ${v})">${v}</button>`).join('');
+      gymSetRow(itemId, n).after(pick);
+    }
+
+    function gymPickRpe(itemId, n, value) {
+      const key = gymEntryKey(itemId, n);
+      const before = (gymSession.entries.get(key) || {}).rpe;
+      gymSetInput(itemId, n, 'rpe', value === null ? '' : String(value), null);
+      document.querySelector('.gym-rpepick')?.remove();
+      const item = gymItem(itemId);
+      const btn = document.querySelector(`.sr-rpe[data-key="${CSS.escape(key)}"]`);
+      if (btn) {
+        btn.textContent = value === null ? 'RPE' : String(value);
+        btn.className = `sr-rpe ${gymRpeClass(item, value)}`;
+      }
+      // The RPE going in is the moment the set ended. A correction to an RPE
+      // already logged doesn't restart anything.
+      if ((before === null || before === undefined) && value !== null) gymRestAfter(item, n);
+      gymUpdateFocus();
+    }
+
+    // ── Contrast step ──
+    function gymPairRow(item, n, e, readOnly) {
+      const pw = item.pairedWith;
+      const name = (((gym.exercises || {})[pw.exerciseKey] || {}).name || pw.exerciseKey.replace(/-/g, ' ')).toLowerCase();
+      const what = `${pw.reps} ${name}${pw.reps === 1 || name.endsWith('s') ? '' : 's'}`;
+      const v = e.pairedResult === null || e.pairedResult === undefined ? '' : String(e.pairedResult);
+      return `
+            <div class="gym-pairrow">
+              <div class="pr-arrow">↳</div>
+              <div class="pr-text"><b>Then</b>${gymKeepUnits(escHtml(`${what} within ${pw.withinSec} s`))}</div>
+              ${readOnly ? '<div></div>' : `<button type="button" class="pr-go" onclick="gymJumpWindow('${escJsAttr(item.id)}', ${n})">▶ ${pw.withinSec} s</button>`}
+              <input inputmode="numeric" placeholder="box cm" aria-label="Box height for set ${n}"
+                     data-key="${escHtml(gymEntryKey(item.id, n))}" data-field="pairedResult"
+                     class="${v ? 'filled' : ''}" value="${escHtml(v)}" ${readOnly ? 'disabled' : ''}
+                     onchange="gymTyped('${escJsAttr(item.id)}', ${n}, 'pairedResult', this.value, this)">
+            </div>`;
+    }
+
+    // Tap as the bar is racked: the jumps have to start inside the window,
+    // and the set's rest follows straight on from it.
+    function gymJumpWindow(itemId, n) {
+      gymAudioUnlock();
+      const item = gymItem(itemId);
+      const pw = item.pairedWith;
+      const key = gymEntryKey(itemId, n);
+      const rest = gymNextWhat(item, n);
+      gymStartTimer({
+        key, kind: 'jump', what: `${pw.reps} jumps, full effort`, seconds: pw.withinSec,
+        then: rest && item.restSec ? { key, kind: 'rest', what: rest, seconds: item.restSec } : null,
+      });
+    }
+
+    // ── Rest timer ──
+    // Starts itself when a set's RPE goes in and counts the card's rest. It
+    // runs on the wall clock (endsAt), so a phone that slept mid-rest shows
+    // the right number when it wakes. iPhones don't let a page vibrate, so the
+    // end is a chime and a flash.
+    const gymTimer = { key: null, kind: 'rest', what: '', endsAt: 0, total: 0, then: null, tick: null };
+    let gymAudio = null;
+
+    function gymAudioUnlock() {
+      try {
+        if (!gymAudio) gymAudio = new (window.AudioContext || window.webkitAudioContext)();
+        if (gymAudio.state === 'suspended') gymAudio.resume();
+      } catch { gymAudio = null; }
+    }
+
+    function gymChime() {
+      if (!gymAudio) return;
+      try {
+        const t0 = gymAudio.currentTime;
+        [[0, 880], [0.22, 1175]].forEach(([dt, hz]) => {
+          const osc = gymAudio.createOscillator();
+          const gain = gymAudio.createGain();
+          osc.frequency.value = hz;
+          gain.gain.setValueAtTime(0.0001, t0 + dt);
+          gain.gain.exponentialRampToValueAtTime(0.35, t0 + dt + 0.02);
+          gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dt + 0.18);
+          osc.connect(gain).connect(gymAudio.destination);
+          osc.start(t0 + dt);
+          osc.stop(t0 + dt + 0.2);
+        });
+      } catch { /* the flash still shows */ }
+    }
+
+    // Where the athlete goes after this set: the next set, or the next card.
+    function gymNextWhat(item, n) {
+      if (n < gymRowCount(item)) return `${item.label} · set ${n + 1} next`;
+      const items = gymSession.data.day.items;
+      const after = items[items.indexOf(item) + 1];
+      return after ? `Next: ${after.label}` : null;
+    }
+
+    function gymRestAfter(item, n) {
+      const key = gymEntryKey(item.id, n);
+      if (gymTimer.tick && gymTimer.key === key) return;   // the jump window already rolled into this rest
+      const what = gymNextWhat(item, n);
+      if (what && item.restSec) gymStartTimer({ key, kind: 'rest', what, seconds: item.restSec });
+    }
+
+    function gymStartTimer({ key, kind, what, seconds, then = null }) {
+      clearInterval(gymTimer.tick);
+      Object.assign(gymTimer, { key, kind, what, total: seconds, endsAt: Date.now() + seconds * 1000, then });
+      const el = document.getElementById('gymTimer');
+      el.dataset.sig = '';
+      el.classList.remove('hidden', 'ding');
+      gymTimer.tick = setInterval(gymRenderTimer, 250);
+      gymRenderTimer();
+    }
+
+    function gymStopTimer() {
+      clearInterval(gymTimer.tick);
+      Object.assign(gymTimer, { tick: null, key: null, then: null });
+      const el = document.getElementById('gymTimer');
+      if (el) { el.className = 'gym-timer hidden'; el.dataset.sig = ''; el.innerHTML = ''; }
+    }
+
+    function gymAddTime(seconds) {
+      if (!gymTimer.tick) return;
+      gymTimer.endsAt += seconds * 1000;
+      gymTimer.total += seconds;
+      gymRenderTimer();
+    }
+
+    function gymRenderTimer() {
+      const el = document.getElementById('gymTimer');
+      if (!el) return;
+      const sig = `${gymTimer.key}|${gymTimer.kind}|${gymTimer.what}`;
+      if (el.dataset.sig !== sig) {
+        el.dataset.sig = sig;
+        el.className = `gym-timer ${gymTimer.kind}`;
+        el.innerHTML = `
+          <div class="gt-fillbar"></div>
+          <div><div class="gt-k">${gymTimer.kind === 'jump' ? 'Jump now' : 'Rest'}</div><div class="gt-time"></div></div>
+          <div class="gt-what">${escHtml(gymTimer.what)}</div>
+          <button type="button" onclick="gymAddTime(15)">+15 s</button>
+          <button type="button" aria-label="Stop the timer" onclick="gymStopTimer()">✕</button>`;
+      }
+      const left = Math.max(0, Math.ceil((gymTimer.endsAt - Date.now()) / 1000));
+      if (left > 0) {
+        el.querySelector('.gt-time').textContent = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
+        el.querySelector('.gt-fillbar').style.width = `${(left / gymTimer.total) * 100}%`;
+        return;
+      }
+      clearInterval(gymTimer.tick);
+      gymTimer.tick = null;
+      gymChime();
+      if (gymTimer.then) { gymStartTimer(gymTimer.then); return; }
+      el.classList.add('ding');
+      el.querySelector('.gt-time').textContent = 'Go';
+      el.querySelector('.gt-fillbar').style.width = '0%';
+      setTimeout(() => { if (!gymTimer.tick && el.dataset.sig === sig) gymStopTimer(); }, 8000);
+    }
+
+    // ── Session focus ──
+    // A set is done once its RPE is in: that is the moment a set ends. An
+    // exercise with no RPE target is done once its number is typed. A weight
+    // alone doesn't count, because copying it down to later sets isn't doing
+    // them. Blank sets still finish as written; this only drives the bar, the
+    // marker and the folding.
+    function gymSetDone(item, n) {
+      const e = gymSession.entries.get(gymEntryKey(item.id, n));
+      if (!e) return false;
+      const has = v => v !== null && v !== undefined;
+      return has(e.rpe) || (typeof item.targetRpe !== 'number' && has(e.reps));
+    }
+
+    function gymUpdateFocus({ instant = false } = {}) {
+      const s = gymSession.data;
+      if (gym.showing !== 'session' || gymSessionReadOnly()) return;
+      const order = [];
+      for (const item of s.day.items) {
+        for (let n = 1; n <= gymRowCount(item); n += 1) order.push({ item, n, done: gymSetDone(item, n) });
+      }
+      const doneCount = order.filter(x => x.done).length;
+      // The next set is the first blank one after the last set touched, so a
+      // set skipped as written doesn't hold the marker back.
+      let last = -1;
+      order.forEach((x, i) => { if (x.done) last = i; });
+      const next = order.slice(last + 1).find(x => !x.done) || order.find(x => !x.done) || null;
+      document.querySelectorAll('.gym-setrow.next').forEach(r => r.classList.remove('next'));
+      const nextRow = next ? gymSetRow(next.item.id, next.n) : null;
+      if (nextRow) nextRow.classList.add('next');
+
+      const active = document.activeElement;
+      let deferred = false;
+      for (const item of s.day.items) {
+        const card = gymCard(item.id);
+        if (!card) continue;
+        const finished = order.filter(x => x.item === item).every(x => x.done);
+        const wasFinished = card.classList.contains('finished');
+        card.classList.toggle('finished', finished);
+        card.querySelector('.gi-sum').innerHTML = gymItemSummary(item, finished);
+        const override = gymSession.foldOverride.get(item.id);
+        let fold = override !== undefined ? override : finished;
+        if (override === undefined && fold) {
+          const typing = active && active.tagName === 'INPUT' && card.contains(active);
+          const open = card.querySelector('.gym-rpepick, .gym-copy');
+          if (typing || open) fold = false;
+          // Just finished: fold after a beat, so the last tap is seen landing.
+          else if (!wasFinished && !instant) { fold = false; deferred = true; }
+        }
+        card.classList.toggle('folded', fold);
+        const btn = card.querySelector('.gi-fold');
+        if (btn) btn.textContent = fold ? '▸' : '▾';
+      }
+      if (deferred) setTimeout(() => gymUpdateFocus(), 900);
+
+      const bar = document.querySelector('.gym-progress .gp-bar > span');
+      if (bar) bar.style.width = `${order.length ? Math.round((doneCount / order.length) * 100) : 0}%`;
+      const count = document.querySelector('.gym-progress .gp-count');
+      if (count) count.textContent = `${doneCount} / ${order.length} sets`;
+
+      // Opening a session already under way lands on the set that's next.
+      if (gymSession.revealNext) {
+        gymSession.revealNext = false;
+        if (doneCount && nextRow) nextRow.scrollIntoView({ block: 'center' });
+      }
+    }
+
+    function gymToggleFold(itemId) {
+      const card = gymCard(itemId);
+      if (!card) return;
+      gymSession.foldOverride.set(itemId, !card.classList.contains('folded'));
+      gymUpdateFocus();
+    }
+
+    // The prescribed load as the card shows it, in kg: what a blank load box
+    // finishes as. The same rounding as the server's shownTargetKg.
+    function gymShownTargetKg(item) {
+      const t = item.targetLoad;
+      if (t === null || t === undefined) {
+        if (gymBarKg(item) !== null) return gymBarKg(item);
+        return item.loadType === 'bodyweight_plus_kg' ? 0 : null;
+      }
+      if (!gymIsWeight(item)) return t;
+      if (gymBarKg(item) !== null) return gymStoreLoad(gymTargetPlates(item), item);
+      return gymStoreWeight(gymTargetWeight(t, item.loadType, item), item);
+    }
+
+    // The folded card's one line: what each set will be recorded as.
+    function gymItemSummary(item, finished) {
+      const has = v => v !== null && v !== undefined;
+      const counted = ['reps', 'reps_per_side', 'seconds', 'metres'].includes(item.resultType) && !item.isBaseline;
+      const sets = [];
+      for (let n = 1; n <= gymRowCount(item); n += 1) {
+        const e = gymSession.entries.get(gymEntryKey(item.id, n)) || {};
+        const load = has(e.load) ? e.load : item.isRamp ? null : gymShownTargetKg(item);
+        const reps = has(e.reps) ? e.reps
+          : counted && typeof item.reps === 'number' && (!item.isRamp || has(e.load)) ? item.reps : null;
+        if (item.isRamp && !has(load)) continue;   // a test row never done
+        sets.push({ load, reps, rpe: has(e.rpe) ? e.rpe : null });
+      }
+      const rpe = sets.some(x => x.rpe !== null) ? ` · RPE ${sets.map(x => (x.rpe === null ? '–' : x.rpe)).join(' ')}` : '';
+      const done = sets.length ? `${gymSetsText(item, sets)}${rpe}` : 'Nothing logged';
+      return gymKeepUnits(escHtml(`${finished ? '✓ ' : ''}${done}`));
+    }
+
+    // ── Pre-finish check ──
+    // What Finish is about to record, said before it happens: blanks that
+    // finish as the card, test sets that count as triples, and the gaps worth
+    // fixing first (no RPE where the card has a target, no number where the
+    // number is the point).
+    function gymFinishReview() {
+      const s = gymSession.data;
+      const has = v => v !== null && v !== undefined;
+      let asCard = 0, triples = 0;
+      const gaps = [];
+      for (const item of s.day.items) {
+        const counted = ['reps', 'reps_per_side', 'seconds', 'metres'].includes(item.resultType) && !item.isBaseline;
+        for (let n = 1; n <= gymRowCount(item); n += 1) {
+          const e = gymSession.entries.get(gymEntryKey(item.id, n)) || {};
+          if (item.isRamp) {
+            if (has(e.load) && !has(e.reps)) triples += 1;
+            continue;   // an empty test row is a set that wasn't needed
+          }
+          if (!counted) {
+            if (!has(e.reps) && !item.setsAreOptional) gaps.push({ item, n, field: 'reps' });
+          } else if (!has(e.reps) || (!has(e.load) && gymShownTargetKg(item) !== null)) {
+            asCard += 1;
+          }
+          if (typeof item.targetRpe === 'number' && !has(e.rpe)) gaps.push({ item, n, field: 'rpe' });
+        }
+      }
+      return { asCard, triples, gaps };
+    }
+
+    async function gymConfirmFinish() {
+      const { asCard, triples, gaps } = gymFinishReview();
+      const list = field => {
+        const byItem = new Map();
+        for (const g of gaps.filter(x => x.field === field)) {
+          if (!byItem.has(g.item)) byItem.set(g.item, []);
+          byItem.get(g.item).push(g.n);
+        }
+        return [...byItem].map(([item, ns]) => `${item.label} ${gymRanges(ns)}`).join(' · ');
+      };
+      const lines = [];
+      if (asCard) lines.push(['ok', `${asCard} set${asCard === 1 ? '' : 's'} as the card says`]);
+      if (triples) lines.push(['ok', `${triples} test set${triples === 1 ? '' : 's'} count as triples`]);
+      const noRpe = list('rpe');
+      const noResult = list('reps');
+      if (noRpe) lines.push(['gap', `No RPE: ${noRpe}`]);
+      if (noResult) lines.push(['gap', `No number: ${noResult}`]);
+      if (!lines.length) lines.push(['ok', 'Every set was typed in.']);
+      const html = `<div class="gym-review">${lines.map(([kind, text]) =>
+        `<div class="rv rv-${kind}"><span class="rv-i">${kind === 'ok' ? '✓' : '!'}</span><span>${escHtml(text)}</span></div>`).join('')}</div>`;
+      const res = await showModal({
+        title: 'Finish this workout?',
+        html,
+        confirmLabel: gaps.length ? 'Finish anyway' : 'Finish',
+        cancelLabel: gaps.length ? 'Fix gaps' : 'Back',
+      });
+      if (res?.confirmed) return true;
+      if (gaps.length) gymShowGaps(gaps);
+      return false;
+    }
+
+    function gymShowGaps(gaps) {
+      for (const g of gaps) gymSession.foldOverride.set(g.item.id, false);
+      gymUpdateFocus();
+      let first = null;
+      for (const g of gaps) {
+        const key = CSS.escape(gymEntryKey(g.item.id, g.n));
+        const el = g.field === 'rpe'
+          ? document.querySelector(`.sr-rpe[data-key="${key}"]`)
+          : document.querySelector(`.gym-setrow input[data-key="${key}"][data-field="reps"]`);
+        if (el) { el.classList.add('gap'); first = first || el; }
+      }
+      if (first) first.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
+
+    // ── New bests ──
+    // What this session set, read from the maxes the server recomputed at
+    // finish: a test that beat the number before it, or a first test. Shown
+    // above the assessment so progress isn't buried in its prose.
+    const GYM_BEST_NAMES = {
+      'back-squat': 'Squat 3RM', 'trap-bar-deadlift': 'Trap bar 3RM', 'dumbbell-bench-press': 'Bench 3RM',
+      'pull-up-weighted': 'Pull-up', 'standing-broad-jump': 'Broad jump', 'box-jump': 'Box jump', 'front-plank': 'Plank',
+    };
+
+    function gymBests(s) {
+      if (!s.log.performedOn) return '';
+      const out = [];
+      for (const [key, m] of Object.entries(s.maxes || {})) {
+        if (key.startsWith('_') || !m || m.testedWeek !== s.week.week || m.testedOn !== s.log.performedOn) continue;
+        const prev = (m.history || []).slice(-1)[0] || null;
+        const name = GYM_BEST_NAMES[key] || ((gym.exercises || {})[key] || {}).name || key.replace(/-/g, ' ');
+        const ex = { exerciseKey: key };
+        let value, gain;
+        if (m.loadType === 'bodyweight_plus_kg' && typeof m.threeRm === 'number') {
+          value = m.threeRm ? `bw + ${gymShowWeight(m.threeRm, ex)} ${gymWeightUnit(ex)} × 3` : 'bodyweight × 3';
+          if (prev && typeof prev.threeRm === 'number') {
+            if (m.threeRm <= prev.threeRm) continue;
+            gain = `+${gymShowWeight(m.threeRm - prev.threeRm, ex)}`;
+          } else if (prev && typeof prev.bodyweightReps === 'number') {
+            gain = `was ${prev.bodyweightReps} rep${prev.bodyweightReps === 1 ? '' : 's'}`;
+          } else gain = 'first test';
+        } else if (typeof m.threeRm === 'number') {
+          const lbs = kg => Math.round(Number(gymShowWeight(kg, ex)));
+          value = `${lbs(m.threeRm)} ${gymWeightUnit(ex)}${m.loadType === 'kg_total_pair' ? ' pair' : ''}`;
+          if (!prev || typeof prev.threeRm !== 'number') gain = 'first test';
+          else if (m.threeRm > prev.threeRm) gain = `+${lbs(m.threeRm - prev.threeRm)}`;
+          else continue;
+        } else {
+          const field = ['cm', 'seconds', 'reps'].find(f => typeof m[f] === 'number');
+          if (!field) continue;
+          value = gymMeasure(m[field], field === 'seconds' ? 'seconds' : field);
+          if (!prev || typeof prev[field] !== 'number') gain = 'first test';
+          else if (m[field] > prev[field]) gain = `+${m[field] - prev[field]}`;
+          else continue;
+        }
+        out.push(`<span class="gym-best"><span class="gb-k">${escHtml(name)}</span>${escHtml(value)}<span class="gb-up">${escHtml(gain)}</span></span>`);
+      }
+      return out.length ? `<div class="gym-bests-title">New bests</div><div class="gym-bests">${out.join('')}</div>` : '';
+    }
+
+    // ── Sparkline ──
+    // Weeks 1–12 across, the value up the side. Test weeks get a tick, so a
+    // retest reads as a retest and a flat line between them reads as flat.
+    const GYM_TEST_WEEKS = [1, 5, 9, 12];
+
+    function gymSparkline(points) {
+      const pts = points.filter(p => typeof p.value === 'number' && typeof p.week === 'number');
+      if (pts.length < 2) return '';
+      const W = 300, H = 40, padX = 12, top = 6, bottom = 27;
+      const x = wk => padX + ((wk - 1) * (W - 2 * padX)) / 11;
+      let lo = Math.min(...pts.map(p => p.value));
+      let hi = Math.max(...pts.map(p => p.value));
+      if (hi === lo) { lo -= 1; hi += 1; }
+      const y = v => bottom - ((v - lo) / (hi - lo)) * (bottom - top);
+      const ticks = GYM_TEST_WEEKS.map(wk =>
+        `<line class="sk-tick" x1="${x(wk)}" x2="${x(wk)}" y1="${top - 3}" y2="${bottom + 3}"/><text class="sk-lab" x="${x(wk)}" y="${H - 1}">W${wk}</text>`).join('');
+      const line = `<polyline class="sk-line" points="${pts.map(p => `${x(p.week).toFixed(1)},${y(p.value).toFixed(1)}`).join(' ')}"/>`;
+      const dots = pts.map((p, i) => `<circle class="sk-dot${i === pts.length - 1 ? ' last' : ''}" cx="${x(p.week).toFixed(1)}" cy="${y(p.value).toFixed(1)}" r="${i === pts.length - 1 ? 3.5 : 2.5}"/>`).join('');
+      return `<svg class="gym-spark" viewBox="0 0 ${W} ${H}" role="img" aria-label="By week">${ticks}${line}${dots}</svg>`;
     }
 
     function gymAddSet(itemId) {
@@ -2146,6 +2796,7 @@
           method: 'POST', body: JSON.stringify({ performedOn: gymLocalDate() }),
         });
         gymSession.data.log = finish.log;
+        if (finish.maxes) gymSession.data.maxes = finish.maxes;
         gymSession.job = finish.jobId || null;
         renderGymSession();
         if (finish.jobId) pollGymJob(finish.jobId);
@@ -2157,7 +2808,10 @@
     // No guard on an empty grid: a card left alone means it went as prescribed,
     // and the server fills those sets in at finish.
     async function finishGymWorkout() {
-      // Pinned before the first await — profile, week and day together, because
+      // Said before it happens, while a gap can still be fixed. The dialog
+      // covers the screen, so nothing below can change while it is open.
+      if (!(await gymConfirmFinish())) return;
+      // Pinned before the next await — profile, week and day together, because
       // all three are read off live state that the header and the day list can
       // change mid-finish. Both profiles' week files are byte-identical, so
       // itemId validation would happily accept one athlete's sets into the other's log if
@@ -2182,7 +2836,9 @@
           body: JSON.stringify({ performedOn: gymLocalDate() }),
         });
         gymSession.data.log = res.log;
+        if (res.maxes) gymSession.data.maxes = res.maxes;
         gymSession.job = res.jobId || null;
+        gymStopTimer();
         showToast('Workout saved.', 'success');
         if (!res.jobId) {
           // The skill is not installed on this machine. The log is still saved.
@@ -2259,9 +2915,10 @@
       }
       const last = points[points.length - 1];
       const path = points.map(p => `W${p.week} ${gymMeasure(p.value, trend.unit)}`).join(' → ');
+      const spark = gymSparkline(points);
       return `<div class="gym-trendrow"><div class="tr-name">${escHtml(name)}</div>
               <div class="tr-value">${escHtml(gymMeasure(last.value, trend.unit))}</div>
-              <div class="tr-path">${escHtml(path)}</div></div>`;
+              <div class="tr-path">${escHtml(path)}</div>${spark ? `<div class="tr-spark">${spark}</div>` : ''}</div>`;
     }
 
     function gymPullPathRows(data) {
@@ -2361,11 +3018,13 @@
         const showDelta = measured.length > 1;
         const delta = showDelta ? latest.e1rm - measured[0].e1rm : 0;
         const sign = delta > 0 ? '+' : '';
+        const spark = gymSparkline(measured.map(p => ({ week: p.week, value: Number(gymShowWeight(p.e1rm)) })));
         return `<div class="gym-statrow">
           <div class="sr-label" style="width:auto">${name}</div>
           <div class="sr-mid">3RM ${gymShowWeight(latest.threeRm)} · W${latest.testedWeek || latest.week}${
             showDelta ? ` · ${sign}${gymShowWeight(delta)} ${gymWeightUnit()}` : ''}</div>
           <div class="sr-value">${gymShowWeight(latest.e1rm)} ${gymWeightUnit()}</div>
+          ${spark ? `<div class="sr-spark">${spark}</div>` : ''}
         </div>`;
       }).join('');
 
@@ -2374,8 +3033,10 @@
         const shown = value.cm !== undefined && value.cm !== null ? `${value.cm} cm`
                     : value.seconds !== undefined && value.seconds !== null ? `${value.seconds} s`
                     : typeof value.reps === 'number' ? `${value.reps} reps` : '—';
+        const bt = (data.baselineTrend || {})[key];
+        const spark = bt ? gymSparkline(bt.points) : '';
         return `<div class="gym-statrow"><div class="sr-label" style="width:auto">${escHtml(label)}</div>
-                <div></div><div class="sr-value">${shown}</div></div>`;
+                <div></div><div class="sr-value">${shown}</div>${spark ? `<div class="sr-spark">${spark}</div>` : ''}</div>`;
       }).join('') || '<div class="gym-empty">Recorded on day 3 of a test week.</div>';
 
       const pace = data.pace;

@@ -665,8 +665,9 @@ Lightweight Express.js server that auto-discovers every skill from `.github/skil
 | Chat Interface | Natural language, Claude picks the right skill |
 | Research Reader | Browse the vault by topic, by ISO week, or last 7 days — with search and Obsidian deep links |
 | Skill Picker | Pin a specific skill to scope your messages |
+| Gym Tracker | 12-week programs per athlete: labelled cards, tap-to-pick RPE, a rest timer that starts itself, focus mode, a pre-finish check, new bests and trend sparklines |
 | Queue | Requests serialize — safe for concurrent use |
-| Auth | Bearer token via `API_SECRET` (keyring, env var, or `.env`) |
+| Auth | Bearer token via `API_SECRET` (keyring, env var, or `.env`); a device stays signed in through a 400-day HttpOnly cookie |
 | Reboot Survival | Startup shortcut launches server at login |
 | Remote Restart | Authenticated endpoint can restart the Node service via the launcher |
 

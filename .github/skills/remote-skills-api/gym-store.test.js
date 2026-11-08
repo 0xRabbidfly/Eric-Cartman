@@ -226,17 +226,36 @@ test('finishing fills blank reps with the prescription and marks them assumed', 
   assert.equal(findSet(log, 'd-side-plank', 1).reps, 45, 'a prescribed hold counts like prescribed reps');
 });
 
-test('finishing never assumes reps on a baseline or a distance', () => {
-  const { store } = defaultsFixture();
+test('finishing never assumes a baseline or a jump height', () => {
+  const { root, store } = defaultsFixture();
+  const weekFile = path.join(root, 'athlete-b', 'weeks', 'W1.json');
+  const week = JSON.parse(fs.readFileSync(weekFile, 'utf8'));
+  week.days[0].items.push({
+    id: 'e-box-jump', block: 'E', exerciseKey: 'box-jump', label: 'Box jump', sets: 3, reps: 3,
+    resultType: 'cm', loadType: 'bodyweight', targetLoad: null, targetPct: null, loadNote: '',
+    targetRpe: null, restSec: 60, isRamp: false, isBaseline: false, setsAreOptional: false, pairedWith: null,
+  });
+  fs.writeFileSync(weekFile, JSON.stringify(week), 'utf8');
   store.saveSession('athlete-b', 1, 1, { entries: [
     set('d-front-plank', 1, { loadType: 'bodyweight', rpe: 9 }),
-    set('e-carry', 1, { loadType: 'kg_total_pair', load: 40, rpe: 7 }),
+    set('e-box-jump', 1, { loadType: 'bodyweight', rpe: 7 }),
   ] });
   const { log } = store.finishSession('athlete-b', 1, 1, new Date('2026-09-09T18:00:00'));
-  for (const id of ['d-front-plank', 'e-carry']) {
+  for (const id of ['d-front-plank', 'e-box-jump']) {
     assert.equal(findSet(log, id, 1).reps, null, id);
     assert.equal(findSet(log, id, 1).assumed, undefined, id);
   }
+});
+
+test('a carry left blank is the prescribed distance, like reps', () => {
+  const { store } = defaultsFixture();
+  store.saveSession('athlete-b', 1, 1, { entries: [
+    set('e-carry', 1, { loadType: 'kg_total_pair', load: 40, rpe: 7 }),
+  ] });
+  const { log } = store.finishSession('athlete-b', 1, 1, new Date('2026-09-09T18:00:00'));
+  assert.equal(findSet(log, 'e-carry', 1).reps, 30, 'the card said 30 m');
+  assert.deepEqual(findSet(log, 'e-carry', 1).assumed, ['reps']);
+  assert.equal(findSet(log, 'e-carry', 2).reps, 30, 'an untouched set is the card too');
 });
 
 test('finishing puts the bar on a barbell set left blank or at 0, using that exercise\'s bar', () => {
@@ -458,7 +477,8 @@ test('finishing with nothing typed logs every prescribed set as prescribed', () 
   assert.equal(findSet(log, 'f-squat-work', 2).load, 60);
   assert.equal(findSet(log, 'f-squat-work', 2).rpe, null, 'how hard it felt is never assumed');
   assert.equal(findSet(log, 'd-side-plank', 3).reps, 45);
-  for (const id of ['a-back-squat', 'd-front-plank', 'e-carry']) {
+  assert.equal(findSet(log, 'e-carry', 3).reps, 30, 'a carry left alone went the prescribed distance');
+  for (const id of ['a-back-squat', 'd-front-plank']) {
     assert.equal(findSet(log, id, 1), undefined, `${id} is a measurement, not a prescription`);
   }
 });

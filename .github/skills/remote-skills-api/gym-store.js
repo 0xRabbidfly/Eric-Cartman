@@ -679,7 +679,9 @@ function createGymStore(dataRoot, { libraryPath = DEFAULT_LIBRARY_PATH } = {}) {
     return reopened;
   }
 
-  const ASSUMABLE_RESULTS = new Set(['reps', 'reps_per_side', 'seconds']);
+  // Counts the card prescribes. A carry's metres are its prescription like a
+  // set's reps; a jump's centimetres are a measurement and never assumed.
+  const ASSUMABLE_RESULTS = new Set(['reps', 'reps_per_side', 'seconds', 'metres']);
 
   /** Load types where `targetLoad` is a number the athlete could have used as prescribed. */
   const PRESCRIBED_LOADS = new Set(['kg', 'kg_total_pair', 'setting', 'bodyweight_plus_kg']);
@@ -731,8 +733,9 @@ function createGymStore(dataRoot, { libraryPath = DEFAULT_LIBRARY_PATH } = {}) {
    *   whose weight went unrecorded, and filling it in would test a fake max.
    * - blank reps are the prescribed reps, or the prescribed hold for seconds.
    *   On a max-test ramp too, for any set with a load: the card says 3, and a
-   *   blank means 3. Never on a baseline, where the number is the measurement,
-   *   and never on centimetres or metres, which are not a count.
+   *   blank means 3. A carry's blank metres are its prescribed distance.
+   *   Never on a baseline, where the number is the measurement, and never on
+   *   centimetres, a jump's height, which nothing can stand in for.
    * - a weighted pull-up with no added load and none prescribed is bodyweight.
    * Filled-in values carry `assumed`, so the assessment can tell them apart.
    */
@@ -785,7 +788,8 @@ function createGymStore(dataRoot, { libraryPath = DEFAULT_LIBRARY_PATH } = {}) {
    *
    * Only where there is something to accept. A max-test ramp, a baseline and an
    * optional max-reps set are measurements — nothing can stand in for a number
-   * that was never measured — and centimetres and metres are not rep counts.
+   * that was never measured — and a jump's centimetres are not a count. A
+   * carry's metres are: the card prescribes the distance.
    */
   function addUntouchedSets(items, entries) {
     const key = (itemId, set) => `${itemId}::${set}`;

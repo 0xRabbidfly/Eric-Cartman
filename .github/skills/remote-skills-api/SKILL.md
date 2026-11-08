@@ -169,9 +169,10 @@ gym-cyclist skill rounds the same way, so assessment notes match the app.
 Finishing a session fills blanks the athlete skipped because they matched the
 plan, and lists each in the entry's `assumed` array:
 
-- Blank reps become the prescribed reps, or the prescribed hold for seconds.
-  On a max-test ramp only for a set with a load (the card says 3). Never on a
-  baseline, centimetres or metres.
+- Blank reps become the prescribed reps, the prescribed hold for seconds, or
+  the prescribed distance for a carry's metres. On a max-test ramp only for a
+  set with a load (the card says 3). Never on a baseline, or on centimetres,
+  which are a jump's measured height.
 - A blank load with a prescription becomes the weight the card showed. In
   pounds that is the target rounded the card's way (5 lb, per hand on a pair,
   the plates on a barbell), not the unrounded kg target. So 50 kg on a 20 kg
@@ -186,6 +187,10 @@ beside it.
 - A weighted pull-up with no added load becomes 0, bodyweight.
 
 Typing into a field the server filled removes that field from `assumed`.
+
+A set on an item with `pairedWith` (a contrast week's heavy set, followed by
+box jumps) may also carry `pairedResult`: the box height in cm for those jumps.
+It is a measurement and is never assumed.
 
 A profile may also have `<profile>/podcasts.json`, keyed `W<week>D<day>`, with
 an episode picked for that session. It is kept out of the week files, so
@@ -264,18 +269,48 @@ old crowded header icon bar. The Gym tab appears only when gym data is present.
   - Session view logs load, reps and RPE per set with a numeric keypad, autosaves
     every change, shows rep ranges ("3 × 10–12") where the week has them, and
     links each exercise to its how-to and video
-  - Weights read and type in the app-wide unit. Each exercise says what to type:
-    both dumbbells together, one dumbbell, or the barbell total with the bar
-    included. Target RPE reads in reps left ("RPE 7 · about 3 reps left"), a max
-    test reads "build up to RPE 9.5", and a lift with no load yet says "pick a
-    weight"
+  - Each card reads as labelled chips (SETS, LOAD, RPE, REST, each in its own
+    colour) that wrap only between chips, then a NOTE line and a LAST (or TEST)
+    line with the previous session's sets. Barbells read "65 lb plates (109 lb
+    total)", a dumbbell pair "70 lb (35/hand)", a max test "up to 9.5"
+  - Weights read and type in the app-wide unit; a blank box shows the card's
+    number and finishes as it. An exercise whose box needs saying gets a short
+    hint ("One dumbbell.", "Plates loaded on the bar end.")
+  - RPE is a tap target that opens the values people log (6–10, then 3, 4, 5,
+    9.5 for ramp warm-ups). The chosen value is green on target, amber over and
+    blue under; on a max test, anything up to the ceiling is green
+  - Focus mode: a sticky bar counts sets done ("9 / 21 sets"), the next set's
+    number is highlighted, and an exercise folds to one line ("✓ 120 lb plates ×
+    3, 3 sets · RPE 9 8 7") once every set has its RPE. A set counts as done when
+    its RPE is in, or its number on an exercise with no RPE target; a weight
+    alone doesn't. ▾/▸ folds or unfolds a card by hand, and reopening a session
+    already under way scrolls to the next set
+  - A contrast set (`pairedWith`) shows its jumps as their own step under each
+    set: a ▶ 20 s button for the jump window and a box for the height
+    (`pairedResult`)
+  - A rest timer starts itself when a set's RPE goes in, counting the card's
+    rest, and sits above the tab bar with +15 s and stop. The jump window rolls
+    straight into that set's rest. It chimes and flashes at zero (iPhones don't
+    let a page vibrate, and the chime follows the silent switch). It runs on the
+    wall clock, so a phone that slept shows the right time when it wakes
+  - Typing a load or rep count that differs from the card offers to copy it to
+    the sets still blank ("Use 70 lb plates for sets 2–3?")
+  - Finish first shows what will be recorded: sets that finish as the card,
+    test sets that count as triples, and the gaps (no RPE where the card has a
+    target, no number where the number is the measurement). "Fix gaps" marks
+    them in red and scrolls to the first
   - A session with a podcast picked for it shows the episode as a Spotify card,
     and the week list shows its title under the day
-  - Finish workout runs the `gym-cyclist` skill and shows the assessment inline
+  - Finish workout runs the `gym-cyclist` skill and shows the assessment inline.
+    Above it, "New bests" lists anything that session's tests improved, read
+    from the maxes the server recomputed ("Squat 3RM 129 lb +15", "Pull-up
+    bodyweight × 3, was 2 reps")
   - Stats shows pace (sessions per week so far, projected against planned finish),
     weekly tonnage, adherence and average RPE. A cycling athlete also sees the
     estimated 1RM trend and power baselines. A strength-tone athlete sees the
-    pull-up path checks, working loads and core re-checks instead
+    pull-up path checks, working loads and core re-checks instead. Every trend
+    with two or more points gets a sparkline across weeks 1–12 with the test
+    weeks (1, 5, 9, 12) ticked
   - Text uses high-contrast tokens, and every number (loads, reps, RPE, stats,
     tracker counts) is drawn in the primary text colour
   - A finished session is read-only until reopened for safety and audit purposes
